@@ -10,6 +10,10 @@ import {
   FiX,
   FiCheckCircle,
   FiCalendar,
+  FiAward,
+  FiStar,
+  FiGlobe,
+  FiShield,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import Modal from '../../components/ui/Modal';
@@ -18,6 +22,9 @@ import extractBatteryCode from '../../utils/extract-battery-code';
 import { ClientStatusBadge } from '../../components/ui/Badge';
 import { useTheme } from '../../context/ThemeContext';
 import logoUrl from '../../utils/logo-url';
+import RatingModal from '../../components/feedback/RatingModal';
+import MilestoneCertificateModal from '../../components/certificates/MilestoneCertificateModal';
+import CertificateView from '../../components/certificates/CertificateView';
 
 // A battery is registered with status 'returned' from day one — it means
 // "currently with the client", not "came back from a service visit" — so a
@@ -87,6 +94,14 @@ function ClientDashboardPage() {
   const [modalCode, setModalCode] = useState('');
   const [useCamera, setUseCamera] = useState(false);
 
+  // Milestone Certificates & Rating Modals
+  const [milestoneData, setMilestoneData] = useState(null);
+  const [activeMilestoneCert, setActiveMilestoneCert] = useState(null);
+  const [showMilestoneModal, setShowMilestoneModal] = useState(false);
+  const [selectedPreviewCert, setSelectedPreviewCert] = useState(null);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingTargetBatteryCode, setRatingTargetBatteryCode] = useState('');
+
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
@@ -96,8 +111,9 @@ function ClientDashboardPage() {
       apiClient.get('/clients/me/batteries'),
       apiClient.get('/tickets?limit=3').catch(() => ({ data: { data: [] } })),
       apiClient.get('/clients/me/invoices').catch(() => ({ data: { data: [] } })),
+      apiClient.get('/certificates/my-milestones').catch(() => ({ data: null })),
     ])
-      .then(([dashRes, battRes, tickRes, invRes]) => {
+      .then(([dashRes, battRes, tickRes, invRes, certRes]) => {
         if (!cancelled) {
           setData(dashRes.data);
           setRecentBatteries((battRes.data?.data || []).slice(0, 6));
@@ -111,6 +127,15 @@ function ClientDashboardPage() {
 
           if (unpaidInvoices.length > 0 && !alreadyDismissed) {
             setShowDuePaymentModal(true);
+          }
+
+          if (certRes?.data) {
+            setMilestoneData(certRes.data);
+            const unacked = certRes.data.unacknowledged || [];
+            if (unacked.length > 0) {
+              setActiveMilestoneCert(unacked[0]);
+              setShowMilestoneModal(true);
+            }
           }
         }
       })
@@ -481,6 +506,145 @@ function ClientDashboardPage() {
           </div>
         </Link>
       </div>
+
+      {/* ── Sustainability Milestones & Eco Impact Card ───────────────── */}
+      {(() => {
+        const servicedCount = Number(milestoneData?.servicedCount || data?.stats?.returned_count || data?.stats?.repaired_count || 0);
+        const co2SavedTons = ((servicedCount * 15.2) / 1000).toFixed(1);
+        const ewasteKg = Math.round(servicedCount * 2.8).toLocaleString();
+        const allCerts = milestoneData?.allCerts || [];
+        const tiers = milestoneData?.milestoneTiers || [
+          { count: 100, badge: 'Bronze' },
+          { count: 500, badge: 'Silver' },
+          { count: 1000, badge: 'Gold' },
+          { count: 5000, badge: 'Platinum' },
+          { count: 10000, badge: 'Diamond' },
+          { count: 20000, badge: 'Emerald' },
+        ];
+        const nextTier = tiers.find((t) => t.count > servicedCount) || tiers[tiers.length - 1];
+        const progressPct = nextTier ? Math.min(100, Math.round((servicedCount / nextTier.count) * 100)) : 100;
+
+        return (
+          <div className="rounded-3xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/70 via-white to-blue-50/50 p-6 shadow-sm dark:border-emerald-900/40 dark:from-emerald-950/30 dark:via-surface-900 dark:to-surface-850">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+              <div className="space-y-2 min-w-0 max-w-xl">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 font-extrabold text-[10.5px] uppercase tracking-wider border border-emerald-300 dark:border-emerald-800">
+                    <FiGlobe className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                    <span>Circular Economy Milestone</span>
+                  </span>
+                  {allCerts.length > 0 && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-100 text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 font-bold text-[10px] border border-amber-300 dark:border-amber-800">
+                      <FiAward className="w-3 h-3 text-amber-600 dark:text-amber-400" />
+                      <span>{allCerts.length} Official Certificate{allCerts.length > 1 ? 's' : ''}</span>
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  <h2 className="text-lg font-black text-slate-900 dark:text-white tracking-tight">
+                    Sustainability & CO₂ Decarbonization Impact
+                  </h2>
+                  <p className="text-xs text-slate-600 dark:text-neutral-300 leading-relaxed mt-0.5">
+                    By partnering with Refurbnics to repair and extend the lifespan of your lithium battery fleet, your organization has prevented hazardous landfill waste and reduced carbon emissions.
+                  </p>
+                </div>
+
+                {/* Progress bar to next milestone tier */}
+                <div className="pt-1 space-y-1">
+                  <div className="flex items-center justify-between text-xs font-bold">
+                    <span className="text-slate-700 dark:text-neutral-200">
+                      Progress towards {nextTier.badge || 'Milestone'} Tier ({nextTier.count.toLocaleString()} Batteries)
+                    </span>
+                    <span className="font-mono text-emerald-600 dark:text-emerald-400 font-black">
+                      {progressPct}%
+                    </span>
+                  </div>
+                  <div className="h-2.5 w-full bg-slate-200/80 rounded-full overflow-hidden dark:bg-surface-800">
+                    <div
+                      style={{ width: `${progressPct}%` }}
+                      className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 rounded-full transition-all duration-500"
+                    />
+                  </div>
+                  <div className="flex justify-between text-[10.5px] text-slate-400 dark:text-neutral-500">
+                    <span>{servicedCount.toLocaleString()} units serviced</span>
+                    <span>
+                      {Math.max(0, nextTier.count - servicedCount).toLocaleString()} more to reach {nextTier.badge || 'Next'} Milestone
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Eco Stats & Certificate Action */}
+              <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end justify-between gap-3 shrink-0">
+                <div className="grid grid-cols-2 gap-2.5 w-full sm:w-auto">
+                  <div className="rounded-2xl border border-emerald-200/80 bg-white/90 p-3 text-center dark:border-white/10 dark:bg-surface-850 shadow-2xs min-w-28">
+                    <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block">
+                      CO₂ Emissions Saved
+                    </span>
+                    <span className="text-base font-black text-slate-900 dark:text-white block mt-0.5">
+                      ~{co2SavedTons} Tons
+                    </span>
+                  </div>
+                  <div className="rounded-2xl border border-blue-200/80 bg-white/90 p-3 text-center dark:border-white/10 dark:bg-surface-850 shadow-2xs min-w-28">
+                    <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 block">
+                      E-Waste Diverted
+                    </span>
+                    <span className="text-base font-black text-slate-900 dark:text-white block mt-0.5">
+                      {ewasteKg} kg
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  {allCerts.length > 0 ? (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedPreviewCert(allCerts[allCerts.length - 1])}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-2 text-xs font-bold text-white shadow-xs hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 transition-all cursor-pointer"
+                    >
+                      <FiAward className="w-3.5 h-3.5 text-amber-400" />
+                      <span>View Official Certificates</span>
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        // Generate dynamic instant preview for current volume
+                        setSelectedPreviewCert({
+                          client_name: client?.name,
+                          milestone_count: servicedCount >= 100 ? servicedCount : 100,
+                          title: `${client?.name || 'Partner'} Sustainability & Battery Restoration Certificate`,
+                          co2_saved_kg: Number(co2SavedTons) * 1000,
+                          ewaste_diverted_kg: Number(servicedCount) * 2.8,
+                          certificate_code: `CERT-REFURB-${client?.name?.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'PARTNER'}-2026`,
+                          issued_at: new Date().toISOString(),
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-white px-3.5 py-2 text-xs font-bold text-emerald-800 hover:bg-emerald-50 dark:border-emerald-800 dark:bg-surface-850 dark:text-emerald-300 dark:hover:bg-surface-800 transition-all cursor-pointer shadow-2xs"
+                    >
+                      <FiAward className="w-3.5 h-3.5 text-amber-500" />
+                      <span>Sustainability Record</span>
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRatingTargetBatteryCode(recentBatteries[0]?.battery_code || '');
+                      setShowRatingModal(true);
+                    }}
+                    className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-bold text-amber-800 hover:bg-amber-50 dark:border-amber-800 dark:bg-surface-850 dark:text-amber-300 dark:hover:bg-surface-800 transition-all cursor-pointer shadow-2xs"
+                  >
+                    <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                    <span>Rate Service</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Interactive Visual Service Pipeline ─────────────────────────── */}
       <div className="rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-surface-900">
@@ -1027,6 +1191,50 @@ function ClientDashboardPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {/* ── Milestone Certificate Celebration Popup Modal ────────────── */}
+      {showMilestoneModal && activeMilestoneCert && (
+        <MilestoneCertificateModal
+          certificate={activeMilestoneCert}
+          clientName={client?.name}
+          onClose={() => setShowMilestoneModal(false)}
+          onAcknowledge={(cert) => {
+            setShowMilestoneModal(false);
+            // Refresh milestone status
+            apiClient.get('/certificates/my-milestones').then((res) => {
+              if (res?.data) setMilestoneData(res.data);
+            });
+          }}
+        />
+      )}
+
+      {/* ── Certificate Preview Modal ─────────────────────────────────── */}
+      {selectedPreviewCert && (
+        <Modal
+          title="Sustainability Milestone Certificate"
+          description={selectedPreviewCert.title || 'Official Decarbonization Record'}
+          size="3xl"
+          onClose={() => setSelectedPreviewCert(null)}
+        >
+          <CertificateView
+            certificate={selectedPreviewCert}
+            clientName={client?.name}
+            showActions={true}
+          />
+        </Modal>
+      )}
+
+      {/* ── Client Service Rating Modal ───────────────────────────────── */}
+      {showRatingModal && (
+        <RatingModal
+          batteryCode={ratingTargetBatteryCode}
+          clientId={client?.id}
+          onClose={() => setShowRatingModal(false)}
+          onSuccess={() => {
+            // Optionally reload or toast
+          }}
+        />
       )}
     </div>
   );

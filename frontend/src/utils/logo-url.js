@@ -6,6 +6,9 @@ import apiClient from '../services/api-client';
 
 const API_ROOT = (apiClient.defaults.baseURL || '').replace(/\/api\/?$/, '');
 
-export default function logoUrl(logoPath) {
+export function logoUrl(logoPath) {
   return logoPath ? `${API_ROOT}/uploads/client-logos/${logoPath}` : null;
 }
+
+export const getLogoUrl = logoUrl;
+export default logoUrl;

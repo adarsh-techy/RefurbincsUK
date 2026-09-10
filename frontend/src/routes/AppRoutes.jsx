@@ -45,6 +45,8 @@ const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
 const ClientInvoicesPage = lazy(() => import('../features/clients/ClientInvoicesPage'));
 const RecycleClientShipmentsPage = lazy(() => import('../features/recycle-client/RecycleClientShipmentsPage'));
 const RecycleClientsAdminPage = lazy(() => import('../features/recycle-client/RecycleClientsAdminPage'));
+const RatingsPage = lazy(() => import('../features/ratings/RatingsPage'));
+const CertificatesPage = lazy(() => import('../features/certificates/CertificatesPage'));
 
 function HistoryRouter() {
   const user = useSelector((state) => state.auth.user);
@@ -73,6 +75,8 @@ function AppRoutes() {
           {/* Admin & Operations Messages */}
           <Route element={<ProtectedRoute roles={['super_admin', 'admin', 'staff']} />}>
             <Route path="/messages" element={<AdminMessagesPage />} />
+            <Route path="/ratings" element={<RatingsPage />} />
+            <Route path="/certificates" element={<CertificatesPage />} />
           </Route>
 
           <Route element={<ProtectedRoute roles={['super_admin', 'admin']} />}>

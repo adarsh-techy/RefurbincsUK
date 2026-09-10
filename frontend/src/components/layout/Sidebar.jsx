@@ -201,6 +201,17 @@ const Icons = {
       <polyline points="22 4 12 14.01 9 11.01" />
     </svg>
   ),
+  ratings: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0">
+      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+    </svg>
+  ),
+  certificates: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0">
+      <circle cx="12" cy="8" r="7" />
+      <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
+    </svg>
+  ),
 };
 
 // ── Role-Specific Categorized Navigation Menus ──────────────────────────────
@@ -304,6 +315,8 @@ const NAV_GROUPS = [
   {
     heading: 'Administration',
     links: [
+      { to: '/ratings', label: 'Ratings & Reviews', icon: Icons.ratings },
+      { to: '/certificates', label: 'Certificates & Impact', icon: Icons.certificates },
       { to: '/invoices', label: 'Invoices', icon: Icons.invoice },
       { to: '/finance', label: 'Finance', icon: Icons.finance, superAdminOnly: true },
       { to: '/users', label: 'Users', icon: Icons.users, superAdminOnly: true },

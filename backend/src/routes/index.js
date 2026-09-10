@@ -17,5 +17,7 @@ router.use('/audit-logs', require('./audit-log.routes'));
 router.use('/finance', require('./finance.routes'));
 router.use('/invoices', require('./invoice.routes'));
 router.use('/tickets', require('./ticket.routes'));
+router.use('/ratings', require('./rating.routes'));
+router.use('/certificates', require('./certificate.routes'));
 
 module.exports = router;
