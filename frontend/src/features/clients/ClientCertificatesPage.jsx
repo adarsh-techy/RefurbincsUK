@@ -88,9 +88,9 @@ function ClientCertificatesPage() {
       </div>
 
       {loading ? (
-        <TableState.Loading message="Loading your sustainability milestones & certificates..." />
+        <TableState>Loading your sustainability milestones & certificates…</TableState>
       ) : error ? (
-        <TableState.Error message={error} onRetry={fetchMilestones} />
+        <TableState tone="error">{error}</TableState>
       ) : (
         <>
           {/* Top Key Impact Metrics */}

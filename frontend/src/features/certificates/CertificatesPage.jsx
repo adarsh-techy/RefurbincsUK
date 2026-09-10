@@ -195,9 +195,9 @@ function CertificatesPage() {
 
       {/* Tab Contents */}
       {loading ? (
-        <TableState.Loading message="Loading certificates & impact stats..." />
+        <TableState>Loading certificates & impact stats…</TableState>
       ) : error ? (
-        <TableState.Error message={error} onRetry={fetchCertificates} />
+        <TableState tone="error">{error}</TableState>
       ) : activeTab === 'progress' ? (
         /* Tab 1: Client Milestone Tracker */
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

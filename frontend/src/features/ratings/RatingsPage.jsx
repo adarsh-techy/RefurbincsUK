@@ -238,9 +238,9 @@ function RatingsPage() {
 
       {/* Reviews List */}
       {loading ? (
-        <TableState.Loading message="Loading client ratings & feedback..." />
+        <TableState>Loading client ratings & feedback…</TableState>
       ) : error ? (
-        <TableState.Error message={error} onRetry={fetchRatings} />
+        <TableState tone="error">{error}</TableState>
       ) : ratings.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center bg-white dark:border-white/10 dark:bg-surface-850">
           <FiStar className="mx-auto h-10 w-10 text-slate-300 dark:text-neutral-600 mb-3" />
