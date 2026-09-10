@@ -163,35 +163,38 @@ function CertificatesPage() {
         <button
           type="button"
           onClick={() => setActiveTab('progress')}
-          className={`rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'progress'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-850'
           }`}
         >
-          Client Milestone Tracker ({clientProgress.length})
+          <FiTrendingUp className="w-3.5 h-3.5" />
+          <span>Client Milestone Tracker ({clientProgress.length})</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('certificates')}
-          className={`rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'certificates'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-850'
           }`}
         >
-          Issued Certificates ({certificates.length})
+          <FiAward className="w-3.5 h-3.5" />
+          <span>Issued Certificates ({certificates.length})</span>
         </button>
         <button
           type="button"
           onClick={() => setActiveTab('tiers')}
-          className={`rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
+          className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'tiers'
               ? 'bg-blue-600 text-white shadow-xs'
               : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-850'
           }`}
         >
-          Milestone Tiers Overview
+          <FiShield className="w-3.5 h-3.5" />
+          <span>Milestone Tiers Overview</span>
         </button>
       </div>
 

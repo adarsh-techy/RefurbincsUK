@@ -380,6 +380,16 @@ function ClientDashboardPage() {
             </svg>
           </form>
 
+          {/* Milestone Certificates Action Button */}
+          <Link
+            to="/my/certificates"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300/90 bg-gradient-to-r from-amber-50 to-emerald-50 px-3.5 py-2 text-xs font-bold text-amber-900 hover:border-amber-400 hover:shadow-xs dark:border-amber-700/60 dark:from-amber-950/40 dark:to-emerald-950/40 dark:text-amber-200 transition-all cursor-pointer shadow-2xs"
+            title="Milestone Certificates & Sustainability Impact"
+          >
+            <FiAward className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+            <span>Certificates & Impact</span>
+          </Link>
+
           {/* Clean Scan Button */}
           <button
             type="button"
