@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import {
   FiAward,
   FiSearch,
@@ -16,8 +16,21 @@ import apiClient from '../../services/api-client';
 import TableState from '../../components/ui/TableState';
 import Modal from '../../components/ui/Modal';
 import CertificateView from '../../components/certificates/CertificateView';
-import { downloadMilestoneCertificatePDF } from '../../utils/generate-milestone-certificate';
+import {
+  downloadMilestoneCertificatePDF,
+  getTierForCertificate,
+  TIER_CONFIGS,
+} from '../../utils/generate-milestone-certificate';
 import { getLogoUrl } from '../../utils/logo-url';
+
+const TIER_BADGES = {
+  Bronze: 'bg-amber-100 text-amber-900 border-amber-300 dark:bg-amber-950/80 dark:text-amber-300 dark:border-amber-700',
+  Silver: 'bg-slate-200 text-slate-900 border-slate-300 dark:bg-slate-800 dark:text-slate-200 dark:border-slate-700',
+  Gold: 'bg-amber-100 text-amber-900 border-amber-400 dark:bg-amber-950/90 dark:text-amber-300 dark:border-amber-600',
+  Platinum: 'bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-950/80 dark:text-indigo-300 dark:border-indigo-700',
+  Diamond: 'bg-cyan-100 text-cyan-900 border-cyan-300 dark:bg-cyan-950/80 dark:text-cyan-300 dark:border-cyan-700',
+  Emerald: 'bg-emerald-100 text-emerald-900 border-emerald-300 dark:bg-emerald-950/80 dark:text-emerald-300 dark:border-emerald-700',
+};
 
 function CertificatesPage() {
   const [data, setData] = useState(null);
@@ -26,6 +39,7 @@ function CertificatesPage() {
   const [search, setSearch] = useState('');
   const [selectedCert, setSelectedCert] = useState(null);
   const [activeTab, setActiveTab] = useState('progress'); // 'progress' | 'certificates' | 'tiers'
+  const [tierFilter, setTierFilter] = useState('ALL');
 
   useEffect(() => {
     fetchCertificates();
@@ -61,6 +75,22 @@ function CertificatesPage() {
   const totalServiced = Number(stats.totalServicedAll || 0).toLocaleString();
   const totalCerts = Number(stats.totalCertificatesIssued || 0);
 
+  // Category counts for issued certificates
+  const categoryCounts = useMemo(() => {
+    const counts = { ALL: certificates.length, Bronze: 0, Silver: 0, Gold: 0, Platinum: 0, Diamond: 0, Emerald: 0 };
+    certificates.forEach((cert) => {
+      const t = getTierForCertificate(cert);
+      if (counts[t.badge] !== undefined) counts[t.badge]++;
+    });
+    return counts;
+  }, [certificates]);
+
+  // Filtered certificates on Tab 2
+  const filteredCertificates = useMemo(() => {
+    if (tierFilter === 'ALL') return certificates;
+    return certificates.filter((cert) => getTierForCertificate(cert).badge === tierFilter);
+  }, [certificates, tierFilter]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -76,7 +106,7 @@ function CertificatesPage() {
         <button
           type="button"
           onClick={fetchCertificates}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-850 dark:text-neutral-200 dark:hover:bg-surface-800 transition-colors shadow-2xs"
+          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-850 dark:text-neutral-200 dark:hover:bg-surface-800 transition-colors shadow-2xs cursor-pointer"
         >
           <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
           <span>Refresh</span>
@@ -132,10 +162,10 @@ function CertificatesPage() {
           </div>
           <div className="mt-2 flex items-baseline gap-1.5">
             <span className="text-2xl font-black text-slate-900 dark:text-white">{totalServiced}</span>
-            <span className="text-xs text-slate-400 font-bold">Packs</span>
+            <span className="text-xs text-amber-700 dark:text-amber-300 font-bold">Packs</span>
           </div>
           <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-medium">
-            Across all client operations
+            Completed repairs across all client fleets
           </p>
         </div>
 
@@ -227,109 +257,142 @@ function CertificatesPage() {
                         <img
                           src={logo}
                           alt={client.clientName}
-                          className="h-10 w-10 rounded-xl object-contain bg-slate-50 border border-slate-200 p-1 dark:bg-surface-800 dark:border-white/10 shrink-0"
+                          className="h-9 w-9 rounded-xl object-contain bg-slate-50 border border-slate-200 p-1 dark:bg-surface-800 dark:border-white/10 shrink-0"
                         />
                       ) : (
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-700 dark:bg-surface-800 dark:text-neutral-200 font-bold text-sm shrink-0">
-                          {client.clientName[0]}
+                        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-700 font-black text-sm dark:bg-surface-800 dark:text-white shrink-0">
+                          {client.clientName?.[0] || 'C'}
                         </div>
                       )}
                       <div className="min-w-0">
                         <h3 className="font-bold text-sm text-slate-900 dark:text-white truncate">
                           {client.clientName}
                         </h3>
-                        <span className="text-[11px] text-slate-400 dark:text-neutral-400">
-                          {client.certificatesCount} Milestone Certificate
-                          {client.certificatesCount !== 1 ? 's' : ''} Awarded
+                        <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+                          {client.certificates.length} certificate{client.certificates.length === 1 ? '' : 's'} issued
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right shrink-0">
-                      <span className="text-base font-black text-slate-900 dark:text-white">
-                        {currentCount.toLocaleString()}
-                      </span>
-                      <span className="text-[10px] text-slate-400 block uppercase font-bold">
-                        Serviced
-                      </span>
-                    </div>
+                    <span className="font-mono text-sm font-black text-slate-900 dark:text-white bg-slate-100 px-2.5 py-1 rounded-lg dark:bg-surface-800 shrink-0">
+                      {currentCount.toLocaleString()} Serviced
+                    </span>
                   </div>
 
-                  {/* Progress Bar towards Next Milestone */}
+                  {/* Progress to Next Tier */}
                   <div className="mt-4 space-y-1.5">
-                    <div className="flex items-center justify-between text-xs font-semibold">
-                      <span className="text-slate-600 dark:text-neutral-300">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="text-slate-500 dark:text-neutral-400 font-medium">
                         {nextTier
-                          ? `Progress to ${nextTier.badge} Tier (${nextTier.count.toLocaleString()} Batteries)`
-                          : '🎉 Highest Milestone Achieved!'}
+                          ? `Next: ${nextTier.badge} Tier (${nextTier.count.toLocaleString()} units)`
+                          : '🎉 Top Tier Achieved'}
                       </span>
-                      <span className="font-mono text-blue-600 dark:text-blue-400 font-bold">
+                      <span className="font-mono font-bold text-emerald-600 dark:text-emerald-400">
                         {progressPct}%
                       </span>
                     </div>
-
-                    <div className="h-2.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-800">
+                    <div className="h-2 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-800">
                       <div
                         style={{ width: `${progressPct}%` }}
-                        className="h-full bg-gradient-to-r from-blue-500 via-emerald-500 to-amber-500 rounded-full transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-emerald-500 via-teal-500 to-blue-500 rounded-full transition-all duration-500"
                       />
-                    </div>
-
-                    <div className="flex justify-between text-[10.5px] text-slate-400 dark:text-neutral-500">
-                      <span>{currentCount.toLocaleString()} restored</span>
-                      {nextTier && (
-                        <span>
-                          {(targetCount - currentCount).toLocaleString()} more needed for {nextTier.badge}
-                        </span>
-                      )}
                     </div>
                   </div>
 
-                  {/* Awarded Badges */}
-                  {client.certificates.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-slate-100 dark:border-white/5">
-                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1.5">
-                        Achieved Certificates
+                  {/* Impact Summary Pill */}
+                  <div className="grid grid-cols-2 gap-2 mt-4 p-2.5 rounded-xl bg-slate-50 dark:bg-surface-900/60 text-center">
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">CO₂ Saved</span>
+                      <span className="font-bold text-xs text-emerald-700 dark:text-emerald-400">
+                        ~{((currentCount * 15.2) / 1000).toFixed(1)} Tons
                       </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {client.certificates.map((cert) => (
-                          <button
-                            key={cert.id}
-                            type="button"
-                            onClick={() => setSelectedCert(cert)}
-                            className="inline-flex items-center gap-1 rounded-lg bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-200/80 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-900/50 dark:text-amber-300 transition-colors cursor-pointer"
-                          >
-                            <FiAward className="w-3 h-3 text-amber-600 dark:text-amber-400" />
-                            <span>{cert.milestone_count.toLocaleString()} Milestone</span>
-                          </button>
-                        ))}
-                      </div>
                     </div>
-                  )}
+                    <div>
+                      <span className="text-[10px] text-slate-400 uppercase font-semibold block">E-Waste Diverted</span>
+                      <span className="font-bold text-xs text-blue-700 dark:text-blue-400">
+                        {Math.round(currentCount * 2.8).toLocaleString()} kg
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Issued Badges List */}
+                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    {client.certificates.length === 0 ? (
+                      <span className="text-[11px] text-slate-400 italic">No milestone certificates earned yet</span>
+                    ) : (
+                      client.certificates.map((c) => {
+                        const t = getTierForCertificate(c);
+                        const bStyle = TIER_BADGES[t.badge] || TIER_BADGES.Gold;
+                        return (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setSelectedCert(c)}
+                            className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[10.5px] font-extrabold cursor-pointer border hover:opacity-80 transition-opacity ${bStyle}`}
+                          >
+                            <FiAward className="w-3 h-3" />
+                            <span>{t.badge} ({c.milestone_count.toLocaleString()})</span>
+                          </button>
+                        );
+                      })
+                    )}
+                  </div>
                 </div>
               </div>
             );
           })}
         </div>
       ) : activeTab === 'certificates' ? (
-        /* Tab 2: Issued Certificates Table */
+        /* Tab 2: All Issued Certificates Table with Tier Filter Chips */
         <div className="space-y-4">
-          <form onSubmit={handleSearchSubmit} className="relative max-w-md">
-            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
-            <input
-              type="text"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search certificates by client name, code, or title..."
-              className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-850 dark:text-neutral-100"
-            />
-          </form>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            {/* Search Input */}
+            <form onSubmit={handleSearchSubmit} className="relative flex-1 max-w-md">
+              <FiSearch className="absolute left-3 top-2.5 h-3.5 w-3.5 text-slate-400" />
+              <input
+                type="text"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search certificates by client name, code, or title..."
+                className="w-full rounded-xl border border-slate-200 bg-white pl-9 pr-4 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-850 dark:text-neutral-100"
+              />
+            </form>
 
-          {certificates.length === 0 ? (
+            {/* Category Filter Chips */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {['ALL', 'Bronze', 'Silver', 'Gold', 'Platinum', 'Diamond', 'Emerald'].map((cat) => {
+                const countVal = categoryCounts[cat] || 0;
+                const isActive = tierFilter === cat;
+                return (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setTierFilter(cat)}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-slate-900 text-white shadow-xs dark:bg-surface-700'
+                        : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200 dark:bg-surface-850 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-surface-800'
+                    }`}
+                  >
+                    <span>{cat === 'ALL' ? 'All' : cat}</span>
+                    <span className={`px-1.5 py-0.2 rounded-md text-[10px] font-black ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-400'
+                    }`}>
+                      {countVal}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {filteredCertificates.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-slate-200 p-12 text-center bg-white dark:border-white/10 dark:bg-surface-850">
               <FiAward className="mx-auto h-10 w-10 text-slate-300 dark:text-neutral-600 mb-3" />
               <h3 className="text-sm font-bold text-slate-800 dark:text-neutral-200">
-                No Certificates Found
+                {tierFilter === 'ALL' ? 'No Certificates Found' : `No ${tierFilter} Certificates Found`}
               </h3>
               <p className="text-xs text-slate-400 mt-1">
                 Certificates are automatically awarded when client battery services reach milestone thresholds.
@@ -344,7 +407,10 @@ function CertificatesPage() {
                       Client
                     </th>
                     <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">
-                      Milestone Certificate
+                      Tier & Milestone
+                    </th>
+                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">
+                      Certificate Title
                     </th>
                     <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">
                       CO₂ Saved
@@ -361,8 +427,10 @@ function CertificatesPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/5">
-                  {certificates.map((cert) => {
+                  {filteredCertificates.map((cert) => {
                     const logo = getLogoUrl(cert.client_logo_path);
+                    const tier = getTierForCertificate(cert);
+                    const bStyle = TIER_BADGES[tier.badge] || TIER_BADGES.Gold;
                     const co2 = (Number(cert.co2_saved_kg || 0) / 1000).toFixed(1);
 
                     return (
@@ -385,23 +453,26 @@ function CertificatesPage() {
                             </span>
                           </div>
                         </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <FiAward className="w-3.5 h-3.5 text-amber-500" />
-                            <span className="font-bold text-slate-800 dark:text-neutral-200">
-                              {cert.title}
-                            </span>
-                          </div>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full font-extrabold text-[10.5px] uppercase border ${bStyle}`}>
+                            <FiAward className="w-3 h-3" />
+                            <span>{tier.badge} ({cert.milestone_count.toLocaleString()})</span>
+                          </span>
                         </td>
                         <td className="px-4 py-3">
+                          <span className="font-bold text-slate-800 dark:text-neutral-200">
+                            {cert.title}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
                           <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-2 py-0.5 font-extrabold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-900/50">
                             ~{co2} Tons CO₂
                           </span>
                         </td>
-                        <td className="px-4 py-3 font-mono text-slate-600 dark:text-neutral-400">
+                        <td className="px-4 py-3 font-mono text-slate-600 dark:text-neutral-400 whitespace-nowrap">
                           {cert.certificate_code}
                         </td>
-                        <td className="px-4 py-3 text-slate-500 dark:text-neutral-400">
+                        <td className="px-4 py-3 text-slate-500 dark:text-neutral-400 whitespace-nowrap">
                           {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('en-GB') : '—'}
                         </td>
                         <td className="px-4 py-3 text-right whitespace-nowrap">
@@ -435,59 +506,69 @@ function CertificatesPage() {
           )}
         </div>
       ) : (
-        /* Tab 3: Milestone Tiers Breakdown */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {milestoneTiers.map((tier) => (
-            <div
-              key={tier.count}
-              className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-surface-850 shadow-2xs space-y-3"
-            >
-              <div className="flex items-center justify-between">
-                <span className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-black text-amber-900 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-300 dark:border-amber-700">
-                  <FiAward className="w-3 h-3 text-amber-600" />
-                  <span>{tier.badge} Tier</span>
-                </span>
-                <span className="font-black text-lg text-slate-900 dark:text-white">
-                  {tier.count.toLocaleString()} Units
-                </span>
-              </div>
+        /* Tab 3: Milestone Tiers Breakdown & Roadmap */
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {milestoneTiers.map((tier) => {
+              const bStyle = TIER_BADGES[tier.badge] || TIER_BADGES.Gold;
+              return (
+                <div
+                  key={tier.count}
+                  className="rounded-2xl border border-slate-200 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-850 flex flex-col justify-between"
+                >
+                  <div>
+                    <div className="flex items-center justify-between">
+                      <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-extrabold uppercase border ${bStyle}`}>
+                        <FiAward className="w-3.5 h-3.5" />
+                        <span>{tier.badge} Tier</span>
+                      </span>
+                      <span className="font-mono text-xs font-black text-slate-700 dark:text-neutral-300">
+                        {tier.count.toLocaleString()} Units
+                      </span>
+                    </div>
 
-              <div>
-                <h3 className="font-bold text-sm text-slate-800 dark:text-white">
-                  {tier.title}
-                </h3>
-                <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
-                  {tier.subtitle}
-                </p>
-              </div>
+                    <h3 className="font-bold text-sm text-slate-900 dark:text-white mt-3">
+                      {tier.title}
+                    </h3>
+                    <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
+                      {tier.subtitle}
+                    </p>
 
-              <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-100 dark:border-white/5 text-center">
-                <div className="p-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/30">
-                  <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 uppercase block">
-                    CO₂ Saved
-                  </span>
-                  <span className="font-extrabold text-xs text-emerald-800 dark:text-emerald-200">
-                    ~{(tier.co2Kg / 1000).toFixed(1)} Tons
-                  </span>
+                    <div className="grid grid-cols-2 gap-2 mt-4 p-2.5 rounded-xl bg-slate-50 dark:bg-surface-900/80 border border-slate-200/50 dark:border-white/5 text-center">
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-emerald-700 dark:text-emerald-400 block">
+                          CO₂ Reduction
+                        </span>
+                        <span className="font-black text-xs text-slate-900 dark:text-white block mt-0.5">
+                          ~{(tier.co2Kg / 1000).toFixed(1)} Tons
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] uppercase font-bold text-blue-700 dark:text-blue-400 block">
+                          E-Waste Diversion
+                        </span>
+                        <span className="font-black text-xs text-slate-900 dark:text-white block mt-0.5">
+                          {tier.ewasteKg.toLocaleString()} kg
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
+                    <span>Issued automatically upon reach</span>
+                    <FiCheckCircle className="w-4 h-4 text-emerald-500" />
+                  </div>
                 </div>
-                <div className="p-2 rounded-xl bg-blue-50 dark:bg-blue-950/30">
-                  <span className="text-[10px] font-bold text-blue-700 dark:text-blue-400 uppercase block">
-                    E-Waste Saved
-                  </span>
-                  <span className="font-extrabold text-xs text-blue-800 dark:text-blue-200">
-                    {tier.ewasteKg.toLocaleString()} kg
-                  </span>
-                </div>
-              </div>
-            </div>
-          ))}
+              );
+            })}
+          </div>
         </div>
       )}
 
-      {/* Certificate Live Preview Modal */}
+      {/* Certificate Modal View */}
       {selectedCert && (
         <Modal
-          title="Official Milestone Certificate"
+          title="Sustainability Milestone Certificate"
           description={selectedCert.title}
           size="3xl"
           onClose={() => setSelectedCert(null)}
