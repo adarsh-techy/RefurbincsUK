@@ -127,16 +127,17 @@ async function acknowledge(certificateId, clientId) {
 }
 
 async function getClientServicedBatteryCount(clientId, clientName) {
-  // CTE matching client's batteries
+  // Canonical client battery matching: via truck_intakes.client_id or lower(b.client_name)
   const { rows } = await db.query(
     `WITH client_b_ids AS (
-       SELECT id FROM batteries WHERE client_id = $1
+       SELECT b.id
+       FROM batteries b
+       JOIN truck_intakes ti ON ti.id = b.truck_intake_id
+       WHERE ti.client_id = $1
        UNION
-       SELECT id FROM batteries WHERE client_name = $2
-       UNION
-       SELECT b.id FROM batteries b
-       JOIN clients c ON c.id = $1
-       WHERE c.prefix IS NOT NULL AND c.prefix <> '' AND b.battery_code LIKE c.prefix || '-%'
+       SELECT b.id
+       FROM batteries b
+       WHERE lower(b.client_name) = lower($2)
      )
      SELECT 
        COUNT(DISTINCT b.id) AS total_batteries,
