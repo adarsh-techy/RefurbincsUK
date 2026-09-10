@@ -10,11 +10,13 @@ import {
   FiRefreshCw,
   FiShield,
   FiExternalLink,
+  FiDownload,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import TableState from '../../components/ui/TableState';
 import Modal from '../../components/ui/Modal';
 import CertificateView from '../../components/certificates/CertificateView';
+import { downloadMilestoneCertificatePDF } from '../../utils/generate-milestone-certificate';
 import { getLogoUrl } from '../../utils/logo-url';
 
 function CertificatesPage() {
@@ -400,14 +402,24 @@ function CertificatesPage() {
                           {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('en-GB') : '—'}
                         </td>
                         <td className="px-4 py-3 text-right">
-                          <button
-                            type="button"
-                            onClick={() => setSelectedCert(cert)}
-                            className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 cursor-pointer shadow-2xs"
-                          >
-                            <FiEye className="w-3 h-3" />
-                            <span>View & Print</span>
-                          </button>
+                          <div className="flex items-center justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => downloadMilestoneCertificatePDF(cert, cert.client_name)}
+                              className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
+                            >
+                              <FiDownload className="w-3 h-3" />
+                              <span>PDF</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedCert(cert)}
+                              className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 cursor-pointer shadow-2xs"
+                            >
+                              <FiEye className="w-3 h-3" />
+                              <span>View & Print</span>
+                            </button>
+                          </div>
                         </td>
                       </tr>
                     );

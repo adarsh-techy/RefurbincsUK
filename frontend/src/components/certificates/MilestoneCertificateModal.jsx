@@ -1,7 +1,8 @@
-import { FiAward, FiCheck, FiX, FiPrinter } from 'react-icons/fi';
+import { FiAward, FiCheck, FiX, FiPrinter, FiDownload } from 'react-icons/fi';
 import Modal from '../ui/Modal';
 import CertificateView from './CertificateView';
 import apiClient from '../../services/api-client';
+import { downloadMilestoneCertificatePDF } from '../../utils/generate-milestone-certificate';
 
 function MilestoneCertificateModal({ certificate, clientName, onClose, onAcknowledge }) {
   if (!certificate) return null;
@@ -44,11 +45,19 @@ function MilestoneCertificateModal({ certificate, clientName, onClose, onAcknowl
           <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
             <button
               type="button"
+              onClick={() => downloadMilestoneCertificatePDF(certificate, clientName)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 cursor-pointer shadow-2xs"
+            >
+              <FiDownload className="w-3.5 h-3.5" />
+              <span>Download PDF</span>
+            </button>
+            <button
+              type="button"
               onClick={() => window.print()}
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-100 dark:border-white/10 dark:text-neutral-200 dark:hover:bg-surface-800 cursor-pointer"
             >
               <FiPrinter className="w-3.5 h-3.5" />
-              <span>Print / PDF</span>
+              <span>Print</span>
             </button>
             <button
               type="button"

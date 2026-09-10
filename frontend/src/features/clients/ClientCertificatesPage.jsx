@@ -9,11 +9,13 @@ import {
   FiRefreshCw,
   FiCheckCircle,
   FiArrowRight,
+  FiDownload,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import TableState from '../../components/ui/TableState';
 import Modal from '../../components/ui/Modal';
 import CertificateView from '../../components/certificates/CertificateView';
+import { downloadMilestoneCertificatePDF } from '../../utils/generate-milestone-certificate';
 import { useTheme } from '../../context/ThemeContext';
 
 function ClientCertificatesPage() {
@@ -292,6 +294,14 @@ function ClientCertificatesPage() {
                       </div>
 
                       <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => downloadMilestoneCertificatePDF(cert, client?.name)}
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
+                        >
+                          <FiDownload className="w-3 h-3" />
+                          <span>PDF</span>
+                        </button>
                         <button
                           type="button"
                           onClick={() => setSelectedCert(cert)}
