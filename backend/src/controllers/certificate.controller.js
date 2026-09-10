@@ -7,9 +7,12 @@ function isClientRole(role) {
 
 async function getMyMilestones(req, res, next) {
   try {
+    if (req.user.role !== 'client') {
+      return res.status(403).json({ message: 'Milestone certificates are exclusively for fleet clients.' });
+    }
     const client = await clientModel.findByUserId(req.user.id);
     if (!client) {
-      return res.status(404).json({ message: 'Client profile not found.' });
+      return res.status(404).json({ message: 'Fleet client profile not found.' });
     }
 
     const result = await certificateModel.checkAndAwardMilestones(client.id, client.name);
@@ -24,10 +27,13 @@ async function getMyMilestones(req, res, next) {
 
 async function acknowledgeCertificate(req, res, next) {
   try {
+    if (req.user.role !== 'client') {
+      return res.status(403).json({ message: 'Milestone certificates are exclusively for fleet clients.' });
+    }
     const { id } = req.params;
     const client = await clientModel.findByUserId(req.user.id);
     if (!client) {
-      return res.status(404).json({ message: 'Client profile not found.' });
+      return res.status(404).json({ message: 'Fleet client profile not found.' });
     }
 
     const acknowledged = await certificateModel.acknowledge(Number(id), client.id);
@@ -40,7 +46,7 @@ async function acknowledgeCertificate(req, res, next) {
 async function listAdmin(req, res, next) {
   try {
     const { clientId, search } = req.query;
-    const [allCerts, clients] = await Promise.all([
+    const [allCerts, allClients] = await Promise.all([
       certificateModel.findAllCertificates({
         clientId: clientId ? Number(clientId) : null,
         search,
@@ -48,9 +54,12 @@ async function listAdmin(req, res, next) {
       clientModel.findAll(),
     ]);
 
-    // Compute milestone progress for each client
+    // Only fleet clients (exclude recycle_client role)
+    const fleetClients = allClients.filter((c) => c.user_role !== 'recycle_client');
+
+    // Compute milestone progress for each fleet client
     const clientProgress = await Promise.all(
-      clients.map(async (c) => {
+      fleetClients.map(async (c) => {
         const servicedCount = await certificateModel.getClientServicedBatteryCount(c.id, c.name);
         const certs = allCerts.filter((cert) => cert.client_id === c.id);
         const nextTier = certificateModel.MILESTONE_TIERS.find((t) => t.count > servicedCount) || null;

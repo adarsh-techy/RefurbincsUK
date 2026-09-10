@@ -9,9 +9,9 @@ router.get('/verify/:code', certificateController.getByCode);
 // Authenticated routes
 router.use(requireAuth);
 
-// Client milestone checks & acknowledgement
-router.get('/my-milestones', requireRole('client', 'recycle_client'), certificateController.getMyMilestones);
-router.post('/acknowledge/:id', requireRole('client', 'recycle_client'), certificateController.acknowledgeCertificate);
+// Client milestone checks & acknowledgement (Fleet clients only)
+router.get('/my-milestones', requireRole('client'), certificateController.getMyMilestones);
+router.post('/acknowledge/:id', requireRole('client'), certificateController.acknowledgeCertificate);
 
 // Admin / Staff certificate management
 router.get('/admin', requireRole('super_admin', 'admin', 'staff'), certificateController.listAdmin);
