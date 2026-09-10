@@ -11,7 +11,7 @@ import Modal from '../../components/ui/Modal';
 import QrScanner from '../../components/ui/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { useTheme } from '../../context/ThemeContext';
-import { hasClientPermission } from '../../utils/permissions';
+import { FiStar } from 'react-icons/fi';
 import ClientReturnVerifyModal from './ClientReturnVerifyModal';
 import RatingModal from '../../components/feedback/RatingModal';
 
@@ -509,15 +509,29 @@ function ClientBatteriesPage() {
     },
     {
       key: 'actions',
-      label: 'Lifecycle History',
+      label: 'Actions',
       render: (row) => (
-        <Link
-          to={`/batteries/${encodeURIComponent(row.battery_code)}`}
-          className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-emerald-600"
-        >
-          <span>View History</span>
-          <span>→</span>
-        </Link>
+        <div className="flex items-center gap-1.5 justify-end">
+          {effectiveBucket === 'received' && (
+            <button
+              type="button"
+              onClick={() => {
+                setRatingBatteryCode(row.battery_code);
+                setShowRatingModal(true);
+              }}
+              className="inline-flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer"
+            >
+              <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+              <span>Rate</span>
+            </button>
+          )}
+          <Link
+            to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+            className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-emerald-600"
+          >
+            <span>History →</span>
+          </Link>
+        </div>
       ),
     },
   ];

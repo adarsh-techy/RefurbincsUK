@@ -30,7 +30,9 @@ import {
   FiChevronUp,
   FiZap,
   FiCheck,
+  FiStar,
 } from 'react-icons/fi';
+import RatingModal from '../../components/feedback/RatingModal';
 
 const STATUS_ACCENT = {
   in_repair: 'border-warning-500',
@@ -233,6 +235,7 @@ function buildCycles(events) {
 // ── CLIENT-SPECIFIC ELEGANT, VIBRANT & INTERACTIVE BATTERY VIEW ────────────
 function ClientBatteryDetailView({ battery, history = [], returns = [], visits = [], issues = [], qrDataUrl, onDownloadQr }) {
   const navigate = useNavigate();
+  const [showRatingModal, setShowRatingModal] = useState(false);
 
   // Distinct repair cycles / batches
   const repairBatches = {};
@@ -407,6 +410,16 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
                   <FiTool className="w-3.5 h-3.5 text-blue-500" />
                   <span>Last Service: <strong>{new Date(battery.last_service_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
                 </span>
+              )}
+              {isReturned && (
+                <button
+                  type="button"
+                  onClick={() => setShowRatingModal(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer"
+                >
+                  <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <span>Rate Service Quality</span>
+                </button>
               )}
             </div>
           </div>
@@ -840,6 +853,14 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
           </div>
         </div>
       </div>
+
+      {showRatingModal && (
+        <RatingModal
+          batteryCode={battery.battery_code}
+          onClose={() => setShowRatingModal(false)}
+          onSuccess={() => setShowRatingModal(false)}
+        />
+      )}
     </div>
   );
 }
