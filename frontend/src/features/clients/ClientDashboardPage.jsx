@@ -834,7 +834,7 @@ function ClientDashboardPage() {
       {/* ── Pending Due Payment Popup Modal ─────────────────────────────── */}
       {showDuePaymentModal && unpaidInvoices.length > 0 && (
         <Modal
-          title={hasOverdue ? '⚠️ Overdue Payment Action Required' : '💳 Pending Due Payment Notice'}
+          title={hasOverdue ? 'Overdue Payment Action Required' : 'Pending Due Payment Notice'}
           description="Official billing statement and settlement reminder for your battery service visits."
           size="xl"
           onClose={handleDismissDueModal}
