@@ -113,20 +113,20 @@ function TechnicianHomePage() {
             onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
             placeholder="Scan or type battery code, then Enter"
             autoComplete="off"
-            className="w-full rounded-md border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-center text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30"
+            className="w-full rounded-md border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-center text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 dark:border-blue-800/40 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
           />
 
           {showSuggestions && suggestions.length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-blue-200 bg-white py-1 text-left shadow-lg">
+            <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-blue-200 bg-white py-1 text-left shadow-lg dark:border-surface-700 dark:bg-surface-900">
               {suggestions.map((b) => (
                 <li key={b.id}>
                   <button
                     type="button"
                     onMouseDown={(e) => e.preventDefault()}
                     onClick={() => goToBattery(b.battery_code)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50"
+                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-surface-800"
                   >
-                    <span className="font-medium text-slate-900">{b.battery_code}</span>
+                    <span className="font-medium text-slate-900 dark:text-white">{b.battery_code}</span>
                     <StatusBadge status={b.status} />
                   </button>
                 </li>

@@ -2,6 +2,10 @@
 module.exports = {
   content: ['./App.js', './src/**/*.{js,jsx}'],
   presets: [require('nativewind/preset')],
+  // 'class' (rather than the default 'media') lets the app set the scheme
+  // itself via nativewind's setColorScheme — see src/context/ThemeContext.js
+  // — instead of only following the OS setting.
+  darkMode: 'class',
   theme: {
     extend: {
       colors: {

@@ -169,7 +169,8 @@ function PartDetailPage() {
         <StatCard label="Times Used" value={usageHistory.length} tone="good" />
         <StatCard label="Total Quantity Used" value={totalQuantityUsed} tone="info" />
         <StatCard label="Total Restocked" value={totalRestocked} tone="critical" />
-        <StatCard label="Repair Cost" value={`£${Number(part.repair_cost).toFixed(2)}`} tone="warning" />
+        <StatCard label="Price" value={`£${Number(part.repair_cost).toFixed(2)}`} tone="warning" />
+        <StatCard label="Service Charge" value={`£${Number(part.service_charge || 0).toFixed(2)}`} tone="warning" />
         <StatCard label="Total Revenue" value={`£${totalRevenue.toFixed(2)}`} tone="good" />
       </div>
 

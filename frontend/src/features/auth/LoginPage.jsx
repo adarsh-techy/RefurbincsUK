@@ -41,6 +41,31 @@ function LoginPage() {
             <p className="mt-1 text-sm text-neutral-400">Sign in to continue</p>
           </div>
 
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('humanforest@gmail.com');
+                  setPassword('12345678');
+                }}
+                className="flex-1 rounded-md border border-dashed border-emerald-500/50 bg-emerald-500/10 py-2 text-xs font-medium text-emerald-400 transition hover:bg-emerald-500/20"
+              >
+                ⚡ HumanForest Client
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail('superadmin@gmail.com');
+                  setPassword('123456');
+                }}
+                className="flex-1 rounded-md border border-dashed border-neutral-600 bg-neutral-800/40 py-2 text-xs font-medium text-neutral-300 transition hover:bg-neutral-800/80"
+              >
+                Super Admin
+              </button>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>
               <label className={labelClasses}>Email Address</label>

@@ -17,6 +17,9 @@ async function getById(req, res, next) {
     if (!returnRecord) {
       return res.status(404).json({ message: 'Return not found' });
     }
+    if (req.user.role === 'client' && req.user.client_id && returnRecord.client_id !== req.user.client_id) {
+      return res.status(403).json({ message: 'Not authorized for this return dispatch.' });
+    }
     const batteries = await returnModel.findBatteries(req.params.id);
     res.json({ returnRecord, batteries });
   } catch (err) {
@@ -41,6 +44,32 @@ async function create(req, res, next) {
     });
 
     res.status(201).json(returnRecord);
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function verifyReceipt(req, res, next) {
+  try {
+    const returnRecord = await returnModel.findById(req.params.id);
+    if (!returnRecord) {
+      return res.status(404).json({ message: 'Return not found.' });
+    }
+    if (req.user.role === 'client' && req.user.client_id && returnRecord.client_id !== req.user.client_id) {
+      return res.status(403).json({ message: 'Not authorized for this return dispatch.' });
+    }
+    const updated = await returnModel.verifyReceipt(req.params.id, req.user.id);
+    await auditLogModel.record({
+      userId: req.user.id,
+      action: 'verify_return_receipt',
+      entity: 'return',
+      entityId: updated.id,
+      details: { truckNumber: updated.truck_number, driverName: updated.driver_name },
+    });
+    res.json({
+      message: `Return shipment ${updated.truck_number} verified and received successfully.`,
+      returnRecord: updated,
+    });
   } catch (err) {
     next(err);
   }
@@ -71,4 +100,4 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { list, getById, create, update, remove };
+module.exports = { list, getById, create, verifyReceipt, update, remove };

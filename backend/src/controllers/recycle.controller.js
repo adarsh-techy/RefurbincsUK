@@ -1,10 +1,17 @@
 const recycleModel = require('../models/recycle.model');
 const auditLogModel = require('../models/audit-log.model');
+const clientModel = require('../models/client.model');
 const realtime = require('../realtime');
 
+// Admin sees all batches; a recycle_client sees only their own.
 async function list(req, res, next) {
   try {
-    res.json(await recycleModel.findAll());
+    let recycleClientId = null;
+    if (req.user.role === 'recycle_client') {
+      const client = await clientModel.findByUserId(req.user.id);
+      recycleClientId = client?.id || -1;
+    }
+    res.json(await recycleModel.findAll(recycleClientId ? { recycleClientId } : undefined));
   } catch (err) {
     next(err);
   }
@@ -18,6 +25,12 @@ async function getById(req, res, next) {
     if (!batch) {
       return res.status(404).json({ message: 'Recycle batch not found' });
     }
+    if (req.user.role === 'recycle_client') {
+      const client = await clientModel.findByUserId(req.user.id);
+      if (!client || batch.recycle_client_id !== client.id) {
+        return res.status(403).json({ message: 'Access denied to this shipment' });
+      }
+    }
     const batteries = await recycleModel.findBatteries(req.params.id);
     res.json({ batch, batteries });
   } catch (err) {
@@ -27,14 +40,19 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { vehicleNumber, driverName, batteryIds } = req.body;
+    const { vehicleNumber, driverName, batteryIds, recycleClientId } = req.body;
     const cleanBatteryIds = Array.isArray(batteryIds)
       ? [...new Set(batteryIds.map(Number).filter(Boolean))]
       : [];
     if (cleanBatteryIds.length === 0) {
       return res.status(400).json({ message: 'Select at least one battery.' });
     }
-    const batch = await recycleModel.create({ vehicleNumber, driverName, batteryIds: cleanBatteryIds });
+    const batch = await recycleModel.create({
+      vehicleNumber,
+      driverName,
+      batteryIds: cleanBatteryIds,
+      recycleClientId: recycleClientId ? Number(recycleClientId) : null,
+    });
 
     await auditLogModel.record({
       userId: req.user.id,

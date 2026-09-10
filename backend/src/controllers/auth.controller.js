@@ -1,6 +1,8 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const userModel = require('../models/user.model');
+const staffModel = require('../models/staff.model');
+const clientModel = require('../models/client.model');
 const env = require('../config/env');
 const { PERMISSIONS } = require('../config/permissions');
 
@@ -8,6 +10,17 @@ function signToken(user) {
   // Only the id is embedded — requireAuth re-fetches role/permissions fresh
   // from the DB on every request, so nothing else here is ever trusted.
   return jwt.sign({ id: user.id }, env.jwt.secret, { expiresIn: env.jwt.expiresIn });
+}
+
+// A client's uploaded logo lives on their `clients` row, not the `users`
+// login row — the Sidebar (which every client sees on every page, not just
+// the dashboard) needs it on the session's own user object to show it
+// instead of the generic Refurbinics brand mark, so it's folded in here
+// rather than making the frontend fetch a second endpoint just for this.
+async function attachClientLogo(userRow) {
+  if (userRow.role !== 'client') return null;
+  const client = await clientModel.findByUserId(userRow.id);
+  return client?.logo_path || null;
 }
 
 async function login(req, res, next) {
@@ -22,6 +35,13 @@ async function login(req, res, next) {
       return res.status(401).json({ message: 'This account has been deactivated' });
     }
 
+    let staffRole = undefined;
+    if (user.role === 'technician') {
+      const staff = await staffModel.findByUserId(user.id);
+      staffRole = staff?.role || 'technician';
+    }
+    const clientLogoPath = await attachClientLogo(user);
+
     res.json({
       token: signToken(user),
       user: {
@@ -29,8 +49,10 @@ async function login(req, res, next) {
         name: user.name,
         email: user.email,
         role: user.role,
+        staff_role: staffRole,
         permissions: user.permissions,
         must_change_password: user.must_change_password,
+        client_logo_path: clientLogoPath,
       },
     });
   } catch (err) {
@@ -72,7 +94,13 @@ async function register(req, res, next) {
 }
 
 async function me(req, res) {
-  res.json({ user: req.user });
+  let staffRole = undefined;
+  if (req.user.role === 'technician') {
+    const staff = await staffModel.findByUserId(req.user.id);
+    staffRole = staff?.role || 'technician';
+  }
+  const clientLogoPath = await attachClientLogo(req.user);
+  res.json({ user: { ...req.user, staff_role: staffRole, client_logo_path: clientLogoPath } });
 }
 
 // Sets the caller's own password — used by the forced first-login change

@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Refurbinics Technician",
+    "name": "Refurbinics",
     "slug": "refurbinics-technician",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -28,7 +28,9 @@
         {
           "cameraPermission": "Refurbinics needs camera access to scan battery QR codes."
         }
-      ]
+      ],
+      "expo-sharing",
+      "expo-status-bar"
     ]
   }
 }

@@ -1,8 +1,36 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import Constants from 'expo-constants';
+
+function getBaseUrl() {
+  // In Expo Go / a dev client, hostUri is the address the phone actually
+  // used to reach this machine's Metro server moments ago — so it tracks
+  // the dev machine's current LAN IP even after it changes (new Wi-Fi,
+  // DHCP lease renewal, etc.), unlike a hand-edited .env value that goes
+  // stale silently. Prefer it whenever it's available; EXPO_PUBLIC_API_URL
+  // remains the source of truth for production/standalone builds, where
+  // there's no Metro connection to infer an address from.
+  const hostUri =
+    Constants.expoConfig?.hostUri ||
+    Constants.manifest2?.extra?.expoGo?.debuggerHost ||
+    Constants.manifest?.debuggerHost;
+
+  if (hostUri && !hostUri.includes('localhost') && !hostUri.includes('127.0.0.1')) {
+    const ip = hostUri.split(':')[0];
+    if (ip) {
+      return `http://${ip}:5000/api`;
+    }
+  }
+
+  const envUrl = process.env.EXPO_PUBLIC_API_URL;
+  if (envUrl) return envUrl;
+
+  return 'http://192.168.31.244:5000/api';
+}
 
 const apiClient = axios.create({
-  baseURL: process.env.EXPO_PUBLIC_API_URL,
+  baseURL: getBaseUrl(),
+  timeout: 15000,
 });
 
 apiClient.interceptors.request.use(async (config) => {

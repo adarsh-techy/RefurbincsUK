@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../services/api-client';
 import extractBatteryCode from '../utils/extract-battery-code';
 import { StatusBadge } from '../components/Badge';
@@ -13,6 +13,7 @@ const DEBOUNCE_MS = 250;
 // the camera, or search/type its code, then jump to its detail screen.
 export default function ServiceScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -21,6 +22,12 @@ export default function ServiceScreen() {
   // Camera fires onBarcodeScanned repeatedly while the code stays in frame —
   // pause after a hit instead of navigating more than once.
   const scanLockRef = useRef(false);
+
+  useEffect(() => {
+    if (route.params?.autoScan) {
+      handleOpenCamera();
+    }
+  }, [route.params?.autoScan]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);

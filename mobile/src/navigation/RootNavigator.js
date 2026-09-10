@@ -5,9 +5,22 @@ import { useSelector } from 'react-redux';
 import LoginScreen from '../screens/LoginScreen';
 import SetPasswordScreen from '../screens/SetPasswordScreen';
 import BatteryDetailScreen from '../screens/BatteryDetailScreen';
+import ClientSortingScreen from '../screens/ClientSortingScreen';
+import ClientInvoicesScreen from '../screens/ClientInvoicesScreen';
+import ClientTransactionsScreen from '../screens/ClientTransactionsScreen';
+import ClientNotificationsScreen from '../screens/ClientNotificationsScreen';
+import ClientSupportScreen from '../screens/ClientSupportScreen';
 import MainTabs from './MainTabs';
+import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator();
+
+const clientScreenOptions = {
+  headerShown: true,
+  headerStyle: { backgroundColor: '#040509' },
+  headerTintColor: '#e5e5e5',
+  headerTitleStyle: { color: '#fff' },
+};
 
 const navTheme = {
   ...DarkTheme,
@@ -38,7 +51,7 @@ export default function RootNavigator() {
   }
 
   return (
-    <NavigationContainer theme={navTheme}>
+    <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -51,6 +64,31 @@ export default function RootNavigator() {
               name="BatteryDetail"
               component={BatteryDetailScreen}
               options={{ headerShown: true, headerStyle: { backgroundColor: '#040509' }, headerTintColor: '#e5e5e5', title: '' }}
+            />
+            <Stack.Screen
+              name="BatterySorting"
+              component={ClientSortingScreen}
+              options={{ ...clientScreenOptions, title: 'Battery Sorting' }}
+            />
+            <Stack.Screen
+              name="Invoices"
+              component={ClientInvoicesScreen}
+              options={{ ...clientScreenOptions, title: 'Invoices & Bills' }}
+            />
+            <Stack.Screen
+              name="Transactions"
+              component={ClientTransactionsScreen}
+              options={{ ...clientScreenOptions, title: 'Transactions' }}
+            />
+            <Stack.Screen
+              name="ClientNotifications"
+              component={ClientNotificationsScreen}
+              options={{ ...clientScreenOptions, title: 'Notifications' }}
+            />
+            <Stack.Screen
+              name="Support"
+              component={ClientSupportScreen}
+              options={{ ...clientScreenOptions, title: 'Help & Support' }}
             />
           </>
         )}

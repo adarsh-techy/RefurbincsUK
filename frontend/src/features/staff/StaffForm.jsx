@@ -11,7 +11,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
   const [form, setForm] = useState({
     name: staff?.name || '',
     phone: staff?.phone || '',
-    role: staff?.role || '',
+    role: staff?.role || 'technician',
     active: staff?.active ?? true,
     salary: staff ? String(staff.salary) : '0',
   });
@@ -34,7 +34,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
         await apiClient.patch(`/staff/${staff.id}`, {
           name: form.name,
           phone: form.phone || undefined,
-          role: form.role || undefined,
+          role: form.role || 'technician',
           active: form.active,
           salary: Number(form.salary) || 0,
         });
@@ -42,7 +42,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
         await apiClient.post('/staff', {
           name: form.name,
           phone: form.phone || undefined,
-          role: form.role || undefined,
+          role: form.role || 'technician',
           salary: Number(form.salary) || 0,
           loginEmail: grantLogin ? loginEmail : undefined,
           tempPassword: grantLogin ? tempPassword : undefined,
@@ -65,7 +65,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
             type="text"
             value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
-            placeholder="e.g. Ravi Kumar"
+            placeholder="e.g. Harry Taylor"
             className={inputClasses}
             required
           />
@@ -77,20 +77,27 @@ function StaffForm({ staff, onSaved, onCancel }) {
             type="text"
             value={form.phone}
             onChange={(e) => updateField('phone', e.target.value)}
-            placeholder="e.g. 98765 43210"
+            placeholder="e.g. 07700 900123"
             className={inputClasses}
           />
         </div>
 
         <div>
-          <label className={labelClasses}>Role (optional)</label>
-          <input
-            type="text"
+          <label className={labelClasses}>Staff Role</label>
+          <select
             value={form.role}
             onChange={(e) => updateField('role', e.target.value)}
-            placeholder="e.g. Senior Technician"
             className={inputClasses}
-          />
+          >
+            <option value="technician">Technician (Repairs only)</option>
+            <option value="supervisor">Supervisor (Repairs & Testing)</option>
+            <option value="manager">Manager (Repairs & Testing)</option>
+          </select>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            {form.role === 'technician'
+              ? 'Technicians can start work and replace parts, but cannot complete testing.'
+              : 'Supervisors and Managers have full testing permissions to verify and complete repairs.'}
+          </p>
         </div>
 
         <div>

@@ -1,0 +1,1 @@
+ALTER TABLE batteries ADD COLUMN IF NOT EXISTS notes TEXT;

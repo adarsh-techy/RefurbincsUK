@@ -114,6 +114,8 @@ function ReturnsPage() {
         <Modal
           title="Record a Return"
           description="Dispatch repaired batteries back to the customer."
+          size="4xl"
+          className="h-[88vh] max-h-[92vh]"
           onClose={() => setShowForm(false)}
         >
           <ReturnForm onCreated={handleCreated} onCancel={() => setShowForm(false)} />
@@ -124,6 +126,7 @@ function ReturnsPage() {
         <Modal
           title="Edit Return"
           description="Update the truck/driver details for this return."
+          size="2xl"
           onClose={() => setEditTarget(null)}
         >
           <ReturnEditForm

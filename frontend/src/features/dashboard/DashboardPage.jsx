@@ -115,7 +115,7 @@ function DashboardPage() {
   if (loading && Array.isArray(data)) return <TableState>Loading dashboard…</TableState>;
   if (error) return <TableState tone="error">{error}</TableState>;
 
-  const { totals, changes, trends, todaysRepairs, hourlyRepairsToday, serviceTimes } = data;
+  const { totals, changes, trends, todaysRepairs, hourlyRepairsToday, serviceTimes, recentClientReturns = [] } = data;
   const hourlyData = buildHourlyRange(hourlyRepairsToday || []);
   const hasActivityToday = hourlyData.some((h) => h.count > 0);
   const selectedDateLabel = selectedDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
@@ -189,15 +189,15 @@ function DashboardPage() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
         <div
-          className={`rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm transition-opacity duration-150 dark:border-blue-800/40 dark:bg-blue-900/20 lg:col-span-2 ${
+          className={`rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm transition-opacity duration-150 dark:border-surface-700 dark:bg-surface-900 lg:col-span-2 ${
             loading ? 'opacity-50' : 'opacity-100'
           }`}
         >
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-blue-800/40">
+          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-surface-800">
             <h2 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
               {isToday ? "Today's Repairs" : `Repairs — ${selectedDateLabel}`}
             </h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-blue-900/30 dark:text-neutral-300">
+            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-300">
               {todaysRepairs.length} repair{todaysRepairs.length === 1 ? '' : 's'}
             </span>
           </div>
@@ -213,7 +213,7 @@ function DashboardPage() {
                   <Link
                     key={r.id}
                     to={`/batteries/${r.batteryCode}`}
-                    className="flex items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-blue-900/30"
+                    className="flex items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-surface-800"
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
                       {initials(r.staffName)}
@@ -225,7 +225,7 @@ function DashboardPage() {
                         <span className="font-mono text-slate-400 dark:text-neutral-500">{r.batteryCode}</span>
                       </p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-blue-900/30 dark:text-neutral-400">
+                    <span className="shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
                       {new Date(r.repairedAt).toLocaleTimeString([], {
                         hour: '2-digit',
                         minute: '2-digit',
@@ -250,11 +250,11 @@ function DashboardPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800/40 dark:bg-blue-900/20">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-surface-700 dark:bg-surface-900">
             <MiniCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} />
           </div>
 
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800/40 dark:bg-blue-900/20">
+          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-surface-700 dark:bg-surface-900">
             <h2 className="mb-3 text-sm font-semibold text-slate-800 dark:text-neutral-100">Quick Actions</h2>
             <ul className="flex flex-col gap-2 text-sm">
               {QUICK_ACTIONS.filter((action) => hasPermission(user, action.permission)).map(
@@ -271,9 +271,75 @@ function DashboardPage() {
         </div>
       </div>
 
+      {/* ── Recent Client Battery Returns & Receipts Notification Feed ─────── */}
+      <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-surface-800">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4.5 w-4.5">
+                <path d="M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h12V6.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM13.5 15h-12v2.625c0 1.035.84 1.875 1.875 1.875h.375a3 3 0 1 1 6 0h3a.75.75 0 0 0 .75-.75V15Z" />
+                <path d="M8.25 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0ZM15.75 6.75a.75.75 0 0 0-.75.75v11.25c0 .087.015.17.042.248a3 3 0 0 1 5.958.464c.853-.175 1.522-.935 1.464-1.883a18.659 18.659 0 0 0-3.732-10.104 1.837 1.837 0 0 0-1.47-.725H15.75Z" />
+                <path d="M19.5 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
+              </svg>
+            </span>
+            <div>
+              <h2 className="text-sm font-bold text-slate-800 dark:text-white">
+                Client Battery Receipts & Returns
+              </h2>
+              <p className="text-[11px] text-slate-500 dark:text-neutral-400">
+                Live alerts for repaired batteries dispatched to and received by client fleets
+              </p>
+            </div>
+          </div>
+          {hasPermission(user, 'returns') && (
+            <Link
+              to="/returns"
+              className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400"
+            >
+              View All Returns →
+            </Link>
+          )}
+        </div>
+
+        {recentClientReturns.length === 0 ? (
+          <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
+            No client returns recorded yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {recentClientReturns.map((ret) => (
+              <Link
+                key={ret.id}
+                to={`/returns/${ret.id}`}
+                className="flex flex-col justify-between gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all hover:scale-[1.01] hover:shadow-xs dark:border-white/10 dark:bg-surface-850"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                      ✓ Client Received
+                    </span>
+                    <h3 className="mt-1.5 truncate text-xs font-bold text-slate-900 dark:text-white">
+                      {ret.clientName}
+                    </h3>
+                  </div>
+                  <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-neutral-200">
+                    {ret.batteryCount} {ret.batteryCount === 1 ? 'battery' : 'batteries'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-[10px] text-slate-400 dark:border-white/5 dark:text-neutral-500">
+                  <span className="truncate">Truck {ret.truckNumber || 'N/A'} {ret.driverName ? `• ${ret.driverName}` : ''}</span>
+                  <span className="shrink-0">{new Date(ret.returnedAt).toLocaleDateString([], { day: '2-digit', month: 'short' })}</span>
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
+      </div>
+
       <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-blue-800/40 dark:bg-blue-900/20">
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-blue-800/40">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-surface-800">
             <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-neutral-100">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-blue-500">
                 <path
@@ -285,7 +351,7 @@ function DashboardPage() {
               Average Time by Service
             </h2>
             {serviceTimes?.byPart?.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-blue-900/30 dark:text-neutral-300">
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-300">
                 {serviceTimes.byPart.length} service{serviceTimes.byPart.length === 1 ? '' : 's'}
               </span>
             )}
@@ -303,8 +369,8 @@ function DashboardPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-blue-800/40 dark:bg-blue-900/20">
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-blue-800/40">
+        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
+          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-surface-800">
             <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-neutral-100">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-blue-500">
                 <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7 9a7 7 0 1 1 14 0 1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
@@ -312,7 +378,7 @@ function DashboardPage() {
               Average Time by Technician
             </h2>
             {serviceTimes?.byStaff?.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-blue-900/30 dark:text-neutral-300">
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-300">
                 {serviceTimes.byStaff.length} technician{serviceTimes.byStaff.length === 1 ? '' : 's'}
               </span>
             )}

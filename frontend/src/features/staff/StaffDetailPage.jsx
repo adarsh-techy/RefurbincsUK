@@ -116,7 +116,7 @@ function StaffDetailPage() {
 
       <PageHeader
         title={staff.name}
-        description={[staff.role, staff.phone].filter(Boolean).join(' · ') || 'No details on file'}
+        description={[staff.role ? staff.role.charAt(0).toUpperCase() + staff.role.slice(1) : 'Technician', staff.phone].filter(Boolean).join(' · ') || 'No details on file'}
       />
 
       <div

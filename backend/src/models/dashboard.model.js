@@ -143,6 +143,25 @@ async function getAvgDurationByStaff(limit) {
   return rows;
 }
 
+async function getRecentClientReturns(limit = 6) {
+  const { rows } = await db.query(
+    `SELECT 
+       r.id,
+       r.truck_number,
+       r.driver_name,
+       r.battery_count,
+       r.returned_at,
+       c.name AS client_name,
+       c.id AS client_id
+     FROM returns r
+     LEFT JOIN clients c ON c.id = r.client_id
+     ORDER BY r.returned_at DESC
+     LIMIT $1`,
+    [limit]
+  );
+  return rows;
+}
+
 module.exports = {
   getTotals,
   getMonthlyComparison,
@@ -152,4 +171,5 @@ module.exports = {
   getHourlyRepairsToday,
   getAvgDurationByPart,
   getAvgDurationByStaff,
+  getRecentClientReturns,
 };

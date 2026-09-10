@@ -6,11 +6,11 @@ import TableState from '../../components/ui/TableState';
 import StatCard from '../../components/ui/StatCard';
 
 const STATUS_BREAKDOWN = [
-  { key: 'in_repair_count', label: 'Pending', dot: 'bg-warning-500' },
-  { key: 'in_progress_count', label: 'In Progress', dot: 'bg-critical-500' },
+  { key: 'in_repair_count', label: 'Awaiting Repair', dot: 'bg-warning-500' },
+  { key: 'in_progress_count', label: 'Repair In Progress', dot: 'bg-critical-500' },
   { key: 'in_testing_count', label: 'In Testing', dot: 'bg-blue-500' },
-  { key: 'repaired_count', label: 'Completed', dot: 'bg-brand-500' },
-  { key: 'returned_count', label: 'Returned', dot: 'bg-info-500' },
+  { key: 'repaired_count', label: 'Repair Completed', dot: 'bg-brand-500' },
+  { key: 'returned_count', label: 'Returned to Client', dot: 'bg-info-500' },
 ];
 
 // A client's detail page — status breakdown across every battery they've
@@ -63,7 +63,13 @@ function ClientDetailPage() {
 
       <PageHeader
         title={client.name}
-        description={client.login_email ? `Login: ${client.login_email}` : 'No login access'}
+        description={
+          client.invoice_email
+            ? `Invoice Email: ${client.invoice_email}${client.login_email ? ` • Login: ${client.login_email}` : ''}`
+            : client.login_email
+              ? `Login: ${client.login_email}`
+              : 'No login access'
+        }
       />
 
       <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl border-l-4 border-y border-r border-slate-200 bg-gradient-to-r from-emerald-50 to-white p-5 shadow-sm dark:border-y-surface-700 dark:border-r-surface-700 dark:from-emerald-500/15 dark:to-black border-brand-500">

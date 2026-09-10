@@ -165,4 +165,23 @@ async function remove(req, res, next) {
   }
 }
 
-module.exports = { list, getById, create, importSheet, update, remove };
+async function verifyArrival(req, res, next) {
+  try {
+    const intake = await truckIntakeModel.verifyArrival(req.params.id, req.user.id);
+    if (!intake) {
+      return res.status(404).json({ message: 'Truck intake not found.' });
+    }
+    await auditLogModel.record({
+      userId: req.user.id,
+      action: 'verify_arrival',
+      entity: 'truck_intake',
+      entityId: intake.id,
+      details: { truckNumber: intake.truck_number, driverName: intake.driver_name },
+    });
+    res.json({ message: `Truck ${intake.truck_number} arrival verified successfully.`, intake });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { list, getById, create, importSheet, update, remove, verifyArrival };

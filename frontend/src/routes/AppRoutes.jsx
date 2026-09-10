@@ -1,5 +1,6 @@
 import { lazy } from 'react';
 import { Routes, Route } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import ProtectedRoute from './ProtectedRoute';
 import HomeRoute from './HomeRoute';
 import DashboardLayout from '../components/layout/DashboardLayout';
@@ -8,12 +9,7 @@ import RegisterPage from '../features/auth/RegisterPage';
 import SetPasswordPage from '../features/auth/SetPasswordPage';
 import NotFoundPage from '../pages/NotFoundPage';
 
-// Every other route is loaded on demand — each feature page (and whatever
-// heavy libraries it alone pulls in, e.g. jspdf on the battery detail page)
-// ships in its own chunk instead of bloating the one bundle every user
-// downloads just to reach the login screen. DashboardLayout wraps its
-// <Outlet /> in a Suspense boundary, so the sidebar/navbar shell stays
-// mounted while a page chunk loads.
+// Every other route is loaded on demand
 const TruckIntakePage = lazy(() => import('../features/truck-intake/TruckIntakePage'));
 const TruckIntakeDetailPage = lazy(() => import('../features/truck-intake/TruckIntakeDetailPage'));
 const BatteriesPage = lazy(() => import('../features/batteries/BatteriesPage'));
@@ -29,8 +25,13 @@ const ClientsPage = lazy(() => import('../features/clients/ClientsPage'));
 const IssueReasonsPage = lazy(() => import('../features/issue-reasons/IssueReasonsPage'));
 const ClientDetailPage = lazy(() => import('../features/clients/ClientDetailPage'));
 const ClientBatteriesPage = lazy(() => import('../features/clients/ClientBatteriesPage'));
+const ClientHistoryPage = lazy(() => import('../features/clients/ClientHistoryPage'));
+const ClientBatterySortPage = lazy(() => import('../features/clients/ClientBatterySortPage'));
 const ClientTransactionsPage = lazy(() => import('../features/clients/ClientTransactionsPage'));
+const ClientNotificationsPage = lazy(() => import('../features/clients/ClientNotificationsPage'));
 const ClientProfilePage = lazy(() => import('../features/clients/ClientProfilePage'));
+const ClientSupportPage = lazy(() => import('../features/support/ClientSupportPage'));
+const AdminMessagesPage = lazy(() => import('../features/support/AdminMessagesPage'));
 const TechnicianDashboardPage = lazy(() => import('../features/batteries/TechnicianDashboardPage'));
 const TechnicianHistoryPage = lazy(() => import('../features/batteries/TechnicianHistoryPage'));
 const ReturnsPage = lazy(() => import('../features/returns/ReturnsPage'));
@@ -40,6 +41,16 @@ const RecycleDetailPage = lazy(() => import('../features/recycle/RecycleDetailPa
 const AuditLogPage = lazy(() => import('../features/audit-log/AuditLogPage'));
 const FinancePage = lazy(() => import('../features/finance/FinancePage'));
 const UsersPage = lazy(() => import('../features/users/UsersPage'));
+const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
+const ClientInvoicesPage = lazy(() => import('../features/clients/ClientInvoicesPage'));
+const RecycleClientShipmentsPage = lazy(() => import('../features/recycle-client/RecycleClientShipmentsPage'));
+const RecycleClientsAdminPage = lazy(() => import('../features/recycle-client/RecycleClientsAdminPage'));
+
+function HistoryRouter() {
+  const user = useSelector((state) => state.auth.user);
+  if (user?.role === 'technician') return <TechnicianHistoryPage />;
+  return <ClientHistoryPage />;
+}
 
 function AppRoutes() {
   return (
@@ -48,17 +59,27 @@ function AppRoutes() {
       {/* TEMPORARY: remove this route once real admin management is in use. */}
       <Route path="/register" element={<RegisterPage />} />
 
+      {/* Battery Detail & Full History: Accessible both publicly via QR scan and when logged in */}
+      <Route element={<DashboardLayout />}>
+        <Route path="/batteries/:code" element={<BatteryDetailPage />} />
+      </Route>
+
       <Route element={<ProtectedRoute />}>
         <Route path="/set-password" element={<SetPasswordPage />} />
 
         <Route element={<DashboardLayout />}>
           <Route path="/" element={<HomeRoute />} />
-          <Route path="/batteries/:code" element={<BatteryDetailPage />} />
+
+          {/* Admin & Operations Messages */}
+          <Route element={<ProtectedRoute roles={['super_admin', 'admin', 'staff']} />}>
+            <Route path="/messages" element={<AdminMessagesPage />} />
+          </Route>
 
           <Route element={<ProtectedRoute roles={['super_admin', 'admin']} />}>
             <Route path="/batteries" element={<BatteriesPage />} />
             <Route path="/batteries/unserviceable" element={<UnserviceableBatteriesPage />} />
             <Route path="/batteries-qr-code" element={<GenerateQrPage />} />
+            <Route path="/invoices" element={<InvoicesPage />} />
           </Route>
 
           <Route element={<ProtectedRoute permission="truck_intakes" />}>
@@ -79,21 +100,44 @@ function AppRoutes() {
           <Route element={<ProtectedRoute permission="clients" />}>
             <Route path="/clients" element={<ClientsPage />} />
             <Route path="/clients/:id" element={<ClientDetailPage />} />
+            <Route path="/recycle-clients" element={<RecycleClientsAdminPage />} />
           </Route>
           <Route element={<ProtectedRoute permission="issue_reasons" />}>
             <Route path="/issue-reasons" element={<IssueReasonsPage />} />
           </Route>
 
-          <Route element={<ProtectedRoute roles={['client']} />}>
+          {/* Client Portal Routes */}
+          <Route element={<ProtectedRoute roles={['client', 'recycle_client']} clientPermission="client_support" />}>
+            <Route path="/my/support" element={<ClientSupportPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['client']} clientPermission="client_invoices" />}>
+            <Route path="/my/invoices" element={<ClientInvoicesPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['client']} clientPermission="client_notifications" />}>
+            <Route path="/my/notifications" element={<ClientNotificationsPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['client']} clientPermission="client_transactions" />}>
             <Route path="/my/transactions" element={<ClientTransactionsPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['client']} />}>
+            <Route path="/my/batteries" element={<ClientBatteriesPage />} />
             <Route path="/my/batteries/:bucket" element={<ClientBatteriesPage />} />
           </Route>
-          <Route element={<ProtectedRoute roles={['client', 'technician']} />}>
+          <Route element={<ProtectedRoute roles={['client']} clientPermission="client_battery_sorting" />}>
+            <Route path="/my/battery-sorting" element={<ClientBatterySortPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['client', 'technician', 'recycle_client']} />}>
             <Route path="/my/profile" element={<ClientProfilePage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['recycle_client']} />}>
+            <Route path="/my/recycle-shipments" element={<RecycleClientShipmentsPage />} />
+            <Route path="/recycle/:id" element={<RecycleDetailPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={['client', 'technician']} />}>
+            <Route path="/my/history" element={<HistoryRouter />} />
           </Route>
           <Route element={<ProtectedRoute roles={['technician']} />}>
             <Route path="/my/dashboard" element={<TechnicianDashboardPage />} />
-            <Route path="/my/history" element={<TechnicianHistoryPage />} />
           </Route>
           <Route element={<ProtectedRoute permission="returns" />}>
             <Route path="/returns" element={<ReturnsPage />} />

@@ -8,7 +8,10 @@ const userModel = require('../models/user.model');
 // next request instead of only after they log in again.
 async function requireAuth(req, res, next) {
   const header = req.headers.authorization || '';
-  const token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  let token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token && req.query?.token) {
+    token = req.query.token;
+  }
 
   if (!token) {
     return res.status(401).json({ message: 'Authentication required' });
@@ -24,6 +27,29 @@ async function requireAuth(req, res, next) {
     next();
   } catch (err) {
     res.status(401).json({ message: 'Invalid or expired token' });
+  }
+}
+
+async function optionalAuth(req, res, next) {
+  const header = req.headers.authorization || '';
+  let token = header.startsWith('Bearer ') ? header.slice(7) : null;
+  if (!token && req.query?.token) {
+    token = req.query.token;
+  }
+
+  if (!token) {
+    return next();
+  }
+
+  try {
+    const decoded = jwt.verify(token, env.jwt.secret);
+    const user = await userModel.findById(decoded.id);
+    if (user && user.active) {
+      req.user = user;
+    }
+    next();
+  } catch {
+    next();
   }
 }
 
@@ -53,4 +79,5 @@ function requirePermission(permission) {
   };
 }
 
-module.exports = { requireAuth, requireRole, requirePermission };
+module.exports = { requireAuth, optionalAuth, requireRole, requirePermission };
+

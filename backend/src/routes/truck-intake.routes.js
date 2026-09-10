@@ -27,6 +27,7 @@ router.get('/', truckIntakeController.list);
 router.get('/:id', truckIntakeController.getById);
 router.post('/', truckIntakeController.create);
 router.post('/import', upload.single('file'), truckIntakeController.importSheet);
+router.patch('/:id/verify-arrival', truckIntakeController.verifyArrival);
 // Editing/removing intakes is super_admin only, distinct from the
 // 'truck_intakes' permission (which only covers recording new intakes).
 router.patch('/:id', requireRole('super_admin'), truckIntakeController.update);

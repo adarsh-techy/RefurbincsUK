@@ -4,17 +4,23 @@ const TONES = {
   good: 'bg-brand-50 text-brand-800 dark:bg-emerald-500/15 dark:text-emerald-300',
   critical: 'bg-critical-50 text-critical-700 dark:bg-red-500/15 dark:text-red-300',
   testing: 'bg-blue-50 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
-  neutral: 'bg-slate-100 text-slate-600 dark:bg-surface-700 dark:text-neutral-300',
+  neutral: 'bg-slate-100 text-slate-700 dark:bg-surface-700 dark:text-neutral-300',
 };
 
 // battery/status strings from the API (snake_case) mapped to a tone +
-// professional display label.
+// professional display label. Worded to read unambiguously at a glance on
+// the admin/staff side — "Pending", "Completed", and "Returned" all read as
+// shorthand for something without a direction or a subject, which is fine
+// when you already know the workflow but easy to misread from a table row.
 const STATUS_MAP = {
-  in_repair: { tone: 'warning', label: 'Pending' },
-  in_progress: { tone: 'critical', label: 'In Progress' },
+  registered: { tone: 'neutral', label: 'Registered' },
+  with_client: { tone: 'info', label: 'With Client' },
+  new: { tone: 'neutral', label: 'Registered' },
+  in_repair: { tone: 'warning', label: 'Awaiting Repair' },
+  in_progress: { tone: 'critical', label: 'Repair In Progress' },
   in_testing: { tone: 'testing', label: 'In Testing' },
-  repaired: { tone: 'good', label: 'Completed' },
-  returned: { tone: 'info', label: 'Returned' },
+  repaired: { tone: 'good', label: 'Repair Completed' },
+  returned: { tone: 'info', label: 'Returned to Client' },
   unserviceable: { tone: 'critical', label: 'Unserviceable' },
   recycled: { tone: 'neutral', label: 'Recycled' },
 };
@@ -22,7 +28,7 @@ const STATUS_MAP = {
 function Badge({ tone = 'neutral', children }) {
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${TONES[tone]}`}
+      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONES[tone] || TONES.neutral}`}
     >
       {children}
     </span>
@@ -32,7 +38,39 @@ function Badge({ tone = 'neutral', children }) {
 // Convenience wrapper for the battery status enum specifically, since it
 // shows up on the Batteries table, the lookup panel, and the Repair form.
 export function StatusBadge({ status }) {
-  const meta = STATUS_MAP[status] || { tone: 'neutral', label: status };
+  if (!status || status === 'null' || status === 'undefined') {
+    return <Badge tone="neutral">Registered</Badge>;
+  }
+  const meta = STATUS_MAP[status] || {
+    tone: 'neutral',
+    label: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+  };
+  return <Badge tone={meta.tone}>{meta.label}</Badge>;
+}
+
+// Same statuses as StatusBadge, but worded for the client portal instead of
+// staff — "Pending" / "In Progress" / "Completed" read as internal workshop
+// shorthand to someone who isn't in the shop day to day. These names mirror
+// the client sidebar's own bucket labels (Packed, In Service, Received) so
+// the wording is consistent everywhere a client sees it.
+const CLIENT_STATUS_MAP = {
+  in_repair: { tone: 'warning', label: 'Packed for Repair' },
+  in_progress: { tone: 'critical', label: 'In Service' },
+  in_testing: { tone: 'critical', label: 'In Service' },
+  repaired: { tone: 'good', label: 'Repair Complete' },
+  returned: { tone: 'info', label: 'Back in Your Fleet' },
+  unserviceable: { tone: 'critical', label: 'Not Repairable' },
+  recycled: { tone: 'neutral', label: 'Recycled' },
+};
+
+export function ClientStatusBadge({ status }) {
+  if (!status || status === 'null' || status === 'undefined') {
+    return <Badge tone="neutral">Registered</Badge>;
+  }
+  const meta = CLIENT_STATUS_MAP[status] || {
+    tone: 'neutral',
+    label: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+  };
   return <Badge tone={meta.tone}>{meta.label}</Badge>;
 }
 

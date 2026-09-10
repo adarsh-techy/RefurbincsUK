@@ -44,4 +44,17 @@ async function remove(id) {
   await db.query('DELETE FROM truck_intakes WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, findById, create, update, remove };
+async function verifyArrival(id, userId) {
+  const { rows } = await db.query(
+    `UPDATE truck_intakes
+     SET status = 'verified',
+         verified_at = now(),
+         verified_by_user_id = $2
+     WHERE id = $1
+     RETURNING *`,
+    [id, userId]
+  );
+  return rows[0];
+}
+
+module.exports = { findAll, findById, create, update, remove, verifyArrival };

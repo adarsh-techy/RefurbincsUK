@@ -72,8 +72,13 @@ function PartsPage() {
     { key: 'quantity', label: 'Qty' },
     {
       key: 'repair_cost',
-      label: 'Repair Cost',
+      label: 'Price',
       render: (row) => `£${Number(row.repair_cost).toFixed(2)}`,
+    },
+    {
+      key: 'service_charge',
+      label: 'Service Charge',
+      render: (row) => `£${Number(row.service_charge || 0).toFixed(2)}`,
     },
     {
       key: 'in_stock',

@@ -50,8 +50,18 @@ function StaffPage() {
         </Link>
       ),
     },
-    { key: 'phone', label: 'Phone', render: (row) => row.phone || '—' },
-    { key: 'role', label: 'Role', render: (row) => row.role || '—' },
+    {
+      key: 'role',
+      label: 'Role',
+      render: (row) => {
+        const role = row.role ? row.role.charAt(0).toUpperCase() + row.role.slice(1) : 'Technician';
+        return (
+          <span className="font-medium text-slate-800 dark:text-neutral-200">
+            {role}
+          </span>
+        );
+      },
+    },
     {
       key: 'login_email',
       label: 'Login',

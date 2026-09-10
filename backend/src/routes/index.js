@@ -12,7 +12,10 @@ router.use('/issue-reasons', require('./issue-reason.routes'));
 router.use('/repairs', require('./repair.routes'));
 router.use('/returns', require('./return.routes'));
 router.use('/recycle', require('./recycle.routes'));
+router.use('/recycle-client', require('./recycle-client.routes'));
 router.use('/audit-logs', require('./audit-log.routes'));
 router.use('/finance', require('./finance.routes'));
+router.use('/invoices', require('./invoice.routes'));
+router.use('/tickets', require('./ticket.routes'));
 
 module.exports = router;

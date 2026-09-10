@@ -65,7 +65,7 @@ function RepairEditForm({ repair, onSaved, onCancel }) {
         </div>
 
         <div className="flex items-center justify-between rounded-lg bg-brand-50 px-4 py-3 dark:bg-emerald-500/10">
-          <span className="text-sm font-medium text-slate-700 dark:text-neutral-200">Repair Cost</span>
+          <span className="text-sm font-medium text-slate-700 dark:text-neutral-200">Price</span>
           <span className="text-base font-semibold text-brand-700 dark:text-emerald-400">
             £{Number(repair.price).toFixed(2)}
           </span>

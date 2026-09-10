@@ -153,65 +153,69 @@ function ReturnForm({ onCreated, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
-        <div>
-          <label className={labelClasses}>Truck Number</label>
-          <input
-            type="text"
-            value={form.truckNumber}
-            onChange={(e) => updateField('truckNumber', e.target.value)}
-            placeholder="e.g. KL18S1234"
-            className={inputClasses}
-            required
-          />
+        {/* Top Details Grid */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div>
+            <label className={labelClasses}>Truck Number</label>
+            <input
+              type="text"
+              value={form.truckNumber}
+              onChange={(e) => updateField('truckNumber', e.target.value)}
+              placeholder="e.g. GB21 XYZ"
+              className={inputClasses}
+              required
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>Driver Name</label>
+            <input
+              type="text"
+              value={form.driverName}
+              onChange={(e) => updateField('driverName', e.target.value)}
+              placeholder="e.g. George Davies"
+              className={inputClasses}
+              required
+            />
+          </div>
+
+          <div className="relative">
+            <label className={labelClasses}>Client</label>
+            <input
+              type="text"
+              value={selectedClient ? selectedClient.name : ''}
+              onFocus={() => setShowClientSuggestions(true)}
+              onBlur={() => setTimeout(() => setShowClientSuggestions(false), 150)}
+              placeholder="Click to choose a client"
+              readOnly
+              className={`${inputClasses} cursor-pointer`}
+              required
+            />
+
+            {showClientSuggestions && (clients || []).length > 0 && (
+              <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-blue-200 bg-white py-1 shadow-lg dark:border-blue-800/40 dark:bg-black">
+                {(clients || []).map((c) => (
+                  <li key={c.id}>
+                    <button
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => selectClient(String(c.id))}
+                      className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 dark:text-neutral-100 dark:hover:bg-blue-900/30"
+                    >
+                      {c.name}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
         </div>
 
-        <div>
-          <label className={labelClasses}>Driver Name</label>
-          <input
-            type="text"
-            value={form.driverName}
-            onChange={(e) => updateField('driverName', e.target.value)}
-            placeholder="e.g. Adarsh"
-            className={inputClasses}
-            required
-          />
-        </div>
-
-        <div className="relative">
-          <label className={labelClasses}>Client</label>
-          <input
-            type="text"
-            value={selectedClient ? selectedClient.name : ''}
-            onFocus={() => setShowClientSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowClientSuggestions(false), 150)}
-            placeholder="Click to choose a client"
-            readOnly
-            className={`${inputClasses} cursor-pointer`}
-            required
-          />
-
-          {showClientSuggestions && (clients || []).length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-blue-200 bg-white py-1 shadow-lg dark:border-blue-800/40 dark:bg-black">
-              {(clients || []).map((c) => (
-                <li key={c.id}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => selectClient(String(c.id))}
-                    className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 dark:text-neutral-100 dark:hover:bg-blue-900/30"
-                  >
-                    {c.name}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
+        {/* Scan & Select Batteries Card */}
         <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
           <div className="mb-1 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">Scan Batteries (returning)</h3>
-            <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
+            <span className="rounded-full bg-blue-100 px-3 py-0.5 text-xs font-semibold text-blue-800 dark:bg-blue-900/40 dark:text-blue-300">
               {addedBatteries.length} added
             </span>
           </div>
@@ -263,7 +267,7 @@ function ReturnForm({ onCreated, onCancel }) {
               type="button"
               onClick={submitScanInput}
               disabled={scanLoading || !form.clientId || !scanInputIsAvailable}
-              className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              className="shrink-0 rounded-md bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
             >
               Add
             </button>
@@ -271,9 +275,9 @@ function ReturnForm({ onCreated, onCancel }) {
               type="button"
               onClick={() => setCameraOpen((prev) => !prev)}
               disabled={!form.clientId}
-              className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+              className="shrink-0 rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
             >
-              {cameraOpen ? 'Close Camera' : 'Use Camera'}
+              {cameraOpen ? 'Close Camera' : '📷 Use Camera'}
             </button>
           </div>
 
@@ -286,48 +290,57 @@ function ReturnForm({ onCreated, onCancel }) {
           )}
 
           {addedBatteries.length > 0 && (
-            <ul className="mt-3 flex flex-col gap-2">
-              {addedBatteries.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2.5 dark:border-surface-700 dark:bg-surface-900"
-                >
-                  <span className="text-sm font-medium text-slate-800 dark:text-neutral-100">{b.battery_code}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAdded(b.id)}
-                    className="rounded-md p-1.5 text-slate-400 hover:bg-critical-50 hover:text-critical-600 dark:text-neutral-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                    aria-label={`Remove ${b.battery_code}`}
-                    title="Remove"
+            <div className="mt-4">
+              <p className="mb-2 text-xs font-semibold text-slate-600 dark:text-neutral-300">
+                Batteries in this return shipment:
+              </p>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5 max-h-64 overflow-y-auto pr-1">
+                {addedBatteries.map((b) => (
+                  <div
+                    key={b.id}
+                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-xs dark:border-surface-700 dark:bg-surface-900"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.36-9.36a.75.75 0 0 0-1.06-1.06L10 9.94 7.7 7.64a.75.75 0 0 0-1.06 1.06L8.94 11l-2.3 2.3a.75.75 0 1 0 1.06 1.06L10 12.06l2.3 2.3a.75.75 0 0 0 1.06-1.06L11.06 11l2.3-2.3Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                    <span className="text-xs font-mono font-bold text-slate-800 dark:text-neutral-100 truncate">
+                      {b.battery_code}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAdded(b.id)}
+                      className="rounded-md p-1 text-slate-400 hover:bg-critical-50 hover:text-critical-600 dark:text-neutral-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+                      aria-label={`Remove ${b.battery_code}`}
+                      title="Remove"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                        <path
+                          fillRule="evenodd"
+                          d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.36-9.36a.75.75 0 0 0-1.06-1.06L10 9.94 7.7 7.64a.75.75 0 0 0-1.06 1.06L8.94 11l-2.3 2.3a.75.75 0 1 0 1.06 1.06L10 12.06l2.3 2.3a.75.75 0 0 0 1.06-1.06L11.06 11l2.3-2.3Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
 
-        <div>
-          <label className={labelClasses}>Total Batteries</label>
-          <p className="rounded-md border border-dashed border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-pink-700 dark:border-surface-700 dark:text-pink-400">
+        <div className="flex items-center justify-between rounded-xl border border-dashed border-slate-200 bg-slate-50/50 px-4 py-3 dark:border-surface-700 dark:bg-surface-950/50">
+          <div>
+            <label className="text-xs font-semibold text-slate-700 dark:text-neutral-200">Total Returning Batteries</label>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400">
+              Scanned work-completed batteries ready to return.
+            </p>
+          </div>
+          <span className="rounded-lg bg-pink-100 px-3 py-1 text-sm font-bold text-pink-700 dark:bg-pink-900/40 dark:text-pink-300">
             {addedBatteries.length}
-          </p>
-          <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-            Scanned returning batteries, added automatically.
-          </p>
+          </span>
         </div>
       </div>
 
       {error && <p className="text-sm text-critical-600 dark:text-red-400">{error}</p>}
 
-      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-surface-700">
+      <div className="flex justify-end gap-2.5 border-t border-slate-100 pt-4 dark:border-surface-700">
         {onCancel && (
           <button
             type="button"
@@ -340,9 +353,9 @@ function ReturnForm({ onCreated, onCancel }) {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          className="rounded-md bg-brand-600 px-5 py-2 text-sm font-semibold text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
         >
-          {submitting ? 'Recording…' : `Record Return (${addedBatteries.length})`}
+          {submitting ? 'Recording…' : `Record Return (${addedBatteries.length} batteries)`}
         </button>
       </div>
     </form>

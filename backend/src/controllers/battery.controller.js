@@ -1,5 +1,6 @@
 const batteryModel = require('../models/battery.model');
 const staffModel = require('../models/staff.model');
+const clientModel = require('../models/client.model');
 const recycleModel = require('../models/recycle.model');
 const realtime = require('../realtime');
 
@@ -54,6 +55,7 @@ async function list(req, res, next) {
       req.query.qrGenerated === 'true' ? true : req.query.qrGenerated === 'false' ? false : undefined;
     const includeBlocked = req.query.includeBlocked === 'true';
     const activeOnly = req.query.activeOnly === 'true';
+    const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
     const { rows, hasMore } = await batteryModel.findPage({
       limit,
@@ -66,6 +68,7 @@ async function list(req, res, next) {
       qrGenerated,
       includeBlocked,
       activeOnly,
+      sortOrder,
     });
     res.json({ data: rows, hasMore });
   } catch (err) {
@@ -169,10 +172,10 @@ async function countByClient(req, res, next) {
   try {
     const clientName = typeof req.query.clientName === 'string' ? req.query.clientName.trim() : '';
     if (!clientName) {
-      return res.json({ count: 0 });
+      return res.json({ lastNumber: 0 });
     }
-    const count = await batteryModel.countByClientName(clientName);
-    res.json({ count });
+    const lastNumber = await batteryModel.maxSequenceByClientName(clientName);
+    res.json({ lastNumber });
   } catch (err) {
     next(err);
   }
@@ -193,7 +196,12 @@ async function generate(req, res, next) {
     if (!batteryCode) {
       return res.status(400).json({ message: 'Battery ID could not be generated.' });
     }
-    const battery = await batteryModel.createForClient({ batteryCode, serialNumber, clientName });
+    const battery = await batteryModel.createForClient({
+      batteryCode,
+      serialNumber,
+      clientName,
+      addedByRole: req.user?.role || 'admin',
+    });
     res.status(201).json(battery);
   } catch (err) {
     if (err.code === '23505') {
@@ -203,6 +211,100 @@ async function generate(req, res, next) {
         });
       }
       return res.status(409).json({ message: 'That battery ID is already in use — try again.' });
+    }
+    next(err);
+  }
+}
+
+// Bulk creates up to 50,000 QR codes for a client in one batch.
+async function generateBulk(req, res, next) {
+  try {
+    const clientName = typeof req.body.clientName === 'string' ? req.body.clientName.trim() : '';
+    const count = parseInt(req.body.count, 10);
+    const startNumber = req.body.startNumber ? parseInt(req.body.startNumber, 10) : undefined;
+
+    if (!clientName) {
+      return res.status(400).json({ message: 'Select a client first.' });
+    }
+    if (isNaN(count) || count < 1 || count > 50000) {
+      return res.status(400).json({ message: 'Please enter a count between 1 and 50,000.' });
+    }
+
+    const result = await batteryModel.createManyForClient({
+      clientName,
+      count,
+      startNumber,
+    });
+
+    res.status(201).json({
+      message: `Successfully generated ${result.count.toLocaleString()} QR codes for ${clientName}.`,
+      ...result,
+      clientName,
+    });
+  } catch (err) {
+    if (err.code === '23505') {
+      return res.status(409).json({
+        message: 'Some battery IDs in this range already exist. Please adjust the starting number.',
+      });
+    }
+    next(err);
+  }
+}
+
+// Updates or adds the physical Battery Number (manufacturer serial).
+// If a client sets the battery number, admins cannot overwrite it ("if client add then not add admin").
+async function updateSerialNumber(req, res, next) {
+  try {
+    const batteryId = req.params.id;
+    const serialNumber = typeof req.body.serialNumber === 'string' ? req.body.serialNumber.trim() : '';
+    const existing = await batteryModel.findById(batteryId);
+
+    if (!existing) {
+      return res.status(404).json({ message: 'Battery not found.' });
+    }
+
+    let addedByRole = req.user?.role || 'admin';
+
+    if (req.user?.role === 'client') {
+      const client = await clientModel.findByUserId(req.user.id);
+      if (!client) {
+        return res.status(403).json({ message: 'Your account is not linked to a client record.' });
+      }
+      const batteryClient = (existing.client_name || '').toLowerCase();
+      const userClient = (client.name || '').toLowerCase();
+      if (batteryClient && userClient && batteryClient !== userClient) {
+        return res.status(403).json({ message: 'You can only edit batteries belonging to your company.' });
+      }
+      // A client can set the Battery Number once, while it's still blank,
+      // but can't come back and edit it afterwards — that's an admin-only
+      // action now (with a type-to-confirm gate on the frontend), so a
+      // client can't quietly overwrite a number that's already on file,
+      // whoever set it.
+      if (existing.serial_number) {
+        return res.status(403).json({
+          message: 'This battery already has a Battery Number on file. Contact your workshop to change it.',
+        });
+      }
+      addedByRole = 'client';
+    }
+    // Admin / super_admin may set or override the Battery Number at any
+    // time, including one a client set — the frontend gates that override
+    // behind typing a confirmation word rather than blocking it here.
+
+    const updated = await batteryModel.updateSerialNumber(batteryId, {
+      serialNumber,
+      addedByRole,
+    });
+
+    realtime.broadcastBatteryUpdated(updated);
+    res.json(updated);
+  } catch (err) {
+    if (err.code === '23505') {
+      if (err.constraint === 'batteries_client_serial_unique') {
+        return res.status(409).json({
+          message: 'This client already has a battery registered with that number.',
+        });
+      }
     }
     next(err);
   }
@@ -252,10 +354,24 @@ async function startWork(req, res, next) {
   }
 }
 
-// A technician confirming a battery works after its parts were replaced —
-// the last step before it's fully done.
+// Confirms a battery works after its parts were replaced — restricted to
+// Supervisors, Managers, and Admins (Technicians do not have testing permission).
 async function completeTesting(req, res, next) {
   try {
+    if (req.user.role === 'technician') {
+      const staff = await staffModel.findByUserId(req.user.id);
+      if (!staff) {
+        return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
+      }
+      const staffRole = (staff.role || '').toLowerCase();
+      if (staffRole === 'technician') {
+        return res.status(403).json({
+          message:
+            'Technicians do not have permission to perform testing. Only Supervisors and Managers can complete testing.',
+        });
+      }
+    }
+
     const battery = await batteryModel.completeTesting(req.params.id);
     if (!battery) {
       return res.status(409).json({
@@ -332,6 +448,8 @@ module.exports = {
   updateClient,
   countByClient,
   generate,
+  generateBulk,
+  updateSerialNumber,
   listSerialNumbers,
   repeatIntakesThisMonth,
   unserviceableCount,

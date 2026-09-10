@@ -1,15 +1,36 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import apiClient from '../../services/api-client';
 import { socket } from '../../services/socket-client';
 import PageHeader from '../../components/ui/PageHeader';
 import Modal from '../../components/ui/Modal';
 import TableState from '../../components/ui/TableState';
-import { StatusBadge } from '../../components/ui/Badge';
+import { StatusBadge, ClientStatusBadge } from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
 import TechnicianRepairPanel from './TechnicianRepairPanel';
+import {
+  FiPackage,
+  FiTruck,
+  FiTool,
+  FiCheckCircle,
+  FiAlertTriangle,
+  FiDownload,
+  FiPrinter,
+  FiLayers,
+  FiCalendar,
+  FiExternalLink,
+  FiShield,
+  FiCpu,
+  FiActivity,
+  FiArrowLeft,
+  FiGrid,
+  FiChevronDown,
+  FiChevronUp,
+  FiZap,
+  FiCheck,
+} from 'react-icons/fi';
 
 const STATUS_ACCENT = {
   in_repair: 'border-warning-500',
@@ -27,10 +48,6 @@ const STATUS_ICON_BG = {
   returned: 'bg-info-100 text-info-700 dark:bg-sky-500/15 dark:text-sky-300',
 };
 
-// Tints the status banner itself so the battery's state reads at a glance
-// instead of only showing up in the thin left border + small icon. Dark
-// mode fades to pure black (not surface-900) to match the rest of the app's
-// black-based theme (sidebar, navbar, modals).
 const STATUS_BANNER_BG = {
   in_repair: 'from-amber-50 to-white dark:from-amber-500/15 dark:to-black',
   in_progress: 'from-red-50 to-white dark:from-red-500/15 dark:to-black',
@@ -82,11 +99,6 @@ const EVENT_META = {
   },
 };
 
-// Flattens every truck intake this battery's ever been part of, every
-// repair, and every return into one chronological (oldest-first) list of
-// events. A battery that's come back on a different truck for a second (or
-// third...) repair round shows one "Intake" event per truck, not just its
-// original one.
 function buildEvents(visits, history, returns, issues) {
   const events = [];
 
@@ -132,19 +144,9 @@ function buildEvents(visits, history, returns, issues) {
   return events.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
-// Standard 5-step process indicator (Intake → Started → Tested → Repaired →
-// Returned) shown above each cycle's detailed timeline, mirroring the
-// battery's real status machine (in_repair -> in_progress -> in_testing ->
-// repaired -> returned) so the cycle's overall progress reads at a glance
-// before drilling into individual events.
 const PROCESS_STEPS = ['Intake', 'Started', 'Tested', 'Repaired', 'Returned'];
 const STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, in_testing: 2, repaired: 3, returned: 4 };
 
-// A battery found faulty during repair never reaches Tested/Repaired/
-// Returned — it diverges after Started into its own short dead-end flow, so
-// showing it against the normal 5 steps would read as "still on track to be
-// repaired" when it isn't. Steps from UNSERVICEABLE_DANGER_INDEX onward are
-// tinted red instead of green/blue to mark that diverging path.
 const UNSERVICEABLE_STEPS = ['Intake', 'Started', 'Unserviceable', 'Recycled'];
 const UNSERVICEABLE_STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, unserviceable: 2, recycled: 3 };
 const UNSERVICEABLE_DANGER_INDEX = 2;
@@ -155,10 +157,6 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   const steps = isUnserviceableFlow ? UNSERVICEABLE_STEPS : PROCESS_STEPS;
   const stepIndex = isUnserviceableFlow ? UNSERVICEABLE_STATUS_STEP_INDEX : STATUS_STEP_INDEX;
 
-  // A closed cycle (has a Returned event) passed through every stage.
-  // An ongoing cycle's progress is read straight off the battery's live
-  // status: everything up to and including that status is done, the next
-  // step is the current/pending action, everything after is untouched.
   const threshold = isOngoing ? stepIndex[batteryStatus] ?? 0 : steps.length - 1;
 
   const stepState = steps.map((_, i) => {
@@ -182,21 +180,11 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
                     : state === 2
                       ? 'bg-brand-600 text-white dark:bg-emerald-500'
                       : state === 1
-                        ? 'bg-blue-500 text-white'
-                        : 'bg-slate-200 text-slate-500 dark:bg-surface-700 dark:text-neutral-400'
+                        ? 'border-2 border-brand-600 text-brand-600 dark:border-emerald-500 dark:text-emerald-400'
+                        : 'bg-slate-100 text-slate-400 dark:bg-surface-700 dark:text-neutral-500'
                 }`}
               >
-                {state === 2 ? (
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                    <path
-                      fillRule="evenodd"
-                      d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                ) : (
-                  i + 1
-                )}
+                {state === 2 ? '✓' : i + 1}
               </span>
               <span
                 className={`text-xs font-medium whitespace-nowrap ${
@@ -226,11 +214,6 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   );
 }
 
-// Groups the flat event list into cycles: the first cycle is Intake +
-// repair(s) + Returned; each cycle after that is another repair(s) +
-// Returned round-trip. A "Returned" event always closes its cycle — the
-// next event (if any) starts a new one. A battery currently back at the
-// shop ends in a trailing cycle with no Returned event yet.
 function buildCycles(events) {
   const cycles = [];
   let current = [];
@@ -247,20 +230,642 @@ function buildCycles(events) {
   return cycles;
 }
 
-// Spec requirement: looking up a battery by its unique ID shows its full
-// history — which truck/driver brought it in, every part changed and by
-// whom, and which truck/driver took it back out — grouped one cycle
-// (intake/repair/return round-trip) at a time, in order.
+// ── CLIENT-SPECIFIC ELEGANT, VIBRANT & INTERACTIVE BATTERY VIEW ────────────
+function ClientBatteryDetailView({ battery, history = [], returns = [], visits = [], issues = [], qrDataUrl, onDownloadQr }) {
+  const navigate = useNavigate();
+
+  // Distinct repair cycles / batches
+  const repairBatches = {};
+  history.forEach((h) => {
+    const key = h.batch_id || `batch-${h.id}`;
+    if (!repairBatches[key]) {
+      repairBatches[key] = {
+        batchId: key,
+        date: h.repaired_at,
+        parts: [],
+        notes: h.notes,
+      };
+    }
+    if (h.part_name && !repairBatches[key].parts.includes(h.part_name)) {
+      repairBatches[key].parts.push(h.part_name);
+    }
+  });
+  const serviceVisitsList = Object.values(repairBatches).sort((a, b) => new Date(b.date) - new Date(a.date));
+
+  // State to track which maintenance visit cards are expanded
+  const [expandedBatches, setExpandedBatches] = useState(() => {
+    const initial = new Set();
+    if (serviceVisitsList.length > 0) {
+      initial.add(serviceVisitsList[0].batchId);
+    }
+    return initial;
+  });
+
+  const toggleBatch = (batchId) => {
+    setExpandedBatches((prev) => {
+      const next = new Set(prev);
+      if (next.has(batchId)) {
+        next.delete(batchId);
+      } else {
+        next.add(batchId);
+      }
+      return next;
+    });
+  };
+
+  const expandAll = () => {
+    setExpandedBatches(new Set(serviceVisitsList.map((v) => v.batchId)));
+  };
+
+  const collapseAll = () => {
+    setExpandedBatches(new Set());
+  };
+
+  // Helper for component tag styling
+  const getPartBadgeStyle = (partName) => {
+    const lower = (partName || '').toLowerCase();
+    if (lower.includes('bms') || lower.includes('circuit') || lower.includes('controller') || lower.includes('pcb') || lower.includes('board')) {
+      return 'bg-indigo-50 text-indigo-700 border-indigo-200/80 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/50';
+    }
+    if (lower.includes('cell') || lower.includes('lithium') || lower.includes('pack') || lower.includes('module')) {
+      return 'bg-emerald-50 text-emerald-700 border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50';
+    }
+    if (lower.includes('wire') || lower.includes('harness') || lower.includes('cable') || lower.includes('terminal')) {
+      return 'bg-amber-50 text-amber-700 border-amber-200/80 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50';
+    }
+    if (lower.includes('case') || lower.includes('housing') || lower.includes('cover') || lower.includes('enclosure') || lower.includes('fuse')) {
+      return 'bg-cyan-50 text-cyan-700 border-cyan-200/80 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800/50';
+    }
+    return 'bg-violet-50 text-violet-700 border-violet-200/80 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800/50';
+  };
+
+  // Determine Client-Friendly Status
+  const isReturned = battery.status === 'returned';
+  const isInService = battery.status === 'in_progress' || battery.status === 'in_testing' || battery.status === 'repaired';
+  const isPacked = battery.status === 'in_repair';
+  const isUnserviceable = battery.status === 'unserviceable' || battery.status === 'recycled';
+
+  // Client Status Stepper Configuration
+  const CLIENT_STEPS = [
+    { key: 'packed', label: 'Intake & Logging', desc: 'Received at workshop facility', icon: FiPackage, color: 'from-amber-500 to-orange-500' },
+    { key: 'in_progress', label: 'Cell & BMS Service', desc: 'Precision repair & restoration', icon: FiTool, color: 'from-blue-500 to-cyan-500' },
+    { key: 'in_testing', label: 'Safety & Bench Testing', desc: 'Capacity & load cycle verification', icon: FiActivity, color: 'from-indigo-500 to-purple-500' },
+    { key: 'repaired', label: 'Restoration Certified', desc: 'Quality approved & packed', icon: FiCheckCircle, color: 'from-emerald-500 to-teal-500' },
+    { key: 'returned', label: 'Active in Fleet', desc: 'Delivered & in operational rotation', icon: FiShield, color: 'from-emerald-600 to-teal-600' },
+  ];
+
+  let currentStepIdx = 0;
+  if (battery.status === 'in_repair') currentStepIdx = 0;
+  else if (battery.status === 'in_progress') currentStepIdx = 1;
+  else if (battery.status === 'in_testing') currentStepIdx = 2;
+  else if (battery.status === 'repaired') currentStepIdx = 3;
+  else if (battery.status === 'returned') currentStepIdx = 4;
+  else if (isUnserviceable) currentStepIdx = 1;
+
+  const latestReturn = returns?.[0] || null;
+  const latestIntake = visits?.[0] || null;
+
+  const allExpanded = serviceVisitsList.length > 0 && expandedBatches.size === serviceVisitsList.length;
+
+  return (
+    <div className="space-y-6 pb-12">
+      {/* ── Top Navigation Bar ──────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={() => (window.history.state?.idx > 0 ? navigate(-1) : navigate('/my/batteries/all'))}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 dark:bg-white/5 dark:text-neutral-200 dark:border-white/10 dark:hover:bg-white/10 shadow-xs transition-all cursor-pointer"
+        >
+          <FiArrowLeft className="w-4 h-4 text-emerald-500" />
+          <span>Back to Fleet Overview</span>
+        </button>
+
+        <div className="flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => window.print()}
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/80 hover:bg-slate-50 dark:bg-white/5 dark:text-neutral-200 dark:border-white/10 dark:hover:bg-white/10 shadow-xs transition-all cursor-pointer"
+          >
+            <FiPrinter className="w-3.5 h-3.5 text-slate-400" />
+            <span>Print Report</span>
+          </button>
+          {qrDataUrl && (
+            <button
+              type="button"
+              onClick={onDownloadQr}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold text-white bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 shadow-xs transition-all cursor-pointer"
+            >
+              <FiDownload className="w-3.5 h-3.5" />
+              <span>Download QR</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Battery Hero Header (Vibrant Gradient Mesh, No Client Name) ─ */}
+      <div className="relative overflow-hidden rounded-3xl border border-slate-200/80 bg-gradient-to-br from-white via-emerald-50/20 to-teal-50/30 p-6 sm:p-8 shadow-sm dark:border-white/10 dark:from-neutral-900 dark:via-neutral-900/90 dark:to-neutral-950">
+        {/* Glow ambient background orbs */}
+        <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-emerald-500/10 blur-3xl pointer-events-none" />
+        <div className="absolute -bottom-24 -left-24 w-72 h-72 rounded-full bg-blue-500/10 blur-3xl pointer-events-none" />
+
+        <div className="relative flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider bg-slate-900 text-white dark:bg-white/15 dark:text-white shadow-xs">
+                <FiZap className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                <span>Battery Asset</span>
+              </span>
+              <ClientStatusBadge status={battery.status} />
+              {battery.battery_type && (
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-purple-50 text-purple-700 border border-purple-200/80 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/50">
+                  {battery.battery_type}
+                </span>
+              )}
+            </div>
+
+            <div>
+              <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black font-mono tracking-tight text-slate-900 dark:text-white">
+                {battery.battery_code}
+              </h1>
+              {battery.serial_number && (
+                <p className="mt-1.5 text-sm font-mono font-semibold text-slate-500 dark:text-neutral-400 flex items-center gap-2">
+                  <span>Serial No:</span>
+                  <span className="px-2 py-0.5 rounded-lg bg-slate-100 dark:bg-white/10 font-bold text-slate-800 dark:text-neutral-200 border border-slate-200/60 dark:border-white/10">
+                    {battery.serial_number}
+                  </span>
+                </p>
+              )}
+            </div>
+
+            <div className="flex items-center gap-4 text-xs text-slate-500 dark:text-neutral-400 flex-wrap">
+              <span className="inline-flex items-center gap-1.5">
+                <FiCalendar className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Enrolled in Fleet: <strong>{battery.created_at ? new Date(battery.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</strong></span>
+              </span>
+              {battery.last_service_date && (
+                <span className="inline-flex items-center gap-1.5">
+                  <FiTool className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Last Service: <strong>{new Date(battery.last_service_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Scannable Tag QR Card */}
+          {qrDataUrl && (
+            <div className="shrink-0 flex items-center gap-4 bg-white/90 dark:bg-white/5 p-4 rounded-2xl border border-slate-200/80 dark:border-white/10 shadow-sm backdrop-blur-sm">
+              <img
+                src={qrDataUrl}
+                alt={`QR code for ${battery.battery_code}`}
+                className="w-20 h-20 rounded-xl object-contain bg-white p-1 border border-slate-100 shadow-2xs"
+              />
+              <div className="text-xs space-y-1.5">
+                <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1.5">
+                  <FiGrid className="w-4 h-4 text-emerald-500" />
+                  <span>Depot QR Tag</span>
+                </span>
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400 max-w-[140px] leading-relaxed">
+                  Fast scan for workshop intake, dispatch & fleet custody checks.
+                </p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ── 4 Colorful Client KPI Metric Cards ───────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Card 1: Operational Status (Emerald) */}
+        <div className="relative overflow-hidden rounded-2xl border border-emerald-200/70 bg-gradient-to-br from-emerald-500/10 via-emerald-500/5 to-transparent p-5 shadow-xs dark:border-emerald-500/20 dark:bg-white/5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+              Fleet Status
+            </span>
+            <span className="w-8 h-8 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <FiShield className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center gap-2">
+              <span
+                className={`h-3 w-3 rounded-full ${
+                  isReturned
+                    ? 'bg-emerald-500 shadow-sm shadow-emerald-500/50'
+                    : isInService
+                      ? 'bg-blue-500 animate-pulse shadow-sm shadow-blue-500/50'
+                      : isPacked
+                        ? 'bg-amber-500 shadow-sm shadow-amber-500/50'
+                        : 'bg-rose-500'
+                }`}
+              />
+              <span className="text-base font-extrabold text-slate-900 dark:text-white">
+                {isReturned
+                  ? 'Operational in Fleet'
+                  : isPacked
+                    ? 'Packed for Workshop'
+                    : isInService
+                      ? 'In Workshop Service'
+                      : 'Unserviceable'}
+              </span>
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">Live custody verification</p>
+          </div>
+        </div>
+
+        {/* Card 2: Service Cycles (Indigo) */}
+        <div className="relative overflow-hidden rounded-2xl border border-indigo-200/70 bg-gradient-to-br from-indigo-500/10 via-indigo-500/5 to-transparent p-5 shadow-xs dark:border-indigo-500/20 dark:bg-white/5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-400">
+              Service Visits
+            </span>
+            <span className="w-8 h-8 rounded-xl bg-indigo-500/15 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+              <FiTool className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <span className="text-3xl font-black text-indigo-950 dark:text-indigo-200 font-mono">
+              {serviceVisitsList.length}
+            </span>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+              {serviceVisitsList.length === 1 ? '1 Completed maintenance round' : `${serviceVisitsList.length} Completed maintenance rounds`}
+            </p>
+          </div>
+        </div>
+
+        {/* Card 3: Components Restored (Violet) */}
+        <div className="relative overflow-hidden rounded-2xl border border-violet-200/70 bg-gradient-to-br from-violet-500/10 via-violet-500/5 to-transparent p-5 shadow-xs dark:border-violet-500/20 dark:bg-white/5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-violet-700 dark:text-violet-400">
+              Restored Parts
+            </span>
+            <span className="w-8 h-8 rounded-xl bg-violet-500/15 text-violet-600 dark:text-violet-400 flex items-center justify-center">
+              <FiCpu className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <span className="text-3xl font-black text-violet-950 dark:text-violet-200 font-mono">
+              {history.length}
+            </span>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+              Subsystems refurbished & tested
+            </p>
+          </div>
+        </div>
+
+        {/* Card 4: Verification & Transport (Amber/Cyan) */}
+        <div className="relative overflow-hidden rounded-2xl border border-amber-200/70 bg-gradient-to-br from-amber-500/10 via-amber-500/5 to-transparent p-5 shadow-xs dark:border-amber-500/20 dark:bg-white/5 flex flex-col justify-between">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold uppercase tracking-wider text-amber-700 dark:text-amber-400">
+              Fleet Custody
+            </span>
+            <span className="w-8 h-8 rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
+              <FiTruck className="w-4 h-4" />
+            </span>
+          </div>
+          <div className="mt-4">
+            <div className="flex items-center gap-1.5 text-sm font-extrabold text-slate-900 dark:text-white">
+              {isReturned ? (
+                <>
+                  <FiCheckCircle className="w-4 h-4 text-emerald-500 shrink-0" />
+                  <span>Delivered to Client</span>
+                </>
+              ) : (
+                <>
+                  <FiActivity className="w-4 h-4 text-blue-500 shrink-0 animate-pulse" />
+                  <span>In Workshop Cycle</span>
+                </>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
+              {latestReturn?.truck_number ? `Delivered via Truck ${latestReturn.truck_number}` : 'Transport log synchronized'}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Interactive Visual Service Lifecycle Stepper ────────────── */}
+      <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-xs dark:border-white/10 dark:bg-white/5">
+        <div className="flex items-center justify-between mb-6 pb-4 border-b border-slate-100 dark:border-white/10">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <FiActivity className="w-4 h-4 text-emerald-500" />
+              <span>Service Lifecycle & Diagnostic Stages</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+              Refurbishment progress from workshop intake to capacity benchmark and fleet delivery.
+            </p>
+          </div>
+          <span className="px-3.5 py-1.5 rounded-full text-xs font-extrabold bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50 shadow-2xs">
+            Cycle #{serviceVisitsList.length > 0 ? serviceVisitsList.length : 1}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5">
+          {CLIENT_STEPS.map((step, idx) => {
+            const isCompleted = idx < currentStepIdx || (idx === currentStepIdx && isReturned);
+            const isCurrent = idx === currentStepIdx && !isReturned;
+            const Icon = step.icon;
+
+            return (
+              <div
+                key={step.key}
+                className={`relative flex flex-col p-4 rounded-2xl border transition-all ${
+                  isCompleted
+                    ? 'border-emerald-300/80 bg-gradient-to-b from-emerald-50/80 to-teal-50/40 dark:border-emerald-900/50 dark:bg-emerald-950/20 shadow-2xs'
+                    : isCurrent
+                      ? 'border-blue-400 bg-gradient-to-b from-blue-50/90 to-indigo-50/40 dark:border-blue-700/70 dark:bg-blue-950/30 ring-2 ring-blue-500/20 shadow-xs'
+                      : 'border-slate-100 bg-slate-50/40 dark:border-white/5 dark:bg-white/2 opacity-50'
+                }`}
+              >
+                <div className="flex items-center justify-between mb-2.5">
+                  <span
+                    className={`w-8 h-8 rounded-xl flex items-center justify-center transition-transform ${
+                      isCompleted
+                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-2xs'
+                        : isCurrent
+                          ? 'bg-gradient-to-br from-blue-600 to-indigo-600 text-white shadow-xs animate-pulse scale-105'
+                          : 'bg-slate-200 text-slate-400 dark:bg-white/10 dark:text-neutral-500'
+                    }`}
+                  >
+                    {isCompleted ? <FiCheck className="w-4 h-4 stroke-[3]" /> : <Icon className="w-4 h-4" />}
+                  </span>
+                  <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500 font-mono">
+                    0{idx + 1}
+                  </span>
+                </div>
+                <h3 className="font-bold text-xs text-slate-900 dark:text-white">{step.label}</h3>
+                <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5 leading-snug">{step.desc}</p>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* ── Maintenance & Component Restoration Log (Card-Wise + Expandable) ─ */}
+      <div className="rounded-3xl border border-slate-200/80 bg-white p-6 sm:p-8 shadow-xs dark:border-white/10 dark:bg-white/5 space-y-6">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-slate-100 dark:border-white/10">
+          <div>
+            <h2 className="text-base font-bold text-slate-900 dark:text-white flex items-center gap-2">
+              <FiTool className="w-4 h-4 text-emerald-500" />
+              <span>Maintenance & Component Service History</span>
+            </h2>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+              Card-by-card breakdown of refurbished components, restoration notes, and diagnostic records.
+            </p>
+          </div>
+
+          {serviceVisitsList.length > 0 && (
+            <div className="flex items-center gap-2.5">
+              <span className="text-xs font-bold text-slate-600 dark:text-neutral-300 bg-slate-100 dark:bg-white/10 px-3 py-1 rounded-xl">
+                {serviceVisitsList.length} {serviceVisitsList.length === 1 ? 'Service Visit' : 'Service Visits'}
+              </span>
+              <button
+                type="button"
+                onClick={allExpanded ? collapseAll : expandAll}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40 transition-colors cursor-pointer"
+              >
+                {allExpanded ? (
+                  <>
+                    <FiChevronUp className="w-3.5 h-3.5" />
+                    <span>Collapse All</span>
+                  </>
+                ) : (
+                  <>
+                    <FiChevronDown className="w-3.5 h-3.5" />
+                    <span>Expand All</span>
+                  </>
+                )}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {serviceVisitsList.length === 0 ? (
+          <div className="text-center py-12 px-4 rounded-2xl border border-dashed border-slate-200 dark:border-white/10 space-y-2">
+            <FiCheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
+            <p className="text-sm font-bold text-slate-800 dark:text-neutral-200">No Repairs Required</p>
+            <p className="text-xs text-slate-400 dark:text-neutral-500 max-w-md mx-auto">
+              This battery is operating in original factory state with no component replacements recorded.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {serviceVisitsList.map((visit, index) => {
+              const isExpanded = expandedBatches.has(visit.batchId);
+              const visitNumber = serviceVisitsList.length - index;
+
+              return (
+                <div
+                  key={visit.batchId}
+                  className={`rounded-2xl border transition-all duration-200 overflow-hidden ${
+                    isExpanded
+                      ? 'border-emerald-300/80 bg-gradient-to-b from-slate-50/90 to-white dark:border-emerald-800/50 dark:from-neutral-900/90 dark:to-neutral-950 shadow-sm'
+                      : 'border-slate-200/80 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-white/5 dark:hover:border-white/20'
+                  }`}
+                >
+                  {/* ── Expandable Card Header (Click to Toggle) ── */}
+                  <div
+                    onClick={() => toggleBatch(visit.batchId)}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-4 sm:p-5 cursor-pointer select-none transition-colors hover:bg-slate-50/60 dark:hover:bg-white/5"
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        toggleBatch(visit.batchId);
+                      }
+                    }}
+                  >
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="px-3 py-1 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-black tracking-wide shadow-2xs">
+                        Service Visit #{visitNumber}
+                      </span>
+                      <span className="inline-flex items-center gap-1.5 text-xs font-bold text-slate-700 dark:text-neutral-300">
+                        <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
+                        <span>
+                          {visit.date
+                            ? new Date(visit.date).toLocaleDateString('en-GB', {
+                                day: '2-digit',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : '—'}
+                        </span>
+                      </span>
+                      <span className="text-xs text-slate-400 dark:text-neutral-500">
+                        • {visit.parts.length} {visit.parts.length === 1 ? 'component serviced' : 'components serviced'}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between sm:justify-end gap-3">
+                      <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40">
+                        <FiCheckCircle className="w-3.5 h-3.5 text-emerald-500" />
+                        <span>Certified Restoration</span>
+                      </span>
+
+                      <div className="inline-flex items-center gap-1 text-xs font-bold text-slate-600 dark:text-neutral-300">
+                        <span>{isExpanded ? 'Hide Details' : 'View Details'}</span>
+                        <FiChevronDown
+                          className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
+                            isExpanded ? 'rotate-180 text-emerald-500' : ''
+                          }`}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* ── Expanded Card Body ── */}
+                  {isExpanded && (
+                    <div className="p-4 sm:p-6 border-t border-slate-200/60 dark:border-white/10 bg-white/70 dark:bg-neutral-900/60 space-y-4">
+                      {/* Restored Components List */}
+                      <div>
+                        <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-neutral-400 mb-2.5 flex items-center gap-1.5">
+                          <FiLayers className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>Restored & Calibrated Subsystems:</span>
+                        </h4>
+                        <div className="flex flex-wrap gap-2.5">
+                          {visit.parts.map((part) => (
+                            <span
+                              key={part}
+                              className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold border shadow-2xs transition-all ${getPartBadgeStyle(
+                                part
+                              )}`}
+                            >
+                              <FiCpu className="w-4 h-4 shrink-0 opacity-80" />
+                              <span>{part}</span>
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Work Notes / Summary */}
+                      {visit.notes && (
+                        <div>
+                          <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-neutral-400 mb-2 flex items-center gap-1.5">
+                            <FiActivity className="w-3.5 h-3.5 text-blue-500" />
+                            <span>Service Diagnosis & Work Notes:</span>
+                          </h4>
+                          <div className="p-3.5 rounded-xl bg-slate-50 dark:bg-white/5 border border-slate-200/70 dark:border-white/10 text-xs text-slate-700 dark:text-neutral-300 leading-relaxed">
+                            {visit.notes}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Certification Assurance Box */}
+                      <div className="p-3.5 rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-200/60 dark:border-emerald-800/30 flex items-center justify-between gap-4 flex-wrap">
+                        <div className="flex items-center gap-2.5 text-xs text-emerald-800 dark:text-emerald-200 font-medium">
+                          <FiCheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
+                          <span>
+                            Full multi-point test passed: <strong>Capacity Benchmarking</strong>, <strong>Cell Balancing</strong> & <strong>BMS Telemetry</strong>.
+                          </span>
+                        </div>
+                        <span className="text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400">
+                          Refurbishment ID: {visit.batchId.slice(0, 16)}
+                        </span>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* ── Logistics & Fleet Transport Record (Vibrant Cards) ──────── */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {/* Workshop Intake Logistics */}
+        <div className="rounded-3xl border border-blue-200/80 bg-gradient-to-br from-blue-50/40 via-white to-white p-6 shadow-xs dark:border-blue-900/40 dark:from-blue-950/20 dark:via-neutral-900 dark:to-neutral-950 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+            <span className="w-7 h-7 rounded-lg bg-blue-500/15 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <FiTruck className="w-4 h-4" />
+            </span>
+            <span>Workshop Collection & Intake</span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-white/5">
+              <span className="text-slate-400">Truck Number:</span>
+              <span className="font-mono font-bold text-slate-800 dark:text-neutral-200">
+                {battery.intake_truck_number || latestIntake?.truck_number || '—'}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-white/5">
+              <span className="text-slate-400">Collection Driver:</span>
+              <span className="font-semibold text-slate-800 dark:text-neutral-200">
+                {battery.intake_driver_name || latestIntake?.driver_name || '—'}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-slate-400">Intake Logged On:</span>
+              <span className="font-semibold text-slate-800 dark:text-neutral-200">
+                {battery.intake_at || latestIntake?.intake_at
+                  ? new Date(battery.intake_at || latestIntake?.intake_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Fleet Return Logistics */}
+        <div className="rounded-3xl border border-emerald-200/80 bg-gradient-to-br from-emerald-50/40 via-white to-white p-6 shadow-xs dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-neutral-900 dark:to-neutral-950 space-y-3">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900 dark:text-white">
+            <span className="w-7 h-7 rounded-lg bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+              <FiCheckCircle className="w-4 h-4" />
+            </span>
+            <span>Fleet Dispatch & Operational Return</span>
+          </div>
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-white/5">
+              <span className="text-slate-400">Delivery Truck:</span>
+              <span className="font-mono font-bold text-slate-800 dark:text-neutral-200">
+                {latestReturn?.truck_number || (isReturned ? 'Fleet Delivered' : 'Pending Dispatch')}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5 border-b border-slate-100 dark:border-white/5">
+              <span className="text-slate-400">Delivery Driver:</span>
+              <span className="font-semibold text-slate-800 dark:text-neutral-200">
+                {latestReturn?.driver_name || (isReturned ? 'Verified Delivery' : '—')}
+              </span>
+            </div>
+            <div className="flex justify-between py-1.5">
+              <span className="text-slate-400">Delivered On:</span>
+              <span className="font-semibold text-slate-800 dark:text-neutral-200">
+                {latestReturn?.returned_at
+                  ? new Date(latestReturn.returned_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+                  : isReturned
+                    ? 'In Fleet Operation'
+                    : '—'}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN BATTERY DETAIL PAGE ROUTER ──────────────────────────────────────────
 function BatteryDetailPage() {
   const { code } = useParams();
+  const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
   const isTechnician = user?.role === 'technician';
+  const isClient = user?.role === 'client';
+  const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [qrDataUrl, setQrDataUrl] = useState(null);
   const [showQrModal, setShowQrModal] = useState(false);
+
+  // Battery Number assign / edit modal
+  const [showSerialModal, setShowSerialModal] = useState(false);
+  const [serialInput, setSerialInput] = useState('');
+  const [serialInputRetype, setSerialInputRetype] = useState('');
+  const [serialSaving, setSerialSaving] = useState(false);
+  const [serialError, setSerialError] = useState(null);
+  const [serialConfirmText, setSerialConfirmText] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -279,9 +884,6 @@ function BatteryDetailPage() {
     load();
   }, [load]);
 
-  // Reloads while this page is open if the same battery changes elsewhere —
-  // e.g. a technician starting work, completing testing, or reporting an
-  // issue in the mobile app — instead of requiring a manual refresh.
   useEffect(() => {
     function handleUpdated(battery) {
       if (battery?.battery_code === code) load();
@@ -290,9 +892,6 @@ function BatteryDetailPage() {
     return () => socket.off('battery:updated', handleUpdated);
   }, [code, load]);
 
-  // Deterministic from the battery code (same as Generate QR Code's
-  // regenerate-on-view) — nothing needs to be stored, so it can always be
-  // rebuilt here rather than only being visible from the Generate QR page.
   useEffect(() => {
     let cancelled = false;
     QRCode.toDataURL(`${window.location.origin}/batteries/${encodeURIComponent(code)}`, {
@@ -307,39 +906,105 @@ function BatteryDetailPage() {
   }, [code]);
 
   function handleDownloadQr() {
+    if (!qrDataUrl) return;
     const link = document.createElement('a');
     link.href = qrDataUrl;
     link.download = `qr-${code}.png`;
     link.click();
   }
 
-  if (loading) return <TableState>Loading…</TableState>;
+  function openSerialModal(battery) {
+    setSerialInput(battery.serial_number || '');
+    setSerialInputRetype(battery.serial_number || '');
+    setSerialConfirmText('');
+    setSerialError(null);
+    setShowSerialModal(true);
+  }
+
+  async function handleSerialSave(battery) {
+    if (serialInput.trim() && serialInput.trim() !== serialInputRetype.trim()) {
+      setSerialError('The two battery numbers you typed don’t match. Please re-check and try again.');
+      return;
+    }
+    setSerialSaving(true);
+    setSerialError(null);
+    try {
+      await apiClient.patch(`/batteries/${battery.id}/serial-number`, {
+        serialNumber: serialInput.trim(),
+      });
+      setShowSerialModal(false);
+      load();
+    } catch (err) {
+      setSerialError(err.response?.data?.message || err.message);
+    } finally {
+      setSerialSaving(false);
+    }
+  }
+
+  const fallbackBackTo = isClient ? '/my/batteries/all' : isTechnician ? '/my/dashboard' : isAdmin ? '/batteries' : null;
+  const canShowBack = fallbackBackTo !== null;
+
+  function handleBack() {
+    if (window.history.state && window.history.state.idx > 0) {
+      navigate(-1);
+    } else if (fallbackBackTo) {
+      navigate(fallbackBackTo);
+    }
+  }
+
+  if (loading) return <TableState>Loading battery details & history…</TableState>;
   if (error) {
     return (
       <div>
-        <Link
-          to="/batteries"
-          className="mb-4 inline-block text-sm text-brand-700 hover:underline dark:text-emerald-400"
-        >
-          ← Back to Global Battery
-        </Link>
+        {canShowBack ? (
+          <button
+            type="button"
+            onClick={handleBack}
+            className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline dark:text-emerald-400"
+          >
+            <FiArrowLeft className="h-4 w-4" />
+            Back
+          </button>
+        ) : (
+          <Link
+            to="/login"
+            className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline dark:text-emerald-400"
+          >
+            ← Sign In
+          </Link>
+        )}
         <TableState tone="error">{error}</TableState>
       </div>
     );
   }
 
-  const { battery, history, returns, visits, issues, recycleBatch } = result;
-  const cycles = buildCycles(buildEvents(visits || [], history, returns, issues || []));
-  const totalSpent = history.reduce(
+  const { battery, history = [], returns = [], visits = [], issues = [], recycleBatch } = result || {};
+
+  // If viewed by client (or an unauthenticated QR scan), render the client view without internal workshop staff / prices
+  if (isClient || (!user && battery)) {
+    return (
+      <ClientBatteryDetailView
+        battery={battery}
+        history={history}
+        returns={returns}
+        visits={visits}
+        issues={issues}
+        qrDataUrl={qrDataUrl}
+        onDownloadQr={handleDownloadQr}
+      />
+    );
+  }
+
+  // ── ADMIN & TECHNICIAN INTERNAL VIEW ──────────────────────────────────────
+  const cycles = buildCycles(buildEvents(visits || [], history || [], returns || [], issues || []));
+  const totalSpent = (history || []).reduce(
     (sum, h) => sum + Number(h.price) + Number(h.labor_charge || 0),
     0
   );
-  // A repair "visit" is every part changed at the same time (same batch_id),
-  // not one count per part — changing 3 parts in one visit is 1 repair, not 3.
-  const repairVisits = new Set(history.map((h) => h.batch_id)).size;
+  const repairVisits = new Set((history || []).map((h) => h.batch_id)).size;
   const now = new Date();
   const repairVisitsThisMonth = new Set(
-    history
+    (history || [])
       .filter((h) => {
         const d = new Date(h.repaired_at);
         return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
@@ -349,19 +1014,26 @@ function BatteryDetailPage() {
 
   return (
     <div>
-      <Link
-        to="/batteries"
-        className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline dark:text-emerald-400"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-          <path
-            fillRule="evenodd"
-            d="M12.79 5.23a.75.75 0 0 1 0 1.06L9.06 10l3.73 3.71a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 0Z"
-            clipRule="evenodd"
-          />
-        </svg>
-        Back to Global Battery
-      </Link>
+      {canShowBack ? (
+        <button
+          type="button"
+          onClick={handleBack}
+          className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline dark:text-emerald-400 cursor-pointer"
+        >
+          <FiArrowLeft className="h-4 w-4" />
+          Back
+        </button>
+      ) : (
+        <div className="mb-4 flex items-center justify-between">
+          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            Verified Battery Record
+          </span>
+          <span className="text-xs text-slate-400 dark:text-neutral-500">
+            Scanned via QR Code
+          </span>
+        </div>
+      )}
 
       <PageHeader title={battery.battery_code} description="Full intake-to-return history." />
 
@@ -389,7 +1061,7 @@ function BatteryDetailPage() {
               type="button"
               onClick={handleDownloadQr}
               disabled={!qrDataUrl}
-              className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-500"
+              className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 dark:bg-blue-600 dark:hover:bg-blue-500 cursor-pointer"
             >
               Download PNG
             </button>
@@ -403,9 +1075,7 @@ function BatteryDetailPage() {
         <span
           className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${STATUS_ICON_BG[battery.status] || 'bg-slate-100 text-slate-500'}`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
-            <path d="M7 2a1 1 0 0 0-1 1v1H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1V3a1 1 0 1 0-2 0v1H8V3a1 1 0 0 0-1-1Zm10 10h-2v3h-2v-3h-2v-2h2V7h2v3h2v2Z" />
-          </svg>
+          <FiCpu className="h-6 w-6" />
         </span>
         <div className="flex-1">
           <div className="flex flex-wrap items-center gap-2">
@@ -415,16 +1085,41 @@ function BatteryDetailPage() {
                 Client: {battery.client_name}
               </span>
             )}
-            {battery.serial_number && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-surface-700 dark:text-neutral-300">
-                Battery Number: {battery.serial_number}
+            {battery.serial_number ? (
+              <span
+                className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                  battery.serial_number_added_by_role === 'client'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
+                    : 'bg-slate-100 text-slate-600 dark:bg-surface-700 dark:text-neutral-300'
+                }`}
+              >
+                {battery.serial_number_added_by_role === 'client' && (
+                  <FiShield className="h-3 w-3 text-amber-600" />
+                )}
+                Battery No: {battery.serial_number}
+                {isAdmin && (
+                  <button
+                    type="button"
+                    onClick={() => openSerialModal(battery)}
+                    title="Edit Battery Number"
+                    className="ml-0.5 rounded text-slate-400 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-neutral-300 cursor-pointer"
+                  >
+                    <FiTool className="h-3 w-3" />
+                  </button>
+                )}
               </span>
-            )}
+            ) : user && !isTechnician ? (
+              <button
+                type="button"
+                onClick={() => openSerialModal(battery)}
+                className="flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs font-medium text-slate-400 hover:border-blue-400 hover:text-blue-600 dark:border-surface-600 dark:text-neutral-500 dark:hover:border-blue-500 dark:hover:text-blue-400 cursor-pointer"
+              >
+                + Assign Battery Number
+              </button>
+            ) : null}
+
             {battery.status === 'in_progress' && battery.started_by_name && (
               <span className="flex items-center gap-1 rounded-full bg-critical-100 px-2.5 py-0.5 text-xs font-medium text-critical-700 dark:bg-red-500/15 dark:text-red-300">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                  <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
-                </svg>
                 Being worked on by {battery.started_by_name}
               </span>
             )}
@@ -435,13 +1130,7 @@ function BatteryDetailPage() {
           </p>
           {repairVisitsThisMonth > 1 && (
             <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-critical-600 dark:text-red-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <path
-                  fillRule="evenodd"
-                  d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
-                  clipRule="evenodd"
-                />
-              </svg>
+              <FiAlertTriangle className="h-4 w-4" />
               Serviced {repairVisitsThisMonth} times this month — worth a closer look.
             </p>
           )}
@@ -451,7 +1140,7 @@ function BatteryDetailPage() {
           type="button"
           onClick={() => setShowQrModal(true)}
           title="View / download QR code"
-          className="shrink-0 rounded-lg border border-slate-200 bg-white p-1 shadow-sm transition-transform hover:scale-105 dark:border-surface-700 dark:bg-black"
+          className="shrink-0 rounded-lg border border-slate-200 bg-white p-1 shadow-sm transition-transform hover:scale-105 dark:border-surface-700 dark:bg-black cursor-pointer"
         >
           {qrDataUrl ? (
             <img
@@ -502,7 +1191,7 @@ function BatteryDetailPage() {
         <StatCard label="Repairs Logged" value={repairVisits} tone="good" />
         <StatCard label="Return Shipments" value={returns.length} tone="info" />
         {!isTechnician && (
-          <StatCard label="Total Repair Cost" value={`£${totalSpent.toFixed(2)}`} tone="warning" />
+          <StatCard label="Total Price" value={`£${totalSpent.toFixed(2)}`} tone="warning" />
         )}
       </div>
 
@@ -514,13 +1203,6 @@ function BatteryDetailPage() {
             const isOngoing = i === cycles.length - 1 && !cycle.some((e) => e.type === 'return');
             const isUnserviceableCycle =
               isOngoing && (battery.status === 'unserviceable' || battery.status === 'recycled');
-            // Repaired-but-not-yet-shipped-back reads as green ("ready to
-            // return") instead of the amber "still with the shop" state;
-            // a cycle that's actually closed (returned) reads as blue,
-            // distinct from the "repaired" green so the two don't look the
-            // same at a glance. A cycle that dead-ended in an unserviceable
-            // report gets its own red tone — it was never "with the shop"
-            // awaiting a normal repair, it's a separate diverging outcome.
             const cardTone = isUnserviceableCycle
               ? 'red'
               : !isOngoing
@@ -573,31 +1255,6 @@ function BatteryDetailPage() {
                   <span
                     className={`inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-semibold dark:bg-surface-800/70 ${tone.text}`}
                   >
-                    {cardTone === 'amber' ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path
-                          fillRule="evenodd"
-                          d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .2.08.39.22.53l3.5 3.5a.75.75 0 1 0 1.06-1.06l-3.28-3.28V5Z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    ) : cardTone === 'red' ? (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path
-                          fillRule="evenodd"
-                          d="M9.401 3.003c1.155-2 4.043-2 5.197 0l7.355 12.748c1.154 2-.29 4.5-2.599 4.5H4.645c-2.309 0-3.752-2.5-2.598-4.5L9.4 3.003ZM12 8.25a.75.75 0 0 1 .75.75v3.75a.75.75 0 0 1-1.5 0V9a.75.75 0 0 1 .75-.75Zm0 8.25a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    ) : (
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path
-                          fillRule="evenodd"
-                          d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
                     {cardLabel}
                   </span>
                 </div>
@@ -605,57 +1262,157 @@ function BatteryDetailPage() {
                   <ProcessStepper isOngoing={isOngoing} batteryStatus={battery.status} />
                 </div>
                 <div className="p-5">
-                <ol>
-                  {cycle.map((event, idx) => {
-                    const meta = EVENT_META[event.type];
-                    const isLast = idx === cycle.length - 1;
-                    return (
-                      <li key={event.key} className="relative flex gap-4">
-                        {!isLast && (
-                          <span className="absolute left-4 top-9 bottom-0 w-px -translate-x-1/2 bg-slate-200 dark:bg-surface-700" />
-                        )}
-                        <span
-                          className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.dot}`}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            viewBox="0 0 20 20"
-                            fill="currentColor"
-                            className="h-4 w-4"
+                  <ol>
+                    {cycle.map((event, idx) => {
+                      const meta = EVENT_META[event.type];
+                      const isLast = idx === cycle.length - 1;
+                      return (
+                        <li key={event.key} className="relative flex gap-4">
+                          {!isLast && (
+                            <span className="absolute left-4 top-9 bottom-0 w-px -translate-x-1/2 bg-slate-200 dark:bg-surface-700" />
+                          )}
+                          <span
+                            className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.dot}`}
                           >
-                            {meta.icon}
-                          </svg>
-                        </span>
-                        <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-6'}`}>
-                          <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                            <span className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-                              {meta.label}
-                            </span>
-                            <span className="text-xs text-slate-400 dark:text-neutral-500">
-                              {new Date(event.date).toLocaleString()}
-                            </span>
-                          </div>
-                          <p className="text-sm text-slate-600 dark:text-neutral-300">{event.primary}</p>
-                          <div className="mt-1 flex flex-wrap items-center gap-2">
-                            {!isTechnician && event.price !== undefined && (
-                              <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                £{Number(event.price).toFixed(2)}
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              viewBox="0 0 20 20"
+                              fill="currentColor"
+                              className="h-4 w-4"
+                            >
+                              {meta.icon}
+                            </svg>
+                          </span>
+                          <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-6'}`}>
+                            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                              <span className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
+                                {meta.label}
                               </span>
-                            )}
-                            {event.notes && (
-                              <span className="text-xs text-slate-400 dark:text-neutral-500">{event.notes}</span>
-                            )}
+                              <span className="text-xs text-slate-400 dark:text-neutral-500">
+                                {new Date(event.date).toLocaleString()}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-600 dark:text-neutral-300">{event.primary}</p>
+                            <div className="mt-1 flex flex-wrap items-center gap-2">
+                              {!isTechnician && event.price !== undefined && (
+                                <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+                                  £{Number(event.price).toFixed(2)}
+                                </span>
+                              )}
+                              {event.notes && (
+                                <span className="text-xs text-slate-400 dark:text-neutral-500">{event.notes}</span>
+                              )}
+                            </div>
                           </div>
-                        </div>
-                      </li>
-                    );
-                  })}
-                </ol>
+                        </li>
+                      );
+                    })}
+                  </ol>
                 </div>
               </div>
             );
           })}
         </div>
+      )}
+
+      {/* Battery Number assign / edit modal */}
+      {showSerialModal && (
+        <Modal
+          title={`Battery Number — ${battery.battery_code}`}
+          onClose={() => {
+            setShowSerialModal(false);
+            setSerialError(null);
+          }}
+        >
+          <div className="flex flex-col gap-4">
+            {isAdmin && battery.serial_number && (
+              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-300">
+                {battery.serial_number_added_by_role === 'client' ? (
+                  <>
+                    <strong>Client-set number:</strong> the client can no longer edit this themselves. Changing it
+                    is an admin override — type <strong>CONFIRM</strong> below to unlock Save.
+                  </>
+                ) : (
+                  <>
+                    You're changing an existing Battery Number. Type <strong>CONFIRM</strong> below to unlock Save.
+                  </>
+                )}
+              </div>
+            )}
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200">
+                Battery Number (manufacturer serial)
+              </label>
+              <input
+                type="text"
+                value={serialInput}
+                onChange={(e) => setSerialInput(e.target.value)}
+                placeholder="e.g. SN-88213"
+                autoComplete="off"
+                className="w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500 disabled:cursor-not-allowed disabled:opacity-50"
+              />
+              <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
+                Leave blank to clear the Battery Number.
+              </p>
+            </div>
+            {serialInput.trim() && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200">
+                  Re-type to Confirm
+                </label>
+                <input
+                  type="text"
+                  value={serialInputRetype}
+                  onChange={(e) => setSerialInputRetype(e.target.value)}
+                  placeholder="Type the battery number again"
+                  autoComplete="off"
+                  className="w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                />
+                <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">Typed twice to catch typos.</p>
+              </div>
+            )}
+            {isAdmin && battery.serial_number && (
+              <div>
+                <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200">
+                  Type <span className="font-semibold text-amber-700 dark:text-amber-400">CONFIRM</span> to change it
+                </label>
+                <input
+                  type="text"
+                  value={serialConfirmText}
+                  onChange={(e) => setSerialConfirmText(e.target.value)}
+                  placeholder="CONFIRM"
+                  autoComplete="off"
+                  className="w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500"
+                />
+              </div>
+            )}
+            {serialError && <p className="text-sm text-critical-600 dark:text-red-400">{serialError}</p>}
+            <div className="flex justify-end gap-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setShowSerialModal(false);
+                  setSerialError(null);
+                }}
+                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-blue-900/30 cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => handleSerialSave(battery)}
+                disabled={
+                  serialSaving ||
+                  (serialInput.trim() && serialInput.trim() !== serialInputRetype.trim()) ||
+                  (isAdmin && battery.serial_number && serialConfirmText.trim().toUpperCase() !== 'CONFIRM')
+                }
+                className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+              >
+                {serialSaving ? 'Saving…' : 'Save'}
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

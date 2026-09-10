@@ -29,12 +29,13 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { name, sku, quantity, repairCost } = req.body;
+    const { name, sku, quantity, repairCost, serviceCharge } = req.body;
     const part = await partModel.create({
       name,
       sku,
       quantity: quantity || 0,
       repairCost: repairCost || 0,
+      serviceCharge: serviceCharge || 0,
     });
     realtime.broadcastOutOfStockParts().catch((err) => console.error('broadcastOutOfStockParts:', err));
     res.status(201).json(part);
@@ -45,12 +46,13 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const { name, sku, quantity, repairCost } = req.body;
+    const { name, sku, quantity, repairCost, serviceCharge } = req.body;
     const part = await partModel.update(req.params.id, {
       name,
       sku,
       quantity: quantity || 0,
       repairCost: repairCost || 0,
+      serviceCharge: serviceCharge || 0,
     });
     if (!part) {
       return res.status(404).json({ message: 'Part not found' });

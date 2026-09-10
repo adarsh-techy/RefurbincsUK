@@ -9,11 +9,7 @@ const batteryModel = require('../models/battery.model');
 let io = null;
 
 // Verifies the same JWT used for HTTP requests (see middlewares/auth.js) on
-// the socket handshake. Both GET /parts and GET /batteries/repeat-intakes-
-// this-month are open to any authenticated user (no permission gate — see
-// part.routes.js / battery.routes.js), so a verified connection is all a
-// socket needs; NotificationBell/RepeatIntakeAlert already gate whether they
-// subscribe client-side on the user's permissions.
+// the socket handshake.
 async function authenticate(socket, next) {
   try {
     const token = socket.handshake.auth?.token;
@@ -40,8 +36,7 @@ function init(servers) {
   return io;
 }
 
-// Recomputes the out-of-stock parts list and pushes it to every connected
-// client — replaces NotificationBell/LowStockAlert's polling.
+// Recomputes the out-of-stock parts list and pushes it to every connected client
 async function broadcastOutOfStockParts() {
   if (!io) return;
   const parts = await partModel.findAll();
@@ -49,30 +44,40 @@ async function broadcastOutOfStockParts() {
   io.emit('parts:out-of-stock', outOfStock);
 }
 
-// Recomputes this month's repeat truck intakes and pushes them to every
-// connected client — replaces RepeatIntakeAlert's polling.
+// Recomputes this month's repeat truck intakes and pushes them to every connected client
 async function broadcastRepeatIntakes() {
   if (!io) return;
   const repeats = await batteryModel.findRepeatIntakesThisMonth();
   io.emit('intakes:repeats', repeats);
 }
 
-// Recomputes how many batteries are marked unserviceable and pushes it to
-// every connected client — powers UnserviceableBatteriesAlert's 100-battery
-// popup.
+// Recomputes how many batteries are marked unserviceable
 async function broadcastUnserviceableCount() {
   if (!io) return;
   const count = await batteryModel.countByStatus('unserviceable');
   io.emit('batteries:unserviceable-count', count);
 }
 
-// Pushes a battery's current row to every connected client whenever its
-// status changes (start-work, complete-testing, report-issue, manual status
-// correction) — lets the admin's Batteries list/Battery detail page stay in
-// sync without a manual refresh, mirroring what technicians see live.
+// Pushes a battery's current row whenever its status changes
 function broadcastBatteryUpdated(battery) {
   if (!io || !battery) return;
   io.emit('battery:updated', battery);
+}
+
+// Pushes support ticket events (create, new message, status update)
+function broadcastTicketCreated(ticket) {
+  if (!io || !ticket) return;
+  io.emit('ticket:created', ticket);
+}
+
+function broadcastTicketMessage(payload) {
+  if (!io || !payload) return;
+  io.emit('ticket:message', payload);
+}
+
+function broadcastTicketStatus(ticket) {
+  if (!io || !ticket) return;
+  io.emit('ticket:updated', ticket);
 }
 
 module.exports = {
@@ -81,4 +86,7 @@ module.exports = {
   broadcastRepeatIntakes,
   broadcastUnserviceableCount,
   broadcastBatteryUpdated,
+  broadcastTicketCreated,
+  broadcastTicketMessage,
+  broadcastTicketStatus,
 };

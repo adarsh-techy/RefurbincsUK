@@ -16,6 +16,7 @@ function PartForm({ part, onSaved, onCancel }) {
     sku: part?.sku || '',
     quantity: part ? String(part.quantity) : '0',
     repairCost: part ? String(part.repair_cost) : '0',
+    serviceCharge: part ? String(part.service_charge || 0) : '0',
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -34,6 +35,7 @@ function PartForm({ part, onSaved, onCancel }) {
         sku: form.sku || undefined,
         quantity: Number(form.quantity) || 0,
         repairCost: Number(form.repairCost) || 0,
+        serviceCharge: Number(form.serviceCharge) || 0,
       };
       if (isEdit) {
         await apiClient.patch(`/parts/${part.id}`, payload);
@@ -92,13 +94,26 @@ function PartForm({ part, onSaved, onCancel }) {
         </div>
 
         <div>
-          <label className={labelClasses}>Repair Cost (per unit)</label>
+          <label className={labelClasses}>Price (per unit)</label>
           <input
             type="number"
             min="0"
             step="0.01"
             value={form.repairCost}
             onChange={(e) => updateField('repairCost', e.target.value)}
+            placeholder="0.00"
+            className={inputClasses}
+          />
+        </div>
+
+        <div>
+          <label className={labelClasses}>Service Charge (optional / £)</label>
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={form.serviceCharge}
+            onChange={(e) => updateField('serviceCharge', e.target.value)}
             placeholder="0.00"
             className={inputClasses}
           />

@@ -123,7 +123,16 @@ export default function DashboardScreen() {
           <Text className="text-2xl font-bold text-slate-900">
             {greeting()}, {staff.name}
           </Text>
-          <Text className="text-sm text-slate-500">Your repair activity at a glance.</Text>
+          <View className="mt-1 flex-row items-center gap-2">
+            <View className="rounded-full bg-blue-100 px-2 py-0.5">
+              <Text className="text-[11px] font-semibold capitalize text-blue-700">
+                {staff?.role
+                  ? staff.role.charAt(0).toUpperCase() + staff.role.slice(1)
+                  : 'Technician'}
+              </Text>
+            </View>
+            <Text className="text-xs text-slate-500">Your repair activity</Text>
+          </View>
         </View>
       </View>
 

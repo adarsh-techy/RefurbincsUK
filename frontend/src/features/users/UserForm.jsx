@@ -69,7 +69,7 @@ function UserForm({ targetUser, onSaved, onCancel }) {
             type="text"
             value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
-            placeholder="e.g. Priya Nair"
+            placeholder="e.g. Oliver Smith"
             className={inputClasses}
             required
           />
@@ -81,7 +81,7 @@ function UserForm({ targetUser, onSaved, onCancel }) {
             type="email"
             value={form.email}
             onChange={(e) => updateField('email', e.target.value)}
-            placeholder="e.g. priya@refurbinics.com"
+            placeholder="e.g. oliver.smith@refurbinics.com"
             className={inputClasses}
             required
           />
@@ -109,6 +109,7 @@ function UserForm({ targetUser, onSaved, onCancel }) {
           >
             <option value="admin">Admin</option>
             <option value="super_admin">Super Admin</option>
+            <option value="recycle_client">Recycle Client</option>
           </select>
         </div>
 
@@ -137,6 +138,10 @@ function UserForm({ targetUser, onSaved, onCancel }) {
               ))}
             </div>
           </div>
+        ) : form.role === 'recycle_client' ? (
+          <p className="text-xs text-slate-400 dark:text-neutral-500">
+            Recycle clients have access to their own dashboard and recycle shipments.
+          </p>
         ) : (
           <p className="text-xs text-slate-400 dark:text-neutral-500">Super admins have access to every module.</p>
         )}

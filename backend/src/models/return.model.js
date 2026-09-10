@@ -6,8 +6,8 @@ async function create({ truckNumber, driverName, clientId, batteryIds }) {
     await client.query('BEGIN');
 
     const { rows } = await client.query(
-      `INSERT INTO returns (truck_number, driver_name, battery_count, client_id)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
+      `INSERT INTO returns (truck_number, driver_name, battery_count, client_id, status)
+       VALUES ($1, $2, $3, $4, 'pending_verification') RETURNING *`,
       [truckNumber, driverName, batteryIds.length, clientId || null]
     );
     const returnRecord = rows[0];
@@ -59,7 +59,7 @@ async function findById(id) {
 // scoped to return_batteries instead of battery_visits.
 async function findBatteries(returnId) {
   const { rows } = await db.query(
-    `SELECT b.id, b.battery_code, b.status,
+    `SELECT b.id, b.battery_code, b.serial_number, b.status,
             last_repair.repaired_at AS last_repaired_at,
             last_parts.part_names AS last_repaired_parts
      FROM return_batteries rb
@@ -95,6 +95,19 @@ async function update(id, { truckNumber, driverName, clientId }) {
   return rows[0];
 }
 
+async function verifyReceipt(id, userId) {
+  const { rows } = await db.query(
+    `UPDATE returns
+     SET status = 'verified',
+         verified_at = now(),
+         verified_by_user_id = $2
+     WHERE id = $1
+     RETURNING *`,
+    [id, userId]
+  );
+  return rows[0];
+}
+
 // Undoes the return: every battery that was part of it goes back to
 // 'repaired' (never touching one that's since been re-returned some other
 // way), then the return_batteries links and the return row are removed.
@@ -122,4 +135,4 @@ async function remove(id) {
   }
 }
 
-module.exports = { create, findAll, findById, findBatteries, update, remove };
+module.exports = { create, findAll, findById, findBatteries, update, verifyReceipt, remove };

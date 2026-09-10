@@ -1,8 +1,8 @@
 import { useSelector } from 'react-redux';
 import { Navigate, Outlet, useLocation } from 'react-router-dom';
-import { hasPermission } from '../utils/permissions';
+import { hasPermission, hasClientPermission } from '../utils/permissions';
 
-function ProtectedRoute({ roles, permission }) {
+function ProtectedRoute({ roles, permission, clientPermission }) {
   const user = useSelector((state) => state.auth.user);
   const location = useLocation();
 
@@ -14,6 +14,7 @@ function ProtectedRoute({ roles, permission }) {
   }
   if (roles && !roles.includes(user.role)) return <Navigate to="/" replace />;
   if (permission && !hasPermission(user, permission)) return <Navigate to="/" replace />;
+  if (clientPermission && !hasClientPermission(user, clientPermission)) return <Navigate to="/" replace />;
 
   return <Outlet />;
 }

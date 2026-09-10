@@ -3,15 +3,15 @@ const db = require('../config/db');
 // Same batch-shipment pattern as return.model.js's create: record the
 // shipment, link every battery to it, then flip those batteries to their
 // terminal 'recycled' status — all inside one transaction.
-async function create({ vehicleNumber, driverName, batteryIds }) {
+async function create({ vehicleNumber, driverName, batteryIds, recycleClientId }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
     const { rows } = await client.query(
-      `INSERT INTO recycle_batches (vehicle_number, driver_name, battery_count)
-       VALUES ($1, $2, $3) RETURNING *`,
-      [vehicleNumber, driverName, batteryIds.length]
+      `INSERT INTO recycle_batches (vehicle_number, driver_name, battery_count, recycle_client_id)
+       VALUES ($1, $2, $3, $4) RETURNING *`,
+      [vehicleNumber, driverName, batteryIds.length, recycleClientId || null]
     );
     const batch = rows[0];
 
@@ -35,8 +35,24 @@ async function create({ vehicleNumber, driverName, batteryIds }) {
   }
 }
 
-async function findAll() {
-  const { rows } = await db.query('SELECT * FROM recycle_batches ORDER BY recycled_at DESC');
+async function findAll({ recycleClientId } = {}) {
+  if (recycleClientId) {
+    const { rows } = await db.query(
+      `SELECT rb.*, c.name AS recycle_client_name
+       FROM recycle_batches rb
+       LEFT JOIN clients c ON c.id = rb.recycle_client_id
+       WHERE rb.recycle_client_id = $1
+       ORDER BY rb.recycled_at DESC`,
+      [recycleClientId]
+    );
+    return rows;
+  }
+  const { rows } = await db.query(
+    `SELECT rb.*, c.name AS recycle_client_name
+     FROM recycle_batches rb
+     LEFT JOIN clients c ON c.id = rb.recycle_client_id
+     ORDER BY rb.recycled_at DESC`
+  );
   return rows;
 }
 
@@ -122,4 +138,19 @@ async function remove(id) {
   }
 }
 
-module.exports = { create, findAll, findById, findBatteries, findByBatteryId, update, remove };
+// Summary stats for a recycle_client's dashboard.
+async function getClientDashboard(recycleClientId) {
+  const { rows } = await db.query(
+    `SELECT
+       COUNT(*)::int AS shipment_count,
+       COALESCE(SUM(battery_count), 0)::int AS total_batteries,
+       MAX(recycled_at) AS latest_shipment_at
+     FROM recycle_batches
+     WHERE recycle_client_id = $1`,
+    [recycleClientId]
+  );
+  const recent = await findAll({ recycleClientId });
+  return { stats: rows[0], recentShipments: recent.slice(0, 10) };
+}
+
+module.exports = { create, findAll, findById, findBatteries, findByBatteryId, update, remove, getClientDashboard };

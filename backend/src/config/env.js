@@ -1,8 +1,6 @@
-// .env.local holds real local dev secrets and only exists on a dev machine
-// (it's gitignored, so it's never present in a git-based deploy). In
-// production, the host (Render, etc.) injects real env vars directly into
-// the process — this call finds nothing there and is a harmless no-op.
-require('dotenv').config({ path: require('path').resolve(__dirname, '..', '..', '.env.local') });
+const path = require('path');
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env.local') });
+require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
 
 module.exports = {
   port: process.env.PORT || 5000,

@@ -2,11 +2,11 @@ import { useState } from 'react';
 import apiClient from '../../services/api-client';
 
 const STATUS_OPTIONS = [
-  { value: 'in_repair', label: 'Pending' },
-  { value: 'in_progress', label: 'In Progress' },
+  { value: 'in_repair', label: 'Awaiting Repair' },
+  { value: 'in_progress', label: 'Repair In Progress' },
   { value: 'in_testing', label: 'In Testing' },
-  { value: 'repaired', label: 'Completed' },
-  { value: 'returned', label: 'Returned' },
+  { value: 'repaired', label: 'Repair Completed' },
+  { value: 'returned', label: 'Returned to Client' },
   { value: 'unserviceable', label: 'Unserviceable' },
   { value: 'recycled', label: 'Recycled' },
 ];

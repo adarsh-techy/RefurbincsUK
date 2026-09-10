@@ -21,7 +21,14 @@ export const login = createAsyncThunk(
       await AsyncStorage.setItem('user', JSON.stringify(data.user));
       return data;
     } catch (err) {
-      return rejectWithValue(err.response?.data?.message || 'Unable to sign in. Please try again.');
+      const msg =
+        err.response?.data?.message ||
+        (err.code === 'ECONNABORTED'
+          ? 'Connection timed out. Make sure your phone and server are on the same Wi-Fi.'
+          : !err.response
+          ? 'Network error. Cannot reach backend server at ' + apiClient.defaults.baseURL
+          : err.message || 'Unable to sign in. Please try again.');
+      return rejectWithValue(msg);
     }
   }
 );

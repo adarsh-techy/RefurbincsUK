@@ -219,7 +219,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
             list="existing-truck-numbers"
             value={form.truckNumber}
             onChange={(e) => updateField('truckNumber', e.target.value)}
-            placeholder="e.g. KL18S1234"
+            placeholder="e.g. GB21 XYZ"
             autoComplete="off"
             className={inputClasses}
             required
@@ -240,7 +240,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
               const value = e.target.value;
               updateField('driverName', value.charAt(0).toUpperCase() + value.slice(1));
             }}
-            placeholder="e.g. Adarsh"
+            placeholder="e.g. George Davies"
             className={inputClasses}
             required
           />

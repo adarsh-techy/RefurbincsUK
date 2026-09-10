@@ -62,15 +62,14 @@ function PortalHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-slate-200 bg-white px-3 dark:border-blue-800/40 dark:bg-surface-950/90 dark:backdrop-blur sm:gap-4 sm:px-6">
-        <Link to="/" className="block h-6 w-36 min-w-0 shrink-0 overflow-hidden sm:h-8 sm:w-48">
+      <header className="sticky top-0 z-10 flex h-16 items-center gap-2 border-b border-slate-200/80 bg-white px-3 dark:border-white/10 dark:bg-surface-950/90 dark:backdrop-blur sm:gap-4 sm:px-6 shadow-xs">
+        <Link to="/" className="flex items-center">
           <img
             src={refurbnicsLogo}
             alt="Refurbinics"
-            className="-ml-[5px] -mt-[35px] block h-[103px] w-auto max-w-none sm:-ml-[6px] sm:-mt-[47px] sm:h-[137px]"
+            className="h-8 w-auto max-w-[150px] object-contain sm:h-9 sm:max-w-[170px]"
           />
         </Link>
-
         {isTechnician && (
           <nav className="hidden items-center gap-1 md:flex">
             {TECHNICIAN_NAV.map((link) => (
@@ -121,8 +120,8 @@ function PortalHeader() {
               drawerOpen ? 'translate-x-0' : 'translate-x-full'
             }`}
           >
-            <div className="relative h-20 overflow-hidden px-6 pb-3 pt-6">
-              <img src={refurbnicsLogo} alt="Refurbinics" className="-mt-[47px] block h-[133px] w-auto" />
+            <div className="relative flex h-16 items-center px-6">
+              <img src={refurbnicsLogo} alt="Refurbinics" className="h-8 w-auto max-w-[150px] object-contain" />
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}

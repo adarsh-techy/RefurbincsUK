@@ -30,7 +30,7 @@ function percentChange(current, previous) {
 async function summary(req, res, next) {
   try {
     const date = DATE_PATTERN.test(req.query.date) ? req.query.date : null;
-    const [totals, monthly, intakeRows, repairRows, todaysRepairs, hourlyRows, byPart, byStaff] =
+    const [totals, monthly, intakeRows, repairRows, todaysRepairs, hourlyRows, byPart, byStaff, recentClientReturns] =
       await Promise.all([
         dashboardModel.getTotals(),
         dashboardModel.getMonthlyComparison(),
@@ -40,6 +40,7 @@ async function summary(req, res, next) {
         dashboardModel.getHourlyRepairsToday(date),
         dashboardModel.getAvgDurationByPart(8),
         dashboardModel.getAvgDurationByStaff(8),
+        dashboardModel.getRecentClientReturns(6),
       ]);
 
     const totalBatteriesTrend = buildDailySeries(intakeRows, TREND_DAYS);
@@ -81,6 +82,15 @@ async function summary(req, res, next) {
         repairedAt: r.repaired_at,
       })),
       hourlyRepairsToday: hourlyRows.map((r) => ({ hour: r.hour, count: r.count })),
+      recentClientReturns: recentClientReturns.map((r) => ({
+        id: r.id,
+        truckNumber: r.truck_number,
+        driverName: r.driver_name,
+        batteryCount: Number(r.battery_count),
+        returnedAt: r.returned_at,
+        clientName: r.client_name || 'All Clients',
+        clientId: r.client_id,
+      })),
       serviceTimes: {
         byPart: byPart.map((r) => ({
           partId: r.part_id,

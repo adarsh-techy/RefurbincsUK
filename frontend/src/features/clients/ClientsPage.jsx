@@ -52,12 +52,22 @@ function ClientsPage() {
     },
     {
       key: 'login_email',
-      label: 'Login',
+      label: 'Login Account',
       render: (row) =>
         row.login_email ? (
           <span className="text-slate-600 dark:text-neutral-300">{row.login_email}</span>
         ) : (
           <span className="text-slate-400 dark:text-neutral-500">No login</span>
+        ),
+    },
+    {
+      key: 'invoice_email',
+      label: 'Invoice / Billing Email',
+      render: (row) =>
+        row.invoice_email ? (
+          <span className="font-medium text-emerald-600 dark:text-emerald-400 text-xs">{row.invoice_email}</span>
+        ) : (
+          <span className="text-slate-400 dark:text-neutral-500 text-xs">Same as login</span>
         ),
     },
     {
@@ -94,6 +104,8 @@ function ClientsPage() {
           description={
             formTarget === 'new' ? 'Add a new client.' : 'Update this client’s details.'
           }
+          size="3xl"
+          className="min-h-[580px] md:min-h-[640px]"
           onClose={() => setFormTarget(null)}
         >
           <ClientForm

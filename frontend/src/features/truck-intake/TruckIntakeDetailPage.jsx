@@ -6,6 +6,7 @@ import TableState from '../../components/ui/TableState';
 import { StatusBadge } from '../../components/ui/Badge';
 import StatCard from '../../components/ui/StatCard';
 import DataTable from '../../components/ui/DataTable';
+import TruckVerifyModal from './TruckVerifyModal';
 
 function isThisMonth(dateStr) {
   const d = new Date(dateStr);
@@ -13,14 +14,12 @@ function isThisMonth(dateStr) {
   return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
 }
 
-// Truck intake detail page: which batteries came off this specific truck,
-// and where each one stands now — reached by clicking the truck number on
-// the Intake list.
 function TruckIntakeDetailPage() {
   const { id } = useParams();
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
 
   useEffect(() => {
     setLoading(true);
@@ -46,6 +45,7 @@ function TruckIntakeDetailPage() {
 
   const { intake, batteries } = data;
   const repairedCount = batteries.filter((b) => b.status !== 'in_repair').length;
+  const isPending = intake.status === 'pending_arrival';
 
   return (
     <div>
@@ -81,6 +81,60 @@ function TruckIntakeDetailPage() {
         }
       />
 
+      {isPending ? (
+        <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 shadow-sm dark:border-amber-800/60 dark:bg-amber-950/30 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-lg shadow-2xs dark:bg-amber-900/60">
+              🚚
+            </span>
+            <div>
+              <h3 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                Pending Arrival — Packed by Client for Repair
+              </h3>
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Scan every battery as it comes off the truck to check it against the client's list.
+              </p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-3">
+            <span className="rounded-xl bg-white px-3.5 py-2 text-xs font-black text-amber-900 shadow-2xs dark:bg-surface-900 dark:text-amber-200">
+              {batteries.length} batteries expected
+            </span>
+            <button
+              type="button"
+              onClick={() => setVerifyModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path fillRule="evenodd" d="M1 4.75C1 3.784 1.784 3 2.75 3h14.5c.966 0 1.75.784 1.75 1.75v10.5A1.75 1.75 0 0 1 17.25 17H2.75A1.75 1.75 0 0 1 1 15.25V4.75ZM2.75 4.5a.25.25 0 0 0-.25.25v10.5c0 .138.112.25.25.25h14.5a.25.25 0 0 0 .25-.25V4.75a.25.25 0 0 0-.25-.25H2.75Z" clipRule="evenodd" />
+                <path d="M4 6.25a.75.75 0 0 1 .75-.75h2.5a.75.75 0 0 1 0 1.5h-2.5A.75.75 0 0 1 4 6.25Zm0 3.75a.75.75 0 0 1 .75-.75h5.5a.75.75 0 0 1 0 1.5h-5.5A.75.75 0 0 1 4 10Zm0 3.75a.75.75 0 0 1 .75-.75h3.5a.75.75 0 0 1 0 1.5h-3.5a.75.75 0 0 1-.75-.75Z" />
+              </svg>
+              <span>Scan to Verify</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="mb-6 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/80 px-4 py-2.5 text-xs font-semibold text-emerald-900 dark:border-emerald-900/40 dark:bg-emerald-950/30 dark:text-emerald-300">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-emerald-600">
+            <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+          </svg>
+          <span>Truck arrival verified at workshop on {new Date(intake.verified_at || intake.intake_at).toLocaleString()}</span>
+        </div>
+      )}
+
+      {/* Verification Modal */}
+      {verifyModalOpen && (
+        <TruckVerifyModal
+          intakeId={id}
+          initialData={data}
+          onClose={() => setVerifyModalOpen(false)}
+          onSuccess={() => {
+            apiClient.get(`/truck-intakes/${id}`).then((res) => setData(res.data));
+            setVerifyModalOpen(false);
+          }}
+        />
+      )}
+
       <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="Batteries Delivered" value={intake.battery_count} tone="info" />
         <StatCard label="Repaired or Returned" value={repairedCount} tone="good" />
@@ -111,6 +165,34 @@ function TruckIntakeDetailPage() {
                 </Link>
               ),
             },
+            ...(isPending
+              ? [
+                  {
+                    key: 'scanned',
+                    label: 'Scanned In',
+                    render: (b) => {
+                      const code = b.battery_code.toUpperCase();
+                      const at = scannedAt[code];
+                      return scannedSet.has(code) ? (
+                        <span className="inline-flex flex-col items-start gap-0.5">
+                          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            ✓ Verified
+                          </span>
+                          {at && (
+                            <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500">
+                              {at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-neutral-400">
+                          Awaiting Scan
+                        </span>
+                      );
+                    },
+                  },
+                ]
+              : []),
             {
               key: 'created_at',
               label: 'Date',

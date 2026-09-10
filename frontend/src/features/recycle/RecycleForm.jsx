@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../../services/api-client';
+import useFetchList from '../../utils/use-fetch-list';
 import QrScanner from '../../components/ui/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
@@ -12,6 +13,8 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 // batteries from any client, since they're all terminal/dead either way.
 function RecycleForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({ vehicleNumber: '', driverName: '' });
+  const [recycleClientId, setRecycleClientId] = useState('');
+  const { data: clients } = useFetchList('/clients');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -117,6 +120,7 @@ function RecycleForm({ onCreated, onCancel }) {
         vehicleNumber: form.vehicleNumber,
         driverName: form.driverName,
         batteryIds: addedBatteries.map((b) => b.id),
+        recycleClientId: recycleClientId || undefined,
       });
       onCreated();
     } catch (err) {
@@ -135,7 +139,7 @@ function RecycleForm({ onCreated, onCancel }) {
             type="text"
             value={form.vehicleNumber}
             onChange={(e) => updateField('vehicleNumber', e.target.value)}
-            placeholder="e.g. KL18S1234"
+            placeholder="e.g. GB21 XYZ"
             className={inputClasses}
             required
           />
@@ -147,10 +151,29 @@ function RecycleForm({ onCreated, onCancel }) {
             type="text"
             value={form.driverName}
             onChange={(e) => updateField('driverName', e.target.value)}
-            placeholder="e.g. Adarsh"
+            placeholder="e.g. George Davies"
             className={inputClasses}
             required
           />
+        </div>
+
+        <div>
+          <label className={labelClasses}>Assign Recycle Client (Optional)</label>
+          <select
+            value={recycleClientId}
+            onChange={(e) => setRecycleClientId(e.target.value)}
+            className={inputClasses}
+          >
+            <option value="">None (General Recycling)</option>
+            {(clients || []).map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            If assigned, this shipment will be visible on that partner's recycle portal.
+          </p>
         </div>
 
         <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">

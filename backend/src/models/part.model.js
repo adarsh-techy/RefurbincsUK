@@ -28,18 +28,18 @@ async function findUsageHistory(partId) {
   return rows;
 }
 
-async function create({ name, sku, quantity, repairCost }) {
+async function create({ name, sku, quantity, repairCost, serviceCharge }) {
   const { rows } = await db.query(
-    `INSERT INTO parts (name, sku, quantity, repair_cost) VALUES ($1, $2, $3, $4) RETURNING *`,
-    [name, sku, quantity, repairCost]
+    `INSERT INTO parts (name, sku, quantity, repair_cost, service_charge) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+    [name, sku, quantity, repairCost, serviceCharge]
   );
   return rows[0];
 }
 
-async function update(id, { name, sku, quantity, repairCost }) {
+async function update(id, { name, sku, quantity, repairCost, serviceCharge }) {
   const { rows } = await db.query(
-    `UPDATE parts SET name = $2, sku = $3, quantity = $4, repair_cost = $5 WHERE id = $1 RETURNING *`,
-    [id, name, sku, quantity, repairCost]
+    `UPDATE parts SET name = $2, sku = $3, quantity = $4, repair_cost = $5, service_charge = $6 WHERE id = $1 RETURNING *`,
+    [id, name, sku, quantity, repairCost, serviceCharge]
   );
   return rows[0];
 }

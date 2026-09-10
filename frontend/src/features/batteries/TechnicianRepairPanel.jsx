@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
 
@@ -13,6 +14,14 @@ const inputClasses =
 // server-side in repair.controller.js) — which auto-advances the battery to
 // in_testing — then confirm it tested working to mark it repaired.
 function TechnicianRepairPanel({ battery, onUpdated }) {
+  const user = useSelector((state) => state.auth.user);
+  const staffRole = (user?.staff_role || '').toLowerCase();
+  const canTest =
+    user?.role === 'super_admin' ||
+    user?.role === 'admin' ||
+    staffRole === 'supervisor' ||
+    staffRole === 'manager';
+
   const { data: parts } = useFetchList('/parts');
   // Admin-configured "can't service" reasons for the Report Issue picker
   // below — activeOnly so a disabled reason never shows up here.
@@ -136,19 +145,32 @@ function TechnicianRepairPanel({ battery, onUpdated }) {
   if (battery.status === 'in_testing') {
     return (
       <div className="mb-6 rounded-xl border border-blue-100 bg-blue-50 p-5 shadow-sm">
-        <h2 className="mb-1 text-sm font-semibold text-slate-900">Ready to confirm?</h2>
+        <h2 className="mb-1 text-sm font-semibold text-slate-900">
+          {canTest ? 'Ready to confirm?' : 'Testing In Progress'}
+        </h2>
         <p className="mb-4 text-sm text-slate-500">
-          Parts have been changed — verify the battery works, then mark it tested.
+          {canTest
+            ? 'Parts have been changed — verify the battery works, then mark it tested.'
+            : 'Parts have been changed. This battery is currently in the testing queue.'}
         </p>
         {error && <p className="mb-3 text-sm text-red-600">{error}</p>}
-        <button
-          type="button"
-          onClick={handleCompleteTesting}
-          disabled={submitting}
-          className="w-full rounded-lg bg-blue-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
-        >
-          {submitting ? 'Completing…' : 'Complete'}
-        </button>
+        {canTest ? (
+          <button
+            type="button"
+            onClick={handleCompleteTesting}
+            disabled={submitting}
+            className="w-full rounded-lg bg-blue-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-blue-500 disabled:opacity-50"
+          >
+            {submitting ? 'Completing…' : 'Complete Testing'}
+          </button>
+        ) : (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4">
+            <p className="text-sm font-semibold text-amber-900">Testing Permission Required</p>
+            <p className="mt-1 text-xs text-amber-700">
+              Technicians do not have testing permissions. Only Supervisors and Managers can complete testing.
+            </p>
+          </div>
+        )}
       </div>
     );
   }
@@ -167,8 +189,8 @@ function TechnicianRepairPanel({ battery, onUpdated }) {
       {!showIssueForm && (
         <>
           <div className="mb-3 flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-900">Parts Changed</h2>
-            <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600">
+            <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Parts Changed</h2>
+            <span className="rounded-full bg-slate-200 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
               {selectedParts.length} part{selectedParts.length === 1 ? '' : 's'} selected
             </span>
           </div>
@@ -177,7 +199,7 @@ function TechnicianRepairPanel({ battery, onUpdated }) {
             {partIds.map((partId, index) => (
               <div
                 key={index}
-                className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3"
+                className="flex items-center gap-3 rounded-lg border border-slate-200 bg-white p-3 dark:border-surface-700 dark:bg-surface-900"
               >
                 <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-xs font-semibold text-emerald-700">
                   {index + 1}

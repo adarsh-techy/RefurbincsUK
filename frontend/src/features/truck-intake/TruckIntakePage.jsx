@@ -12,6 +12,7 @@ import AlertModal from '../../components/ui/AlertModal';
 import RowActions from '../../components/ui/RowActions';
 import apiClient from '../../services/api-client';
 import TruckIntakeForm from './TruckIntakeForm';
+import TruckVerifyModal from './TruckVerifyModal';
 
 // Converts to a YYYY-MM-DD string in the browser's local timezone, so a date
 // picked in the filter matches intakes recorded that same calendar day —
@@ -29,6 +30,7 @@ function TruckIntakePage() {
 
   // null = closed, 'new' = create form, an intake object = edit form
   const [formTarget, setFormTarget] = useState(null);
+  const [verifyTarget, setVerifyTarget] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
   const [search, setSearch] = useState('');
@@ -39,7 +41,8 @@ function TruckIntakePage() {
     const matchesSearch =
       !q ||
       row.driver_name?.toLowerCase().includes(q) ||
-      row.truck_number?.toLowerCase().includes(q);
+      row.truck_number?.toLowerCase().includes(q) ||
+      row.client_name?.toLowerCase().includes(q);
     const matchesDate = !date || toLocalDateValue(row.intake_at) === date;
     return matchesSearch && matchesDate;
   });
@@ -68,7 +71,7 @@ function TruckIntakePage() {
       render: (row) => (
         <Link
           to={`/truck-intakes/${row.id}`}
-          className="font-medium text-blue-700 hover:underline dark:text-blue-400"
+          className="font-medium text-blue-700 hover:underline dark:text-blue-400 font-mono"
         >
           {row.truck_number}
         </Link>
@@ -77,6 +80,38 @@ function TruckIntakePage() {
     { key: 'driver_name', label: 'Driver' },
     { key: 'client_name', label: 'Client', render: (row) => row.client_name || '—' },
     { key: 'battery_count', label: 'Batteries' },
+    {
+      key: 'status',
+      label: 'Arrival Status',
+      render: (row) => {
+        const isPending = row.status === 'pending_arrival';
+        if (isPending) {
+          return (
+            <div className="flex items-center gap-2">
+              <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Pending Arrival
+              </span>
+              <button
+                type="button"
+                onClick={() => setVerifyTarget(row)}
+                className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 transition-all dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              >
+                Scan to Verify →
+              </button>
+            </div>
+          );
+        }
+        return (
+          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+              <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+            </svg>
+            Arrived & Verified
+          </span>
+        );
+      },
+    },
     {
       key: 'intake_at',
       label: 'Date/Time',
@@ -205,6 +240,18 @@ function TruckIntakePage() {
           onCancel={() => setDeleteTarget(null)}
         />
       )}
+
+      {verifyTarget && (
+        <TruckVerifyModal
+          intakeId={verifyTarget.id}
+          onClose={() => setVerifyTarget(null)}
+          onSuccess={() => {
+            setVerifyTarget(null);
+            refetch();
+          }}
+        />
+      )}
+
     </div>
   );
 }

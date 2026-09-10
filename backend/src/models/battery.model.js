@@ -22,6 +22,7 @@ async function findPage({
   qrGenerated,
   includeBlocked,
   activeOnly,
+  sortOrder = 'desc',
 }) {
   const conditions = [];
   const params = [];
@@ -31,11 +32,15 @@ async function findPage({
   }
   if (clientName) {
     params.push(clientName);
-    conditions.push(`lower(b.client_name) = lower($${params.length})`);
+    conditions.push(`(lower(b.client_name) = lower($${params.length}) OR EXISTS (SELECT 1 FROM truck_intakes ti JOIN clients c ON c.id = ti.client_id WHERE ti.id = b.truck_intake_id AND lower(c.name) = lower($${params.length})))`);
   }
   if (status) {
-    params.push(status);
-    conditions.push(`b.status = $${params.length}`);
+    if (status === 'registered') {
+      conditions.push(`(b.status = 'registered' OR (b.status = 'returned' AND NOT EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id) AND NOT EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = b.id) AND b.truck_intake_id IS NULL))`);
+    } else {
+      params.push(status);
+      conditions.push(`b.status = $${params.length}`);
+    }
   }
   if (date) {
     params.push(date);
@@ -70,6 +75,14 @@ async function findPage({
 
   const { rows } = await db.query(
     `SELECT b.*,
+            CASE
+              WHEN b.status = 'returned' 
+                   AND NOT EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)
+                   AND NOT EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = b.id)
+                   AND b.truck_intake_id IS NULL
+                THEN 'registered'
+              ELSE b.status
+            END AS status,
             last_repair.repaired_at AS last_repaired_at,
             last_parts.part_names AS last_repaired_parts,
             last_parts.staff_name AS last_repaired_by,
@@ -110,7 +123,7 @@ async function findPage({
        LIMIT 1
      ) last_issue ON true
      ${whereClause}
-     ORDER BY ${qrGenerated ? 'b.qr_generated_at ASC, b.id ASC' : 'b.created_at DESC, b.id DESC'}
+     ORDER BY ${qrGenerated ? 'b.qr_generated_at ASC, b.id ASC' : (sortOrder === 'asc' ? 'b.created_at ASC, b.id ASC' : 'b.created_at DESC, b.id DESC')}
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
@@ -125,6 +138,14 @@ async function findPage({
 async function findByCode(batteryCode) {
   const { rows } = await db.query(
     `SELECT b.*,
+            CASE
+              WHEN b.status = 'returned' 
+                   AND NOT EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)
+                   AND NOT EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = b.id)
+                   AND b.truck_intake_id IS NULL
+                THEN 'registered'
+              ELSE b.status
+            END AS status,
             ti.truck_number AS intake_truck_number,
             ti.driver_name AS intake_driver_name,
             ti.intake_at AS intake_at,
@@ -161,8 +182,8 @@ async function findByTruckIntakeId(truckIntakeId) {
     `SELECT DISTINCT b.*,
             last_repair.repaired_at AS last_repaired_at,
             last_parts.part_names AS last_repaired_parts
-     FROM battery_visits bv
-     JOIN batteries b ON b.id = bv.battery_id
+     FROM batteries b
+     LEFT JOIN battery_visits bv ON bv.battery_id = b.id
      LEFT JOIN LATERAL (
        SELECT r.repaired_at, r.batch_id
        FROM repairs r
@@ -176,7 +197,7 @@ async function findByTruckIntakeId(truckIntakeId) {
        JOIN parts p ON p.id = r2.part_id
        WHERE r2.batch_id = last_repair.batch_id
      ) last_parts ON true
-     WHERE bv.truck_intake_id = $1
+     WHERE bv.truck_intake_id = $1 OR b.truck_intake_id = $1
      ORDER BY b.battery_code`,
     [truckIntakeId]
   );
@@ -497,6 +518,110 @@ async function findRepeatIntakesThisMonth() {
   return rows;
 }
 
+// Bulk creates batteries for a client directly from Generate QR Code page (1 to 50,000 QR codes).
+// Uses PostgreSQL generate_series for ultra-fast multi-row insertion in a single query.
+async function createManyForClient({ clientName, count, startNumber }) {
+  const prefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  const start = Number(startNumber) > 0 ? Number(startNumber) : (await maxSequenceByClientName(clientName)) + 1;
+  const end = start + Number(count) - 1;
+  const padLength = Math.max(4, String(end).length);
+
+  const { rows } = await db.query(
+    `INSERT INTO batteries (battery_code, client_name, qr_generated_at, status)
+     SELECT
+       $1 || '-' || LPAD(s::text, $2::int, '0'),
+       $3,
+       now(),
+       'returned'
+     FROM generate_series($4::int, $5::int) AS s
+     RETURNING battery_code`,
+    [prefix, padLength, clientName.trim(), start, end]
+  );
+
+  return {
+    count: rows.length,
+    firstCode: rows[0]?.battery_code || `${prefix}-${String(start).padStart(padLength, '0')}`,
+    lastCode: rows[rows.length - 1]?.battery_code || `${prefix}-${String(end).padStart(padLength, '0')}`,
+  };
+}
+
+async function maxSequenceByClientName(clientName) {
+  const prefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  const { rows } = await db.query(
+    `SELECT COALESCE(MAX(NULLIF(regexp_replace(battery_code, '^.*-', ''), '')::int), 0) AS max_seq
+     FROM batteries
+     WHERE battery_code LIKE $1`,
+    [`${prefix}-%`]
+  );
+  return rows[0].max_seq;
+}
+
+async function updateSerialNumber(id, { serialNumber, addedByRole }) {
+  const hasSerial = Boolean(serialNumber && serialNumber.trim());
+  const { rows } = await db.query(
+    `UPDATE batteries
+     SET serial_number = $2,
+         serial_number_added_by_role = $3,
+         serial_number_added_at = ${hasSerial ? 'now()' : 'NULL'}
+     WHERE id = $1
+     RETURNING *`,
+    [id, hasSerial ? serialNumber.trim() : null, hasSerial ? (addedByRole || 'client') : null]
+  );
+  return rows[0];
+}
+
+async function findTimeline(batteryId) {
+  const [intakes, repairs, returns, issues] = await Promise.all([
+    db.query(
+      `SELECT ti.id, ti.truck_number, ti.driver_name, ti.intake_at,
+              COALESCE(c.name, '(No client assigned)') AS client_name,
+              c.id AS client_id
+       FROM battery_visits bv
+       JOIN truck_intakes ti ON ti.id = bv.truck_intake_id
+       LEFT JOIN clients c ON c.id = ti.client_id
+       WHERE bv.battery_id = $1
+       ORDER BY ti.intake_at DESC`,
+      [batteryId]
+    ),
+    db.query(
+      `SELECT r.batch_id, r.repaired_at, s.name AS staff_name,
+              string_agg(p.name, ', ' ORDER BY p.name) AS part_names,
+              COUNT(r.id) AS parts_count,
+              SUM(r.price + r.labor_charge) AS total_charge
+       FROM repairs r
+       JOIN parts p ON p.id = r.part_id
+       JOIN staff s ON s.id = r.staff_id
+       WHERE r.battery_id = $1
+       GROUP BY r.batch_id, r.repaired_at, s.name
+       ORDER BY r.repaired_at DESC`,
+      [batteryId]
+    ),
+    db.query(
+      `SELECT ret.id, ret.truck_number, ret.driver_name, ret.returned_at
+       FROM return_batteries rb
+       JOIN returns ret ON ret.id = rb.return_id
+       WHERE rb.battery_id = $1
+       ORDER BY ret.returned_at DESC`,
+      [batteryId]
+    ),
+    db.query(
+      `SELECT bi.id, bi.note, bi.reported_at, ir.label AS reason
+       FROM battery_issues bi
+       JOIN issue_reasons ir ON ir.id = bi.reason_id
+       WHERE bi.battery_id = $1
+       ORDER BY bi.reported_at DESC`,
+      [batteryId]
+    ),
+  ]);
+
+  return {
+    intakes: intakes.rows,
+    repairs: repairs.rows,
+    returns: returns.rows,
+    issues: issues.rows,
+  };
+}
+
 module.exports = {
   findPage,
   findByCode,
@@ -505,6 +630,10 @@ module.exports = {
   findByTruckIntakeId,
   create,
   createMany,
+  createManyForClient,
+  maxSequenceByClientName,
+  updateSerialNumber,
+  findTimeline,
   addVisit,
   addVisitMany,
   findVisitHistory,

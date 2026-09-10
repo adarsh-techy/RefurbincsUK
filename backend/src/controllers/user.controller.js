@@ -1,4 +1,5 @@
 const bcrypt = require('bcryptjs');
+const db = require('../config/db');
 const userModel = require('../models/user.model');
 const auditLogModel = require('../models/audit-log.model');
 const { PERMISSIONS } = require('../config/permissions');
@@ -16,16 +17,16 @@ async function list(req, res, next) {
 async function create(req, res, next) {
   try {
     const { name, email, password, role, permissions } = req.body;
-    const safeRole = role === 'super_admin' ? 'super_admin' : 'admin';
+    const safeRole = ['super_admin', 'recycle_client'].includes(role) ? role : 'admin';
 
-    // super_admin ignores the permissions list (implicitly has everything);
+    // super_admin and recycle_client have no per-module permissions list;
     // an admin only gets the subset of known permission keys it was given.
     const grantedPermissions =
-      safeRole === 'super_admin'
-        ? []
-        : (Array.isArray(permissions) ? permissions : []).filter((p) =>
+      safeRole === 'admin'
+        ? (Array.isArray(permissions) ? permissions : []).filter((p) =>
             PERMISSIONS.includes(p)
-          );
+          )
+        : [];
 
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await userModel.create({
@@ -35,6 +36,13 @@ async function create(req, res, next) {
       role: safeRole,
       permissions: grantedPermissions,
     });
+
+    if (safeRole === 'recycle_client') {
+      await db.query(
+        'INSERT INTO clients (name, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [name, user.id]
+      );
+    }
 
     await auditLogModel.record({
       userId: req.user.id,
@@ -58,18 +66,18 @@ async function update(req, res, next) {
   try {
     const targetId = Number(req.params.id);
     const { name, email, role, permissions, active } = req.body;
-    const safeRole = role === 'super_admin' ? 'super_admin' : 'admin';
+    const safeRole = ['super_admin', 'recycle_client'].includes(role) ? role : 'admin';
 
     if (targetId === req.user.id && active === false) {
       return res.status(400).json({ message: 'You cannot deactivate your own account' });
     }
 
     const grantedPermissions =
-      safeRole === 'super_admin'
-        ? []
-        : (Array.isArray(permissions) ? permissions : []).filter((p) =>
+      safeRole === 'admin'
+        ? (Array.isArray(permissions) ? permissions : []).filter((p) =>
             PERMISSIONS.includes(p)
-          );
+          )
+        : [];
 
     const user = await userModel.update(targetId, {
       name,

@@ -1,12 +1,12 @@
 import { Text, View } from 'react-native';
 
 const TONES = {
-  info: { bg: 'bg-sky-500/15', text: 'text-sky-700' },
-  warning: { bg: 'bg-amber-500/15', text: 'text-amber-700' },
-  good: { bg: 'bg-emerald-500/15', text: 'text-emerald-700' },
-  critical: { bg: 'bg-red-500/15', text: 'text-red-700' },
-  testing: { bg: 'bg-blue-500/15', text: 'text-blue-700' },
-  neutral: { bg: 'bg-slate-200', text: 'text-slate-700' },
+  info: { bg: 'bg-sky-500/15', text: 'text-sky-700 dark:text-sky-400' },
+  warning: { bg: 'bg-amber-500/15', text: 'text-amber-700 dark:text-amber-400' },
+  good: { bg: 'bg-emerald-500/15', text: 'text-emerald-700 dark:text-emerald-400' },
+  critical: { bg: 'bg-red-500/15', text: 'text-red-700 dark:text-red-400' },
+  testing: { bg: 'bg-blue-500/15', text: 'text-blue-700 dark:text-blue-400' },
+  neutral: { bg: 'bg-slate-200 dark:bg-slate-700', text: 'text-slate-700 dark:text-slate-200' },
 };
 
 // battery/status strings from the API (snake_case) mapped to a tone +
