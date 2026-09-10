@@ -355,8 +355,8 @@ function CertificatesPage() {
                     <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">
                       Issued Date
                     </th>
-                    <th className="px-4 py-3 text-right font-bold text-slate-700 dark:text-neutral-300">
-                      Action
+                    <th className="px-4 py-3 text-right font-bold text-slate-700 dark:text-neutral-300 whitespace-nowrap">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -404,23 +404,25 @@ function CertificatesPage() {
                         <td className="px-4 py-3 text-slate-500 dark:text-neutral-400">
                           {cert.issued_at ? new Date(cert.issued_at).toLocaleDateString('en-GB') : '—'}
                         </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1.5">
+                        <td className="px-4 py-3 text-right whitespace-nowrap">
+                          <div className="flex items-center justify-end gap-2">
                             <button
                               type="button"
                               onClick={() => downloadMilestoneCertificatePDF(cert, cert.client_name)}
-                              className="inline-flex items-center gap-1 rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
+                              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-98"
+                              title="Download Official Vector PDF"
                             >
-                              <FiDownload className="w-3 h-3" />
+                              <FiDownload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                               <span>PDF</span>
                             </button>
                             <button
                               type="button"
                               onClick={() => setSelectedCert(cert)}
-                              className="inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 py-1.5 font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 cursor-pointer shadow-2xs"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-98"
+                              title="View & Print Certificate"
                             >
-                              <FiEye className="w-3 h-3" />
-                              <span>View & Print</span>
+                              <FiEye className="w-3.5 h-3.5" />
+                              <span>View Certificate</span>
                             </button>
                           </div>
                         </td>

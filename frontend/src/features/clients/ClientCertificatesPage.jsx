@@ -297,18 +297,20 @@ function ClientCertificatesPage() {
                         <button
                           type="button"
                           onClick={() => downloadMilestoneCertificatePDF(cert, client?.name)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/60 transition-colors cursor-pointer"
+                          className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/50 transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-98"
+                          title="Download Official Vector PDF"
                         >
-                          <FiDownload className="w-3 h-3" />
+                          <FiDownload className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                           <span>PDF</span>
                         </button>
                         <button
                           type="button"
                           onClick={() => setSelectedCert(cert)}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 transition-colors cursor-pointer shadow-2xs"
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-98"
+                          title="View & Print Certificate"
                         >
-                          <FiEye className="w-3 h-3" />
-                          <span>View & Print</span>
+                          <FiEye className="w-3.5 h-3.5" />
+                          <span>View Certificate</span>
                         </button>
                       </div>
                     </div>
