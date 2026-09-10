@@ -47,6 +47,7 @@ const RecycleClientShipmentsPage = lazy(() => import('../features/recycle-client
 const RecycleClientsAdminPage = lazy(() => import('../features/recycle-client/RecycleClientsAdminPage'));
 const RatingsPage = lazy(() => import('../features/ratings/RatingsPage'));
 const CertificatesPage = lazy(() => import('../features/certificates/CertificatesPage'));
+const ClientCertificatesPage = lazy(() => import('../features/clients/ClientCertificatesPage'));
 
 function HistoryRouter() {
   const user = useSelector((state) => state.auth.user);
@@ -124,6 +125,7 @@ function AppRoutes() {
             <Route path="/my/transactions" element={<ClientTransactionsPage />} />
           </Route>
           <Route element={<ProtectedRoute roles={['client']} />}>
+            <Route path="/my/certificates" element={<ClientCertificatesPage />} />
             <Route path="/my/batteries" element={<ClientBatteriesPage />} />
             <Route path="/my/batteries/:bucket" element={<ClientBatteriesPage />} />
           </Route>

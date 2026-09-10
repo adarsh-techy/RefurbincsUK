@@ -246,6 +246,12 @@ const CLIENT_NAV_GROUPS = [
     ],
   },
   {
+    heading: 'Sustainability',
+    links: [
+      { to: '/my/certificates', label: 'Milestones & Impact', icon: Icons.certificates },
+    ],
+  },
+  {
     heading: 'Support',
     links: [
       { to: '/my/support', label: 'Support', icon: Icons.support, clientPermission: 'client_support' },
