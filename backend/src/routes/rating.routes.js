@@ -1,9 +1,9 @@
 const express = require('express');
 const router = express.Router();
 const ratingController = require('../controllers/rating.controller');
-const { authenticateToken, requireRole } = require('../middlewares/auth');
+const { requireAuth, requireRole } = require('../middlewares/auth');
 
-router.use(authenticateToken);
+router.use(requireAuth);
 
 // Client or Admin can submit rating
 router.post('/', ratingController.create);

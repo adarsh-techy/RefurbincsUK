@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
 const certificateController = require('../controllers/certificate.controller');
-const { authenticateToken, requireRole } = require('../middlewares/auth');
+const { requireAuth, requireRole } = require('../middlewares/auth');
 
 // Public verification of a certificate by certificate code
 router.get('/verify/:code', certificateController.getByCode);
 
 // Authenticated routes
-router.use(authenticateToken);
+router.use(requireAuth);
 
 // Client milestone checks & acknowledgement
 router.get('/my-milestones', requireRole('client', 'recycle_client'), certificateController.getMyMilestones);
