@@ -224,6 +224,8 @@ export default function BatteryDetailScreen() {
   const [showTestingDecisionModal, setShowTestingDecisionModal] = useState(false);
   const [showPassToTechSuccessModal, setShowPassToTechSuccessModal] = useState(false);
   const [passToTechSubmitting, setPassToTechSubmitting] = useState(false);
+  const [showCantServiceAlertModal, setShowCantServiceAlertModal] = useState(false);
+  const [cantServiceAlertData, setCantServiceAlertData] = useState(null);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -337,12 +339,12 @@ export default function BatteryDetailScreen() {
         const isOwnInProgress =
           data.battery?.status === 'in_progress' &&
           data.battery?.started_by_user_id === currentUserId;
-        const canTestInTesting = canTest && data.battery?.status === 'in_testing';
-        // Unserviceable but still carrying parts fitted during repair —
-        // let it through to the Parts Pending Removal panel instead of
-        // blocking, so whoever scans it can reclaim them.
-        const hasPendingPartsRemoval =
-          data.battery?.status === 'unserviceable' && (data.pendingPartsRemoval?.length || 0) > 0;
+        const hasPendingPartsRemoval = (data.pendingPartsRemoval?.length || 0) > 0;
+        const latestPassBack = (data.services || []).find(
+          (s) => s.service_name === 'Passed back to Technician'
+        );
+        const isPassedBack = data.battery?.status === 'in_repair' && !!latestPassBack;
+
         if (
           fromScan &&
           data.battery?.status !== 'in_repair' &&
@@ -359,6 +361,30 @@ export default function BatteryDetailScreen() {
         if (fromScan && canTestInTesting) {
           setRepairedByInfo(data.history?.[0] || null);
           setShowRepairedByModal(true);
+        } else if (
+          fromScan &&
+          (isPassedBack ||
+            (data.battery?.status === 'unserviceable' && hasPendingPartsRemoval))
+        ) {
+          const fittedParts = hasPendingPartsRemoval
+            ? data.pendingPartsRemoval
+            : (data.history || []).filter((h) => !h.removed_at);
+
+          setCantServiceAlertData({
+            staffName:
+              latestPassBack?.staff_name ||
+              data.issues?.[0]?.staff_name ||
+              'Supervisor / Tester',
+            note: latestPassBack?.notes || data.issues?.[0]?.note || null,
+            date:
+              latestPassBack?.completed_at ||
+              data.issues?.[0]?.reported_at ||
+              null,
+            parts: fittedParts,
+            isPassedBack,
+            isUnserviceable: data.battery?.status === 'unserviceable',
+          });
+          setShowCantServiceAlertModal(true);
         }
       }
       setResult(data);
@@ -1065,19 +1091,58 @@ export default function BatteryDetailScreen() {
         </View>
       )}
 
-      {/* ── Parts Pending Removal (unserviceable battery, parts fitted during
+      {/* ── Passed Back To Technician Banner (if in_repair and was passed back from testing) ─────────── */}
+      {!isClient &&
+        battery.status === 'in_repair' &&
+        (() => {
+          const passBack = services.find((s) => s.service_name === 'Passed back to Technician');
+          if (!passBack) return null;
+          return (
+            <View className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+              <View className="flex-row items-center gap-2 mb-1">
+                <Icon name="alertTriangle" color="#b45309" size={18} />
+                <Text className="text-sm font-bold text-amber-900">
+                  Marked Can't Service · Passed to Technician
+                </Text>
+              </View>
+              <Text className="text-xs text-amber-800 mt-1 mb-2 leading-relaxed">
+                Marked by{' '}
+                <Text className="font-bold text-amber-950">
+                  {passBack.staff_name || 'Supervisor / Manager'}
+                </Text>
+                {passBack.completed_at
+                  ? ` on ${new Date(passBack.completed_at).toLocaleString()}`
+                  : ''}
+              </Text>
+              {passBack.notes ? (
+                <View className="rounded-xl bg-white/80 border border-amber-200 p-2.5 mb-2">
+                  <Text className="text-xs text-amber-900 italic font-medium">"{passBack.notes}"</Text>
+                </View>
+              ) : null}
+              <View className="flex-row items-center gap-1.5 pt-1 border-t border-amber-200/60">
+                <Icon name="wrench" color="#b45309" size={13} />
+                <Text className="text-[11px] font-bold text-amber-900">
+                  Action: Please remove any fitted parts below before restarting rework.
+                </Text>
+              </View>
+            </View>
+          );
+        })()}
+
+      {/* ── Parts Pending Removal (unserviceable or in_repair battery, parts fitted during
            repair before it failed testing — technician or manager/
-           supervisor reclaims them here before it can go to Recycle) ────── */}
-      {!isClient && battery.status === 'unserviceable' && pendingPartsRemoval.length > 0 && (
-        <View className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
-          <View className="mb-1 flex-row items-center gap-2">
-            <Icon name="wrench" color="#b45309" size={16} />
-            <Text className="text-sm font-bold text-amber-900">Parts Pending Removal</Text>
-          </View>
-          <Text className="mb-3 text-[11px] text-amber-800/80 leading-relaxed">
-            These parts were fitted before this battery failed testing. Check off what you've
-            physically removed to restock it — the rest stay flagged until they're pulled too.
-          </Text>
+           supervisor reclaims them here before it can proceed) ────── */}
+      {!isClient &&
+        (battery.status === 'unserviceable' || battery.status === 'in_repair') &&
+        pendingPartsRemoval.length > 0 && (
+          <View className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+            <View className="mb-1 flex-row items-center gap-2">
+              <Icon name="wrench" color="#b45309" size={16} />
+              <Text className="text-sm font-bold text-amber-900">Parts Pending Removal</Text>
+            </View>
+            <Text className="mb-3 text-[11px] text-amber-800/80 leading-relaxed">
+              These parts were already fitted to this battery. Check off the parts you have physically removed to restock inventory:
+            </Text>
 
           <View className="gap-2">
             {pendingPartsRemoval.map((p) => {
@@ -2038,6 +2103,163 @@ export default function BatteryDetailScreen() {
                 className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
               >
                 <Text className="text-xs font-semibold text-slate-700">View Battery Details</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Can't Service / Passed to Tech Alert Modal ───────────────────── */}
+      <Modal
+        visible={showCantServiceAlertModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowCantServiceAlertModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-5">
+          <View className="w-full max-w-sm rounded-3xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            {/* Top Icon & Badge */}
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                <Icon name="alertTriangle" color="#d97706" size={24} />
+              </View>
+              <View className="rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-1">
+                <Text className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  Can't Service · Passed to Tech
+                </Text>
+              </View>
+            </View>
+
+            <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
+              Battery Can't Service
+            </Text>
+            <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              This battery failed testing and was passed back for technician review:
+            </Text>
+
+            {/* Details Card */}
+            <View className="mb-4 rounded-2xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/30 p-3.5 space-y-2">
+              {/* Battery Code */}
+              <View className="flex-row items-center justify-between py-1 border-b border-amber-200/60 dark:border-amber-800/60">
+                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Battery ID</Text>
+                <Text className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                  {battery?.battery_code || code}
+                </Text>
+              </View>
+
+              {/* Marked By */}
+              <View className="flex-row items-center justify-between py-1 border-b border-amber-200/60 dark:border-amber-800/60">
+                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Marked By</Text>
+                <View className="flex-row items-center gap-1.5">
+                  <Icon name="user" color="#b45309" size={13} />
+                  <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                    {cantServiceAlertData?.staffName || 'Supervisor / Tester'}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Timestamp */}
+              {cantServiceAlertData?.date && (
+                <View className="flex-row items-center justify-between py-1 border-b border-amber-200/60 dark:border-amber-800/60">
+                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Date &amp; Time</Text>
+                  <Text className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    {new Date(cantServiceAlertData.date).toLocaleDateString('en-GB', {
+                      day: '2-digit',
+                      month: 'short',
+                      year: 'numeric',
+                    })} · {new Date(cantServiceAlertData.date).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </Text>
+                </View>
+              )}
+
+              {/* Tester Notes */}
+              {cantServiceAlertData?.note && (
+                <View className="pt-1">
+                  <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                    Tester Note:
+                  </Text>
+                  <Text className="text-xs text-slate-800 dark:text-slate-200 italic font-medium">
+                    "{cantServiceAlertData.note}"
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Instruction Callout */}
+            <View className="mb-4 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-100/70 dark:bg-amber-900/40 p-3 flex-row items-start gap-2.5">
+              <Icon name="wrench" color="#b45309" size={16} />
+              <View className="flex-1">
+                <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                  Please Remove The Fitted Part(s)
+                </Text>
+                <Text className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">
+                  The following parts were already fitted to this battery and must be removed:
+                </Text>
+              </View>
+            </View>
+
+            {/* Already Fitted Parts List */}
+            <View className="mb-5 max-h-36">
+              <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
+                Already Fitted Parts ({cantServiceAlertData?.parts?.length || 0})
+              </Text>
+              {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 ? (
+                <ScrollView nestedScrollEnabled className="space-y-1.5 max-h-32">
+                  {cantServiceAlertData.parts.map((p, pIdx) => (
+                    <View
+                      key={p.id || pIdx}
+                      className="flex-row items-center justify-between rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-3 py-2"
+                    >
+                      <View className="flex-row items-center gap-2 flex-1 pr-2">
+                        <View className="h-6 w-6 rounded-lg bg-amber-500/10 items-center justify-center">
+                          <Icon name="package" color="#d97706" size={12} />
+                        </View>
+                        <Text className="text-xs font-bold text-slate-800 dark:text-slate-200 numberOfLines={1}">
+                          {p.part_name}
+                        </Text>
+                      </View>
+                      <View className="rounded-md bg-slate-200/80 dark:bg-slate-800 px-2 py-0.5">
+                        <Text className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
+                          Qty {p.quantity_used || 1}
+                        </Text>
+                      </View>
+                    </View>
+                  ))}
+                </ScrollView>
+              ) : (
+                <View className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-3 items-center">
+                  <Text className="text-xs text-slate-500 dark:text-slate-400">
+                    No specific parts recorded — inspect battery physically.
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            {/* Modal Actions */}
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={() => setShowCantServiceAlertModal(false)}
+                className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
+              >
+                <Text className="text-xs font-bold text-white">Proceed &amp; Remove Parts</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCantServiceAlertModal(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
+              >
+                <Icon name="camera" color="#64748b" size={14} />
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
               </TouchableOpacity>
             </View>
           </View>

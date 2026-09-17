@@ -619,13 +619,11 @@ async function passToTech(id, { staffId = null, note = null } = {}) {
       return undefined;
     }
 
-    if (note) {
-      await client.query(
-        `INSERT INTO battery_services (battery_id, service_id, service_name, rate, staff_id, notes, completed_at)
-         VALUES ($1, NULL, 'Passed back to Technician', 0, $2, $3, now())`,
-        [id, staffId, note]
-      );
-    }
+    await client.query(
+      `INSERT INTO battery_services (battery_id, service_id, service_name, rate, staff_id, notes, completed_at)
+       VALUES ($1, NULL, 'Passed back to Technician', 0, $2, $3, now())`,
+      [id, staffId, note || 'Marked can\'t service during testing and passed back to technician for rework / parts removal.']
+    );
 
     await client.query('COMMIT');
     return rows[0];

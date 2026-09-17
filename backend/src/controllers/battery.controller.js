@@ -99,7 +99,7 @@ async function getByCode(req, res, next) {
       batteryModel.findIssueHistory(battery.id),
       recycleModel.findByBatteryId(battery.id),
       serviceModel.findBatteryServices(battery.id),
-      battery.status === 'unserviceable' ? batteryModel.findPendingPartsRemoval(battery.id) : [],
+      batteryModel.findPendingPartsRemoval(battery.id),
     ]);
     res.json({ battery, history, returns, visits, issues, recycleBatch, services, pendingPartsRemoval });
   } catch (err) {
