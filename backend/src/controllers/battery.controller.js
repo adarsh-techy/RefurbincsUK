@@ -519,6 +519,49 @@ async function removeParts(req, res, next) {
   }
 }
 
+// Passes a battery back from 'in_testing' to 'in_repair' so technicians
+// can re-work on it after failing testing. Restricted to Supervisors,
+// Managers, and Admins.
+async function passToTech(req, res, next) {
+  try {
+    let staffId = null;
+    if (req.user.role === 'technician') {
+      const staff = await staffModel.findByUserId(req.user.id);
+      if (!staff) {
+        return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
+      }
+      staffId = staff.id;
+      const staffRole = (staff.role || '').toLowerCase();
+      if (staffRole === 'technician') {
+        return res.status(403).json({
+          message:
+            'Technicians cannot pass batteries back. Only Supervisors and Managers can perform testing and QA decisions.',
+        });
+      }
+    } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
+      const staff = await staffModel.findByUserId(req.user.id);
+      if (staff) {
+        staffId = staff.id;
+      }
+    }
+
+    const { note } = req.body || {};
+    const battery = await batteryModel.passToTech(req.params.id, {
+      staffId,
+      note: typeof note === 'string' ? note.trim() : null,
+    });
+    if (!battery) {
+      return res.status(409).json({
+        message: 'This battery cannot be passed back to technician — it may not be in testing.',
+      });
+    }
+    realtime.broadcastBatteryUpdated(battery);
+    res.json(battery);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Hides/restores a battery app-wide (Batteries list, Generate QR Code list,
 // typeahead suggestions) without touching its history. Super_admin only,
 // same as delete/status correction.
@@ -551,6 +594,7 @@ module.exports = {
   completeTesting,
   reportIssue,
   removeParts,
+  passToTech,
   remove,
   setBlocked,
 };

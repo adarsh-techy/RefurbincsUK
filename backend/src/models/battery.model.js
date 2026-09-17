@@ -597,6 +597,46 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
   }
 }
 
+// A supervisor / manager / tester passing a battery back to the technician
+// pool from 'in_testing' — resets testing timestamps and reverts status to
+// 'in_repair' so it can be re-worked, logging an optional note.
+async function passToTech(id, { staffId = null, note = null } = {}) {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE batteries
+       SET status = 'in_repair',
+           testing_started_at = NULL,
+           work_started_at = NULL,
+           started_by_user_id = NULL
+       WHERE id = $1 AND status = 'in_testing'
+       RETURNING *`,
+      [id]
+    );
+    if (!rows[0]) {
+      await client.query('ROLLBACK');
+      return undefined;
+    }
+
+    if (note) {
+      await client.query(
+        `INSERT INTO battery_services (battery_id, service_id, service_name, rate, staff_id, notes, completed_at)
+         VALUES ($1, NULL, 'Passed back to Technician', 0, $2, $3, now())`,
+        [id, staffId, note]
+      );
+    }
+
+    await client.query('COMMIT');
+    return rows[0];
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 // Sets which client a battery belongs to and marks its QR code as
 // generated — used when generating its QR code, so scanning it later shows
 // who it's for. Open to any authenticated user (unlike the super_admin-only
@@ -790,6 +830,7 @@ module.exports = {
   startWork,
   completeTesting,
   reportIssue,
+  passToTech,
   updateStatus,
   updateClientName,
   countByClientName,

@@ -9,6 +9,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { useSelector } from 'react-redux';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
@@ -161,7 +162,7 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       label: 'Reported Issue',
       icon: 'alertTriangle',
       date: iss.reported_at,
-      primary: `${iss.reason_label} · by ${iss.staff_name || 'Technician'}`,
+      primary: `${iss.reason_label || 'Unserviceable'} · by ${iss.staff_name || 'Technician'}`,
       notes: iss.note,
       photos: iss.photo_urls || [],
     });
@@ -192,15 +193,13 @@ export default function BatteryDetailScreen() {
   const currentUser = useSelector((state) => state.auth.user);
   const currentUserId = currentUser?.id;
   const isClient = currentUser?.role === 'client';
-  const isTechnician = currentUser?.role === 'technician';
-  const staffRole = (currentUser?.staff_role || '').toLowerCase();
+  const isStaff = !isClient;
+  const staffRole = (currentUser?.staff_role || currentUser?.role || '').toLowerCase();
   const canTest =
     currentUser?.role === 'super_admin' ||
     currentUser?.role === 'admin' ||
-    staffRole === 'supervisor' ||
-    staffRole === 'manager' ||
-    staffRole === 'tester' ||
-    staffRole === 'qa';
+    ['supervisor', 'manager', 'tester', 'qa'].includes(staffRole);
+  const isTechnicianOnly = isStaff && !canTest;
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -222,6 +221,9 @@ export default function BatteryDetailScreen() {
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [showSubmittedModal, setShowSubmittedModal] = useState(false);
   const [showUnserviceableSuccessModal, setShowUnserviceableSuccessModal] = useState(false);
+  const [showTestingDecisionModal, setShowTestingDecisionModal] = useState(false);
+  const [showPassToTechSuccessModal, setShowPassToTechSuccessModal] = useState(false);
+  const [passToTechSubmitting, setPassToTechSubmitting] = useState(false);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -550,6 +552,31 @@ export default function BatteryDetailScreen() {
     }
   }
 
+  async function handlePassToTech() {
+    setPassToTechSubmitting(true);
+    setActionError(null);
+    try {
+      await apiClient.patch(`/batteries/${result.battery.id}/pass-to-tech`, {
+        note: issueNote || undefined,
+      });
+      setShowTestingDecisionModal(false);
+      setShowTestingUnserviceableForm(false);
+      setIssueNote('');
+      setIssuePhotos([]);
+      await load();
+      setShowPassToTechSuccessModal(true);
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message);
+    } finally {
+      setPassToTechSubmitting(false);
+    }
+  }
+
+  async function handleConfirmTestingUnserviceable() {
+    setShowTestingDecisionModal(false);
+    await handleReportIssue();
+  }
+
   function toggleRemovalId(repairId) {
     setSelectedRemovalIds((prev) =>
       prev.includes(repairId) ? prev.filter((id) => id !== repairId) : [...prev, repairId]
@@ -860,11 +887,11 @@ export default function BatteryDetailScreen() {
                 <Text className="text-xs font-medium text-slate-600">Cancel</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={handleReportIssue}
+                onPress={() => setShowTestingDecisionModal(true)}
                 disabled={submitting}
                 className="flex-1 items-center rounded-xl bg-red-600 py-2.5 disabled:opacity-50"
               >
-                <Text className="text-xs font-bold text-white">Mark Unserviceable</Text>
+                <Text className="text-xs font-bold text-white">Report &amp; Proceed</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1128,7 +1155,7 @@ export default function BatteryDetailScreen() {
             <Text className="mt-1 text-xs text-slate-400 italic">No serial number assigned</Text>
           )}
         </View>
-        {(isClient || (!isClientLocked && !isTechnician)) && (
+        {(isClient || (!isClientLocked && isStaff)) && (
           <TouchableOpacity
             onPress={openSerialModal}
             className="rounded-xl bg-blue-50 px-3.5 py-2 border border-blue-200 active:bg-blue-100"
@@ -1140,8 +1167,8 @@ export default function BatteryDetailScreen() {
         )}
       </View>
 
-      {/* ── Technician Action Panels (if technician) ─────────────────────── */}
-      {isTechnician && (
+      {/* ── Workshop Staff Action Panels ─────────────────────────────────── */}
+      {isStaff && (
         <>
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
@@ -1831,18 +1858,146 @@ export default function BatteryDetailScreen() {
             </View>
             <Text className="mb-1.5 text-lg font-bold text-slate-900">Completed!</Text>
             <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
-              {battery.battery_code} has been tested and marked as repaired.
+              <Text className="font-bold text-slate-800">{battery?.battery_code}</Text> has been tested and marked as repaired.
             </Text>
-            <TouchableOpacity
-              onPress={() => {
-                setShowCompletedModal(false);
-                allowExitRef.current = true;
-                navigation.goBack();
-              }}
-              className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md"
-            >
-              <Text className="text-sm font-bold text-white">Back to List</Text>
-            </TouchableOpacity>
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCompletedModal(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCompletedModal(false);
+                  allowExitRef.current = true;
+                  navigation.goBack();
+                }}
+                className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
+              >
+                <Text className="text-xs font-semibold text-slate-700">Back to Service List</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Testing Decision Modal (Remove fitted parts vs Pass back to tech) ── */}
+      <Modal
+        visible={showTestingDecisionModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowTestingDecisionModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-5">
+          <View className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <View className="flex-row items-center justify-between mb-4">
+              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                <Icon name="alertTriangle" color="#d97706" size={22} />
+              </View>
+              <View className="rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-1">
+                <Text className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
+                  Testing Decision
+                </Text>
+              </View>
+            </View>
+
+            <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
+              Choose Next Action
+            </Text>
+            <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              Choose how you would like to proceed with this battery:
+            </Text>
+
+            <View className="mb-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 p-3 flex-row items-center justify-between">
+              <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Battery ID</Text>
+              <Text className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                {battery?.battery_code || '—'}
+              </Text>
+            </View>
+
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={handleConfirmTestingUnserviceable}
+                disabled={submitting || passToTechSubmitting}
+                className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700 disabled:opacity-50"
+              >
+                {submitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-xs font-bold text-white">Continue to Remove Fitted Parts</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handlePassToTech}
+                disabled={submitting || passToTechSubmitting}
+                className="items-center rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700 disabled:opacity-50"
+              >
+                {passToTechSubmitting ? (
+                  <ActivityIndicator color="#fff" />
+                ) : (
+                  <Text className="text-xs font-bold text-white">Pass Back to Technician</Text>
+                )}
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowTestingDecisionModal(false)}
+                className="items-center rounded-2xl py-2.5 mt-1"
+              >
+                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Cancel</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Pass Back to Tech Success Modal ─────────────────────────────── */}
+      <Modal
+        visible={showPassToTechSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowPassToTechSuccessModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-6">
+          <View className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200">
+              <Icon name="checkCircle" color="#2563eb" size={22} />
+            </View>
+            <Text className="mb-1.5 text-lg font-bold text-slate-900">Passed to Technician</Text>
+            <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
+              <Text className="font-bold text-slate-800">{battery?.battery_code}</Text> has been returned to the repair queue for technician rework.
+            </Text>
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPassToTechSuccessModal(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowPassToTechSuccessModal(false)}
+                className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
+              >
+                <Text className="text-xs font-semibold text-slate-700">View Battery Details</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>

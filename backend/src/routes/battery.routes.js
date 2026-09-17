@@ -49,6 +49,12 @@ router.patch('/:id/report-issue', requireRole('technician'), uploadIssuePhotos.a
 // Reclaiming parts fitted during repair from a battery that failed testing —
 // open to the same workshop logins as report-issue/complete-testing.
 router.patch('/:id/remove-parts', requireRole('technician'), batteryController.removeParts);
+// A supervisor/manager/tester passing a battery back to the technician pool
+router.patch(
+  '/:id/pass-to-tech',
+  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  batteryController.passToTech
+);
 // Editing/removing batteries (manual status correction) is super_admin only.
 router.patch('/:id', requireRole('super_admin'), batteryController.update);
 router.delete('/:id', requireRole('super_admin'), batteryController.remove);
