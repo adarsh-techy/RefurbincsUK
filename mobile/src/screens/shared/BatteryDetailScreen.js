@@ -2217,7 +2217,7 @@ export default function BatteryDetailScreen() {
                         <View className="h-6 w-6 rounded-lg bg-amber-500/10 items-center justify-center">
                           <Icon name="package" color="#d97706" size={12} />
                         </View>
-                        <Text className="text-xs font-bold text-slate-800 dark:text-slate-200 numberOfLines={1}">
+                        <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>
                           {p.part_name}
                         </Text>
                       </View>
