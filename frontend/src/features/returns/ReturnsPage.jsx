@@ -114,8 +114,8 @@ function ReturnsPage() {
         <Modal
           title="Record a Return"
           description="Dispatch repaired batteries back to the customer."
-          size="4xl"
-          className="h-[88vh] max-h-[92vh]"
+          size="5xl"
+          className="max-h-[92vh] flex flex-col"
           onClose={() => setShowForm(false)}
         >
           <ReturnForm onCreated={handleCreated} onCancel={() => setShowForm(false)} />

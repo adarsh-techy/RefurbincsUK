@@ -165,8 +165,8 @@ function ClientHistoryDetailPage() {
             </button>
           </div>
 
-          <div className="overflow-y-auto rounded-2xl border border-slate-200/80 dark:border-white/10">
-            <table className="w-full text-left text-xs">
+          <div className="overflow-x-auto overflow-y-auto rounded-2xl border border-slate-200/80 dark:border-white/10">
+            <table className="w-full min-w-[640px] text-left text-xs">
               <thead className="bg-slate-100 text-slate-700 dark:bg-surface-800 dark:text-neutral-200 font-bold sticky top-0">
                 <tr>
                   <th className="px-4 py-2.5">#</th>
