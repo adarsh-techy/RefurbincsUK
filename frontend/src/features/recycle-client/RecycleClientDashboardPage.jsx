@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../services/api-client';
-import PageHeader from '../../components/ui/PageHeader';
-import StatCard from '../../components/ui/StatCard';
-import TableState from '../../components/ui/TableState';
-import DataTable from '../../components/ui/DataTable';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import StatCard from '../../components/ui/primitives/StatCard';
+import TableState from '../../components/ui/table/TableState';
+import DataTable from '../../components/ui/table/DataTable';
 
 // A recycle client's own read-only dashboard: summary of recycle batches
 // received, total unserviceable batteries received for recycling, and recent shipments.

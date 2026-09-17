@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import apiClient from '../../services/api-client';
-import PageHeader from '../../components/ui/PageHeader';
-import TableState from '../../components/ui/TableState';
-import { StatusBadge } from '../../components/ui/Badge';
-import StatCard from '../../components/ui/StatCard';
-import DataTable from '../../components/ui/DataTable';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import TableState from '../../components/ui/table/TableState';
+import { StatusBadge } from '../../components/ui/primitives/Badge';
+import StatCard from '../../components/ui/primitives/StatCard';
+import DataTable from '../../components/ui/table/DataTable';
 
 // Return detail page: which batteries shipped out on this return, and the
 // service each one had just before shipping — reached by clicking the
@@ -99,46 +99,49 @@ function ReturnDetailPage() {
       <div>
         <h2 className="mb-3 text-sm font-semibold text-slate-800 dark:text-neutral-100">Batteries In This Return</h2>
 
-        <DataTable
-          headerColor="blue"
-          showRowNumber
-          emptyMessage="No batteries recorded for this return."
-          columns={[
-            {
-              key: 'battery_code',
-              label: 'Battery ID',
-              render: (b) => (
-                <Link
-                  to={`/batteries/${b.battery_code}`}
-                  className="font-medium text-blue-700 hover:underline dark:text-blue-400"
-                >
-                  {b.battery_code}
-                </Link>
-              ),
-            },
-            {
-              key: 'last_repaired_at',
-              label: 'Service Performed',
-              render: (b) =>
-                b.last_repaired_at ? (
-                  <span className="block whitespace-normal text-xs">
-                    {new Date(b.last_repaired_at).toLocaleDateString()}
-                    {b.last_repaired_parts && (
-                      <span className="text-slate-400 dark:text-neutral-500"> · {b.last_repaired_parts}</span>
-                    )}
-                  </span>
-                ) : (
-                  '—'
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-surface-700">
+          <DataTable
+            headerColor="blue"
+            showRowNumber
+            maxHeight="calc(100vh - 360px)"
+            emptyMessage="No batteries recorded for this return."
+            columns={[
+              {
+                key: 'battery_code',
+                label: 'Battery ID',
+                render: (b) => (
+                  <Link
+                    to={`/batteries/${b.battery_code}`}
+                    className="font-medium text-blue-700 hover:underline dark:text-blue-400"
+                  >
+                    {b.battery_code}
+                  </Link>
                 ),
-            },
-            {
-              key: 'status',
-              label: 'Status',
-              render: (b) => <StatusBadge status={b.status} />,
-            },
-          ]}
-          rows={batteries}
-        />
+              },
+              {
+                key: 'last_repaired_at',
+                label: 'Service Performed',
+                render: (b) =>
+                  b.last_repaired_at ? (
+                    <span className="block whitespace-normal text-xs">
+                      {new Date(b.last_repaired_at).toLocaleDateString()}
+                      {b.last_repaired_parts && (
+                        <span className="text-slate-400 dark:text-neutral-500"> · {b.last_repaired_parts}</span>
+                      )}
+                    </span>
+                  ) : (
+                    '—'
+                  ),
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (b) => <StatusBadge status={b.status} />,
+              },
+            ]}
+            rows={batteries}
+          />
+        </div>
       </div>
     </div>
   );

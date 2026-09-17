@@ -19,5 +19,8 @@ router.use('/invoices', require('./invoice.routes'));
 router.use('/tickets', require('./ticket.routes'));
 router.use('/ratings', require('./rating.routes'));
 router.use('/certificates', require('./certificate.routes'));
+router.use('/services', require('./service.routes'));
+router.use('/notifications', require('./notification.routes'));
 
 module.exports = router;
+

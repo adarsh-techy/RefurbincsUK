@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
-import QrScanner from '../../components/ui/QrScanner';
+import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
 const inputClasses =
@@ -60,6 +60,12 @@ function RecycleForm({ onCreated, onCancel }) {
       }
       if (battery.status !== 'unserviceable') {
         setScanError(`${battery.battery_code} isn't marked unserviceable (currently ${battery.status.replace('_', ' ')}).`);
+        return;
+      }
+      if (data.pendingPartsRemoval?.length > 0) {
+        setScanError(
+          `${battery.battery_code} still has ${data.pendingPartsRemoval.length} part(s) fitted that need to be removed and restocked first.`
+        );
         return;
       }
       setAddedBatteries((prev) => [...prev, battery]);
@@ -133,28 +139,30 @@ function RecycleForm({ onCreated, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
-        <div>
-          <label className={labelClasses}>Vehicle Number</label>
-          <input
-            type="text"
-            value={form.vehicleNumber}
-            onChange={(e) => updateField('vehicleNumber', e.target.value)}
-            placeholder="e.g. GB21 XYZ"
-            className={inputClasses}
-            required
-          />
-        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className={labelClasses}>Vehicle Number</label>
+            <input
+              type="text"
+              value={form.vehicleNumber}
+              onChange={(e) => updateField('vehicleNumber', e.target.value)}
+              placeholder="e.g. GB21 XYZ"
+              className={inputClasses}
+              required
+            />
+          </div>
 
-        <div>
-          <label className={labelClasses}>Driver Name</label>
-          <input
-            type="text"
-            value={form.driverName}
-            onChange={(e) => updateField('driverName', e.target.value)}
-            placeholder="e.g. George Davies"
-            className={inputClasses}
-            required
-          />
+          <div>
+            <label className={labelClasses}>Driver Name</label>
+            <input
+              type="text"
+              value={form.driverName}
+              onChange={(e) => updateField('driverName', e.target.value)}
+              placeholder="e.g. George Davies"
+              className={inputClasses}
+              required
+            />
+          </div>
         </div>
 
         <div>
@@ -165,11 +173,13 @@ function RecycleForm({ onCreated, onCancel }) {
             className={inputClasses}
           >
             <option value="">None (General Recycling)</option>
-            {(clients || []).map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.name}
-              </option>
-            ))}
+            {(clients || [])
+              .filter((c) => c.user_role === 'recycle_client')
+              .map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
           </select>
           <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
             If assigned, this shipment will be visible on that partner's recycle portal.

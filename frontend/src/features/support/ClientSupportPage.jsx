@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import apiClient from '../../services/api-client';
-import Modal from '../../components/ui/Modal';
+import Modal from '../../components/ui/overlays/Modal';
 import { useTheme } from '../../context/ThemeContext';
 import { socket } from '../../services/socket-client';
 
@@ -301,7 +301,7 @@ export default function ClientSupportPage() {
         {/* ── Left Pane: My Tickets Queue ────────────────────────────── */}
         <div className="lg:col-span-5 flex flex-col rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1 dark:border-white/5 dark:bg-surface-850 mb-3">
+          <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-surface-800 mb-3">
             {[
               { id: 'all', label: 'All' },
               { id: 'open', label: 'Open' },
@@ -315,10 +315,10 @@ export default function ClientSupportPage() {
                   type="button"
                   onClick={() => setFilterStatus(tab.id)}
                   style={isActive ? { backgroundColor: accent, color: '#ffffff' } : {}}
-                  className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-semibold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-bold transition-all ${
                     isActive
                       ? 'shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white'
                   }`}
                 >
                   <span>{tab.label}</span>
@@ -334,9 +334,9 @@ export default function ClientSupportPage() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search your requests…"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2 pl-8 pr-3 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-900"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-700"
             />
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-neutral-500">
               <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
             </svg>
           </div>
@@ -344,11 +344,11 @@ export default function ClientSupportPage() {
           {/* Tickets Scroll List */}
           <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar max-h-[520px] pr-1">
             {loading && tickets.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">Loading your tickets…</div>
+              <div className="py-12 text-center text-xs text-slate-400 dark:text-neutral-500">Loading your tickets…</div>
             ) : filteredTickets.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-white/10 dark:bg-surface-850">
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-white/10 dark:bg-surface-800">
                 <p className="text-xs font-semibold text-slate-700 dark:text-neutral-300">No support tickets</p>
-                <p className="mt-1 text-[11px] text-slate-400">Click &apos;New Help Request&apos; to submit an inquiry.</p>
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-neutral-500">Click &apos;New Help Request&apos; to submit an inquiry.</p>
               </div>
             ) : (
               filteredTickets.map((t) => {
@@ -364,16 +364,16 @@ export default function ClientSupportPage() {
                   <div
                     key={t.id}
                     onClick={() => loadTicketDetail(t.id)}
-                    className={`group relative cursor-pointer rounded-2xl border p-3 transition-all ${
+                    className={`group relative cursor-pointer rounded-2xl border p-3.5 transition-all ${
                       isSelected
-                        ? 'border-emerald-500/80 bg-emerald-50 shadow-xs dark:border-emerald-500/60 dark:bg-emerald-950/25'
-                        : 'border-slate-200/70 bg-slate-50 hover:border-slate-300 hover:bg-slate-100 hover:shadow-2xs dark:border-white/10 dark:bg-surface-850 dark:hover:border-white/20'
+                        ? 'border-emerald-500 bg-emerald-50/50 shadow-xs dark:border-emerald-500 dark:bg-emerald-950/40'
+                        : 'border-slate-200/80 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-300 dark:border-white/10 dark:bg-surface-800 dark:hover:bg-surface-700/70 dark:hover:border-white/20'
                     }`}
                   >
                     {/* Active accent vertical indicator bar */}
                     {isSelected && (
                       <span
-                        className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full"
+                        className="absolute left-0 top-3 bottom-3 w-1.5 rounded-r-full"
                         style={{ backgroundColor: accent }}
                       />
                     )}
@@ -393,11 +393,11 @@ export default function ClientSupportPage() {
                       <span
                         className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
                           isOpen
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 dark:border dark:border-amber-800/40'
                             : isInProgress
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 dark:border dark:border-blue-800/40'
                               : isResolved
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border dark:border-emerald-800/40'
                                 : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-400'
                         }`}
                       >
@@ -405,16 +405,16 @@ export default function ClientSupportPage() {
                       </span>
                     </div>
 
-                    <p className="mt-2 text-xs font-semibold text-slate-800 dark:text-neutral-100 line-clamp-1">
+                    <p className="mt-2 text-xs font-bold text-slate-900 dark:text-white line-clamp-1">
                       {t.subject}
                     </p>
 
-                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-400 line-clamp-1">
+                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-300 line-clamp-1">
                       {isSupportReply ? 'Support: ' : 'You: '}
                       {t.last_message?.message || 'No messages yet'}
                     </p>
 
-                    <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 dark:border-white/5">
+                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-200/60 pt-2 text-[10px] text-slate-400 dark:border-white/5 dark:text-neutral-400">
                       <div className="flex items-center gap-1.5">
                         <span className="capitalize">{t.category?.replace('_', ' ')}</span>
                         {t.battery_code && (
@@ -446,21 +446,21 @@ export default function ClientSupportPage() {
           ) : activeTicket ? (
             <div className="flex flex-1 flex-col justify-between gap-4">
               {/* ── Enhanced Thread Header Container ── */}
-              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-slate-50/70 to-emerald-50/20 p-4 shadow-2xs dark:border-white/10 dark:from-surface-850 dark:via-surface-850/80 dark:to-emerald-950/20">
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 shadow-2xs dark:border-white/10 dark:bg-surface-800">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white bg-slate-200/80 dark:bg-white/10 px-2.5 py-0.5 rounded-lg">
+                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white bg-slate-200/90 dark:bg-surface-700 dark:border dark:border-white/10 px-2.5 py-0.5 rounded-lg">
                       {activeTicket.ticket_number}
                     </span>
                     <span
                       className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
                         activeTicket.status === 'open'
-                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                          ? 'bg-amber-100 text-amber-900 border border-amber-300/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60'
                           : activeTicket.status === 'in_progress'
-                            ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
+                            ? 'bg-blue-100 text-blue-900 border border-blue-300/80 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60'
                             : activeTicket.status === 'resolved'
-                              ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
-                              : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-400'
+                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60'
+                              : 'bg-slate-100 text-slate-800 border border-slate-300 dark:bg-white/10 dark:text-neutral-300 dark:border-white/10'
                       }`}
                     >
                       {activeTicket.status.replace('_', ' ').toUpperCase()}
@@ -477,18 +477,18 @@ export default function ClientSupportPage() {
                 </h2>
 
                 {/* ── Enhanced Details Bar ── */}
-                <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-blue-200/70 bg-blue-50/70 p-2.5 text-xs font-semibold text-slate-700 shadow-2xs dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-neutral-200">
-                  <span className="rounded-lg bg-white/90 px-2.5 py-1 text-[11px] font-bold text-blue-900 shadow-2xs border border-blue-200/60 dark:bg-surface-800 dark:text-blue-300 dark:border-white/5">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/90 bg-white/90 p-2.5 text-xs font-semibold text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-900/90 dark:text-neutral-200">
+                  <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-900 shadow-2xs border border-blue-200/70 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60">
                     Category: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.category?.replace('_', ' ')}</strong>
                   </span>
                   
-                  <span className="rounded-lg bg-white/90 px-2.5 py-1 text-[11px] font-bold text-amber-900 shadow-2xs border border-amber-200/60 dark:bg-surface-800 dark:text-amber-300 dark:border-white/5">
+                  <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 shadow-2xs border border-amber-200/70 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60">
                     Priority: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.priority}</strong>
                   </span>
 
                   {activeTicket.battery_code && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500 px-2.5 py-1 text-[11px] font-mono font-bold text-white shadow-xs dark:bg-emerald-500">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-yellow-300">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300/70 px-2.5 py-1 text-[11px] font-mono font-bold shadow-2xs dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400">
                         <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
                         <line x1="22" x2="22" y1="11" y2="13" />
                       </svg>
@@ -499,7 +499,7 @@ export default function ClientSupportPage() {
               </div>
 
               {/* Chat Messages Canvas */}
-              <div className="flex-1 space-y-3.5 overflow-y-auto no-scrollbar pr-1 max-h-[380px] p-2 bg-slate-50/40 rounded-2xl dark:bg-black/20">
+              <div className="flex-1 space-y-3.5 overflow-y-auto no-scrollbar pr-1 max-h-[380px] p-3 bg-slate-50/40 rounded-2xl dark:bg-black/30 border border-transparent dark:border-white/5">
                 {(activeTicket.messages || []).map((msg) => {
                   const isMe = msg.sender_role === 'client' || msg.sender_role === 'recycle_client';
 
@@ -603,7 +603,7 @@ export default function ClientSupportPage() {
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
                 placeholder="Brief summary of your inquiry (e.g. Battery UBE-0012 inquiry)"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-850"
               />
             </div>
 
@@ -615,7 +615,7 @@ export default function ClientSupportPage() {
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
                 >
                   {CATEGORIES.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -632,7 +632,7 @@ export default function ClientSupportPage() {
                 <select
                   value={newPriority}
                   onChange={(e) => setNewPriority(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
                 >
                   {PRIORITIES.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -658,7 +658,7 @@ export default function ClientSupportPage() {
                 className={`w-full rounded-xl border bg-white px-3.5 py-2 text-xs font-medium focus:outline-hidden dark:bg-surface-800 ${
                   batteriesLoaded && newBatteryCode.trim() && !isKnownBatteryCode(newBatteryCode)
                     ? 'border-red-400 text-red-600 focus:border-red-500 dark:border-red-500/60 dark:text-red-400'
-                    : 'border-slate-300 text-slate-800 focus:border-emerald-500 dark:border-surface-600 dark:text-white'
+                    : 'border-slate-300 text-slate-800 focus:border-emerald-500 dark:border-white/10 dark:text-white dark:focus:bg-surface-850'
                 }`}
               />
               {batteriesLoaded && newBatteryCode.trim() && !isKnownBatteryCode(newBatteryCode) && (
@@ -700,7 +700,7 @@ export default function ClientSupportPage() {
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 placeholder="Describe your request or issue in detail…"
-                className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+                className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-850"
               />
             </div>
 

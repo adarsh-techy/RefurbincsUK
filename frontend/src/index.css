@@ -8,10 +8,18 @@
   --custom-accent-hover: #059669;
 }
 
+html {
+  -webkit-text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
   margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
   background-color: var(--custom-page-bg, #ffffff);
   color: #0f172a;
+  -webkit-font-smoothing: antialiased;
 }
 
 html.dark body,
@@ -26,6 +34,37 @@ html.dark,
   background-color: #000000;
 }
 
+/* Touch-optimized scroll */
+.touch-scroll {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior-x: contain;
+}
+
+/* Responsive Table Scroll styling */
+.table-responsive-container {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  max-width: 100%;
+}
+
+.table-responsive-container::-webkit-scrollbar {
+  height: 6px;
+  width: 6px;
+}
+
+.table-responsive-container::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.table-responsive-container::-webkit-scrollbar-thumb {
+  background-color: rgba(156, 163, 175, 0.4);
+  border-radius: 9999px;
+}
+
+.dark .table-responsive-container::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.15);
+}
+
 .no-scrollbar {
   scrollbar-width: none;
   -ms-overflow-style: none;
@@ -34,3 +73,14 @@ html.dark,
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Safe Area Inset Helpers */
+@supports (padding: max(0px)) {
+  .pb-safe {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+  .pt-safe {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+}
+

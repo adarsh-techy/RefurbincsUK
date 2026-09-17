@@ -94,19 +94,6 @@ function PartForm({ part, onSaved, onCancel }) {
         </div>
 
         <div>
-          <label className={labelClasses}>Price (per unit)</label>
-          <input
-            type="number"
-            min="0"
-            step="0.01"
-            value={form.repairCost}
-            onChange={(e) => updateField('repairCost', e.target.value)}
-            placeholder="0.00"
-            className={inputClasses}
-          />
-        </div>
-
-        <div>
           <label className={labelClasses}>Service Charge (optional / £)</label>
           <input
             type="number"

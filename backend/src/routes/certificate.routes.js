@@ -15,5 +15,7 @@ router.post('/acknowledge/:id', requireRole('client'), certificateController.ack
 
 // Admin / Staff certificate management
 router.get('/admin', requireRole('super_admin', 'admin', 'staff'), certificateController.listAdmin);
+router.get('/admin/client/:clientId', requireRole('super_admin', 'admin', 'staff'), certificateController.getClientMilestoneDetailAdmin);
+router.post('/admin/evaluate/:clientId', requireRole('super_admin', 'admin', 'staff'), certificateController.evaluateClientAdmin);
 
 module.exports = router;

@@ -1,5 +1,9 @@
 const db = require('../config/db');
 
+// Source of truth for tier thresholds/names. If you change a count or badge
+// name here, also update the mirrored copies in:
+//   frontend/src/utils/generate-milestone-certificate.js (TIER_CONFIGS)
+//   frontend/src/features/clients/ClientCertificatesPage.jsx (fallback `tiers`, used only if the API call fails)
 const MILESTONE_TIERS = [
   {
     count: 100,
@@ -128,6 +132,8 @@ async function acknowledge(certificateId, clientId) {
 
 async function getClientServicedBatteryCount(clientId, clientName) {
   // Canonical client battery matching: via truck_intakes.client_id or lower(b.client_name)
+  // Criteria: Count only batteries actually serviced/returned through Refurbnics workshop lifecycle
+  // (strictly excluding fleet registrations that never went through intake/service).
   const { rows } = await db.query(
     `WITH client_b_ids AS (
        SELECT b.id
@@ -140,8 +146,10 @@ async function getClientServicedBatteryCount(clientId, clientName) {
        WHERE lower(b.client_name) = lower($2)
      )
      SELECT 
-       COUNT(DISTINCT b.id) AS total_batteries,
-       COUNT(DISTINCT b.id) FILTER (WHERE b.status IN ('repaired', 'returned') OR EXISTS (SELECT 1 FROM repairs r WHERE r.battery_id = b.id)) AS serviced_count
+       COUNT(DISTINCT b.id) FILTER (
+         WHERE EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)
+            OR (b.truck_intake_id IS NOT NULL AND b.status IN ('repaired', 'returned'))
+       ) AS serviced_count
      FROM client_b_ids cb
      JOIN batteries b ON b.id = cb.id`,
     [clientId, clientName || '']

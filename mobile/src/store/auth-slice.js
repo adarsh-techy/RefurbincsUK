@@ -9,7 +9,17 @@ export const bootstrap = createAsyncThunk('auth/bootstrap', async () => {
     AsyncStorage.getItem('token'),
     AsyncStorage.getItem('user'),
   ]);
-  return { token, user: userJson ? JSON.parse(userJson) : null };
+  const user = userJson ? JSON.parse(userJson) : null;
+
+  // A saved session still carrying an admin-issued temp password shouldn't
+  // auto-resume straight into the Set Password screen on cold start — drop
+  // it so the app lands on Login instead, same as a fresh install.
+  if (user?.must_change_password) {
+    await AsyncStorage.multiRemove(['token', 'user']);
+    return { token: null, user: null };
+  }
+
+  return { token, user };
 });
 
 export const login = createAsyncThunk(

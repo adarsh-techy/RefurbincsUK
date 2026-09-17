@@ -9,7 +9,8 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 // truck_number/driver_name/client are editable — which batteries were
 // returned is fixed here (use delete + re-record if that needs to change).
 function ReturnEditForm({ returnRecord, onSaved, onCancel }) {
-  const { data: clients } = useFetchList('/clients');
+  const { data: rawClients } = useFetchList('/clients');
+  const clients = (rawClients || []).filter((c) => c.user_role !== 'recycle_client');
   const [truckNumber, setTruckNumber] = useState(returnRecord.truck_number);
   const [driverName, setDriverName] = useState(returnRecord.driver_name);
   const [clientId, setClientId] = useState(returnRecord.client_id ? String(returnRecord.client_id) : '');

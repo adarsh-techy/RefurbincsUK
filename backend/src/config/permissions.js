@@ -12,6 +12,7 @@ const PERMISSIONS = [
   'audit_logs',
   'clients',
   'issue_reasons',
+  'services',
 ];
 
 // The manageable modules a super_admin can grant to a client account.

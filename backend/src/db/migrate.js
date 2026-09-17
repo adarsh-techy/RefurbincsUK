@@ -18,7 +18,7 @@ async function getAppliedMigrations() {
   return new Set(rows.map((row) => row.name));
 }
 
-async function runMigrations() {
+async function runMigrations(closePool = false) {
   await ensureMigrationsTable();
   const applied = await getAppliedMigrations();
 
@@ -27,6 +27,7 @@ async function runMigrations() {
     .filter((file) => file.endsWith('.sql'))
     .sort();
 
+  let count = 0;
   for (const file of files) {
     if (applied.has(file)) continue;
 
@@ -34,13 +35,23 @@ async function runMigrations() {
     console.log(`Applying migration: ${file}`);
     await db.query(sql);
     await db.query('INSERT INTO schema_migrations (name) VALUES ($1)', [file]);
+    count++;
   }
 
-  console.log('Migrations complete.');
-  await db.pool.end();
+  if (count > 0) {
+    console.log(`✅ ${count} migration(s) applied successfully.`);
+  }
+
+  if (closePool) {
+    await db.pool.end();
+  }
 }
 
-runMigrations().catch((err) => {
-  console.error('Migration failed:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  runMigrations(true).catch((err) => {
+    console.error('Migration failed:', err);
+    process.exit(1);
+  });
+}
+
+module.exports = { runMigrations };

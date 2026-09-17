@@ -1,5 +1,15 @@
+const fs = require('fs');
+const path = require('path');
 const bcrypt = require('bcryptjs');
 const staffModel = require('../models/staff.model');
+
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'staff-docs');
+
+function ensureUploadsDir() {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+}
 
 async function list(req, res, next) {
   try {
@@ -14,16 +24,54 @@ async function list(req, res, next) {
 // on first login (see must_change_password).
 async function create(req, res, next) {
   try {
-    const { name, phone, salary, role, loginEmail, tempPassword } = req.body;
+    const {
+      name,
+      phone,
+      salary,
+      role,
+      email,
+      loginEmail,
+      tempPassword,
+      passportNumber,
+      passport_number,
+      niNumber,
+      ni_number,
+      shareCode,
+      share_code,
+    } = req.body;
+
+    const finalEmail = email || loginEmail || undefined;
+    const finalPassport = passportNumber || passport_number || undefined;
+    const finalNi = niNumber || ni_number || undefined;
+    const finalShareCode = shareCode || share_code || undefined;
+
+    let documentPath = undefined;
+    let documentName = undefined;
+
+    if (req.file) {
+      ensureUploadsDir();
+      const cleanOriginal = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filename = `doc-${Date.now()}-${cleanOriginal}`;
+      fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+      documentPath = filename;
+      documentName = req.file.originalname;
+    }
+
     const passwordHash =
-      loginEmail && tempPassword ? await bcrypt.hash(tempPassword, 10) : undefined;
+      finalEmail && tempPassword ? await bcrypt.hash(tempPassword, 10) : undefined;
+
     const staff = await staffModel.create({
       name,
       phone,
       salary,
       role,
-      email: loginEmail,
+      email: finalEmail,
       passwordHash,
+      passportNumber: finalPassport,
+      niNumber: finalNi,
+      shareCode: finalShareCode,
+      documentPath,
+      documentName,
     });
     res.status(201).json(staff);
   } catch (err) {
@@ -36,13 +84,45 @@ async function create(req, res, next) {
 
 async function update(req, res, next) {
   try {
-    const { name, phone, active, salary, role } = req.body;
+    const {
+      name,
+      phone,
+      active,
+      salary,
+      role,
+      email,
+      passportNumber,
+      passport_number,
+      niNumber,
+      ni_number,
+      shareCode,
+      share_code,
+    } = req.body;
+
+    let documentPath = undefined;
+    let documentName = undefined;
+
+    if (req.file) {
+      ensureUploadsDir();
+      const cleanOriginal = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const filename = `doc-${Date.now()}-${cleanOriginal}`;
+      fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+      documentPath = filename;
+      documentName = req.file.originalname;
+    }
+
     const staff = await staffModel.update(req.params.id, {
       name,
       phone,
-      active: active !== undefined ? active : true,
+      active,
       salary,
       role,
+      email: email !== undefined ? email : undefined,
+      passportNumber: (passportNumber !== undefined ? passportNumber : passport_number),
+      niNumber: (niNumber !== undefined ? niNumber : ni_number),
+      shareCode: (shareCode !== undefined ? shareCode : share_code),
+      documentPath,
+      documentName,
     });
     if (!staff) {
       return res.status(404).json({ message: 'Staff member not found' });
@@ -69,16 +149,18 @@ async function remove(req, res, next) {
   }
 }
 
-// Staff detail page: profile plus every repair they've logged, for the
-// "how many jobs, when" view.
+// Staff detail page: profile plus every repair they've logged and issues reported
 async function getById(req, res, next) {
   try {
     const staff = await staffModel.findById(req.params.id);
     if (!staff) {
       return res.status(404).json({ message: 'Staff member not found' });
     }
-    const repairs = await staffModel.findRepairs(req.params.id);
-    res.json({ staff, repairs });
+    const [repairs, issues] = await Promise.all([
+      staffModel.findRepairs(req.params.id),
+      staffModel.findIssues(req.params.id),
+    ]);
+    res.json({ staff, repairs, issues: issues || [] });
   } catch (err) {
     next(err);
   }

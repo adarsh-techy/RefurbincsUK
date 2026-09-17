@@ -109,9 +109,87 @@ async function getByCode(req, res, next) {
   }
 }
 
+async function getClientMilestoneDetailAdmin(req, res, next) {
+  try {
+    const { clientId } = req.params;
+    const client = await clientModel.findById(Number(clientId));
+    if (!client) {
+      return res.status(404).json({ message: 'Fleet client not found.' });
+    }
+
+    const servicedCount = await certificateModel.getClientServicedBatteryCount(client.id, client.name);
+    const certificates = await certificateModel.findByClientId(client.id);
+    const nextTier = certificateModel.MILESTONE_TIERS.find((t) => t.count > servicedCount) || null;
+
+    // Fetch recent serviced batteries for this client
+    const { rows: recentBatteries } = await require('../config/db').query(
+      `WITH client_b_ids AS (
+         SELECT b.id, b.battery_code, b.serial_number, b.status, b.created_at
+         FROM batteries b
+         JOIN truck_intakes ti ON ti.id = b.truck_intake_id
+         WHERE ti.client_id = $1
+         UNION
+         SELECT b.id, b.battery_code, b.serial_number, b.status, b.created_at
+         FROM batteries b
+         WHERE lower(b.client_name) = lower($2)
+       )
+       SELECT b.*,
+              last_repair.repaired_at AS last_repaired_at
+       FROM client_b_ids b
+       LEFT JOIN LATERAL (
+         SELECT r.repaired_at
+         FROM repairs r
+         WHERE r.battery_id = b.id
+         ORDER BY r.repaired_at DESC
+         LIMIT 1
+       ) last_repair ON true
+       ORDER BY COALESCE(last_repair.repaired_at, b.created_at) DESC
+       LIMIT 10`,
+      [client.id, client.name]
+    );
+
+    const totalCo2SavedKg = Math.round(servicedCount * 15.2);
+    const totalEwasteDivertedKg = Math.round(servicedCount * 2.8);
+
+    res.json({
+      client,
+      servicedCount,
+      totalCo2SavedKg,
+      totalEwasteDivertedKg,
+      certificates,
+      nextTier,
+      milestoneTiers: certificateModel.MILESTONE_TIERS,
+      recentBatteries,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function evaluateClientAdmin(req, res, next) {
+  try {
+    const { clientId } = req.params;
+    const client = await clientModel.findById(Number(clientId));
+    if (!client) {
+      return res.status(404).json({ message: 'Fleet client not found.' });
+    }
+
+    const result = await certificateModel.checkAndAwardMilestones(client.id, client.name);
+    res.json({
+      success: true,
+      client,
+      ...result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getMyMilestones,
   acknowledgeCertificate,
   listAdmin,
+  getClientMilestoneDetailAdmin,
+  evaluateClientAdmin,
   getByCode,
 };

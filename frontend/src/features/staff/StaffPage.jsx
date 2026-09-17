@@ -2,15 +2,16 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import useFetchList from '../../utils/use-fetch-list';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import PageHeader from '../../components/ui/PageHeader';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import ConfirmModal from '../../components/ui/ConfirmModal';
-import Badge from '../../components/ui/Badge';
-import RowActions from '../../components/ui/RowActions';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import Button from '../../components/ui/primitives/Button';
+import Modal from '../../components/ui/overlays/Modal';
+import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import Badge from '../../components/ui/primitives/Badge';
+import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
+import { resolveImageUrl } from '../../utils/image-url';
 import StaffForm from './StaffForm';
 
 function StaffPage() {
@@ -63,14 +64,55 @@ function StaffPage() {
       },
     },
     {
-      key: 'login_email',
-      label: 'Login',
+      key: 'email',
+      label: 'Email / Login',
       render: (row) =>
-        row.login_email ? (
-          <span className="text-slate-600 dark:text-neutral-300">{row.login_email}</span>
+        row.email || row.login_email ? (
+          <span className="text-slate-600 dark:text-neutral-300 font-mono text-xs">
+            {row.email || row.login_email}
+          </span>
         ) : (
-          <span className="text-slate-400 dark:text-neutral-500">No login</span>
+          <span className="text-slate-400 dark:text-neutral-500 text-xs">No email</span>
         ),
+    },
+    {
+      key: 'ni_number',
+      label: 'NI / Passport',
+      render: (row) => (
+        <div className="flex flex-col text-xs">
+          {row.ni_number && (
+            <span className="font-mono font-bold text-slate-800 dark:text-neutral-200">
+              NI: {row.ni_number}
+            </span>
+          )}
+          {row.passport_number && (
+            <span className="font-mono text-slate-500 dark:text-neutral-400">
+              Pass: {row.passport_number}
+            </span>
+          )}
+          {!row.ni_number && !row.passport_number && (
+            <span className="text-slate-400 dark:text-neutral-500">—</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'document_path',
+      label: 'Doc',
+      render: (row) => {
+        if (!row.document_path) return <span className="text-slate-400 text-xs">—</span>;
+        return (
+          <a
+            href={resolveImageUrl(`/uploads/staff-docs/${row.document_path}`)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:underline dark:text-blue-400"
+            title={row.document_name || 'View Document'}
+          >
+            <span>View Doc</span>
+          </a>
+        );
+      },
     },
     {
       key: 'salary',
@@ -107,11 +149,12 @@ function StaffPage() {
 
       {formTarget && (
         <Modal
-          title={formTarget === 'new' ? 'Add Staff' : 'Edit Staff'}
+          size="3xl"
+          title={formTarget === 'new' ? 'Add Staff Member' : 'Edit Staff Details'}
           description={
             formTarget === 'new'
-              ? 'Add a new repair technician.'
-              : 'Update this technician’s details.'
+              ? 'Enroll a new technician or workshop employee with role permissions and compliance docs.'
+              : 'Update this staff member’s profile, compliance credentials, and salary details.'
           }
           onClose={() => setFormTarget(null)}
         >

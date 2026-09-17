@@ -1,27 +1,86 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Image, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import Svg, { Path } from 'react-native-svg';
-import ServiceScreen from '../screens/ServiceScreen';
-import DashboardScreen from '../screens/DashboardScreen';
-import HistoryScreen from '../screens/HistoryScreen';
-import ProfileScreen from '../screens/ProfileScreen';
-import ClientDashboardScreen from '../screens/ClientDashboardScreen';
-import ClientBatteriesScreen from '../screens/ClientBatteriesScreen';
-import ClientScanScreen from '../screens/ClientScanScreen';
-import ClientSidebar from '../components/ClientSidebar';
+import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
+import ServiceScreen from '../screens/technician/ServiceScreen';
+import DashboardScreen from '../screens/technician/DashboardScreen';
+import HistoryScreen from '../screens/technician/HistoryScreen';
+import ProfileScreen from '../screens/technician/ProfileScreen';
+import ClientDashboardScreen from '../screens/client/ClientDashboardScreen';
+import ClientBatteriesScreen from '../screens/client/ClientBatteriesScreen';
+import ClientScanScreen from '../screens/client/ClientScanScreen';
+import ClientSidebar from '../components/client/ClientSidebar';
 import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
 
-const ICONS = {
-  Service: '🔧',
-  Dashboard: '📊',
-  History: '🕘',
-  Profile: '👤',
-  MyBatteries: '🔋',
-  ScanQR: '📷',
+function iconProps(color, size) {
+  return { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
+}
+
+function ServiceIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z" />
+    </Svg>
+  );
+}
+
+function DashboardIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Rect width="7" height="9" x="3" y="3" rx="1" />
+      <Rect width="7" height="5" x="14" y="3" rx="1" />
+      <Rect width="7" height="9" x="14" y="12" rx="1" />
+      <Rect width="7" height="5" x="3" y="16" rx="1" />
+    </Svg>
+  );
+}
+
+function HistoryIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Circle cx="12" cy="12" r="9" />
+      <Polyline points="12 7 12 12 15.5 14" />
+    </Svg>
+  );
+}
+
+function ProfileIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2" />
+      <Circle cx="12" cy="7" r="4" />
+    </Svg>
+  );
+}
+
+function BatteryIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Rect width="17" height="11" x="2" y="6" rx="2" ry="2" />
+      <Line x1="22" x2="22" y1="10" y2="13" />
+    </Svg>
+  );
+}
+
+function ScanIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+      <Circle cx="12" cy="13" r="3" />
+    </Svg>
+  );
+}
+
+const TAB_ICONS = {
+  Service: ServiceIcon,
+  Dashboard: DashboardIcon,
+  History: HistoryIcon,
+  Profile: ProfileIcon,
+  MyBatteries: BatteryIcon,
+  ScanQR: ScanIcon,
 };
 
 function MenuIcon({ color }) {
@@ -52,36 +111,23 @@ function Header({ isClient, onMenuPress }) {
         flexDirection: 'row',
         alignItems: 'flex-end',
         justifyContent: 'space-between',
-        paddingLeft: 14,
-        paddingRight: 10,
-        paddingBottom: 10,
-        backgroundColor: '#040509',
+        paddingLeft: 16,
+        paddingRight: 14,
+        paddingBottom: 12,
+        backgroundColor: '#000000',
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: '#14532d',
+        borderBottomColor: 'rgba(255, 255, 255, 0.12)',
       }}
     >
-      {isClient ? (
-        <Image
-          source={require('../../assets/brand-mark.png')}
-          style={{ width: 108, height: 35 }}
-          resizeMode="contain"
-        />
-      ) : (
-        // Cropped tight to the logo's wordmark (the source PNG has a lot of
-        // empty canvas above/below/around it) so it reads as large and sits
-        // flush left instead of "contain" centering a small image in a
-        // mismatched box.
-        <View style={{ width: 124, height: 21, overflow: 'hidden' }}>
-          <Image
-            source={require('../../assets/logo.png')}
-            style={{ width: 134, height: 90, marginTop: -31, marginLeft: -4 }}
-          />
-        </View>
-      )}
+      <Image
+        source={require('../../assets/REFURBNICSmobile.png')}
+        style={{ width: 140, height: 38 }}
+        resizeMode="contain"
+      />
 
       {isClient && (
         <TouchableOpacity onPress={onMenuPress} hitSlop={10} style={{ padding: 8 }}>
-          <MenuIcon color="#e5e5e5" />
+          <MenuIcon color="#ffffff" />
         </TouchableOpacity>
       )}
     </View>
@@ -91,28 +137,33 @@ function Header({ isClient, onMenuPress }) {
 export default function MainTabs() {
   const user = useSelector((state) => state.auth.user);
   const isClient = user?.role === 'client';
-  const { theme } = useTheme();
-  const isLight = isClient && theme === 'light';
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
     <>
       <Tab.Navigator
-        // Background tabs are normally frozen/detached from the native tree
-        // as a perf optimization, which doesn't play well with a global
-        // style change (the theme toggle) re-rendering every mounted screen
-        // at once — see the note on Header above.
         detachInactiveScreens={!isClient}
         screenOptions={({ route }) => ({
           headerShown: true,
           header: () => <Header isClient={isClient} onMenuPress={() => setSidebarOpen(true)} />,
-          tabBarActiveTintColor: isLight ? '#2563eb' : '#60a5fa',
-          tabBarInactiveTintColor: isLight ? '#94a3b8' : '#71717a',
+          tabBarActiveTintColor: '#2563eb',
+          tabBarInactiveTintColor: '#64748b',
           tabBarStyle: {
-            backgroundColor: isLight ? '#ffffff' : '#040509',
-            borderTopColor: isLight ? '#e2e8f0' : 'rgba(30, 64, 175, 0.4)',
+            backgroundColor: '#ffffff',
+            borderTopColor: '#e2e8f0',
+            borderTopWidth: StyleSheet.hairlineWidth,
+            height: 60,
+            paddingBottom: 8,
+            paddingTop: 6,
           },
-          tabBarIcon: () => <Text style={{ fontSize: 18 }}>{ICONS[route.name] || '📱'}</Text>,
+          tabBarLabelStyle: {
+            fontSize: 11,
+            fontWeight: '600',
+          },
+          tabBarIcon: ({ color, size }) => {
+            const IconComponent = TAB_ICONS[route.name] || DashboardIcon;
+            return <IconComponent color={color} size={size ?? 20} />;
+          },
         })}
       >
         {isClient ? (

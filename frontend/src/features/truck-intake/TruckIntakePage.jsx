@@ -1,30 +1,35 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
-import useFetchList from '../../utils/use-fetch-list';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import PageHeader from '../../components/ui/PageHeader';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import ConfirmModal from '../../components/ui/ConfirmModal';
-import AlertModal from '../../components/ui/AlertModal';
-import RowActions from '../../components/ui/RowActions';
+import useInfiniteList from '../../utils/use-infinite-list';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import InfiniteScrollTrigger from '../../components/ui/table/InfiniteScrollTrigger';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import Button from '../../components/ui/primitives/Button';
+import Modal from '../../components/ui/overlays/Modal';
+import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import AlertModal from '../../components/ui/overlays/AlertModal';
+import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
 import TruckIntakeForm from './TruckIntakeForm';
 import TruckVerifyModal from './TruckVerifyModal';
 
-// Converts to a YYYY-MM-DD string in the browser's local timezone, so a date
-// picked in the filter matches intakes recorded that same calendar day —
-// toISOString() alone would shift the date near midnight in non-UTC zones.
-function toLocalDateValue(value) {
-  const dt = new Date(value);
-  const offset = dt.getTimezoneOffset();
-  return new Date(dt.getTime() - offset * 60000).toISOString().slice(0, 10);
-}
+const PAGE_SIZE = 15;
 
 function TruckIntakePage() {
-  const { data, loading, error, refetch } = useFetchList('/truck-intakes');
+  const [search, setSearch] = useState('');
+  const [date, setDate] = useState('');
+
+  const { items, loading, hasMore, error, loadMore, refetch } = useInfiniteList(
+    '/truck-intakes',
+    PAGE_SIZE,
+    {
+      search: search.trim() || undefined,
+      date: date || undefined,
+    }
+  );
+
   const user = useSelector((state) => state.auth.user);
   const isSuperAdmin = user?.role === 'super_admin';
 
@@ -33,19 +38,6 @@ function TruckIntakePage() {
   const [verifyTarget, setVerifyTarget] = useState(null);
   const [deleteError, setDeleteError] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
-  const [search, setSearch] = useState('');
-  const [date, setDate] = useState('');
-
-  const filtered = (data || []).filter((row) => {
-    const q = search.trim().toLowerCase();
-    const matchesSearch =
-      !q ||
-      row.driver_name?.toLowerCase().includes(q) ||
-      row.truck_number?.toLowerCase().includes(q) ||
-      row.client_name?.toLowerCase().includes(q);
-    const matchesDate = !date || toLocalDateValue(row.intake_at) === date;
-    return matchesSearch && matchesDate;
-  });
 
   function handleSaved() {
     refetch();
@@ -164,9 +156,9 @@ function TruckIntakePage() {
         </Modal>
       )}
 
-      <div className="mb-8 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-3 shadow-sm dark:border-blue-800/40">
+      <div className="mb-4 sm:mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-3 shadow-xs dark:border-blue-800/40">
         <div className="min-w-[16rem] flex-1 sm:flex-none">
-          <label htmlFor="intake-search" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200">
+          <label htmlFor="intake-search" className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-neutral-200 uppercase tracking-wider">
             Search driver / truck
           </label>
           <input
@@ -175,12 +167,12 @@ function TruckIntakePage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="e.g. John or TRK-102"
-            className="w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30 sm:w-64"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 sm:w-64"
           />
         </div>
 
         <div className="flex items-center gap-2">
-          <label htmlFor="intake-date-filter" className="text-sm font-medium text-slate-600 dark:text-neutral-300">
+          <label htmlFor="intake-date-filter" className="text-xs font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-wider">
             Intake date
           </label>
           <input
@@ -188,17 +180,8 @@ function TruckIntakePage() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-blue-200 bg-blue-50/60 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:focus:border-blue-400 dark:focus:ring-blue-400/30 [&::-webkit-calendar-picker-indicator]:[filter:invert(72%)_sepia(93%)_saturate(1352%)_hue-rotate(359deg)_brightness(101%)_contrast(101%)]"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200"
           />
-          {date && (
-            <button
-              type="button"
-              onClick={() => setDate('')}
-              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
-            >
-              Clear
-            </button>
-          )}
         </div>
 
         {(search || date) && (
@@ -208,7 +191,7 @@ function TruckIntakePage() {
               setSearch('');
               setDate('');
             }}
-            className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 cursor-pointer transition-colors"
           >
             Clear all
           </button>
@@ -219,16 +202,25 @@ function TruckIntakePage() {
         <AlertModal title="Cannot Delete Intake" message={deleteError} onClose={() => setDeleteError(null)} />
       )}
 
-      {loading && <TableState>Loading…</TableState>}
       {error && <TableState tone="error">{error}</TableState>}
-      {!loading && !error && (
-        <DataTable
-          columns={columns}
-          rows={filtered}
-          showRowNumber
-          headerColor="blue"
-          emptyMessage="No intakes match these filters."
-        />
+
+      {items.length === 0 && loading ? (
+        <TableState>Loading…</TableState>
+      ) : (
+        !error && (
+          <div className="overflow-hidden rounded-xl">
+            <DataTable
+              columns={columns}
+              rows={items}
+              showRowNumber
+              headerColor="blue"
+              maxHeight="calc(100vh - 320px)"
+              onScrollBottom={hasMore && !loading ? loadMore : null}
+              emptyMessage="No intakes match these filters."
+            />
+            <InfiniteScrollTrigger hasMore={hasMore} loading={loading} onVisible={loadMore} />
+          </div>
+        )
       )}
 
       {deleteTarget && (

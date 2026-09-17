@@ -10,6 +10,7 @@ export const PERMISSIONS = [
   { key: 'audit_logs', label: 'Audit Log' },
   { key: 'clients', label: 'Clients' },
   { key: 'issue_reasons', label: 'Issue Reasons' },
+  { key: 'services', label: 'Services' },
 ];
 
 // Super admin-configurable permissions for client portal accounts

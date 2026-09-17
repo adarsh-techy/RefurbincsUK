@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import useInfiniteList from '../../utils/use-infinite-list';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import InfiniteScrollTrigger from '../../components/ui/InfiniteScrollTrigger';
-import PageHeader from '../../components/ui/PageHeader';
-import Badge from '../../components/ui/Badge';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import InfiniteScrollTrigger from '../../components/ui/table/InfiniteScrollTrigger';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import Badge from '../../components/ui/primitives/Badge';
 
 const PAGE_SIZE = 15;
 

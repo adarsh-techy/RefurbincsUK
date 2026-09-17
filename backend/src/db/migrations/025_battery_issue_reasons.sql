@@ -10,8 +10,9 @@ CREATE TABLE IF NOT EXISTS issue_reasons (
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-INSERT INTO issue_reasons (label, sort_order) VALUES ('Battery is dead', 0)
-  ON CONFLICT (label) DO NOTHING;
+-- No seed rows on purpose — this list is entirely admin-managed from the
+-- Issue Reasons page; a fresh install starts empty rather than with
+-- example reasons the admin didn't ask for.
 
 -- New terminal status: a technician reports mid-repair that the battery
 -- can't be serviced. Distinct from 'repaired' and stays out of the active

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
-import QrScanner from '../../components/ui/QrScanner';
+import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
 const inputClasses =
@@ -12,7 +12,8 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 // client's own batteries — here scoped to work-completed ('repaired')
 // batteries only, since a return means handing finished work back.
 function ReturnForm({ onCreated, onCancel }) {
-  const { data: clients } = useFetchList('/clients');
+  const { data: rawClients } = useFetchList('/clients');
+  const clients = (rawClients || []).filter((c) => c.user_role !== 'recycle_client');
 
   const [form, setForm] = useState({ truckNumber: '', driverName: '', clientId: '' });
   const [submitting, setSubmitting] = useState(false);

@@ -251,7 +251,7 @@ export default function AdminMessagesPage() {
         {/* ── Left Pane: Inbox Queue ─────────────────────────────────── */}
         <div className="lg:col-span-5 flex flex-col rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-50/80 p-1 dark:border-white/5 dark:bg-surface-850 mb-3">
+          <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-surface-800 mb-3">
             {[
               { id: 'all', label: 'All', count: stats.total || 0 },
               { id: 'open', label: 'Open', count: stats.open || 0 },
@@ -265,16 +265,16 @@ export default function AdminMessagesPage() {
                   type="button"
                   onClick={() => setFilterStatus(tab.id)}
                   style={isActive ? { backgroundColor: accent, color: '#ffffff' } : {}}
-                  className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-1.5 text-xs font-semibold transition-all ${
+                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
                     isActive
                       ? 'shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
+                      : 'text-slate-600 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white'
                   }`}
                 >
                   <span>{tab.label}</span>
                   <span
-                    className={`rounded-full px-1 text-[10px] font-bold ${
-                      isActive ? 'bg-white/25 text-white' : 'bg-slate-200/60 text-slate-700 dark:bg-white/10 dark:text-neutral-300'
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-extrabold ${
+                      isActive ? 'bg-white/30 text-white' : 'bg-slate-200/80 text-slate-700 dark:bg-white/10 dark:text-neutral-200'
                     }`}
                   >
                     {tab.count}
@@ -292,9 +292,9 @@ export default function AdminMessagesPage() {
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search ticket, client, battery…"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/60 py-2 pl-8 pr-3 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-900"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-700"
               />
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-neutral-500">
                 <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
               </svg>
             </div>
@@ -302,7 +302,7 @@ export default function AdminMessagesPage() {
             <select
               value={filterClient}
               onChange={(e) => setFilterClient(e.target.value)}
-              className="max-w-[130px] rounded-xl border border-slate-200 bg-slate-50/60 py-2 px-2 text-xs font-semibold text-slate-800 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+              className="max-w-[130px] rounded-xl border border-slate-200 bg-slate-50 py-2 px-2 text-xs font-semibold text-slate-800 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
             >
               <option value="">All Clients</option>
               {clients.map((c) => (
@@ -316,11 +316,11 @@ export default function AdminMessagesPage() {
           {/* Ticket Queue List */}
           <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar max-h-[520px] pr-1">
             {loading && tickets.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400">Loading inbox…</div>
+              <div className="py-12 text-center text-xs text-slate-400 dark:text-neutral-500">Loading inbox…</div>
             ) : filteredTickets.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-white/10 dark:bg-surface-850">
+              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-white/10 dark:bg-surface-800">
                 <p className="text-xs font-semibold text-slate-700 dark:text-neutral-300">No tickets found</p>
-                <p className="mt-1 text-[11px] text-slate-400">No support requests match your search or filter.</p>
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-neutral-500">No support requests match your search or filter.</p>
               </div>
             ) : (
               filteredTickets.map((t) => {
@@ -336,31 +336,31 @@ export default function AdminMessagesPage() {
                   <div
                     key={t.id}
                     onClick={() => loadTicketDetail(t.id)}
-                    className={`group relative cursor-pointer rounded-2xl border p-3 transition-all ${
+                    className={`group relative cursor-pointer rounded-2xl border p-3.5 transition-all ${
                       isSelected
-                        ? 'border-emerald-500/80 bg-emerald-50/20 shadow-xs dark:border-emerald-500/60 dark:bg-emerald-950/25'
-                        : 'border-slate-200/70 bg-white hover:border-slate-300 hover:shadow-2xs dark:border-white/10 dark:bg-surface-850 dark:hover:border-white/20'
+                        ? 'border-emerald-500 bg-emerald-50/50 shadow-xs dark:border-emerald-500 dark:bg-emerald-950/40'
+                        : 'border-slate-200/80 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-300 dark:border-white/10 dark:bg-surface-800 dark:hover:bg-surface-700/70 dark:hover:border-white/20'
                     }`}
                   >
                     {/* Active accent vertical indicator bar */}
                     {isSelected && (
                       <span
-                        className="absolute left-0 top-3 bottom-3 w-1 rounded-r-full"
+                        className="absolute left-0 top-3 bottom-3 w-1.5 rounded-r-full"
                         style={{ backgroundColor: accent }}
                       />
                     )}
 
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2 min-w-0">
-                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-100 font-mono text-[11px] font-bold text-slate-700 dark:bg-white/10 dark:text-neutral-200">
+                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-200/80 font-mono text-[11px] font-bold text-slate-800 dark:bg-white/10 dark:text-neutral-200">
                           {clientInitials(t.client_name)}
                         </span>
                         <div className="min-w-0 flex-1">
                           {/* Client Name Background Badge */}
-                          <span className="inline-block rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-extrabold text-emerald-800 border border-emerald-200/60 dark:bg-emerald-950/60 dark:border-emerald-800/40 dark:text-emerald-300">
+                          <span className="inline-block rounded-md bg-emerald-100/90 px-2 py-0.5 text-xs font-extrabold text-emerald-900 border border-emerald-300/80 dark:bg-emerald-950/80 dark:border-emerald-700/60 dark:text-emerald-300">
                             {t.client_name}
                           </span>
-                          <p className="mt-0.5 truncate font-mono text-[10px] text-slate-400">
+                          <p className="mt-0.5 truncate font-mono text-[10px] text-slate-400 dark:text-neutral-400">
                             {t.ticket_number}
                           </p>
                         </div>
@@ -373,11 +373,11 @@ export default function AdminMessagesPage() {
                         <span
                           className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
                             isOpen
-                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/50 dark:text-amber-300'
+                              ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 dark:border dark:border-amber-800/40'
                               : isInProgress
-                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
+                                ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 dark:border dark:border-blue-800/40'
                                 : isResolved
-                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300'
+                                  ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border dark:border-emerald-800/40'
                                   : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-400'
                           }`}
                         >
@@ -386,19 +386,19 @@ export default function AdminMessagesPage() {
                       </div>
                     </div>
 
-                    <p className="mt-2 text-xs font-semibold text-slate-800 dark:text-neutral-100 line-clamp-1">
+                    <p className="mt-2 text-xs font-bold text-slate-900 dark:text-white line-clamp-1">
                       {t.subject}
                     </p>
 
-                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-400 line-clamp-1">
+                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-300 line-clamp-1">
                       {t.last_message?.message || 'No messages yet'}
                     </p>
 
-                    <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 text-[10px] text-slate-400 dark:border-white/5">
+                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-200/60 pt-2 text-[10px] text-slate-400 dark:border-white/5 dark:text-neutral-400">
                       <div className="flex items-center gap-1.5">
                         <span className="capitalize">{t.category?.replace('_', ' ')}</span>
                         {t.battery_code && (
-                          <span className="rounded bg-slate-100 px-1 py-0.2 font-mono font-bold text-slate-700 dark:bg-white/10 dark:text-neutral-300">
+                          <span className="rounded bg-slate-200/70 px-1.5 py-0.5 font-mono font-bold text-slate-800 dark:bg-white/10 dark:text-neutral-200">
                             🔋 {t.battery_code}
                           </span>
                         )}
@@ -422,7 +422,7 @@ export default function AdminMessagesPage() {
           ) : activeTicket ? (
             <div className="flex flex-1 flex-col justify-between gap-4">
               {/* ── Enhanced Client Name & Ticket Header Container ── */}
-              <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-slate-50/70 to-emerald-50/20 p-4 shadow-2xs dark:border-white/10 dark:from-surface-850 dark:via-surface-850/80 dark:to-emerald-950/20">
+              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 shadow-2xs dark:border-white/10 dark:bg-surface-800">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex items-center gap-3">
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 font-mono text-xs font-bold text-white shadow-xs">
@@ -434,7 +434,7 @@ export default function AdminMessagesPage() {
                         <span className="rounded-xl bg-emerald-100 px-3 py-1 text-xs font-extrabold text-emerald-900 border border-emerald-300/80 shadow-2xs dark:bg-emerald-950/80 dark:text-emerald-200 dark:border-emerald-700/60">
                           {activeTicket.client_name}
                         </span>
-                        <span className="font-mono text-xs font-bold bg-slate-200/80 text-slate-700 px-2 py-0.5 rounded-lg dark:bg-white/10 dark:text-neutral-200">
+                        <span className="font-mono text-xs font-bold bg-slate-200/90 text-slate-800 px-2 py-0.5 rounded-lg dark:bg-surface-700 dark:text-neutral-100 dark:border dark:border-white/10">
                           {activeTicket.ticket_number}
                         </span>
                       </div>
@@ -451,7 +451,7 @@ export default function AdminMessagesPage() {
                       value={activeTicket.status}
                       disabled={updatingStatus}
                       onChange={(e) => handleStatusChange(e.target.value)}
-                      className="rounded-xl border border-slate-300 bg-white py-1.5 px-3 text-xs font-bold text-slate-800 shadow-2xs focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                      className="rounded-xl border border-slate-300 bg-white py-1.5 px-3 text-xs font-bold text-slate-800 shadow-2xs focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-900 dark:text-white"
                     >
                       <option value="open">🟢 Open</option>
                       <option value="in_progress">🔵 In Progress</option>
@@ -462,19 +462,19 @@ export default function AdminMessagesPage() {
                 </div>
 
                 {/* ── Enhanced Distinct Details Bar Background ── */}
-                <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-blue-200/70 bg-blue-50/70 p-2.5 text-xs font-semibold text-slate-700 shadow-2xs dark:border-blue-900/40 dark:bg-blue-950/30 dark:text-neutral-200">
-                  <span className="rounded-lg bg-white/90 px-2.5 py-1 text-[11px] font-bold text-blue-900 shadow-2xs border border-blue-200/60 dark:bg-surface-800 dark:text-blue-300 dark:border-white/5">
+                <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/90 bg-white/90 p-2.5 text-xs font-semibold text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-900/90 dark:text-neutral-200">
+                  <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-900 shadow-2xs border border-blue-200/70 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60">
                     Category: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.category?.replace('_', ' ')}</strong>
                   </span>
                   
-                  <span className="rounded-lg bg-white/90 px-2.5 py-1 text-[11px] font-bold text-amber-900 shadow-2xs border border-amber-200/60 dark:bg-surface-800 dark:text-amber-300 dark:border-white/5">
+                  <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 shadow-2xs border border-amber-200/70 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60">
                     Priority: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.priority}</strong>
                   </span>
 
                   {activeTicket.battery_code && (
                     <Link
                       to={`/batteries/${encodeURIComponent(activeTicket.battery_code)}`}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-mono font-bold text-emerald-800 shadow-2xs border border-emerald-300/60 hover:bg-emerald-200 transition-colors dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60"
+                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2.5 py-1 text-[11px] font-mono font-bold text-emerald-900 shadow-2xs border border-emerald-300/70 hover:bg-emerald-200 transition-colors dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60 dark:hover:bg-emerald-900/50"
                     >
                       <span>🔋 {activeTicket.battery_code}</span>
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
@@ -491,7 +491,7 @@ export default function AdminMessagesPage() {
               </div>
 
               {/* Message Chat Feed */}
-              <div className="flex-1 space-y-3.5 overflow-y-auto no-scrollbar pr-1 max-h-[380px] p-2 bg-slate-50/40 rounded-2xl dark:bg-black/20">
+              <div className="flex-1 space-y-3.5 overflow-y-auto no-scrollbar pr-1 max-h-[380px] p-3 bg-slate-50/40 rounded-2xl dark:bg-black/30 border border-transparent dark:border-white/5">
                 {(activeTicket.messages || []).map((msg) => {
                   const isStaff = msg.sender_role === 'admin' || msg.sender_role === 'super_admin' || msg.sender_role === 'staff';
 

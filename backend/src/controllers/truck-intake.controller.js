@@ -5,8 +5,24 @@ const truckIntakeService = require('../services/truck-intake.service');
 const { parseTruckIntakeSheet } = require('../utils/parse-truck-intake-sheet');
 const realtime = require('../realtime');
 
+// Two response shapes on purpose: with no query params at all, returns a
+// plain array (used by TruckIntakeForm.jsx's useFetchList, which expects a
+// bare array body); passing ANY of limit/offset/search/date switches to the
+// paginated `{ data, hasMore }` shape (used by TruckIntakePage.jsx's
+// useInfiniteList). Do not add a new query param to the plain-array call
+// site without also updating it to handle the paginated shape.
 async function list(req, res, next) {
   try {
+    const { limit, offset, search, date } = req.query;
+    if (limit !== undefined || offset !== undefined || search !== undefined || date !== undefined) {
+      const pageResult = await truckIntakeModel.findPage({
+        limit: limit ? Number(limit) : 15,
+        offset: offset ? Number(offset) : 0,
+        search: search ? String(search).trim() : '',
+        date: date ? String(date).trim() : '',
+      });
+      return res.json(pageResult);
+    }
     res.json(await truckIntakeModel.findAll());
   } catch (err) {
     next(err);

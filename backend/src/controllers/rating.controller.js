@@ -53,7 +53,7 @@ async function create(req, res, next) {
 
 async function list(req, res, next) {
   try {
-    const { clientId, rating, search, limit = 50, offset = 0 } = req.query;
+    const { clientId, rating, search, startDate, endDate, limit = 50, offset = 0 } = req.query;
     let targetClientId = clientId ? Number(clientId) : null;
 
     if (isClientRole(req.user?.role)) {
@@ -69,16 +69,42 @@ async function list(req, res, next) {
         clientId: targetClientId,
         rating: rating ? Number(rating) : null,
         search,
+        startDate: startDate || null,
+        endDate: endDate || null,
         limit: Number(limit),
         offset: Number(offset),
       }),
-      ratingModel.getStats(targetClientId),
+      ratingModel.getStats({
+        clientId: targetClientId,
+        startDate: startDate || null,
+        endDate: endDate || null,
+      }),
     ]);
 
     res.json({
       data: ratings,
       stats,
     });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function getById(req, res, next) {
+  try {
+    const rating = await ratingModel.findById(req.params.id);
+    if (!rating) {
+      return res.status(404).json({ message: 'Rating record not found.' });
+    }
+
+    if (isClientRole(req.user?.role)) {
+      const client = await clientModel.findByUserId(req.user.id);
+      if (!client || rating.client_id !== client.id) {
+        return res.status(404).json({ message: 'Rating record not found.' });
+      }
+    }
+
+    res.json(rating);
   } catch (err) {
     next(err);
   }
@@ -101,5 +127,6 @@ async function myRatings(req, res, next) {
 module.exports = {
   create,
   list,
+  getById,
   myRatings,
 };

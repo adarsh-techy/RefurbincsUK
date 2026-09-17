@@ -1,9 +1,9 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import useFetchList from '../../utils/use-fetch-list';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import PageHeader from '../../components/ui/PageHeader';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import PageHeader from '../../components/ui/primitives/PageHeader';
 
 function toLocalDateValue(value) {
   const dt = new Date(value);

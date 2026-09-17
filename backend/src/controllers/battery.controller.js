@@ -1,8 +1,16 @@
+const fs = require('fs');
+const path = require('path');
 const batteryModel = require('../models/battery.model');
 const staffModel = require('../models/staff.model');
 const clientModel = require('../models/client.model');
 const recycleModel = require('../models/recycle.model');
+const serviceModel = require('../models/service.model');
 const realtime = require('../realtime');
+
+const ISSUE_PHOTOS_DIR = path.join(__dirname, '..', '..', 'uploads', 'issue-photos');
+if (!fs.existsSync(ISSUE_PHOTOS_DIR)) {
+  fs.mkdirSync(ISSUE_PHOTOS_DIR, { recursive: true });
+}
 
 const DEFAULT_LIMIT = 15;
 const MAX_LIMIT = 100;
@@ -57,7 +65,7 @@ async function list(req, res, next) {
     const activeOnly = req.query.activeOnly === 'true';
     const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
-    const { rows, hasMore } = await batteryModel.findPage({
+    const { rows, hasMore, total } = await batteryModel.findPage({
       limit,
       offset,
       status,
@@ -70,7 +78,7 @@ async function list(req, res, next) {
       activeOnly,
       sortOrder,
     });
-    res.json({ data: rows, hasMore });
+    res.json({ data: rows, hasMore, total });
   } catch (err) {
     next(err);
   }
@@ -84,14 +92,16 @@ async function getByCode(req, res, next) {
     if (!battery) {
       return res.status(404).json({ message: 'Battery not found' });
     }
-    const [history, returns, visits, issues, recycleBatch] = await Promise.all([
+    const [history, returns, visits, issues, recycleBatch, services, pendingPartsRemoval] = await Promise.all([
       batteryModel.findRepairHistory(battery.id),
       batteryModel.findReturnHistory(battery.id),
       batteryModel.findVisitHistory(battery.id),
       batteryModel.findIssueHistory(battery.id),
       recycleModel.findByBatteryId(battery.id),
+      serviceModel.findBatteryServices(battery.id),
+      battery.status === 'unserviceable' ? batteryModel.findPendingPartsRemoval(battery.id) : [],
     ]);
-    res.json({ battery, history, returns, visits, issues, recycleBatch });
+    res.json({ battery, history, returns, visits, issues, recycleBatch, services, pendingPartsRemoval });
   } catch (err) {
     next(err);
   }
@@ -358,11 +368,13 @@ async function startWork(req, res, next) {
 // Supervisors, Managers, and Admins (Technicians do not have testing permission).
 async function completeTesting(req, res, next) {
   try {
+    let staffId = null;
     if (req.user.role === 'technician') {
       const staff = await staffModel.findByUserId(req.user.id);
       if (!staff) {
         return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
       }
+      staffId = staff.id;
       const staffRole = (staff.role || '').toLowerCase();
       if (staffRole === 'technician') {
         return res.status(403).json({
@@ -370,9 +382,19 @@ async function completeTesting(req, res, next) {
             'Technicians do not have permission to perform testing. Only Supervisors and Managers can complete testing.',
         });
       }
+    } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
+      const staff = await staffModel.findByUserId(req.user.id);
+      if (staff) {
+        staffId = staff.id;
+      }
     }
 
-    const battery = await batteryModel.completeTesting(req.params.id);
+    const { serviceIds, notes } = req.body || {};
+    const battery = await batteryModel.completeTesting(req.params.id, {
+      serviceIds: Array.isArray(serviceIds) ? serviceIds.map(Number).filter(Boolean) : [],
+      staffId,
+      notes: typeof notes === 'string' ? notes.trim() : null,
+    });
     if (!battery) {
       return res.status(409).json({
         message: 'This battery cannot be marked completed — it may not be in testing.',
@@ -390,10 +412,11 @@ async function completeTesting(req, res, next) {
 // an optional free-text note, then moves the battery to 'unserviceable'.
 async function reportIssue(req, res, next) {
   try {
-    const reasonId = Number(req.body.reasonId);
-    if (!reasonId) {
-      return res.status(400).json({ message: 'Select a reason' });
-    }
+    // Optional: the mid-repair reason-picker flow's own form requires
+    // picking one before it will submit, but the testing-time "mark
+    // unserviceable" flow deliberately has no picker (just notes/photo), so
+    // the backend doesn't hard-require it either.
+    const reasonId = req.body.reasonId ? Number(req.body.reasonId) || null : null;
     const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
 
     // Route is technician-only (see battery.routes.js), so this always
@@ -403,14 +426,57 @@ async function reportIssue(req, res, next) {
       return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
     }
 
+    // Process uploaded photos (up to 3) via multipart/form-data or JSON base64
+    const photoUrls = [];
+    if (req.files && Array.isArray(req.files)) {
+      for (const file of req.files.slice(0, 3)) {
+        const ext = path.extname(file.originalname || '') || '.jpg';
+        const safeName = `issue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${ext}`;
+        fs.writeFileSync(path.join(ISSUE_PHOTOS_DIR, safeName), file.buffer);
+        photoUrls.push(`/uploads/issue-photos/${safeName}`);
+      }
+    }
+
+    if (req.body.photos) {
+      let photosArr = req.body.photos;
+      if (typeof photosArr === 'string') {
+        try {
+          photosArr = JSON.parse(photosArr);
+        } catch {
+          photosArr = [photosArr];
+        }
+      }
+      if (Array.isArray(photosArr)) {
+        for (const item of photosArr) {
+          if (photoUrls.length >= 3) break;
+          if (typeof item === 'string') {
+            if (item.startsWith('data:image/')) {
+              const match = item.match(/^data:image\/([a-zA-Z0-9+.-]+);base64,(.+)$/);
+              if (match) {
+                const rawExt = match[1].toLowerCase();
+                const ext = rawExt.includes('png') ? '.png' : rawExt.includes('webp') ? '.webp' : '.jpg';
+                const buffer = Buffer.from(match[2], 'base64');
+                const safeName = `issue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${ext}`;
+                fs.writeFileSync(path.join(ISSUE_PHOTOS_DIR, safeName), buffer);
+                photoUrls.push(`/uploads/issue-photos/${safeName}`);
+              }
+            } else if (item.startsWith('/uploads/')) {
+              photoUrls.push(item);
+            }
+          }
+        }
+      }
+    }
+
     const battery = await batteryModel.reportIssue(req.params.id, {
       staffId: staff.id,
       reasonId,
       note,
+      photoUrls,
     });
     if (!battery) {
       return res.status(409).json({
-        message: 'This battery cannot be reported — work must be in progress first.',
+        message: 'This battery cannot be reported — it must be in progress or in testing first.',
       });
     }
     realtime.broadcastUnserviceableCount().catch((err) => console.error('broadcastUnserviceableCount:', err));
@@ -421,6 +487,34 @@ async function reportIssue(req, res, next) {
     if (err.code === '23503') {
       return res.status(400).json({ message: 'Invalid reason selected' });
     }
+    next(err);
+  }
+}
+
+// Reclaims parts fitted during repair from a battery that failed testing and
+// was declared unserviceable there (rather than caught earlier in
+// in_progress, before anything was fitted) — restocks each selected part
+// and stamps its repair row so it drops off the pending list. Open to any
+// workshop login (technician/supervisor/manager all share the 'technician'
+// role — see battery.routes.js), matching who can report the issue itself.
+async function removeParts(req, res, next) {
+  try {
+    const repairIds = Array.isArray(req.body.repairIds)
+      ? req.body.repairIds.map(Number).filter(Boolean)
+      : [];
+    if (repairIds.length === 0) {
+      return res.status(400).json({ message: 'Select at least one part to remove.' });
+    }
+    const staff = await staffModel.findByUserId(req.user.id);
+    if (!staff) {
+      return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
+    }
+    const result = await batteryModel.removeParts(req.params.id, repairIds, staff.id);
+    if (result.removedCount === 0) {
+      return res.status(409).json({ message: 'These parts were already removed or do not belong to this battery.' });
+    }
+    res.json(result);
+  } catch (err) {
     next(err);
   }
 }
@@ -456,6 +550,7 @@ module.exports = {
   startWork,
   completeTesting,
   reportIssue,
+  removeParts,
   remove,
   setBlocked,
 };

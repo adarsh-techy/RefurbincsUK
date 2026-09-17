@@ -1,5 +1,5 @@
 import { FiAward, FiCheck, FiX, FiPrinter, FiDownload } from 'react-icons/fi';
-import Modal from '../ui/Modal';
+import Modal from '../ui/overlays/Modal';
 import CertificateView from './CertificateView';
 import apiClient from '../../services/api-client';
 import { downloadMilestoneCertificatePDF } from '../../utils/generate-milestone-certificate';

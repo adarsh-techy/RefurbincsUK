@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import useFetchList from '../../utils/use-fetch-list';
 import { hasPermission } from '../../utils/permissions';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import PageHeader from '../../components/ui/PageHeader';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import ConfirmModal from '../../components/ui/ConfirmModal';
-import AlertModal from '../../components/ui/AlertModal';
-import Badge from '../../components/ui/Badge';
-import RowActions from '../../components/ui/RowActions';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import Button from '../../components/ui/primitives/Button';
+import Modal from '../../components/ui/overlays/Modal';
+import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import AlertModal from '../../components/ui/overlays/AlertModal';
+import Badge from '../../components/ui/primitives/Badge';
+import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
 import IssueReasonForm from './IssueReasonForm';
 
@@ -74,7 +74,7 @@ function IssueReasonsPage() {
     <div>
       <PageHeader
         title="Issue Reasons"
-        description="Reasons a technician can give when a battery can't be serviced."
+        description="Reasons a technician can report when a battery cannot be serviced or repaired."
         titleClassName="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400"
       >
         {canManage && <Button variant="darkViolet" onClick={() => setFormTarget('new')}>+ Add Reason</Button>}
@@ -113,9 +113,20 @@ function IssueReasonsPage() {
         <AlertModal title="Cannot Delete Reason" message={deleteError} onClose={() => setDeleteError(null)} />
       )}
 
-      {loading && <TableState>Loading…</TableState>}
-      {error && <TableState tone="error">{error}</TableState>}
-      {!loading && !error && <DataTable columns={columns} rows={data} headerColor="blue" showRowNumber />}
+      {loading && !data ? (
+        <TableState>Loading issue reasons…</TableState>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-surface-700">
+          <DataTable
+            columns={columns}
+            rows={data || []}
+            emptyMessage="No issue reasons configured yet. Click '+ Add Reason' to create one."
+            showRowNumber
+            headerColor="blue"
+            maxHeight="calc(100vh - 270px)"
+          />
+        </div>
+      )}
     </div>
   );
 }

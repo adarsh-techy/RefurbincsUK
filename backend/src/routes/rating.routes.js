@@ -13,5 +13,6 @@ router.get('/my', requireRole('client', 'recycle_client'), ratingController.myRa
 
 // Admin / Staff can view all ratings with full stats
 router.get('/', requireRole('super_admin', 'admin', 'staff'), ratingController.list);
+router.get('/:id', requireRole('super_admin', 'admin', 'staff', 'client', 'recycle_client'), ratingController.getById);
 
 module.exports = router;

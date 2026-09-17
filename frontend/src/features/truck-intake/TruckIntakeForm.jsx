@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
-import AlertModal from '../../components/ui/AlertModal';
-import QrScanner from '../../components/ui/QrScanner';
+import AlertModal from '../../components/ui/overlays/AlertModal';
+import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
 const inputClasses =
@@ -15,7 +15,8 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 // batteries back in is create-only.
 function TruckIntakeForm({ intake, onSaved, onCancel }) {
   const isEdit = Boolean(intake);
-  const { data: clients } = useFetchList('/clients');
+  const { data: rawClients } = useFetchList('/clients');
+  const clients = (rawClients || []).filter((c) => c.user_role !== 'recycle_client');
   const { data: pastIntakes } = useFetchList('/truck-intakes');
   const existingTruckNumbers = [...new Set((pastIntakes || []).map((i) => i.truck_number))];
 

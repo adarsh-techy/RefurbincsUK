@@ -57,7 +57,13 @@ async function findAll({ recycleClientId } = {}) {
 }
 
 async function findById(id) {
-  const { rows } = await db.query('SELECT * FROM recycle_batches WHERE id = $1', [id]);
+  const { rows } = await db.query(
+    `SELECT rb.*, c.name AS recycle_client_name
+     FROM recycle_batches rb
+     LEFT JOIN clients c ON c.id = rb.recycle_client_id
+     WHERE rb.id = $1`,
+    [id]
+  );
   return rows[0];
 }
 
@@ -67,11 +73,13 @@ async function findBatteries(recycleId) {
   const { rows } = await db.query(
     `SELECT b.id, b.battery_code, b.status, b.client_name,
             last_issue.reason AS issue_reason,
+            last_issue.note AS issue_note,
+            last_issue.photo_urls AS issue_photos,
             last_issue.reported_at AS issue_reported_at
      FROM recycle_batteries rb
      JOIN batteries b ON b.id = rb.battery_id
      LEFT JOIN LATERAL (
-       SELECT ir.label AS reason, bi.reported_at
+       SELECT ir.label AS reason, bi.note, bi.photo_urls, bi.reported_at
        FROM battery_issues bi
        JOIN issue_reasons ir ON ir.id = bi.reason_id
        WHERE bi.battery_id = b.id

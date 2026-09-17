@@ -6,6 +6,7 @@ const app = require('./app');
 const env = require('./config/env');
 const db = require('./config/db');
 const realtime = require('./realtime');
+const { runMigrations } = require('./db/migrate');
 
 // Self-signed dev cert (see certs/). Served *alongside* plain http, not
 // instead of it: the web frontend needs https for getUserMedia (browsers
@@ -20,10 +21,20 @@ const CERT_PATH = path.join(CERT_DIR, 'cert.pem');
 
 async function start() {
   try {
-    await db.query('SELECT 1');
-    console.log(`Connected to PostgreSQL database "${env.db.name}"`);
+    const { rows } = await db.query(
+      'SELECT current_database() AS db_name, current_user AS user_name, inet_server_addr() AS host, inet_server_port() AS port'
+    );
+    const activeDb = rows[0]?.db_name || env.db.name || 'unknown';
+    const activeUser = rows[0]?.user_name || env.db.user || 'unknown';
+    const host = env.db.host || rows[0]?.host || 'localhost';
+    const port = env.db.port || rows[0]?.port || 5432;
+    console.log(`✅ Connected to PostgreSQL [Database: "${activeDb}", Host: ${host}:${port}, User: ${activeUser}]`);
+
+    await runMigrations(false);
   } catch (err) {
-    console.error('Failed to connect to PostgreSQL:', err.message);
+    const targetHost = env.db.host || 'localhost';
+    const targetDb = env.db.name || 'unknown';
+    console.error(`❌ Failed to connect to PostgreSQL (Target: ${targetHost}:${env.db.port || 5432}/${targetDb}):`, err.message);
     process.exit(1);
   }
 

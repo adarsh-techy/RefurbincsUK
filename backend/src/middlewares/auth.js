@@ -54,8 +54,9 @@ async function optionalAuth(req, res, next) {
 }
 
 function requireRole(...allowedRoles) {
+  const roles = allowedRoles.flat();
   return (req, res, next) => {
-    if (!req.user || !allowedRoles.includes(req.user.role)) {
+    if (!req.user || !roles.includes(req.user.role)) {
       return res.status(403).json({ message: 'Insufficient permissions' });
     }
     next();

@@ -163,7 +163,10 @@ async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, p
         updates.push(`permissions = $${params.length}`);
       }
       if (active !== undefined) {
-        params.push(Boolean(active));
+        // Comes through as the literal string "false"/"true" over
+        // multipart form-data (ClientForm submits via FormData) —
+        // Boolean("false") is true, so a naive cast always activates.
+        params.push(active === true || active === 'true');
         updates.push(`active = $${params.length}`);
       }
 
@@ -208,7 +211,7 @@ async function remove(id) {
 // 'received' (physically back with the client via admin return dispatch).
 const BUCKET_STATUSES = {
   packed: ['in_repair'],
-  pending: ['in_progress', 'in_testing', 'repaired'],
+  pending: ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired', 'unserviceable'],
   received: ['returned'],
 };
 
@@ -220,6 +223,14 @@ async function findMyBatteries(clientId, clientName, bucket) {
   if (bucket === 'received') {
     conditions.push(`b.status = 'returned'`);
     conditions.push(`EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)`);
+  } else if (bucket === 'packed') {
+    // Every truck ever packed for repair, whether it's still pending arrival
+    // at the workshop or has already arrived and is awaiting technician
+    // pickup — the client should see every packed truck here, not just the
+    // ones that haven't arrived yet.
+    conditions.push(`b.status = 'in_repair'`);
+  } else if (bucket === 'pending') {
+    conditions.push(`b.status IN ('in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired', 'unserviceable')`);
   } else if (statuses) {
     params.push(statuses);
     conditions.push(`b.status = ANY($${params.length}::text[])`);
@@ -490,7 +501,7 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
   }
 }
 
-// Comprehensive lifecycle history of all battery movements, services, and transactions for the client
+// Comprehensive lifecycle history of all truck shipments and batch movements for the client
 async function findMyHistory(clientId, clientName, { type, search, limit = 100, offset = 0 } = {}) {
   const conditions = [];
   const params = [clientId, clientName];
@@ -505,11 +516,8 @@ async function findMyHistory(clientId, clientName, { type, search, limit = 100, 
     const sIdx = params.length;
     conditions.push(`(
       lower(details) LIKE $${sIdx} OR
-      lower(coalesce(battery_code, '')) LIKE $${sIdx} OR
-      lower(coalesce(serial_number, '')) LIKE $${sIdx} OR
       lower(coalesce(vehicle_number, '')) LIKE $${sIdx} OR
       lower(coalesce(driver_name, '')) LIKE $${sIdx} OR
-      lower(coalesce(staff_name, '')) LIKE $${sIdx} OR
       lower(coalesce(reference, '')) LIKE $${sIdx} OR
       lower(type_label) LIKE $${sIdx}
     )`);
@@ -525,54 +533,20 @@ async function findMyHistory(clientId, clientName, { type, search, limit = 100, 
   const { rows } = await db.query(
     `WITH ${CLIENT_BATTERY_IDS_CTE},
      events AS (
-       -- 1. Packed for Repair (Grouped by Truck / Batch)
+       -- 1. Truck Intakes (Packed / Workshop Intakes - strictly grouped by truck intake ID)
        SELECT 
-         'packed_' || COALESCE(ti.id::text, 'b_' || (CASE WHEN ti.id IS NULL THEN b.id ELSE 0 END)::text) AS id,
-         'packed' AS type,
-         'Packed for Repair' AS type_label,
-         COUNT(DISTINCT b.id)::text || ' batteries packed for workshop repair' || COALESCE(' on Truck ' || ti.truck_number, '') AS details,
-         NULL AS battery_code,
-         NULL AS serial_number,
+         'truck_intake_' || ti.id::text AS id,
+         CASE WHEN ti.verified_at IS NOT NULL OR ti.status = 'verified' THEN 'intake' ELSE 'packed' END AS type,
+         CASE WHEN ti.verified_at IS NOT NULL OR ti.status = 'verified' THEN 'Workshop Truck Intake' ELSE 'Truck Packed for Repair' END AS type_label,
+         COUNT(DISTINCT b.id)::text || ' batteries on Truck ' || COALESCE(ti.truck_number, '#' || ti.id::text) || COALESCE(' (Driver: ' || ti.driver_name || ')', '') AS details,
          COUNT(DISTINCT b.id)::int AS battery_count,
-         COALESCE('Truck ' || ti.truck_number, 'Packed Batch') AS reference,
+         'Truck ' || COALESCE(ti.truck_number, '#' || ti.id::text) AS reference,
          ti.truck_number AS vehicle_number,
          ti.driver_name,
          NULL AS staff_name,
          NULL::numeric AS amount,
-         false AS verified_by_client,
-         COALESCE(ti.created_at, MIN(b.created_at)) AS timestamp,
-         jsonb_agg(
-           jsonb_build_object(
-             'id', b.id,
-             'code', b.battery_code,
-             'serial', b.serial_number,
-             'notes', b.notes,
-             'status', b.status
-           ) ORDER BY b.battery_code
-         ) AS batteries_list
-       FROM client_battery_ids b
-       LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
-       WHERE b.created_at IS NOT NULL
-       GROUP BY ti.id, ti.truck_number, ti.driver_name, ti.created_at, (CASE WHEN ti.id IS NULL THEN b.id ELSE 0 END)
-
-       UNION ALL
-
-       -- 2. Workshop Intake Verified (Truck arrived and verified at workshop)
-       SELECT 
-         'intake_' || ti.id::text AS id,
-         'intake' AS type,
-         'Workshop Intake' AS type_label,
-         COUNT(DISTINCT b.id)::text || ' batteries received & verified at workshop on truck ' || COALESCE(ti.truck_number, '—') AS details,
-         NULL AS battery_code,
-         NULL AS serial_number,
-         COUNT(DISTINCT b.id)::int AS battery_count,
-         'Intake #' || ti.id::text AS reference,
-         ti.truck_number AS vehicle_number,
-         ti.driver_name,
-         NULL AS staff_name,
-         NULL::numeric AS amount,
-         true AS verified_by_client,
-         COALESCE(ti.verified_at, ti.created_at) AS timestamp,
+         (ti.verified_at IS NOT NULL OR ti.status = 'verified') AS verified_by_client,
+         COALESCE(ti.intake_at, ti.created_at) AS timestamp,
          jsonb_agg(
            jsonb_build_object(
              'id', b.id,
@@ -584,54 +558,18 @@ async function findMyHistory(clientId, clientName, { type, search, limit = 100, 
          ) AS batteries_list
        FROM client_battery_ids b
        JOIN truck_intakes ti ON ti.id = b.truck_intake_id
-       WHERE ti.verified_at IS NOT NULL OR ti.status = 'verified'
-       GROUP BY ti.id, ti.truck_number, ti.driver_name, ti.verified_at, ti.created_at, ti.status
+       GROUP BY ti.id, ti.truck_number, ti.driver_name, ti.status, ti.verified_at, ti.intake_at, ti.created_at
 
        UNION ALL
 
-       -- 3. Repairs & Service Completed
+       -- 2. Truck Returns (Strictly grouped by return truck ID)
        SELECT 
-         'repair_' || r.batch_id AS id,
-         'repair' AS type,
-         'Repair & Service' AS type_label,
-         'Completed service on battery ' || MAX(b.battery_code) || COALESCE(' — Replaced: ' || string_agg(DISTINCT p.name, ', '), '') AS details,
-         MAX(b.battery_code) AS battery_code,
-         MAX(b.serial_number) AS serial_number,
-         1 AS battery_count,
-         'Batch #' || r.batch_id AS reference,
-         NULL AS vehicle_number,
-         NULL AS driver_name,
-         COALESCE(MAX(s.name), 'Workshop Technician') AS staff_name,
-         SUM(r.price + r.labor_charge)::numeric AS amount,
-         false AS verified_by_client,
-         MIN(r.repaired_at) AS timestamp,
-         jsonb_build_array(
-           jsonb_build_object(
-             'id', MAX(b.id),
-             'code', MAX(b.battery_code),
-             'serial', MAX(b.serial_number),
-             'notes', string_agg(DISTINCT p.name, ', '),
-             'status', 'repaired'
-           )
-         ) AS batteries_list
-       FROM client_battery_ids b
-       JOIN repairs r ON r.battery_id = b.id
-       LEFT JOIN parts p ON p.id = r.part_id
-       LEFT JOIN staff s ON s.id = r.staff_id
-       GROUP BY r.batch_id
-
-       UNION ALL
-
-       -- 4. Returns & Dispatch to Client (Grouped by Truck Return)
-       SELECT 
-         'return_' || ret.id::text AS id,
+         'truck_return_' || ret.id::text AS id,
          'return' AS type,
-         'Returned to Fleet' AS type_label,
-         COUNT(DISTINCT b.id)::text || ' batteries returned & received on truck ' || COALESCE(ret.truck_number, '—') AS details,
-         NULL AS battery_code,
-         NULL AS serial_number,
+         'Truck Returned to Fleet' AS type_label,
+         COUNT(DISTINCT b.id)::text || ' batteries returned on Truck ' || COALESCE(ret.truck_number, '#' || ret.id::text) || COALESCE(' (Driver: ' || ret.driver_name || ')', '') AS details,
          COUNT(DISTINCT b.id)::int AS battery_count,
-         'Return #' || ret.id::text AS reference,
+         'Return Truck ' || COALESCE(ret.truck_number, '#' || ret.id::text) AS reference,
          ret.truck_number AS vehicle_number,
          ret.driver_name,
          NULL AS staff_name,
@@ -650,29 +588,6 @@ async function findMyHistory(clientId, clientName, { type, search, limit = 100, 
        JOIN return_batteries rb ON rb.battery_id = b.id
        JOIN returns ret ON ret.id = rb.return_id
        GROUP BY ret.id, ret.truck_number, ret.driver_name, ret.status, ret.verified_at, ret.returned_at, ret.created_at
-
-       UNION ALL
-
-       -- 5. Invoices & Billing
-       SELECT 
-         'invoice_' || i.id::text AS id,
-         'invoice' AS type,
-         'Invoice Issued' AS type_label,
-         'Official billing invoice ' || i.invoice_number || COALESCE(' (' || i.file_name || ')', '') || COALESCE(' - ' || i.notes, '') AS details,
-         NULL AS battery_code,
-         NULL AS serial_number,
-         1 AS battery_count,
-         i.invoice_number AS reference,
-         NULL AS vehicle_number,
-         NULL AS driver_name,
-         u.name AS staff_name,
-         i.amount::numeric AS amount,
-         false AS verified_by_client,
-         COALESCE(i.created_at, i.issue_date::timestamptz) AS timestamp,
-         '[]'::jsonb AS batteries_list
-       FROM invoices i
-       LEFT JOIN users u ON u.id = i.created_by_user_id
-       WHERE i.client_id = $1
      )
      SELECT * FROM events
      ${whereClause}
@@ -688,12 +603,9 @@ async function getHistorySummary(clientId, clientName) {
   const { rows } = await db.query(
     `WITH ${CLIENT_BATTERY_IDS_CTE}
      SELECT
-       (SELECT COUNT(*) FROM client_battery_ids)::int AS packed_count,
+       (SELECT COUNT(DISTINCT ti.id) FROM truck_intakes ti JOIN client_battery_ids b ON b.truck_intake_id = ti.id WHERE ti.status = 'pending_arrival' AND ti.verified_at IS NULL)::int AS packed_count,
        (SELECT COUNT(DISTINCT ti.id) FROM truck_intakes ti JOIN client_battery_ids b ON b.truck_intake_id = ti.id WHERE ti.verified_at IS NOT NULL OR ti.status = 'verified')::int AS intake_count,
-       (SELECT COUNT(DISTINCT r.batch_id) FROM repairs r JOIN client_battery_ids b ON b.id = r.battery_id)::int AS repair_count,
-       (SELECT COUNT(DISTINCT ret.id) FROM returns ret JOIN return_batteries rb ON rb.return_id = ret.id JOIN client_battery_ids b ON b.id = rb.battery_id)::int AS return_count,
-       (SELECT COUNT(*) FROM invoices WHERE client_id = $1)::int AS invoice_count,
-       0::int AS sort_count
+       (SELECT COUNT(DISTINCT ret.id) FROM returns ret JOIN return_batteries rb ON rb.return_id = ret.id JOIN client_battery_ids b ON b.id = rb.battery_id)::int AS return_count
     `,
     [clientId, clientName]
   );
@@ -701,15 +613,383 @@ async function getHistorySummary(clientId, clientName) {
   const total_events =
     (data.packed_count || 0) +
     (data.intake_count || 0) +
-    (data.repair_count || 0) +
-    (data.return_count || 0) +
-    (data.invoice_count || 0) +
-    (data.sort_count || 0);
+    (data.return_count || 0);
 
   return {
     ...data,
     total_events,
   };
+}
+
+// Record client truck intake (dispatch from client fleet to Refurbnics workshop)
+async function recordClientTruckIntake(clientId, clientName, { truckNumber, driverName, batteryCount, batteryCodes = [], issueDescription }) {
+  const truck = (truckNumber || '').trim();
+  const driver = (driverName || '').trim();
+  const rawCount = Number(batteryCount);
+  const items = Array.isArray(batteryCodes)
+    ? batteryCodes
+        .map((c) => (typeof c === 'string' ? { code: c.trim().toUpperCase() } : { code: (c.code || c.batteryCode || '').trim().toUpperCase() }))
+        .filter((c) => c.code)
+    : [];
+
+  const count = rawCount > 0 ? rawCount : items.length > 0 ? items.length : 1;
+
+  if (!truck) {
+    throw new Error('Truck number is required.');
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Create truck intake record with status 'pending_arrival'
+    const { rows: newIntakeRows } = await client.query(
+      `INSERT INTO truck_intakes (truck_number, driver_name, client_id, battery_count, status, intake_at, created_at)
+       VALUES ($1, $2, $3, $4, 'pending_arrival', now(), now())
+       RETURNING *`,
+      [truck, driver || 'Client Fleet Driver', clientId, count]
+    );
+    const intake = newIntakeRows[0];
+
+    const processedBatteries = [];
+    for (const item of items) {
+      const { rows: existingRows } = await client.query(
+        `SELECT * FROM batteries WHERE upper(battery_code) = upper($1) OR (serial_number IS NOT NULL AND upper(serial_number) = upper($1))`,
+        [item.code]
+      );
+      if (existingRows.length > 0) {
+        const b = existingRows[0];
+        const { rows: updated } = await client.query(
+          `UPDATE batteries
+           SET status = 'in_repair',
+               client_name = COALESCE(client_name, $2),
+               truck_intake_id = $3,
+               notes = CASE WHEN $4::text IS NOT NULL THEN COALESCE(notes || E'\n' || $4::text, $4::text) ELSE notes END
+           WHERE id = $1
+           RETURNING *`,
+          [b.id, clientName, intake.id, issueDescription ? `[Client Truck Intake ${truck}]: ${issueDescription}` : null]
+        );
+        await client.query(
+          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
+          [b.id, intake.id]
+        );
+        processedBatteries.push(updated[0]);
+      } else {
+        const { rows: created } = await client.query(
+          `INSERT INTO batteries (battery_code, client_name, truck_intake_id, status, notes, created_at)
+           VALUES ($1, $2, $3, 'in_repair', $4, now())
+           RETURNING *`,
+          [item.code, clientName, intake.id, issueDescription ? `[Client Truck Intake ${truck}]: ${issueDescription}` : null]
+        );
+        await client.query(
+          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
+          [created[0].id, intake.id]
+        );
+        processedBatteries.push(created[0]);
+      }
+    }
+
+    await client.query('COMMIT');
+
+    return {
+      intake,
+      batteries: processedBatteries,
+      count,
+    };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Update client's unverified truck intake info (truck number, driver name)
+async function updateClientTruckIntake(clientId, intakeId, { truckNumber, driverName }) {
+  const { rows: existing } = await db.query(
+    `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
+    [intakeId, clientId]
+  );
+  if (existing.length === 0) {
+    const err = new Error('Truck intake not found or does not belong to your company.');
+    err.status = 404;
+    throw err;
+  }
+  if (existing[0].status === 'verified' || existing[0].verified_at) {
+    const err = new Error('Cannot edit an intake batch that has already been verified by the workshop.');
+    err.status = 400;
+    throw err;
+  }
+
+  const { rows } = await db.query(
+    `UPDATE truck_intakes
+     SET truck_number = COALESCE(NULLIF(trim($1), ''), truck_number),
+         driver_name = COALESCE(NULLIF(trim($2), ''), driver_name)
+     WHERE id = $3 AND client_id = $4
+     RETURNING *`,
+    [truckNumber, driverName, intakeId, clientId]
+  );
+  return rows[0];
+}
+
+// Add more batteries to an existing unverified truck intake
+async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, { batteries = [] }) {
+  const { rows: existing } = await db.query(
+    `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
+    [intakeId, clientId]
+  );
+  if (existing.length === 0) {
+    const err = new Error('Truck intake not found or does not belong to your company.');
+    err.status = 404;
+    throw err;
+  }
+  if (existing[0].status === 'verified' || existing[0].verified_at) {
+    const err = new Error('Cannot add batteries to a batch that has already been verified by the workshop.');
+    err.status = 400;
+    throw err;
+  }
+
+  const items = Array.isArray(batteries)
+    ? batteries
+        .map((c) => (typeof c === 'string' ? { code: c.trim().toUpperCase() } : { code: (c.batteryCode || c.code || '').trim().toUpperCase(), serial: (c.serialNumber || c.serial || '').trim(), issue: (c.issueDescription || c.issue || '').trim() }))
+        .filter((c) => c.code)
+    : [];
+
+  if (items.length === 0) {
+    throw new Error('Please specify at least one battery code.');
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const processed = [];
+
+    for (const item of items) {
+      let { rows: existingRows } = await client.query(
+        `SELECT * FROM batteries WHERE upper(battery_code) = upper($1) OR (serial_number IS NOT NULL AND upper(serial_number) = upper($1))`,
+        [item.code]
+      );
+      if (existingRows.length > 0) {
+        const b = existingRows[0];
+        const { rows: updated } = await client.query(
+          `UPDATE batteries
+           SET status = 'in_repair',
+               client_name = COALESCE(client_name, $2),
+               serial_number = COALESCE(NULLIF($3::text, ''), serial_number),
+               serial_number_added_by_role = CASE WHEN NULLIF($3::text, '') IS NOT NULL THEN 'client' ELSE serial_number_added_by_role END,
+               truck_intake_id = $4,
+               notes = CASE WHEN NULLIF($5::text, '') IS NOT NULL THEN COALESCE(notes || E'\n' || $5::text, $5::text) ELSE notes END
+           WHERE id = $1
+           RETURNING *`,
+          [b.id, clientName, item.serial, intakeId, item.issue ? `[Packed for Repair]: ${item.issue}` : null]
+        );
+        await client.query(
+          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
+          [b.id, intakeId]
+        );
+        processed.push(updated[0]);
+      } else {
+        const { rows: created } = await client.query(
+          `INSERT INTO batteries (battery_code, client_name, serial_number, serial_number_added_by_role, truck_intake_id, status, notes, created_at)
+           VALUES ($1, $2, NULLIF($3::text, ''), CASE WHEN NULLIF($3::text, '') IS NOT NULL THEN 'client' ELSE NULL END, $4, 'in_repair', $5::text, now())
+           RETURNING *`,
+          [item.code, clientName, item.serial, intakeId, item.issue ? `[Packed for Repair]: ${item.issue}` : null]
+        );
+        await client.query(
+          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
+          [created[0].id, intakeId]
+        );
+        processed.push(created[0]);
+      }
+    }
+
+    // Update battery_count on truck_intake
+    const { rows: countRows } = await client.query(
+      `SELECT COUNT(*)::int AS count FROM batteries WHERE truck_intake_id = $1`,
+      [intakeId]
+    );
+    await client.query(
+      `UPDATE truck_intakes SET battery_count = $1 WHERE id = $2`,
+      [countRows[0].count, intakeId]
+    );
+
+    await client.query('COMMIT');
+    return { added: processed, count: countRows[0].count };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Remove a single battery from an unverified truck intake and reset to returned
+async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId, batteryId) {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Verify battery belongs to client
+    const { rows: bRows } = await client.query(
+      `WITH ${CLIENT_BATTERY_IDS_CTE}
+       SELECT b.* FROM client_battery_ids cb JOIN batteries b ON b.id = cb.id WHERE b.id = $3`,
+      [clientId, clientName, batteryId]
+    );
+    if (bRows.length === 0) {
+      const err = new Error('Battery not found or does not belong to your fleet.');
+      err.status = 404;
+      throw err;
+    }
+
+    const hasIntake = intakeId && intakeId !== 'null' && intakeId !== 'awaiting_pickup' && !isNaN(Number(intakeId));
+
+    if (hasIntake) {
+      const validIntakeId = Number(intakeId);
+      const { rows: intakeRows } = await client.query(
+        `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
+        [validIntakeId, clientId]
+      );
+      if (intakeRows.length === 0) {
+        const err = new Error('Truck intake not found.');
+        err.status = 404;
+        throw err;
+      }
+      if (intakeRows[0].status === 'verified' || intakeRows[0].verified_at) {
+        const err = new Error('Cannot remove batteries from an intake batch that has already been verified by the workshop.');
+        err.status = 400;
+        throw err;
+      }
+
+      // Remove visit for this intake
+      await client.query(
+        `DELETE FROM battery_visits WHERE battery_id = $1 AND truck_intake_id = $2`,
+        [batteryId, validIntakeId]
+      );
+
+      // Recalculate count
+      const { rows: countRows } = await client.query(
+        `SELECT COUNT(*)::int AS count FROM batteries WHERE truck_intake_id = $1 AND id != $2`,
+        [validIntakeId, batteryId]
+      );
+      await client.query(
+        `UPDATE truck_intakes SET battery_count = $1 WHERE id = $2`,
+        [countRows[0].count, validIntakeId]
+      );
+    }
+
+    // Reset status to returned (with client in active fleet) and unlink intake
+    const { rows: updated } = await client.query(
+      `UPDATE batteries
+       SET truck_intake_id = NULL,
+           status = 'returned'
+       WHERE id = $1
+       RETURNING *`,
+      [batteryId]
+    );
+
+    await client.query('COMMIT');
+    return { unlinkedBattery: updated[0] };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Delete / cancel an entire unverified truck intake and reset all its batteries
+async function deleteClientTruckIntake(clientId, clientName, intakeId) {
+  const { rows: intakeRows } = await db.query(
+    `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
+    [intakeId, clientId]
+  );
+  if (intakeRows.length === 0) {
+    const err = new Error('Truck intake not found or does not belong to your company.');
+    err.status = 404;
+    throw err;
+  }
+  if (intakeRows[0].status === 'verified' || intakeRows[0].verified_at) {
+    const err = new Error('Cannot delete an intake batch that has already been verified by the workshop.');
+    err.status = 400;
+    throw err;
+  }
+
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    // Unlink all batteries attached to this intake
+    await client.query(
+      `UPDATE batteries
+       SET truck_intake_id = NULL,
+           status = 'returned'
+       WHERE truck_intake_id = $1`,
+      [intakeId]
+    );
+
+    // Delete battery visits for this intake
+    await client.query(
+      `DELETE FROM battery_visits WHERE truck_intake_id = $1`,
+      [intakeId]
+    );
+
+    // Delete the intake
+    await client.query(
+      `DELETE FROM truck_intakes WHERE id = $1 AND client_id = $2`,
+      [intakeId, clientId]
+    );
+
+    await client.query('COMMIT');
+    return { success: true };
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
+// Update serial number or notes for a client's battery
+async function updateClientBattery(clientId, clientName, batteryId, { serialNumber, notes }) {
+  const { rows: bRows } = await db.query(
+    `WITH ${CLIENT_BATTERY_IDS_CTE}
+     SELECT b.* FROM client_battery_ids b WHERE b.id = $3`,
+    [clientId, clientName, batteryId]
+  );
+  if (bRows.length === 0) {
+    const err = new Error('Battery not found or does not belong to your fleet.');
+    err.status = 404;
+    throw err;
+  }
+
+  const existing = bRows[0];
+  const fields = [];
+  const params = [];
+
+  if (serialNumber !== undefined) {
+    params.push(serialNumber ? serialNumber.trim() : null);
+    fields.push(`serial_number = $${params.length}`);
+    fields.push(`serial_number_added_by_role = 'client'`);
+  }
+
+  if (notes !== undefined) {
+    params.push(notes ? notes.trim() : null);
+    fields.push(`notes = $${params.length}`);
+  }
+
+  if (fields.length === 0) {
+    return existing;
+  }
+
+  params.push(batteryId);
+  const { rows } = await db.query(
+    `UPDATE batteries
+     SET ${fields.join(', ')}
+     WHERE id = $${params.length}
+     RETURNING *`,
+    params
+  );
+  return rows[0];
 }
 
 module.exports = {
@@ -723,7 +1003,14 @@ module.exports = {
   findMyHistory,
   getHistorySummary,
   packBatteryForRepair,
+  recordClientTruckIntake,
+  updateClientTruckIntake,
+  addBatteriesToClientTruckIntake,
+  removeBatteryFromClientTruckIntake,
+  deleteClientTruckIntake,
+  updateClientBattery,
   create,
   update,
   remove,
 };
+

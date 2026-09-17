@@ -1,36 +1,94 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
+import {
+  FiActivity,
+  FiBatteryCharging,
+  FiTool,
+  FiCheckCircle,
+  FiAlertTriangle,
+  FiTrash2,
+  FiRefreshCw,
+  FiClock,
+  FiCalendar,
+  FiArrowRight,
+  FiTruck,
+  FiAward,
+  FiLayers,
+  FiTrendingUp,
+  FiUser,
+  FiZap,
+  FiPackage,
+  FiChevronRight,
+  FiShield,
+  FiCheck,
+} from 'react-icons/fi';
 import useFetchList from '../../utils/use-fetch-list';
-import StatCard from '../../components/ui/StatCard';
-import BarChart from '../../components/ui/BarChart';
-import MiniCalendar from '../../components/ui/MiniCalendar';
-import TableState from '../../components/ui/TableState';
+import Sparkline from '../../components/ui/charts/Sparkline';
+import BarChart from '../../components/ui/charts/BarChart';
+import MiniCalendar from '../../components/ui/charts/MiniCalendar';
 import { hasPermission } from '../../utils/permissions';
 import formatDuration from '../../utils/format-duration';
 
 const QUICK_ACTIONS = [
-  { to: '/truck-intakes', label: 'Intake Battery', permission: 'truck_intakes' },
-  { to: '/repairs', label: 'Log a Repair', permission: 'repairs' },
-  { to: '/parts', label: 'Manage Inventory', permission: 'parts' },
-  { to: '/returns', label: 'Return Battery', permission: 'returns' },
+  {
+    to: '/truck-intakes',
+    label: 'Intake Battery Shipment',
+    desc: 'Receive & scan incoming batches',
+    icon: FiTruck,
+    permission: 'truck_intakes',
+    badge: 'Logistics',
+  },
+  {
+    to: '/repairs',
+    label: 'Log Workshop Repair',
+    desc: 'Record diagnostic & replacement',
+    icon: FiTool,
+    permission: 'repairs',
+    badge: 'Workshop',
+  },
+  {
+    to: '/parts',
+    label: 'Parts & Stock Inventory',
+    desc: 'Manage quantities & restock',
+    icon: FiPackage,
+    permission: 'parts',
+    badge: 'Inventory',
+  },
+  {
+    to: '/returns',
+    label: 'Dispatch Return Delivery',
+    desc: 'Manifest verified serviced packs',
+    icon: FiCheckCircle,
+    permission: 'returns',
+    badge: 'Dispatch',
+  },
+  {
+    to: '/certificates',
+    label: 'Milestones & Impact Hub',
+    desc: 'Track ESG decarbonization awards',
+    icon: FiAward,
+    permission: null,
+    badge: 'ESG',
+  },
+  {
+    to: '/notifications',
+    label: 'Operations Alerts Feed',
+    desc: 'Live stock & support notices',
+    icon: FiActivity,
+    permission: null,
+    badge: 'Live',
+  },
 ];
 
 const DEFAULT_START_HOUR = 8;
 const DEFAULT_END_HOUR = 18;
 
-// Converts to a YYYY-MM-DD string in the browser's local timezone, so the
-// day picked in the mini calendar matches what the backend scopes
-// "Today's Repairs" to — toISOString() alone would shift the date near
-// midnight in non-UTC zones.
 function toLocalDateValue(date) {
   const offset = date.getTimezoneOffset();
   return new Date(date.getTime() - offset * 60000).toISOString().slice(0, 10);
 }
 
-// Defaults to typical business hours, but widens to cover any hour that
-// actually has repairs logged — real activity outside 8am-6pm should never
-// be silently dropped from the chart.
 function buildHourlyRange(hourlyData) {
   const countsByHour = Object.fromEntries(hourlyData.map((d) => [d.hour, d.count]));
   const activeHours = hourlyData.map((d) => d.hour);
@@ -45,44 +103,47 @@ function buildHourlyRange(hourlyData) {
   return hours;
 }
 
-// Ranked horizontal bars for "average time spent" breakdowns — the longer
-// the bar (relative to the slowest entry in this list), the longer that
-// service/technician takes on average. Slowest-first, so #1 is the one
-// worth an admin's attention.
 function DurationList({ items, getLabel, getTo }) {
   const max = Math.max(1, ...items.map((i) => i.avgDurationSeconds || 0));
-  const itemClasses =
-    'flex items-center gap-3 rounded-lg px-2 py-2.5 transition-colors hover:bg-slate-50 dark:hover:bg-surface-800';
 
   return (
-    <ul className="flex flex-col gap-1">
+    <ul className="flex flex-col gap-2">
       {items.map((item, i) => {
         const to = getTo?.(item);
         const Wrapper = to ? Link : 'li';
+        const percent = Math.max(8, Math.min(100, (item.avgDurationSeconds / max) * 100));
+
         return (
-          <Wrapper key={getLabel(item)} {...(to ? { to } : {})} className={itemClasses}>
-            <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[11px] font-semibold text-slate-500 dark:bg-surface-700 dark:text-neutral-400">
+          <Wrapper
+            key={getLabel(item)}
+            {...(to ? { to } : {})}
+            className="group flex items-center gap-3.5 rounded-xl border border-slate-100 bg-slate-50/50 p-3 transition-all hover:border-slate-200 hover:bg-white hover:shadow-2xs dark:border-white/5 dark:bg-surface-850/50 dark:hover:border-white/10 dark:hover:bg-surface-800"
+          >
+            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-slate-200/70 text-xs font-black text-slate-700 dark:bg-surface-700 dark:text-slate-300">
               {i + 1}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="mb-1 flex items-center justify-between gap-2 text-xs">
-                <span className="truncate font-medium text-slate-700 dark:text-neutral-200">
+              <div className="mb-1.5 flex items-center justify-between gap-2 text-xs">
+                <span className="truncate font-bold text-slate-800 group-hover:text-blue-600 dark:text-neutral-200 dark:group-hover:text-blue-400">
                   {getLabel(item)}
                 </span>
-                <span className="shrink-0 font-semibold text-blue-700 dark:text-blue-400">
+                <span className="shrink-0 font-mono font-bold text-blue-700 dark:text-blue-300">
                   {formatDuration(item.avgDurationSeconds)}
                 </span>
               </div>
-              <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-800">
+              <div className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-surface-700">
                 <div
-                  className="h-full rounded-full bg-brand-500 dark:bg-emerald-500"
-                  style={{ width: `${Math.max(4, (item.avgDurationSeconds / max) * 100)}%` }}
+                  className="h-full rounded-full bg-linear-to-r from-blue-500 to-indigo-600 transition-all duration-500"
+                  style={{ width: `${percent}%` }}
                 />
               </div>
-              <p className="mt-1 text-[11px] text-slate-400 dark:text-neutral-500">
-                {item.repairCount} repair{item.repairCount === 1 ? '' : 's'}
+              <p className="mt-1 text-[11px] font-medium text-slate-400 dark:text-neutral-400">
+                {item.repairCount} service cycle{item.repairCount === 1 ? '' : 's'} logged
               </p>
             </div>
+            {to && (
+              <FiChevronRight className="h-4 w-4 text-slate-300 transition-transform group-hover:translate-x-0.5 group-hover:text-slate-600 dark:text-neutral-600 dark:group-hover:text-slate-300" />
+            )}
           </Wrapper>
         );
       })}
@@ -91,7 +152,7 @@ function DurationList({ items, getLabel, getTo }) {
 }
 
 function initials(name) {
-  return (name || '')
+  return (name || 'U')
     .split(' ')
     .filter(Boolean)
     .map((part) => part[0])
@@ -100,236 +161,500 @@ function initials(name) {
     .toUpperCase();
 }
 
+function getTimeGreeting() {
+  const hour = new Date().getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 function DashboardPage() {
   const user = useSelector((state) => state.auth.user);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const isToday = toLocalDateValue(selectedDate) === toLocalDateValue(new Date());
-  const { data, loading, error } = useFetchList(
+
+  const { data, loading, error, refetch } = useFetchList(
     `/dashboard/summary?date=${toLocalDateValue(selectedDate)}`
   );
 
-  // Only the very first load (data still the useFetchList default `[]`)
-  // shows the full-page loader — a date click keeps the page mounted and
-  // just re-fetches in the background, so picking a day doesn't blink the
-  // whole dashboard (including the calendar itself) back to a blank state.
-  if (loading && Array.isArray(data)) return <TableState>Loading dashboard…</TableState>;
-  if (error) return <TableState tone="error">{error}</TableState>;
+  if (loading && Array.isArray(data)) {
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3">
+        <div className="h-10 w-10 animate-spin rounded-full border-3 border-blue-500 border-t-transparent" />
+        <p className="text-xs font-bold text-slate-500 dark:text-neutral-400">
+          Loading Executive Dashboard…
+        </p>
+      </div>
+    );
+  }
 
-  const { totals, changes, trends, todaysRepairs, hourlyRepairsToday, serviceTimes, recentClientReturns = [] } = data;
+  if (error) {
+    return (
+      <div className="rounded-3xl border border-red-200 bg-red-50/50 p-8 text-center dark:border-red-900/40 dark:bg-red-950/20">
+        <p className="text-sm font-bold text-red-600 dark:text-red-400">{error}</p>
+        <button
+          type="button"
+          onClick={refetch}
+          className="mt-4 rounded-xl bg-red-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700"
+        >
+          Retry Loading
+        </button>
+      </div>
+    );
+  }
+
+  const {
+    totals = {},
+    changes = {},
+    trends = {},
+    todaysRepairs = [],
+    hourlyRepairsToday = [],
+    serviceTimes = {},
+    recentClientReturns = [],
+  } = data || {};
+
   const hourlyData = buildHourlyRange(hourlyRepairsToday || []);
   const hasActivityToday = hourlyData.some((h) => h.count > 0);
-  const selectedDateLabel = selectedDate.toLocaleDateString([], { day: 'numeric', month: 'short' });
+  const selectedDateLabel = selectedDate.toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' });
 
   return (
-    <div>
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold tracking-tight text-slate-900 dark:text-neutral-100">
-          Welcome back{user?.name ? `, ${user.name}` : ''}!
-        </h1>
-        <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">Here's what's happening with repairs today</p>
-      </div>
+    <div className="space-y-6 pb-12">
+      {/* ── Page Header ─────────────────────────────────────────────── */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+            Welcome back{user?.name ? `, ${user.name}` : ''}!
+          </h1>
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+            Real-time battery refurbishment overview, workshop throughput analytics & return dispatches
+          </p>
+        </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/batteries" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-          <StatCard
-            label="Total Batteries"
-            value={totals.totalBatteries}
-            delta={changes.totalBatteries}
-            trend={trends.totalBatteries}
-            tone="info"
-          />
-        </Link>
-        <Link to="/batteries?status=in_repair" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-          <StatCard
-            label="Pending Repair"
-            value={totals.pendingRepair}
-            trend={trends.pendingRepair}
-            tone="warning"
-            deltaGoodDirection="down"
-          />
-        </Link>
-        <Link to="/batteries?status=repaired" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-          <StatCard
-            label="Repaired"
-            value={totals.repaired}
-            delta={changes.repaired}
-            trend={trends.repaired}
-            tone="good"
-          />
-        </Link>
-        {hasPermission(user, 'parts') ? (
-          <Link to="/parts?lowStock=true" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-            <StatCard
-              label="Low Stock Parts"
-              value={totals.lowStockParts}
-              tone="critical"
-              deltaGoodDirection="down"
-            />
+        <div className="flex flex-wrap items-center gap-2.5">
+          {!isToday && (
+            <button
+              type="button"
+              onClick={() => setSelectedDate(new Date())}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 dark:hover:bg-white/5 transition-all"
+            >
+              <FiCalendar className="h-3.5 w-3.5 text-blue-500" />
+              <span>Reset to Today</span>
+            </button>
+          )}
+
+          <Link
+            to="/notifications"
+            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-black text-white shadow-xs hover:bg-blue-700 transition-all"
+          >
+            <FiActivity className="h-3.5 w-3.5" />
+            <span>Operations Feed</span>
+            {totals?.lowStockParts > 0 && (
+              <span className="flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
+                {totals.lowStockParts}
+              </span>
+            )}
           </Link>
-        ) : (
-          <StatCard
-            label="Low Stock Parts"
-            value={totals.lowStockParts}
-            tone="critical"
-            deltaGoodDirection="down"
-          />
-        )}
+        </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Link to="/batteries/unserviceable" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-          <StatCard label="Unserviceable" value={totals.unserviceable} tone="critical" />
-        </Link>
-        {hasPermission(user, 'recycle') && (
-          <Link to="/recycle" className="block h-full rounded-xl transition-shadow hover:shadow-md">
-            <StatCard label="Recycled" value={totals.recycled} tone="good" />
-          </Link>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-        <div
-          className={`rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm transition-opacity duration-150 dark:border-surface-700 dark:bg-surface-900 lg:col-span-2 ${
-            loading ? 'opacity-50' : 'opacity-100'
-          }`}
+      {/* ── 6 Primary Operational KPI Metrics ─────────────────────────── */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+        {/* 1. Total Fleet Batteries */}
+        <Link
+          to="/batteries"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
         >
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-surface-800">
-            <h2 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-              {isToday ? "Today's Repairs" : `Repairs — ${selectedDateLabel}`}
-            </h2>
-            <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-300">
-              {todaysRepairs.length} repair{todaysRepairs.length === 1 ? '' : 's'}
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+              Total Batteries
+            </span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+              <FiBatteryCharging className="h-4 w-4" />
             </span>
           </div>
+          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+            {Number(totals?.totalBatteries || 0).toLocaleString()}
+          </div>
+          {typeof changes?.totalBatteries === 'number' && (
+            <div className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              <FiTrendingUp className="h-3 w-3" />
+              <span>{changes.totalBatteries > 0 ? `+${changes.totalBatteries}%` : `${changes.totalBatteries}%`}</span>
+              <span className="font-normal text-slate-400">vs mo.</span>
+            </div>
+          )}
+          {trends?.totalBatteries && (
+            <div className="mt-2 pt-1 border-t border-slate-100 dark:border-white/5">
+              <Sparkline values={trends.totalBatteries} color="#2563eb" />
+            </div>
+          )}
+        </Link>
 
-          {todaysRepairs.length === 0 ? (
-            <p className="py-6 text-center text-sm text-slate-400 dark:text-neutral-500">
-              {isToday ? 'No repairs logged yet today.' : `No repairs logged on ${selectedDateLabel}.`}
-            </p>
-          ) : (
-            <div className="mb-8 max-h-[27rem] overflow-y-auto pr-1">
-              <ul className="flex flex-col gap-2">
+        {/* 2. Pending Repair Backlog */}
+        <Link
+          to="/batteries?status=in_repair"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-200/80 bg-linear-to-b from-amber-50/40 to-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/40 dark:from-amber-950/20 dark:to-surface-900"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+              In Workshop
+            </span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+              <FiTool className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-black text-amber-950 dark:text-amber-100">
+            {Number(totals?.pendingRepair || 0).toLocaleString()}
+          </div>
+          <div className="mt-1 text-[11px] font-medium text-amber-700/80 dark:text-amber-300/80">
+            Active service queue
+          </div>
+          {trends?.pendingRepair && (
+            <div className="mt-2 pt-1 border-t border-amber-100 dark:border-white/5">
+              <Sparkline values={trends.pendingRepair} color="#d97706" />
+            </div>
+          )}
+        </Link>
+
+        {/* 3. Successfully Repaired */}
+        <Link
+          to="/batteries?status=repaired"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-emerald-200/80 bg-linear-to-b from-emerald-50/40 to-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-900"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              Repaired & Ready
+            </span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
+              <FiCheckCircle className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-black text-emerald-950 dark:text-emerald-100">
+            {Number(totals?.repaired || 0).toLocaleString()}
+          </div>
+          {typeof changes?.repaired === 'number' && (
+            <div className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+              <FiTrendingUp className="h-3 w-3" />
+              <span>{changes.repaired > 0 ? `+${changes.repaired}%` : `${changes.repaired}%`}</span>
+              <span className="font-normal text-slate-400">throughput</span>
+            </div>
+          )}
+          {trends?.repaired && (
+            <div className="mt-2 pt-1 border-t border-emerald-100 dark:border-white/5">
+              <Sparkline values={trends.repaired} color="#059669" />
+            </div>
+          )}
+        </Link>
+
+        {/* 4. Critical Stock Watch */}
+        <Link
+          to="/parts?lowStock=true"
+          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+            totals?.lowStockParts > 0
+              ? 'border-rose-300 bg-linear-to-b from-rose-50/50 to-white dark:border-rose-900/50 dark:from-rose-950/20 dark:to-surface-900'
+              : 'border-slate-200/90 bg-white dark:border-white/10 dark:bg-surface-900'
+          }`}
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+              Low Stock Parts
+            </span>
+            <span
+              className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+                totals?.lowStockParts > 0
+                  ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300 animate-pulse'
+                  : 'bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300'
+              }`}
+            >
+              <FiPackage className="h-4 w-4" />
+            </span>
+          </div>
+          <div
+            className={`mt-2 text-2xl font-black ${
+              totals?.lowStockParts > 0 ? 'text-rose-750 dark:text-rose-300' : 'text-slate-900 dark:text-white'
+            }`}
+          >
+            {Number(totals?.lowStockParts || 0).toLocaleString()}
+          </div>
+          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+            {totals?.lowStockParts > 0 ? '⚠️ Replenishment needed' : '✓ Stock levels healthy'}
+          </div>
+        </Link>
+
+        {/* 5. Unserviceable Batteries */}
+        <Link
+          to="/batteries/unserviceable"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+              Unserviceable
+            </span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400">
+              <FiAlertTriangle className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+            {Number(totals?.unserviceable || 0).toLocaleString()}
+          </div>
+          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+            Awaiting scrap batch
+          </div>
+        </Link>
+
+        {/* 6. Recycled Batteries */}
+        <Link
+          to="/recycle"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+        >
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+              Recycled & Saved
+            </span>
+            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
+              <FiShield className="h-4 w-4" />
+            </span>
+          </div>
+          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+            {Number(totals?.recycled || 0).toLocaleString()}
+          </div>
+          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+            Diverted to recycling
+          </div>
+        </Link>
+      </div>
+
+      {/* ── Main Operations Grid: Repairs Activity & Calendar/Actions ── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+        {/* Left 2 Cols: Activity Feed for Selected Date + Hourly Velocity */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Repairs Stream Container */}
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 dark:border-white/5">
+              <div className="flex items-center gap-2.5">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                  <FiTool className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-black text-slate-900 dark:text-white sm:text-base">
+                    {isToday ? "Today's Logged Repairs" : `Repairs Log — ${selectedDateLabel}`}
+                  </h2>
+                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                    Workshop technician diagnostic & repair execution stream
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-slate-300">
+                  {todaysRepairs.length} logged unit{todaysRepairs.length === 1 ? '' : 's'}
+                </span>
+                <Link
+                  to="/repairs"
+                  className="rounded-xl bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50"
+                >
+                  All Repairs →
+                </Link>
+              </div>
+            </div>
+
+            {todaysRepairs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-50 text-slate-400 dark:bg-surface-800 dark:text-neutral-500">
+                  <FiClock className="h-6 w-6" />
+                </div>
+                <h3 className="mt-3 text-xs font-bold text-slate-700 dark:text-neutral-300">
+                  {isToday ? 'No repairs logged yet today.' : `No repairs found on ${selectedDateLabel}.`}
+                </h3>
+                <p className="mt-1 text-[11px] text-slate-400 dark:text-neutral-500">
+                  Select a different date on the mini calendar to inspect previous activity logs.
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 max-h-[26rem] overflow-y-auto pr-1 no-scrollbar space-y-2">
                 {todaysRepairs.map((r) => (
                   <Link
                     key={r.id}
-                    to={`/batteries/${r.batteryCode}`}
-                    className="flex items-center gap-4 rounded-lg px-3 py-3 transition-colors hover:bg-slate-50 dark:hover:bg-surface-800"
+                    to={`/batteries/${encodeURIComponent(r.batteryCode)}`}
+                    className="group flex items-center justify-between gap-3.5 rounded-2xl border border-slate-100 bg-slate-50/40 p-3 transition-all hover:border-slate-200 hover:bg-white hover:shadow-2xs dark:border-white/5 dark:bg-surface-850/40 dark:hover:border-white/10 dark:hover:bg-surface-800"
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-blue-100 text-xs font-semibold text-blue-700 dark:bg-blue-500/15 dark:text-blue-300">
-                      {initials(r.staffName)}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-slate-800 dark:text-neutral-100">{r.staffName}</p>
-                      <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-neutral-400">
-                        {r.partName} <span className="mx-1 text-slate-300 dark:text-neutral-600">·</span>{' '}
-                        <span className="font-mono text-slate-400 dark:text-neutral-500">{r.batteryCode}</span>
-                      </p>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-xs font-black text-white shadow-2xs">
+                        {initials(r.staffName)}
+                      </span>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="truncate text-xs font-black text-slate-900 dark:text-white">
+                            {r.staffName}
+                          </p>
+                          <span className="rounded-md bg-blue-100 px-1.5 py-0.2 font-mono text-[10px] font-bold text-blue-800 dark:bg-blue-950/80 dark:text-blue-300">
+                            {r.batteryCode}
+                          </span>
+                        </div>
+                        <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                          Serviced: <span className="font-semibold text-slate-700 dark:text-slate-300">{r.partName}</span>
+                        </p>
+                      </div>
                     </div>
-                    <span className="shrink-0 rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
-                      {new Date(r.repairedAt).toLocaleTimeString([], {
-                        hour: '2-digit',
-                        minute: '2-digit',
-                      })}
-                    </span>
+
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-mono font-bold text-slate-600 dark:bg-surface-700 dark:text-slate-300">
+                        {new Date(r.repairedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </span>
+                      <FiArrowRight className="h-3.5 w-3.5 text-slate-300 group-hover:text-blue-600 group-hover:translate-x-0.5 transition-all dark:text-neutral-600 dark:group-hover:text-blue-400" />
+                    </div>
                   </Link>
                 ))}
-              </ul>
-            </div>
-          )}
+              </div>
+            )}
 
-          <h3 className="mb-3 border-t border-slate-100 pt-4 text-xs font-medium text-slate-500 dark:border-blue-800/40 dark:text-neutral-400">
-            {isToday ? 'Day Overview' : `Day Overview — ${selectedDateLabel}`}
-          </h3>
-          {hasActivityToday ? (
-            <BarChart data={hourlyData} />
-          ) : (
-            <p className="py-6 text-center text-sm text-slate-400 dark:text-neutral-500">
-              {isToday ? 'No repair activity yet today.' : `No repair activity on ${selectedDateLabel}.`}
-            </p>
-          )}
+            {/* Hourly Throughput Bar Chart */}
+            <div className="mt-6 border-t border-slate-100 pt-5 dark:border-white/5">
+              <div className="mb-3 flex items-center justify-between">
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+                  {isToday ? 'Hourly Workshop Velocity (Today)' : `Hourly Breakdown (${selectedDateLabel})`}
+                </span>
+                <span className="text-[10px] font-medium text-slate-400">
+                  Peak hours throughput analysis
+                </span>
+              </div>
+              {hasActivityToday ? (
+                <BarChart data={hourlyData} color="#3b82f6" activeColor="#1d4ed8" height={150} />
+              ) : (
+                <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
+                  No hourly repairs distribution recorded for this date.
+                </p>
+              )}
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-surface-700 dark:bg-surface-900">
+        {/* Right 1 Col: Mini Calendar & Quick Launcher */}
+        <div className="space-y-6">
+          {/* Mini Calendar Card */}
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/5">
+              <div className="flex items-center gap-2">
+                <FiCalendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span className="text-xs font-bold text-slate-900 dark:text-white">
+                  Filter Date Scoped Data
+                </span>
+              </div>
+              <span className="rounded-md bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                {selectedDateLabel}
+              </span>
+            </div>
             <MiniCalendar selectedDate={selectedDate} onSelectDate={setSelectedDate} />
           </div>
 
-          <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-surface-700 dark:bg-surface-900">
-            <h2 className="mb-3 text-sm font-semibold text-slate-800 dark:text-neutral-100">Quick Actions</h2>
-            <ul className="flex flex-col gap-2 text-sm">
-              {QUICK_ACTIONS.filter((action) => hasPermission(user, action.permission)).map(
-                (action) => (
-                  <li key={action.to}>
-                    <Link to={action.to} className="text-brand-700 hover:underline dark:text-emerald-400">
-                      {action.label}
-                    </Link>
-                  </li>
-                )
-              )}
-            </ul>
+          {/* Quick Action Commands */}
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-white/5">
+              <div className="flex items-center gap-2">
+                <FiZap className="h-4 w-4 text-amber-500" />
+                <span className="text-xs font-black uppercase tracking-wider text-slate-900 dark:text-white">
+                  Quick Command Launcher
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {QUICK_ACTIONS.filter(
+                (action) => !action.permission || hasPermission(user, action.permission)
+              ).map((action) => {
+                const ActionIcon = action.icon;
+                return (
+                  <Link
+                    key={action.to}
+                    to={action.to}
+                    className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-2.5 transition-all hover:border-slate-200 hover:bg-white hover:shadow-2xs dark:border-white/5 dark:bg-surface-850/50 dark:hover:border-white/10 dark:hover:bg-surface-800"
+                  >
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-2xs group-hover:bg-blue-600 group-hover:text-white transition-all dark:bg-surface-700 dark:text-slate-200">
+                        <ActionIcon className="h-4 w-4" />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate text-xs font-bold text-slate-800 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+                          {action.label}
+                        </p>
+                        <p className="truncate text-[10px] text-slate-400 dark:text-neutral-400">
+                          {action.desc}
+                        </p>
+                      </div>
+                    </div>
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-600 dark:bg-surface-700 dark:text-slate-300">
+                      {action.badge}
+                    </span>
+                  </Link>
+                );
+              })}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* ── Recent Client Battery Returns & Receipts Notification Feed ─────── */}
-      <div className="mt-6 rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-        <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-surface-800">
+      {/* ── Client Returns & Logistics Stream ────────────────────────── */}
+      <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-teal-100 text-teal-700 dark:bg-teal-500/20 dark:text-teal-300">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4.5 w-4.5">
-                <path d="M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h12V6.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM13.5 15h-12v2.625c0 1.035.84 1.875 1.875 1.875h.375a3 3 0 1 1 6 0h3a.75.75 0 0 0 .75-.75V15Z" />
-                <path d="M8.25 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0ZM15.75 6.75a.75.75 0 0 0-.75.75v11.25c0 .087.015.17.042.248a3 3 0 0 1 5.958.464c.853-.175 1.522-.935 1.464-1.883a18.659 18.659 0 0 0-3.732-10.104 1.837 1.837 0 0 0-1.47-.725H15.75Z" />
-                <path d="M19.5 19.5a1.5 1.5 0 1 0-3 0 1.5 1.5 0 0 0 3 0Z" />
-              </svg>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
+              <FiTruck className="h-5 w-5" />
             </span>
             <div>
-              <h2 className="text-sm font-bold text-slate-800 dark:text-white">
-                Client Battery Receipts & Returns
+              <h2 className="text-sm font-black text-slate-900 dark:text-white sm:text-base">
+                Client Battery Returns & Receipt Dispatches
               </h2>
-              <p className="text-[11px] text-slate-500 dark:text-neutral-400">
-                Live alerts for repaired batteries dispatched to and received by client fleets
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Live dispatches of repaired packs returned to customer fleets
               </p>
             </div>
           </div>
           {hasPermission(user, 'returns') && (
             <Link
               to="/returns"
-              className="text-xs font-bold text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400"
+              className="inline-flex items-center gap-1 rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-all"
             >
-              View All Returns →
+              <span>Manage All Returns</span>
+              <FiArrowRight className="h-3.5 w-3.5" />
             </Link>
           )}
         </div>
 
         {recentClientReturns.length === 0 ? (
-          <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
-            No client returns recorded yet.
+          <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+            No recent client return dispatches recorded.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
             {recentClientReturns.map((ret) => (
               <Link
                 key={ret.id}
                 to={`/returns/${ret.id}`}
-                className="flex flex-col justify-between gap-2.5 rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-2xs transition-all hover:scale-[1.01] hover:shadow-xs dark:border-white/10 dark:bg-surface-850"
+                className="group flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:shadow-xs hover:border-teal-300 dark:border-white/10 dark:bg-surface-850 dark:hover:border-teal-700/60"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
-                      ✓ Client Received
+                    <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
+                      ✓ Dispatched
                     </span>
-                    <h3 className="mt-1.5 truncate text-xs font-bold text-slate-900 dark:text-white">
+                    <h3 className="mt-2 truncate text-xs font-black text-slate-900 group-hover:text-teal-600 dark:text-white dark:group-hover:text-teal-400">
                       {ret.clientName}
                     </h3>
                   </div>
-                  <span className="shrink-0 rounded-lg bg-slate-100 px-2 py-1 font-mono text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-neutral-200">
-                    {ret.batteryCount} {ret.batteryCount === 1 ? 'battery' : 'batteries'}
+                  <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-800 dark:bg-surface-700 dark:text-slate-200">
+                    {ret.batteryCount} {ret.batteryCount === 1 ? 'pack' : 'packs'}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-[10px] text-slate-400 dark:border-white/5 dark:text-neutral-500">
-                  <span className="truncate">Truck {ret.truckNumber || 'N/A'} {ret.driverName ? `• ${ret.driverName}` : ''}</span>
-                  <span className="shrink-0">{new Date(ret.returnedAt).toLocaleDateString([], { day: '2-digit', month: 'short' })}</span>
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px] text-slate-400 dark:border-white/5 dark:text-neutral-500">
+                  <span className="truncate font-medium">
+                    Truck {ret.truckNumber || 'N/A'} {ret.driverName ? `• ${ret.driverName}` : ''}
+                  </span>
+                  <span className="shrink-0 font-bold">
+                    {new Date(ret.returnedAt).toLocaleDateString([], { day: '2-digit', month: 'short' })}
+                  </span>
                 </div>
               </Link>
             ))}
@@ -337,28 +662,28 @@ function DashboardPage() {
         )}
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-surface-800">
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-neutral-100">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-blue-500">
-                <path
-                  fillRule="evenodd"
-                  d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm.75-13a.75.75 0 0 0-1.5 0v5c0 .2.08.39.22.53l3.5 3.5a.75.75 0 1 0 1.06-1.06l-3.28-3.28V5Z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Average Time by Service
-            </h2>
+      {/* ── Workshop Performance Matrix: Average Times ──────────────── */}
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Average Time by Service / Part */}
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                <FiClock className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                Average Duration by Service / Part
+              </h2>
+            </div>
             {serviceTimes?.byPart?.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-300">
-                {serviceTimes.byPart.length} service{serviceTimes.byPart.length === 1 ? '' : 's'}
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
+                {serviceTimes.byPart.length} monitored
               </span>
             )}
           </div>
           {!serviceTimes?.byPart?.length ? (
-            <p className="py-6 text-center text-sm text-slate-400 dark:text-neutral-500">
-              Not enough completed repairs yet to show this.
+            <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+              Not enough completed service sessions recorded to benchmark times.
             </p>
           ) : (
             <DurationList
@@ -369,23 +694,26 @@ function DashboardPage() {
           )}
         </div>
 
-        <div className="rounded-xl border border-blue-200 bg-blue-50 p-5 shadow-sm dark:border-surface-700 dark:bg-surface-900">
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-4 dark:border-surface-800">
-            <h2 className="flex items-center gap-1.5 text-sm font-semibold text-slate-800 dark:text-neutral-100">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-blue-500">
-                <path d="M10 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6Zm-7 9a7 7 0 1 1 14 0 1 1 0 0 1-1 1H4a1 1 0 0 1-1-1Z" />
-              </svg>
-              Average Time by Technician
-            </h2>
+        {/* Average Time by Technician */}
+        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+                <FiUser className="h-4 w-4" />
+              </span>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                Average Duration by Technician
+              </h2>
+            </div>
             {serviceTimes?.byStaff?.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-300">
-                {serviceTimes.byStaff.length} technician{serviceTimes.byStaff.length === 1 ? '' : 's'}
+              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
+                {serviceTimes.byStaff.length} technicians
               </span>
             )}
           </div>
           {!serviceTimes?.byStaff?.length ? (
-            <p className="py-6 text-center text-sm text-slate-400 dark:text-neutral-500">
-              Not enough completed repairs yet to show this.
+            <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+              Not enough completed technician sessions recorded to benchmark times.
             </p>
           ) : (
             <DurationList

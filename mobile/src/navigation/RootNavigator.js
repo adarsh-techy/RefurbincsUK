@@ -1,15 +1,15 @@
 import { ActivityIndicator, Text, View } from 'react-native';
-import { NavigationContainer, DarkTheme } from '@react-navigation/native';
+import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { useSelector } from 'react-redux';
-import LoginScreen from '../screens/LoginScreen';
-import SetPasswordScreen from '../screens/SetPasswordScreen';
-import BatteryDetailScreen from '../screens/BatteryDetailScreen';
-import ClientSortingScreen from '../screens/ClientSortingScreen';
-import ClientInvoicesScreen from '../screens/ClientInvoicesScreen';
-import ClientTransactionsScreen from '../screens/ClientTransactionsScreen';
-import ClientNotificationsScreen from '../screens/ClientNotificationsScreen';
-import ClientSupportScreen from '../screens/ClientSupportScreen';
+import LoginScreen from '../screens/auth/LoginScreen';
+import SetPasswordScreen from '../screens/auth/SetPasswordScreen';
+import BatteryDetailScreen from '../screens/shared/BatteryDetailScreen';
+import ClientSortingScreen from '../screens/client/ClientSortingScreen';
+import ClientInvoicesScreen from '../screens/client/ClientInvoicesScreen';
+import ClientTransactionsScreen from '../screens/client/ClientTransactionsScreen';
+import ClientNotificationsScreen from '../screens/client/ClientNotificationsScreen';
+import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import MainTabs from './MainTabs';
 import { navigationRef } from './navigationRef';
 
@@ -17,18 +17,19 @@ const Stack = createNativeStackNavigator();
 
 const clientScreenOptions = {
   headerShown: true,
-  headerStyle: { backgroundColor: '#040509' },
-  headerTintColor: '#e5e5e5',
-  headerTitleStyle: { color: '#fff' },
+  headerStyle: { backgroundColor: '#000000' },
+  headerTintColor: '#ffffff',
+  headerTitleStyle: { color: '#ffffff', fontWeight: 'bold' },
+  headerShadowVisible: false,
 };
 
 const navTheme = {
-  ...DarkTheme,
+  ...DefaultTheme,
   colors: {
-    ...DarkTheme.colors,
+    ...DefaultTheme.colors,
     background: '#f8fafc',
-    card: '#040509',
-    border: 'rgba(30, 64, 175, 0.4)',
+    card: '#000000',
+    border: 'rgba(255, 255, 255, 0.1)',
     primary: '#2563eb',
     text: '#0f172a',
   },
@@ -63,7 +64,7 @@ export default function RootNavigator() {
             <Stack.Screen
               name="BatteryDetail"
               component={BatteryDetailScreen}
-              options={{ headerShown: true, headerStyle: { backgroundColor: '#040509' }, headerTintColor: '#e5e5e5', title: '' }}
+              options={{ headerShown: true, headerStyle: { backgroundColor: '#000000' }, headerTintColor: '#ffffff', headerTitleStyle: { color: '#ffffff', fontWeight: 'bold' }, headerShadowVisible: false, title: 'Battery Details' }}
             />
             <Stack.Screen
               name="BatterySorting"

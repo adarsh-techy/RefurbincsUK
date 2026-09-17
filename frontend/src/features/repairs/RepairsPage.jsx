@@ -2,15 +2,15 @@ import { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import useInfiniteList from '../../utils/use-infinite-list';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import InfiniteScrollTrigger from '../../components/ui/InfiniteScrollTrigger';
-import PageHeader from '../../components/ui/PageHeader';
-import Modal from '../../components/ui/Modal';
-import ConfirmModal from '../../components/ui/ConfirmModal';
-import RowActions from '../../components/ui/RowActions';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import InfiniteScrollTrigger from '../../components/ui/table/InfiniteScrollTrigger';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import Modal from '../../components/ui/overlays/Modal';
+import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
-import { StatusBadge } from '../../components/ui/Badge';
+import { StatusBadge } from '../../components/ui/primitives/Badge';
 import RepairEditForm from './RepairEditForm';
 
 const PAGE_SIZE = 15;
@@ -144,9 +144,9 @@ function RepairsPage() {
         />
       )}
 
-      <div className="mb-16 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-3 shadow-sm dark:border-blue-800/40">
+      <div className="mb-4 sm:mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-3 shadow-xs dark:border-blue-800/40">
         <div className="min-w-[16rem] flex-1 sm:flex-none">
-          <label htmlFor="repair-search" className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200">
+          <label htmlFor="repair-search" className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-neutral-200 uppercase tracking-wider">
             Search battery / staff / part
           </label>
           <input
@@ -155,12 +155,12 @@ function RepairsPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="e.g. BAT-12-001, John, or Fuse"
-            className="w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30 sm:w-72"
+            className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 sm:w-64"
           />
         </div>
 
-        <div className="flex items-center gap-2 ml-10">
-          <label htmlFor="repair-date-filter" className="text-sm font-medium text-slate-600 dark:text-neutral-300">
+        <div className="flex items-center gap-2">
+          <label htmlFor="repair-date-filter" className="text-xs font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-wider">
             Repair date
           </label>
           <input
@@ -168,17 +168,8 @@ function RepairsPage() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-md border border-blue-200 bg-blue-50/60 px-3 py-1.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:focus:border-blue-400 dark:focus:ring-blue-400/30 [&::-webkit-calendar-picker-indicator]:[filter:invert(70%)_sepia(90%)_saturate(600%)_hue-rotate(360deg)_brightness(100%)]"
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200"
           />
-          {date && (
-            <button
-              type="button"
-              onClick={() => setDate('')}
-              className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
-            >
-              Clear
-            </button>
-          )}
         </div>
 
         {(search || date) && (
@@ -188,7 +179,7 @@ function RepairsPage() {
               setSearch('');
               setDate('');
             }}
-            className="text-sm font-medium text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+            className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 cursor-pointer transition-colors"
           >
             Clear all
           </button>
@@ -202,16 +193,18 @@ function RepairsPage() {
         <TableState>Loading…</TableState>
       ) : (
         !error && (
-          <>
+          <div className="overflow-hidden rounded-xl border border-slate-200 dark:border-surface-700">
             <DataTable
               columns={columns}
               rows={items}
               emptyMessage="No repairs match these filters."
               showRowNumber
               headerColor="blue"
+              maxHeight="calc(100vh - 320px)"
+              onScrollBottom={hasMore && !loading ? loadMore : null}
             />
             <InfiniteScrollTrigger hasMore={hasMore} loading={loading} onVisible={loadMore} />
-          </>
+          </div>
         )
       )}
     </div>

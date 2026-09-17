@@ -13,6 +13,7 @@ import apiClient from '../services/api-client';
 function useInfiniteList(endpoint, pageSize = 15, params = {}) {
   const [items, setItems] = useState([]);
   const [hasMore, setHasMore] = useState(true);
+  const [total, setTotal] = useState(0);
   // Starts true (not false) so the caller's loading UI covers the first
   // render too — otherwise an IntersectionObserver-based trigger can mount
   // on an empty, pre-fetch page, see itself already on-screen, and fire a
@@ -35,6 +36,9 @@ function useInfiniteList(endpoint, pageSize = 15, params = {}) {
         setItems((prev) => (replace ? data.data : [...prev, ...data.data]));
         offsetRef.current = offset + data.data.length;
         setHasMore(data.hasMore);
+        if (data.total !== undefined) {
+          setTotal(Number(data.total));
+        }
         setError(null);
       } catch (err) {
         setError(err.response?.data?.message || err.message);
@@ -69,7 +73,7 @@ function useInfiniteList(endpoint, pageSize = 15, params = {}) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [endpoint, paramsKey]);
 
-  return { items, loading, hasMore, error, loadMore, refetch };
+  return { items, loading, hasMore, total, error, loadMore, refetch };
 }
 
 export default useInfiniteList;

@@ -1,8 +1,8 @@
 import { useSelector } from 'react-redux';
 import { Navigate } from 'react-router-dom';
 import DashboardPage from '../features/dashboard/DashboardPage';
-import ClientDashboardPage from '../features/clients/ClientDashboardPage';
-import TechnicianHomePage from '../features/batteries/TechnicianHomePage';
+import ClientDashboardPage from '../features/clients/portal/ClientDashboardPage';
+import TechnicianHomePage from '../features/batteries/technician/TechnicianHomePage';
 import RecycleClientDashboardPage from '../features/recycle-client/RecycleClientDashboardPage';
 import { hasClientPermission } from '../utils/permissions';
 

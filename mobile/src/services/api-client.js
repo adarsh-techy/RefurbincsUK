@@ -2,30 +2,28 @@ import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
-function getBaseUrl() {
-  // In Expo Go / a dev client, hostUri is the address the phone actually
-  // used to reach this machine's Metro server moments ago — so it tracks
-  // the dev machine's current LAN IP even after it changes (new Wi-Fi,
-  // DHCP lease renewal, etc.), unlike a hand-edited .env value that goes
-  // stale silently. Prefer it whenever it's available; EXPO_PUBLIC_API_URL
-  // remains the source of truth for production/standalone builds, where
-  // there's no Metro connection to infer an address from.
+const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
+
+export function getBaseUrl() {
   const hostUri =
     Constants.expoConfig?.hostUri ||
     Constants.manifest2?.extra?.expoGo?.debuggerHost ||
     Constants.manifest?.debuggerHost;
 
-  if (hostUri && !hostUri.includes('localhost') && !hostUri.includes('127.0.0.1')) {
-    const ip = hostUri.split(':')[0];
-    if (ip) {
-      return `http://${ip}:5000/api`;
+  // Only infer local IP from hostUri if it is a pure numeric IPv4 address
+  // When running via Expo tunnel (e.g. *.exp.direct), hostUri is a tunnel domain for Metro only,
+  // so we must NOT append :5000 to tunnel domains.
+  if (hostUri) {
+    const host = hostUri.split(':')[0];
+    if (IPV4_REGEX.test(host) && host !== '127.0.0.1' && host !== 'localhost') {
+      return `http://${host}:5000/api`;
     }
   }
 
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
-  if (envUrl) return envUrl;
+  if (envUrl && !envUrl.includes('exp.direct')) return envUrl;
 
-  return 'http://192.168.31.244:5000/api';
+  return 'http://192.0.0.2:5000/api';
 }
 
 const apiClient = axios.create({

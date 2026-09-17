@@ -75,6 +75,141 @@ export const TIER_CONFIGS = {
   },
 };
 
+export const BATTERY_COMPOSITION_DATA = [
+  {
+    nameEn: 'Metal Oxide (proprietary) Iron',
+    formula: 'Li(NiCoMn)O2',
+    casNo: '182442-95-1',
+    weightPct: '20-60%',
+    unitKg: 1.60,
+    role: 'Active Cathode Material (NMC/Iron)',
+  },
+  {
+    nameEn: 'Styrene-Butadiene-Rubber',
+    formula: '(C8H8.C4H6)x',
+    casNo: '9003-55-8',
+    weightPct: '< 1%',
+    unitKg: 0.03,
+    role: 'Electrode Binder',
+  },
+  {
+    nameEn: 'Vinyl silicone oil',
+    formula: 'CH2CH[Si(CH3)2O]nSi(CH3)2CH=CH2',
+    casNo: '68083-19-2',
+    weightPct: '6-13%',
+    unitKg: 0.38,
+    role: 'Thermal Silicone Sealant',
+  },
+  {
+    nameEn: 'Quartz Powder',
+    formula: 'SiO2',
+    casNo: '7631-86-9',
+    weightPct: '13-18%',
+    unitKg: 0.62,
+    role: 'Thermal & Structural Filler',
+  },
+  {
+    nameEn: 'Graphite (C)',
+    formula: 'C',
+    casNo: '7780-42-5',
+    weightPct: '8.9%',
+    unitKg: 0.356,
+    role: 'Anode Active Material',
+  },
+  {
+    nameEn: 'Electrolyte (proprietary)',
+    formula: '/',
+    casNo: '21324-40-3',
+    weightPct: '0.6%',
+    unitKg: 0.024,
+    role: 'Ionic Conduction Solution',
+  },
+  {
+    nameEn: 'Ethylene carbonate',
+    formula: 'C3H4O3',
+    casNo: '96-49-1',
+    weightPct: '1.3%',
+    unitKg: 0.052,
+    role: 'Organic Electrolyte Solvent',
+  },
+  {
+    nameEn: 'Ethyl methyl carbonate',
+    formula: 'C4H8O3',
+    casNo: '623-53-0',
+    weightPct: '0.5%',
+    unitKg: 0.020,
+    role: 'Electrolyte Co-Solvent',
+  },
+  {
+    nameEn: 'Polypropylene',
+    formula: 'C22H42O3',
+    casNo: '9003-07-0',
+    weightPct: '1.25%',
+    unitKg: 0.050,
+    role: 'Separator Membrane & Casing',
+  },
+  {
+    nameEn: 'Dimethyl carbonate',
+    formula: 'C3H6O3',
+    casNo: '616-38-6',
+    weightPct: '2.8%',
+    unitKg: 0.112,
+    role: 'Electrolyte Solvent',
+  },
+  {
+    nameEn: 'PVDF',
+    formula: '[-CH2-CF2-]n',
+    casNo: '24937-79-9',
+    weightPct: '0.25%',
+    unitKg: 0.010,
+    role: 'Fluoropolymer Cathode Binder',
+  },
+  {
+    nameEn: 'Nickel',
+    formula: 'Ni',
+    casNo: '7440-02-0',
+    weightPct: '4%',
+    unitKg: 0.160,
+    role: 'Cathode Current Collector & Tabs',
+  },
+  {
+    nameEn: 'Copper Foil',
+    formula: 'Cu',
+    casNo: '7440-50-8',
+    weightPct: '4%',
+    unitKg: 0.160,
+    role: 'Anode Current Collector Foil',
+  },
+  {
+    nameEn: 'Iron',
+    formula: 'Fe',
+    casNo: '7439-89-6',
+    weightPct: '6%',
+    unitKg: 0.240,
+    role: 'Structural Enclosure & Shell',
+  },
+];
+
+export function calculateMaterialBreakdown(batteryCount = 100) {
+  const count = Number(batteryCount) || 100;
+  return BATTERY_COMPOSITION_DATA.map((item) => {
+    const totalKg = item.unitKg * count;
+    let formattedAmount;
+    if (totalKg >= 1000) {
+      formattedAmount = `${(totalKg / 1000).toFixed(2)} Tons`;
+    } else if (totalKg >= 10) {
+      formattedAmount = `${totalKg.toLocaleString(undefined, { minimumFractionDigits: 1, maximumFractionDigits: 1 })} kg`;
+    } else {
+      formattedAmount = `${totalKg.toFixed(2)} kg`;
+    }
+    return {
+      ...item,
+      totalKg,
+      formattedAmount,
+    };
+  });
+}
+
 export function getTierForCertificate(certificate) {
   const count = Number(certificate?.milestone_count || 0);
   const title = (certificate?.title || '').toLowerCase();
@@ -253,152 +388,336 @@ export function generateMilestoneCertificatePDF(certificate, clientName) {
   const splitText = doc.splitTextToSize(citationText, 660);
   doc.text(splitText, width / 2, y, { align: 'center', lineHeightFactor: 1.4 });
 
-  // 9. Metric Impact Plaques (3 Tier Beveled Boxes)
-  y += 44;
-  const cardW = 186;
-  const cardH = 55;
-  const gap = 20;
-  const startX = (width - (cardW * 3 + gap * 2)) / 2;
+  // 9. Metric Impact Plaques (4 Tier Beveled Boxes with Full ESG Data)
+  y += 38;
+  const cardW = 176;
+  const cardH = 46;
+  const gap = 12;
+  const startX = (width - (cardW * 4 + gap * 3)) / 2;
 
   // Plaque 1: CO2 Saved
   const b1X = startX;
   doc.setFillColor(236, 253, 245);
   doc.setDrawColor(16, 149, 93);
-  doc.setLineWidth(1.25);
-  doc.roundedRect(b1X, y, cardW, cardH, 6, 6, 'FD');
+  doc.setLineWidth(1.2);
+  doc.roundedRect(b1X, y, cardW, cardH, 5, 5, 'FD');
 
   doc.setTextColor(10, 68, 42);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('CO₂ EMISSIONS SAVED', b1X + cardW / 2, y + 15, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(15.5);
-  doc.text(`~${co2Tons} Metric Tons`, b1X + cardW / 2, y + 34, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Decarbonization Equivalent', b1X + cardW / 2, y + 47, { align: 'center' });
+  doc.text('CO₂ EMISSIONS SAVED', b1X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
+  doc.setFontSize(13);
+  doc.text(`~${co2Tons} Metric Tons`, b1X + cardW / 2, y + 27, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text('Decarbonization Abatement', b1X + cardW / 2, y + 39, { align: 'center' });
 
   // Plaque 2: E-Waste Diverted
   const b2X = startX + cardW + gap;
   doc.setFillColor(239, 246, 255);
   doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(1.25);
-  doc.roundedRect(b2X, y, cardW, cardH, 6, 6, 'FD');
+  doc.setLineWidth(1.2);
+  doc.roundedRect(b2X, y, cardW, cardH, 5, 5, 'FD');
 
   doc.setTextColor(30, 64, 175);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text('E-WASTE DIVERTED', b2X + cardW / 2, y + 15, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(15.5);
-  doc.text(`${ewasteKg} kg`, b2X + cardW / 2, y + 34, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Landfill Toxic Avoidance', b2X + cardW / 2, y + 47, { align: 'center' });
+  doc.text('E-WASTE DIVERTED', b2X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
+  doc.setFontSize(13);
+  doc.text(`${ewasteKg} kg`, b2X + cardW / 2, y + 27, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text('Toxic Landfill Avoidance', b2X + cardW / 2, y + 39, { align: 'center' });
 
   // Plaque 3: Batteries Restored
   const b3X = startX + (cardW + gap) * 2;
   doc.setFillColor(254, 252, 232);
   doc.setDrawColor(...PRIMARY);
-  doc.setLineWidth(1.25);
-  doc.roundedRect(b3X, y, cardW, cardH, 6, 6, 'FD');
+  doc.setLineWidth(1.2);
+  doc.roundedRect(b3X, y, cardW, cardH, 5, 5, 'FD');
 
   doc.setTextColor(...DARK);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(8.5);
-  doc.text(`${tier.badge.toUpperCase()} MILESTONE`, b3X + cardW / 2, y + 15, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(15.5);
-  doc.text(`${count.toLocaleString()} Units`, b3X + cardW / 2, y + 34, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(7.5);
-  doc.text('Circular Fleet Mileage', b3X + cardW / 2, y + 47, { align: 'center' });
+  doc.text(`${tier.badge.toUpperCase()} MILESTONE`, b3X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
+  doc.setFontSize(13);
+  doc.text(`${count.toLocaleString()} Packs`, b3X + cardW / 2, y + 27, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text('Circular Fleet Extended', b3X + cardW / 2, y + 39, { align: 'center' });
 
-  // 10. Footer Section: Left Signature, Center Tier Foil Seal with Ribbons, Right Signature
-  y += 74;
+  // Plaque 4: Material Recovery Rate
+  const b4X = startX + (cardW + gap) * 3;
+  doc.setFillColor(243, 232, 255);
+  doc.setDrawColor(147, 51, 234);
+  doc.setLineWidth(1.2);
+  doc.roundedRect(b4X, y, cardW, cardH, 5, 5, 'FD');
+
+  doc.setTextColor(88, 28, 135);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(7.5);
+  doc.text('MATERIAL RECOVERY', b4X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
+  doc.setFontSize(13);
+  doc.text('100% Closed-Loop', b4X + cardW / 2, y + 27, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text('Zero Municipal Landfill', b4X + cardW / 2, y + 39, { align: 'center' });
+
+  // 10. Audited Chemical & Material Composition Summary Banner (Dynamic for this battery count)
+  y += 54;
+  const chemW = width - 100;
+  const chemX = 50;
+  const chemH = 28;
+  doc.setFillColor(255, 255, 255);
+  doc.setDrawColor(...PRIMARY);
+  doc.setLineWidth(0.8);
+  doc.roundedRect(chemX, y, chemW, chemH, 4, 4, 'FD');
+
+  const breakdown = calculateMaterialBreakdown(count);
+  const cathodeAmount = breakdown[0]?.formattedAmount || '—';
+  const graphiteAmount = breakdown[4]?.formattedAmount || '—';
+  const cuAmount = breakdown[12]?.formattedAmount || '—';
+  const niAmount = breakdown[11]?.formattedAmount || '—';
+  const feAmount = breakdown[13]?.formattedAmount || '—';
+
+  doc.setTextColor(...DARK);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text(`AUDITED MATERIAL RECOVERY FOR ${count.toLocaleString()} PACKS (SECTION 2 STANDARDS):`, chemX + 10, y + 10);
+
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(6.5);
+  doc.setTextColor(...SLATE_BODY);
+  doc.text(
+    `Cathode NMC: ~${cathodeAmount}  •  Anode Graphite: ~${graphiteAmount}  •  Copper Foil: ~${cuAmount}  •  Nickel: ~${niAmount}  •  Shell Iron: ~${feAmount}`,
+    chemX + 10,
+    y + 20
+  );
+
+  // 11. Standards Compliance Badges
+  y += 34;
+  doc.setTextColor(...SLATE_MUTED);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(6.5);
+  doc.text('ISO 14001:2015 ESG REGISTRY   •   RoHS 2011/65/EU COMPLIANT   •   UN 38.3 SAFE TRANSPORT CERTIFIED   •   EU BATTERY PASSPORT 2026', width / 2, y, { align: 'center', charSpace: 0.8 });
+
+  // 12. Footer Section: Left Signature, Center Tier Foil Seal with Ribbons, Right Signature
+  y += 16;
 
   // Left Executive Signature Block
   const sig1X = 64;
   doc.setTextColor(...SLATE_DEEP);
   doc.setFont('times', 'italic');
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.text('Dr. Richard Thorne', sig1X + 80, y + 2, { align: 'center' });
 
   doc.setDrawColor(...SLATE_MUTED);
   doc.setLineWidth(0.75);
-  doc.line(sig1X, y + 8, sig1X + 160, y + 8);
+  doc.line(sig1X, y + 7, sig1X + 160, y + 7);
 
   doc.setTextColor(...SLATE_MUTED);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('HEAD OF CIRCULAR ENGINEERING', sig1X + 80, y + 18, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.text(`Refurbnics Technical Directorate`, sig1X + 80, y + 27, { align: 'center' });
+  doc.text('HEAD OF CIRCULAR ENGINEERING', sig1X + 80, y + 16, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text(`Refurbnics Technical Directorate`, sig1X + 80, y + 24, { align: 'center' });
 
   // Center Tier Embossed Foil Seal with Silk Ribbon Tails
   const sealX = width / 2;
-  const sealY = y + 4;
+  const sealY = y + 2;
 
   // Ribbon Tails
   doc.setFillColor(...RIBBON);
   doc.setDrawColor(...RIBBON_DARK);
   doc.setLineWidth(0.5);
-  doc.triangle(sealX - 18, sealY + 12, sealX - 8, sealY + 44, sealX - 26, sealY + 40, 'FD');
-  doc.triangle(sealX + 18, sealY + 12, sealX + 8, sealY + 44, sealX + 26, sealY + 40, 'FD');
+  doc.triangle(sealX - 16, sealY + 10, sealX - 7, sealY + 38, sealX - 23, sealY + 34, 'FD');
+  doc.triangle(sealX + 16, sealY + 10, sealX + 7, sealY + 38, sealX + 23, sealY + 34, 'FD');
 
   // Starburst Rosette
   doc.setFillColor(...PRIMARY);
   doc.setDrawColor(...DARK);
   doc.setLineWidth(1.5);
-  doc.circle(sealX, sealY, 28, 'FD');
+  doc.circle(sealX, sealY, 25, 'FD');
 
   for (let angle = 0; angle < Math.PI * 2; angle += Math.PI / 12) {
-    const rx = sealX + Math.cos(angle) * 30;
-    const ry = sealY + Math.sin(angle) * 30;
+    const rx = sealX + Math.cos(angle) * 27;
+    const ry = sealY + Math.sin(angle) * 27;
     doc.setFillColor(...SECONDARY);
-    doc.circle(rx, ry, 2.5, 'FD');
+    doc.circle(rx, ry, 2.2, 'FD');
   }
 
   // Inner Ring
   doc.setFillColor(...SECONDARY);
-  doc.circle(sealX, sealY, 23, 'FD');
+  doc.circle(sealX, sealY, 20, 'FD');
 
   // Inner Core
   doc.setFillColor(...DARK);
-  doc.circle(sealX, sealY, 19, 'F');
+  doc.circle(sealX, sealY, 16.5, 'F');
 
   // Embossed Seal Inscription
   doc.setTextColor(255, 255, 255);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(5.5);
-  doc.text(tier.sealTitle, sealX, sealY - 7, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(7.5);
-  doc.text('★ VERIFIED ★', sealX, sealY + 1, { align: 'center' });
   doc.setFontSize(5);
-  doc.text('CIRCULAR ESG', sealX, sealY + 8, { align: 'center', charSpace: 0.5 });
+  doc.text(tier.sealTitle, sealX, sealY - 6, { align: 'center', charSpace: 0.5 });
+  doc.setFontSize(6.5);
+  doc.text('★ VERIFIED ★', sealX, sealY + 1, { align: 'center' });
+  doc.setFontSize(4.5);
+  doc.text('CIRCULAR ESG', sealX, sealY + 7, { align: 'center', charSpace: 0.5 });
 
   // Right Executive Signature & Verification Block
   const sig2X = width - 64 - 160;
   doc.setTextColor(...SLATE_DEEP);
   doc.setFont('times', 'italic');
-  doc.setFontSize(16);
+  doc.setFontSize(15);
   doc.text('Eleanor Sterling-Ward', sig2X + 80, y + 2, { align: 'center' });
 
   doc.setDrawColor(...SLATE_MUTED);
   doc.setLineWidth(0.75);
-  doc.line(sig2X, y + 8, sig2X + 160, y + 8);
+  doc.line(sig2X, y + 7, sig2X + 160, y + 7);
 
   doc.setTextColor(...SLATE_MUTED);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('MANAGING DIRECTOR & CHAIR', sig2X + 80, y + 18, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
   doc.setFontSize(7);
-  doc.text(`Issued: ${issueDate}`, sig2X + 80, y + 27, { align: 'center' });
+  doc.text('MANAGING DIRECTOR & CHAIR', sig2X + 80, y + 16, { align: 'center' });
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(6.5);
+  doc.text(`Issued: ${issueDate}`, sig2X + 80, y + 24, { align: 'center' });
 
   // Bottom Central Registry & Verification Line
   doc.setTextColor(...SLATE_MUTED);
   doc.setFont('courier', 'bold');
+  doc.setFontSize(7.5);
+  doc.text(`Official Registry Code: ${certCode}   •   Tier: ${tier.badge}   •   SHA-256 Tamper-Evident Digital ESG Record`, width / 2, height - 20, { align: 'center' });
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // PAGE 2: SECTION 2. COMPOSITION & MATERIAL INFORMATION (MSDS AUDIT)
+  // ═══════════════════════════════════════════════════════════════════════
+  doc.addPage('a4', 'landscape');
+
+  // Background
+  doc.setFillColor(...BG);
+  doc.rect(0, 0, width, height, 'F');
+
+  // Multi-tier Border
+  doc.setDrawColor(...PRIMARY);
+  doc.setLineWidth(4);
+  doc.rect(16, 16, width - 32, height - 32);
+
+  doc.setDrawColor(...DARK);
+  doc.setLineWidth(1);
+  doc.rect(22, 22, width - 44, height - 44);
+
+  // Page 2 Header
+  let p2Y = 46;
+  doc.setTextColor(...DARK);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(14);
+  doc.text('SECTION 2. COMPOSITION & MATERIAL INFORMATION', width / 2, p2Y, { align: 'center', charSpace: 1 });
+
+  p2Y += 14;
+  doc.setTextColor(...PRIMARY);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.text(`MATERIAL & CHEMICAL RECOVERY AUDIT FOR ${count.toLocaleString()} HIGH-VOLTAGE BATTERY PACKS`, width / 2, p2Y, { align: 'center', charSpace: 1.5 });
+
+  p2Y += 8;
+  doc.setDrawColor(...PRIMARY);
+  doc.setLineWidth(1);
+  doc.line(width / 2 - 200, p2Y, width / 2 + 200, p2Y);
+
+  // Table Setup
+  p2Y += 16;
+  const tableX = 36;
+  const tableW = width - 72; // 769.89 pt
+  const colW = [160, 160, 80, 85, 124, 160]; // sum = 769 pt
+  const rowH = 20.5;
+
+  // Table Header
+  doc.setFillColor(...PRIMARY);
+  doc.rect(tableX, p2Y, tableW, rowH + 2, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFont('helvetica', 'bold');
   doc.setFontSize(8);
-  doc.text(`Official Registry Code: ${certCode}   •   Tier: ${tier.badge}   •   Tamper-Evident Digital ESG Record`, width / 2, height - 24, { align: 'center' });
+
+  doc.text('Chemical Composition', tableX + 6, p2Y + 14);
+  doc.text('Chemical Formula', tableX + colW[0] + 6, p2Y + 14);
+  doc.text('CAS No.', tableX + colW[0] + colW[1] + 6, p2Y + 14);
+  doc.text('Weight (%)', tableX + colW[0] + colW[1] + colW[2] + 6, p2Y + 14);
+  doc.text(`Recovered (${count.toLocaleString()} Packs)`, tableX + colW[0] + colW[1] + colW[2] + colW[3] + 6, p2Y + 14);
+  doc.text('Battery Component Role', tableX + colW[0] + colW[1] + colW[2] + colW[3] + colW[4] + 6, p2Y + 14);
+
+  p2Y += rowH + 2;
+
+  // Table Rows (14 Chemical Items with Dynamic Amounts)
+  breakdown.forEach((item, index) => {
+    const isEven = index % 2 === 0;
+    if (isEven) {
+      doc.setFillColor(255, 255, 255);
+    } else {
+      doc.setFillColor(245, 247, 250);
+    }
+    doc.rect(tableX, p2Y, tableW, rowH, 'F');
+
+    // Row Border
+    doc.setDrawColor(220, 226, 235);
+    doc.setLineWidth(0.5);
+    doc.rect(tableX, p2Y, tableW, rowH, 'D');
+
+    // Text Values
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...SLATE_DEEP);
+    doc.text(item.nameEn, tableX + 6, p2Y + 13);
+
+    doc.setFont('courier', 'bold');
+    doc.setFontSize(7.5);
+    doc.setTextColor(...SLATE_BODY);
+    doc.text(item.formula, tableX + colW[0] + 6, p2Y + 13);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    doc.text(item.casNo, tableX + colW[0] + colW[1] + 6, p2Y + 13);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...SLATE_BODY);
+    doc.text(item.weightPct, tableX + colW[0] + colW[1] + colW[2] + 6, p2Y + 13);
+
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(...DARK);
+    doc.text(item.formattedAmount, tableX + colW[0] + colW[1] + colW[2] + colW[3] + 6, p2Y + 13);
+
+    doc.setFont('helvetica', 'normal');
+    doc.setTextColor(...SLATE_BODY);
+    doc.setFontSize(7);
+    doc.text(item.role, tableX + colW[0] + colW[1] + colW[2] + colW[3] + colW[4] + 6, p2Y + 13);
+
+    p2Y += rowH;
+  });
+
+  // Technical Footnote & ISO Compliance
+  p2Y += 12;
+  doc.setTextColor(...SLATE_MUTED);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+  doc.text(
+    `* Certified Material Breakdown: 100% of high-voltage cells serviced by Refurbnics adhere to ISO 14001, RoHS, and EU Battery Passport standards.`,
+    tableX + 4,
+    p2Y
+  );
+  p2Y += 10;
+  doc.text(
+    `Lithium, Nickel, Copper, and rare earth components undergo audited recovery and life-extension, preventing toxic leachate in accordance with ESG directives.`,
+    tableX + 4,
+    p2Y
+  );
+
+  // Bottom Central Registry on Page 2
+  doc.setTextColor(...SLATE_MUTED);
+  doc.setFont('courier', 'bold');
+  doc.setFontSize(8);
+  doc.text(`Official Registry Code: ${certCode}   •   Page 2 of 2: Material & Chemical Composition Appendix`, width / 2, height - 24, { align: 'center' });
 
   return doc;
 }

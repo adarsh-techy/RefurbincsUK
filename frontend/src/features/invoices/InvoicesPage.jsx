@@ -18,12 +18,12 @@ import {
   FiMail,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
-import PageHeader from '../../components/ui/PageHeader';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import Modal from '../../components/ui/Modal';
-import Button from '../../components/ui/Button';
-import ConfirmModal from '../../components/ui/ConfirmModal';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import Modal from '../../components/ui/overlays/Modal';
+import Button from '../../components/ui/primitives/Button';
+import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
 import { useTheme } from '../../context/ThemeContext';
 
 function InvoicesPage() {
@@ -591,6 +591,7 @@ function InvoicesPage() {
           columns={columns}
           rows={filtered}
           showRowNumber
+          maxHeight="calc(100vh - 270px)"
           emptyMessage="No invoices found."
         />
       )}

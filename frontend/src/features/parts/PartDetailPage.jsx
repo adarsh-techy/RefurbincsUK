@@ -2,12 +2,12 @@ import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
-import PageHeader from '../../components/ui/PageHeader';
-import TableState from '../../components/ui/TableState';
-import { StatusBadge } from '../../components/ui/Badge';
-import StatCard from '../../components/ui/StatCard';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import TableState from '../../components/ui/table/TableState';
+import { StatusBadge } from '../../components/ui/primitives/Badge';
+import StatCard from '../../components/ui/primitives/StatCard';
+import Button from '../../components/ui/primitives/Button';
+import Modal from '../../components/ui/overlays/Modal';
 import { hasPermission } from '../../utils/permissions';
 import RestockForm from './RestockForm';
 
@@ -169,7 +169,6 @@ function PartDetailPage() {
         <StatCard label="Times Used" value={usageHistory.length} tone="good" />
         <StatCard label="Total Quantity Used" value={totalQuantityUsed} tone="info" />
         <StatCard label="Total Restocked" value={totalRestocked} tone="critical" />
-        <StatCard label="Price" value={`£${Number(part.repair_cost).toFixed(2)}`} tone="warning" />
         <StatCard label="Service Charge" value={`£${Number(part.service_charge || 0).toFixed(2)}`} tone="warning" />
         <StatCard label="Total Revenue" value={`£${totalRevenue.toFixed(2)}`} tone="good" />
       </div>

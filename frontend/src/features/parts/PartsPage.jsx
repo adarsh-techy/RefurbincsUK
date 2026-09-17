@@ -2,15 +2,15 @@ import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link, useSearchParams } from 'react-router-dom';
 import useFetchList from '../../utils/use-fetch-list';
-import DataTable from '../../components/ui/DataTable';
-import TableState from '../../components/ui/TableState';
-import PageHeader from '../../components/ui/PageHeader';
-import Button from '../../components/ui/Button';
-import Modal from '../../components/ui/Modal';
-import ConfirmModal from '../../components/ui/ConfirmModal';
-import AlertModal from '../../components/ui/AlertModal';
-import Badge from '../../components/ui/Badge';
-import RowActions from '../../components/ui/RowActions';
+import DataTable from '../../components/ui/table/DataTable';
+import TableState from '../../components/ui/table/TableState';
+import PageHeader from '../../components/ui/primitives/PageHeader';
+import Button from '../../components/ui/primitives/Button';
+import Modal from '../../components/ui/overlays/Modal';
+import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import AlertModal from '../../components/ui/overlays/AlertModal';
+import Badge from '../../components/ui/primitives/Badge';
+import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
 import { hasPermission } from '../../utils/permissions';
 import PartForm from './PartForm';
@@ -70,11 +70,6 @@ function PartsPage() {
     },
     { key: 'sku', label: 'SKU', render: (row) => row.sku || '—' },
     { key: 'quantity', label: 'Qty' },
-    {
-      key: 'repair_cost',
-      label: 'Price',
-      render: (row) => `£${Number(row.repair_cost).toFixed(2)}`,
-    },
     {
       key: 'service_charge',
       label: 'Service Charge',

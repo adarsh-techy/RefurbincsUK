@@ -2,7 +2,7 @@ import { useState } from 'react';
 import apiClient from '../../services/api-client';
 
 const inputClasses =
-  'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/30';
+  'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30';
 const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
 
 // reason: pass an existing issue reason to edit it (PATCH); omit to create
@@ -10,9 +10,13 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 // sort order can be flagged before submitting instead of only after a 409.
 function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
   const isEdit = Boolean(reason);
+  const nextOrder = existingReasons && existingReasons.length > 0
+    ? Math.max(...existingReasons.map((r) => Number(r.sort_order) || 0)) + 1
+    : 1;
+
   const [form, setForm] = useState({
     label: reason?.label || '',
-    sortOrder: reason ? String(reason.sort_order) : '0',
+    sortOrder: reason ? String(reason.sort_order) : String(nextOrder),
     active: reason ? reason.active : true,
   });
   const [submitting, setSubmitting] = useState(false);
@@ -36,7 +40,7 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
     setError(null);
     try {
       const payload = {
-        label: form.label,
+        label: form.label.trim(),
         sortOrder: Number(form.sortOrder) || 0,
         active: form.active,
       };
@@ -57,12 +61,12 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
         <div>
-          <label className={labelClasses}>Reason</label>
+          <label className={labelClasses}>Reason *</label>
           <input
             type="text"
             value={form.label}
             onChange={(e) => updateField('label', e.target.value)}
-            placeholder="e.g. Battery is dead"
+            placeholder="Enter issue reason description"
             className={inputClasses}
             required
           />
@@ -91,19 +95,19 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
               onChange={(e) => updateField('active', e.target.checked)}
               className="h-4 w-4 rounded border-slate-300 dark:border-surface-600"
             />
-            Active (shown to technicians)
+            Active (shown to technicians when reporting unserviceable batteries)
           </label>
         )}
       </div>
 
       {error && <p className="text-sm text-critical-600 dark:text-red-400">{error}</p>}
 
-      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-surface-700">
+      <div className="flex justify-end gap-3 pt-2">
         {onCancel && (
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800"
+            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800 cursor-pointer"
           >
             Cancel
           </button>
@@ -111,7 +115,7 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
         <button
           type="submit"
           disabled={submitting || sortOrderTaken}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+          className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
         >
           {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Add Reason'}
         </button>

@@ -57,4 +57,43 @@ async function verifyArrival(id, userId) {
   return rows[0];
 }
 
-module.exports = { findAll, findById, create, update, remove, verifyArrival };
+async function findPage({ limit = 15, offset = 0, search, date }) {
+  const conditions = [];
+  const params = [];
+
+  if (search) {
+    params.push(`%${search}%`);
+    conditions.push(
+      `(t.driver_name ILIKE $${params.length} OR t.truck_number ILIKE $${params.length} OR c.name ILIKE $${params.length})`
+    );
+  }
+
+  if (date) {
+    params.push(date);
+    conditions.push(`t.intake_at::date = $${params.length}`);
+  }
+
+  const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+
+  params.push(limit + 1);
+  const limitIndex = params.length;
+  params.push(offset);
+  const offsetIndex = params.length;
+
+  const { rows } = await db.query(
+    `SELECT t.*, c.name AS client_name
+     FROM truck_intakes t
+     LEFT JOIN clients c ON c.id = t.client_id
+     ${whereClause}
+     ORDER BY t.intake_at DESC
+     LIMIT $${limitIndex} OFFSET $${offsetIndex}`,
+    params
+  );
+
+  const hasMore = rows.length > limit;
+  const data = hasMore ? rows.slice(0, limit) : rows;
+
+  return { data, hasMore };
+}
+
+module.exports = { findAll, findPage, findById, create, update, remove, verifyArrival };

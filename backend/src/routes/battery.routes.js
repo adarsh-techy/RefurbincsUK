@@ -1,6 +1,12 @@
 const router = require('express').Router();
+const multer = require('multer');
 const batteryController = require('../controllers/battery.controller');
 const { requireAuth, optionalAuth, requireRole } = require('../middlewares/auth');
+
+const uploadIssuePhotos = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file, up to 3 files
+});
 
 // Must precede '/:code' below, or these would be swallowed as battery code
 // lookups.
@@ -30,10 +36,19 @@ router.patch('/:id/serial-number', batteryController.updateSerialNumber);
 // A technician claiming a battery to start work on — before any part is
 // logged, so it shows as actively being worked on rather than just queued.
 router.patch('/:id/start-work', requireRole('technician'), batteryController.startWork);
-// A technician confirming a battery works after its parts were replaced.
-router.patch('/:id/complete-testing', requireRole('technician'), batteryController.completeTesting);
-// A technician reporting mid-repair that a battery can't be serviced.
-router.patch('/:id/report-issue', requireRole('technician'), batteryController.reportIssue);
+// A technician (Supervisor/Manager only, enforced in the controller), staff
+// member, or admin confirming a battery works after its parts were replaced.
+router.patch(
+  '/:id/complete-testing',
+  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  batteryController.completeTesting
+);
+// A technician (mid-repair) or a tester — supervisor/manager, during
+// testing — reporting that a battery can't be serviced, with up to 3 photos.
+router.patch('/:id/report-issue', requireRole('technician'), uploadIssuePhotos.array('photos', 3), batteryController.reportIssue);
+// Reclaiming parts fitted during repair from a battery that failed testing —
+// open to the same workshop logins as report-issue/complete-testing.
+router.patch('/:id/remove-parts', requireRole('technician'), batteryController.removeParts);
 // Editing/removing batteries (manual status correction) is super_admin only.
 router.patch('/:id', requireRole('super_admin'), batteryController.update);
 router.delete('/:id', requireRole('super_admin'), batteryController.remove);

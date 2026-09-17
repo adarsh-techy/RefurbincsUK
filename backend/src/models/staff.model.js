@@ -4,7 +4,7 @@ const db = require('../config/db');
 // show whether a given staff member has technician login access yet.
 async function findAll() {
   const { rows } = await db.query(
-    `SELECT s.*, u.email AS login_email
+    `SELECT s.*, COALESCE(s.email, u.email) AS login_email
      FROM staff s
      LEFT JOIN users u ON u.id = s.user_id
      ORDER BY s.name`
@@ -21,14 +21,39 @@ async function findByUserId(userId) {
 // `users` login account (role 'technician', forced to set its own password
 // on first login) in the same transaction, so a staff member and its login
 // can never end up out of sync with each other.
-async function create({ name, phone, salary, role, email, passwordHash }) {
+async function create({
+  name,
+  phone,
+  salary,
+  role,
+  email,
+  passwordHash,
+  passportNumber,
+  niNumber,
+  shareCode,
+  documentPath,
+  documentName,
+}) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
     const { rows: staffRows } = await client.query(
-      'INSERT INTO staff (name, phone, salary, role) VALUES ($1, $2, $3, $4) RETURNING *',
-      [name, phone, salary || 0, role || null]
+      `INSERT INTO staff (
+        name, phone, salary, role, email, passport_number, ni_number, share_code, document_path, document_name
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *`,
+      [
+        name,
+        phone,
+        salary || 0,
+        role || null,
+        email || null,
+        passportNumber || null,
+        niNumber || null,
+        shareCode || null,
+        documentPath || null,
+        documentName || null,
+      ]
     );
     let staffRow = staffRows[0];
 
@@ -56,10 +81,36 @@ async function create({ name, phone, salary, role, email, passwordHash }) {
   }
 }
 
-async function update(id, { name, phone, active, salary, role }) {
+async function update(id, fields) {
+  const sets = [];
+  const params = [id];
+
+  const fieldMapping = [
+    ['name', 'name'],
+    ['phone', 'phone'],
+    ['active', 'active'],
+    ['salary', 'salary'],
+    ['role', 'role'],
+    ['email', 'email'],
+    ['passport_number', 'passportNumber'],
+    ['ni_number', 'niNumber'],
+    ['share_code', 'shareCode'],
+    ['document_path', 'documentPath'],
+    ['document_name', 'documentName'],
+  ];
+
+  for (const [col, key] of fieldMapping) {
+    if (fields[key] !== undefined) {
+      params.push(fields[key]);
+      sets.push(`${col} = $${params.length}`);
+    }
+  }
+
+  if (sets.length === 0) return findById(id);
+
   const { rows } = await db.query(
-    `UPDATE staff SET name = $2, phone = $3, active = $4, salary = $5, role = $6 WHERE id = $1 RETURNING *`,
-    [id, name, phone, active, salary || 0, role || null]
+    `UPDATE staff SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
+    params
   );
   return rows[0];
 }
@@ -69,7 +120,13 @@ async function remove(id) {
 }
 
 async function findById(id) {
-  const { rows } = await db.query('SELECT * FROM staff WHERE id = $1', [id]);
+  const { rows } = await db.query(
+    `SELECT s.*, u.email AS linked_user_email
+     FROM staff s
+     LEFT JOIN users u ON u.id = s.user_id
+     WHERE s.id = $1`,
+    [id]
+  );
   return rows[0];
 }
 
@@ -117,7 +174,8 @@ async function findIssues(staffId) {
        b.status AS battery_status,
        ir.label AS reason_label,
        bi.note,
-       bi.reported_at
+       bi.reported_at,
+       bi.photo_urls
      FROM battery_issues bi
      JOIN batteries b ON b.id = bi.battery_id
      JOIN issue_reasons ir ON ir.id = bi.reason_id

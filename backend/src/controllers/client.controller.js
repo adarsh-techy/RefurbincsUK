@@ -3,6 +3,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 const clientModel = require('../models/client.model');
 const invoiceModel = require('../models/invoice.model');
+const recycleModel = require('../models/recycle.model');
 
 // A client's own logo — uploaded here by an admin, shown back on that
 // client's own dashboard. Stored on disk the same way invoice PDFs are
@@ -47,6 +48,19 @@ async function getById(req, res, next) {
     const client = await clientModel.findById(req.params.id);
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
+    }
+    if (client.user_role === 'recycle_client') {
+      const shipments = await recycleModel.findAll({ recycleClientId: client.id });
+      const totalBatteries = shipments.reduce((sum, s) => sum + (Number(s.battery_count) || 0), 0);
+      return res.json({
+        client,
+        isRecycleClient: true,
+        stats: {
+          shipment_count: shipments.length,
+          battery_count: totalBatteries,
+        },
+        shipments,
+      });
     }
     const [stats, transactions] = await Promise.all([
       clientModel.getDashboardStats(client.id, client.name),
@@ -184,7 +198,19 @@ async function myBatteries(req, res, next) {
     if (!client) {
       return res.status(409).json({ message: 'Your account is not linked to a client record.' });
     }
-    const bucket = VALID_BUCKETS.has(req.query.bucket) ? req.query.bucket : req.query.bucket === 'all' ? 'all' : undefined;
+    // No ?bucket= at all (the "All Batteries" tab's request shape) or an
+    // explicit ?bucket=all both mean "every status, unfiltered". Anything
+    // else that isn't one of the known buckets is a garbage/typo'd value —
+    // it must NOT silently fall through to the same unfiltered behavior,
+    // or a malformed request leaks the client's full battery list instead
+    // of erroring or scoping down.
+    const rawBucket = req.query.bucket;
+    const bucket =
+      rawBucket === undefined || rawBucket === 'all'
+        ? 'all'
+        : VALID_BUCKETS.has(rawBucket)
+          ? rawBucket
+          : 'packed';
     const data = await clientModel.findMyBatteries(client.id, client.name, bucket);
     res.json({ data });
   } catch (err) {
@@ -252,6 +278,47 @@ async function packBatteryForRepair(req, res, next) {
   }
 }
 
+// Client recording an incoming truck intake batch
+async function recordTruckIntake(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    const { truckNumber, driverName, batteryCount, batteryCodes, issueDescription } = req.body;
+    if (!truckNumber || !String(truckNumber).trim()) {
+      return res.status(400).json({ message: 'Truck number is required.' });
+    }
+
+    const result = await clientModel.recordClientTruckIntake(client.id, client.name, {
+      truckNumber,
+      driverName,
+      batteryCount,
+      batteryCodes,
+      issueDescription,
+    });
+
+    // Realtime notification
+    try {
+      const realtime = require('../realtime');
+      realtime.emit('intakes:new', {
+        intake: result.intake,
+        clientName: client.name,
+      });
+    } catch {
+      // ignore
+    }
+
+    res.status(201).json({
+      message: `Truck intake ${result.intake.truck_number} with ${result.count} batteries recorded successfully!`,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+
 // The client's complete lifecycle activity history and summary
 async function myHistory(req, res, next) {
   try {
@@ -292,6 +359,106 @@ async function myInvoices(req, res, next) {
   }
 }
 
+// Client updating unverified truck intake details
+async function updateMyTruckIntake(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    const { truckNumber, driverName } = req.body;
+    const intake = await clientModel.updateClientTruckIntake(client.id, req.params.id, {
+      truckNumber,
+      driverName,
+    });
+    res.json({
+      message: 'Intake batch updated successfully.',
+      data: intake,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Client adding more batteries to existing unverified intake
+async function addBatteriesToMyTruckIntake(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    const { batteries } = req.body;
+    const result = await clientModel.addBatteriesToClientTruckIntake(client.id, client.name, req.params.id, {
+      batteries,
+    });
+    res.json({
+      message: `${result.added.length} batteries added to intake batch successfully.`,
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Client removing a battery from unverified truck intake
+async function removeBatteryFromMyTruckIntake(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    const result = await clientModel.removeBatteryFromClientTruckIntake(
+      client.id,
+      client.name,
+      req.params.intakeId,
+      req.params.batteryId
+    );
+    res.json({
+      message: 'Battery removed from intake and returned to your fleet.',
+      data: result,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Client deleting / cancelling an unverified truck intake batch
+async function deleteMyTruckIntake(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    await clientModel.deleteClientTruckIntake(client.id, client.name, req.params.id);
+    res.json({
+      message: 'Intake batch cancelled and all batteries returned to your fleet.',
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// Client updating serial number or defect notes for their battery
+async function updateMyBattery(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    const { serialNumber, notes } = req.body;
+    const updated = await clientModel.updateClientBattery(client.id, client.name, req.params.id, {
+      serialNumber,
+      notes,
+    });
+    res.json({
+      message: 'Battery details updated successfully.',
+      data: updated,
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   list,
   getById,
@@ -304,5 +471,12 @@ module.exports = {
   myNotifications,
   myHistory,
   packBatteryForRepair,
+  recordTruckIntake,
+  updateMyTruckIntake,
+  addBatteriesToMyTruckIntake,
+  removeBatteryFromMyTruckIntake,
+  deleteMyTruckIntake,
+  updateMyBattery,
   myInvoices,
 };
+

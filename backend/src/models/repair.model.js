@@ -16,9 +16,11 @@ async function create({ batteryId, staffId, partId, quantityUsed, notes, laborCh
       throw err;
     }
 
-    // Snapshot the charge at today's repair cost, so it stays accurate on
-    // past invoices even if the part's price changes later.
-    const price = quantityUsed * Number(partResult.rows[0].repair_cost);
+    // Snapshot the charge at today's service charge, so it stays accurate
+    // on past invoices even if the part's price changes later. Per-unit
+    // "Price" was retired from the Add Part form — Service Charge is now
+    // the only per-part charge an admin sets.
+    const price = quantityUsed * Number(partResult.rows[0].service_charge || 0);
 
     // A multi-part visit calls create() once per part with the same
     // batchId. Only the FIRST call can read work_started_at (the second
@@ -160,12 +162,12 @@ async function update(id, { quantityUsed, notes }) {
       }
     }
 
-    // Re-snapshot the charge at today's repair cost, in case it's changed
-    // since this repair was first logged.
-    const { rows: partRows } = await client.query('SELECT repair_cost FROM parts WHERE id = $1', [
+    // Re-snapshot the charge at today's service charge, in case it's
+    // changed since this repair was first logged.
+    const { rows: partRows } = await client.query('SELECT service_charge FROM parts WHERE id = $1', [
       existing.part_id,
     ]);
-    const price = quantityUsed * Number(partRows[0].repair_cost);
+    const price = quantityUsed * Number(partRows[0].service_charge || 0);
 
     const { rows } = await client.query(
       'UPDATE repairs SET quantity_used = $2, notes = $3, price = $4 WHERE id = $1 RETURNING *',

@@ -1,6 +1,24 @@
 const path = require('path');
-require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env.local') });
-require('dotenv').config({ path: path.resolve(__dirname, '..', '..', '.env') });
+const fs = require('fs');
+const dotenv = require('dotenv');
+
+// Load environment variables seamlessly from root or backend folder (most recently saved file wins)
+const rootDir = path.resolve(__dirname, '..', '..', '..');
+const backendDir = path.resolve(__dirname, '..', '..');
+
+const candidatePaths = [
+  path.join(rootDir, '.env'),
+  path.join(rootDir, '.env.local'),
+  path.join(backendDir, '.env'),
+  path.join(backendDir, '.env.local'),
+].filter((p) => fs.existsSync(p));
+
+// Sort files by last modified time ascending so that the most recently edited file overrides
+candidatePaths.sort((a, b) => fs.statSync(a).mtimeMs - fs.statSync(b).mtimeMs);
+
+for (const envPath of candidatePaths) {
+  dotenv.config({ path: envPath, override: true });
+}
 
 module.exports = {
   port: process.env.PORT || 5000,

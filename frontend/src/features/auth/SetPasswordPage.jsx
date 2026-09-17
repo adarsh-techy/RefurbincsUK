@@ -93,7 +93,10 @@ function SetPasswordPage() {
 
           <button
             type="button"
-            onClick={() => dispatch(logout())}
+            onClick={() => {
+              dispatch(logout());
+              navigate('/login', { replace: true });
+            }}
             className="text-center text-sm font-medium text-slate-500 hover:underline dark:text-neutral-400"
           >
             Log out
