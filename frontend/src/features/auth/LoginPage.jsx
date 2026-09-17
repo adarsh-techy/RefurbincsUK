@@ -4,6 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/logo.png';
+import DEMO_CREDENTIALS from '../../config/demo-credentials';
 
 const inputClasses =
   'w-full rounded-md border border-surface-600 bg-black py-2.5 pl-10 pr-3.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
@@ -11,22 +12,8 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-neutral-200';
 const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500';
 
 function LoginPage() {
-  // No hardcoded literal fallbacks — the bundler doesn't reliably tree-shake
-  // a ternary keyed on import.meta.env.DEV, so a literal string here would
-  // still ship inside the production bundle even if never rendered. Reading
-  // only the env vars means there's nothing to ship unless one is actually
-  // set for this build.
-  const defaultEmail = import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || '';
-  const defaultPassword = import.meta.env.VITE_DEFAULT_LOGIN_PASSWORD || '';
-
-  const superAdminEmail = import.meta.env.VITE_DEMO_SUPERADMIN_EMAIL || import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || '';
-  const superAdminPassword = import.meta.env.VITE_DEMO_SUPERADMIN_PASSWORD || import.meta.env.VITE_DEFAULT_LOGIN_PASSWORD || '';
-
-  const clientEmail = import.meta.env.VITE_DEMO_CLIENT_EMAIL || '';
-  const clientPassword = import.meta.env.VITE_DEMO_CLIENT_PASSWORD || '';
-
-  const recycleEmail = import.meta.env.VITE_DEMO_RECYCLE_EMAIL || '';
-  const recyclePassword = import.meta.env.VITE_DEMO_RECYCLE_PASSWORD || '';
+  const defaultEmail = import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || DEMO_CREDENTIALS.superAdmin.email;
+  const defaultPassword = import.meta.env.VITE_DEFAULT_LOGIN_PASSWORD || DEMO_CREDENTIALS.superAdmin.password;
 
   const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState(defaultPassword);
@@ -58,71 +45,50 @@ function LoginPage() {
             <p className="mt-1 text-sm text-neutral-400">Sign in to continue</p>
           </div>
 
-          {/* Demo quick-fill credentials — each button only appears when its
-              VITE_DEMO_* env var is actually set for this build, so a
-              production build with none configured shows nothing here at
-              all (see the literal-free env reads above). */}
-          {(defaultEmail || defaultPassword || superAdminEmail || clientEmail || recycleEmail) && (
-            <div className="mt-4 flex flex-col gap-2">
-              <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium px-0.5">
-                <span>Quick Fill Credentials:</span>
-                {(defaultEmail || defaultPassword) && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(defaultEmail);
-                      setPassword(defaultPassword);
-                    }}
-                    className="text-emerald-400 hover:underline cursor-pointer"
-                  >
-                    ⚡ Default from .env
-                  </button>
-                )}
-              </div>
-
-              <div className="grid grid-cols-3 gap-2">
-                {superAdminEmail && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(superAdminEmail);
-                      setPassword(superAdminPassword);
-                    }}
-                    className="rounded-md border border-dashed border-neutral-600 bg-neutral-800/40 px-2 py-2 text-[11px] font-medium text-neutral-300 transition hover:bg-neutral-800/80 truncate cursor-pointer"
-                    title={`Super Admin: ${superAdminEmail}`}
-                  >
-                    👑 Super Admin
-                  </button>
-                )}
-                {clientEmail && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(clientEmail);
-                      setPassword(clientPassword);
-                    }}
-                    className="rounded-md border border-dashed border-emerald-500/50 bg-emerald-500/10 px-2 py-2 text-[11px] font-medium text-emerald-400 transition hover:bg-emerald-500/20 truncate cursor-pointer"
-                    title={`Client: ${clientEmail}`}
-                  >
-                    ⚡ HumanForest
-                  </button>
-                )}
-                {recycleEmail && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEmail(recycleEmail);
-                      setPassword(recyclePassword);
-                    }}
-                    className="rounded-md border border-dashed border-teal-500/50 bg-teal-500/10 px-2 py-2 text-[11px] font-medium text-teal-400 transition hover:bg-teal-500/20 truncate cursor-pointer"
-                    title={`Recycle: ${recycleEmail}`}
-                  >
-                    ♻️ Recycle Client
-                  </button>
-                )}
-              </div>
+          {/* Demo quick-fill credentials from demo-credentials config */}
+          <div className="mt-4 flex flex-col gap-2">
+            <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium px-0.5">
+              <span>Quick Fill Credentials:</span>
             </div>
-          )}
+
+            <div className="grid grid-cols-3 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(DEMO_CREDENTIALS.superAdmin.email);
+                  setPassword(DEMO_CREDENTIALS.superAdmin.password);
+                }}
+                className="rounded-md border border-dashed border-neutral-600 bg-neutral-800/40 px-2 py-2 text-[11px] font-medium text-neutral-300 transition hover:bg-neutral-800/80 truncate cursor-pointer"
+                title={`Super Admin: ${DEMO_CREDENTIALS.superAdmin.email}`}
+              >
+                👑 Super Admin
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(DEMO_CREDENTIALS.client.email);
+                  setPassword(DEMO_CREDENTIALS.client.password);
+                }}
+                className="rounded-md border border-dashed border-emerald-500/50 bg-emerald-500/10 px-2 py-2 text-[11px] font-medium text-emerald-400 transition hover:bg-emerald-500/20 truncate cursor-pointer"
+                title={`Client: ${DEMO_CREDENTIALS.client.email}`}
+              >
+                ⚡ HumanForest
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(DEMO_CREDENTIALS.recycle.email);
+                  setPassword(DEMO_CREDENTIALS.recycle.password);
+                }}
+                className="rounded-md border border-dashed border-teal-500/50 bg-teal-500/10 px-2 py-2 text-[11px] font-medium text-teal-400 transition hover:bg-teal-500/20 truncate cursor-pointer"
+                title={`Recycle: ${DEMO_CREDENTIALS.recycle.email}`}
+              >
+                ♻️ Recycle Client
+              </button>
+            </div>
+          </div>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>
