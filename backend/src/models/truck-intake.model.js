@@ -21,10 +21,14 @@ async function findById(id) {
   return rows[0];
 }
 
+// status defaults to 'pending_arrival' rather than relying on the table's
+// column default ('verified', kept only for pre-verification-feature rows)
+// — a newly logged intake must go through an explicit verify-arrival scan
+// before it counts as received, same as client-packed intakes.
 async function create({ truckNumber, driverName, batteryCount, clientId }) {
   const { rows } = await db.query(
-    `INSERT INTO truck_intakes (truck_number, driver_name, battery_count, client_id)
-     VALUES ($1, $2, $3, $4) RETURNING *`,
+    `INSERT INTO truck_intakes (truck_number, driver_name, battery_count, client_id, status)
+     VALUES ($1, $2, $3, $4, 'pending_arrival') RETURNING *`,
     [truckNumber, driverName, batteryCount, clientId || null]
   );
   return rows[0];

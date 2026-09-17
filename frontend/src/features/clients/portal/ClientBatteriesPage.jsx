@@ -2257,25 +2257,27 @@ function ClientBatteriesPage() {
         <Modal
           title="Add Truck Intake"
           description="Record a truck delivering or packing batteries for workshop repair."
-          size="3xl"
-          className="min-h-[580px] md:min-h-[640px]"
+          size="7xl"
+          className="h-[85vh] max-h-[85vh]"
           onClose={() => setPackModalOpen(false)}
         >
-          <form onSubmit={handlePackSubmit} className="flex flex-col gap-5">
+          <form onSubmit={handlePackSubmit} className="flex h-full flex-col gap-5">
             {packSuccess && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+              <div className="shrink-0 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
                 ✓ {packSuccess}
               </div>
             )}
 
             {packError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+              <div className="shrink-0 rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
                 {packError}
               </div>
             )}
 
-            <div className="flex flex-col gap-4">
-              <div>
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-12">
+              {/* Left: truck details + scan controls */}
+              <div className="flex min-h-0 flex-col gap-4 lg:col-span-7">
+              <div className="shrink-0">
                 <label className={labelClasses}>Truck Number (optional)</label>
                 <input
                   type="text"
@@ -2293,7 +2295,7 @@ function ClientBatteriesPage() {
                 </datalist>
               </div>
 
-              <div>
+              <div className="shrink-0">
                 <label className={labelClasses}>Driver Name (optional)</label>
                 <input
                   type="text"
@@ -2308,8 +2310,8 @@ function ClientBatteriesPage() {
               </div>
 
               {/* ── Scan / Add Batteries Box (Exact Admin Format) ─────── */}
-              <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
-                <div className="mb-1 flex items-center justify-between">
+              <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
+                <div className="mb-1 flex shrink-0 items-center justify-between">
                   <h3 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
                     Scan Batteries (returning)
                   </h3>
@@ -2317,11 +2319,11 @@ function ClientBatteriesPage() {
                     {scannedBatteries.length} scanned
                   </span>
                 </div>
-                <p className="mb-3 text-xs text-slate-500 dark:text-neutral-400">
+                <p className="mb-3 shrink-0 text-xs text-slate-500 dark:text-neutral-400">
                   For batteries being packed or intaked for repair. A handheld scanner types straight into the box below — or select from your registered battery list.
                 </p>
 
-                <div className="flex gap-2">
+                <div className="flex shrink-0 gap-2">
                   <div className="relative flex-1">
                     <input
                       type="text"
@@ -2364,7 +2366,7 @@ function ClientBatteriesPage() {
 
                 {/* ── Inline Suggestions List (Fully visible, never clipped) ── */}
                 {showScanSuggestions && (
-                  <div className="mt-3 overflow-hidden rounded-xl border border-blue-300 bg-white shadow-sm dark:border-blue-800/60 dark:bg-surface-900">
+                  <div className="mt-3 shrink-0 overflow-hidden rounded-xl border border-blue-300 bg-white shadow-sm dark:border-blue-800/60 dark:bg-surface-900">
                     <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3.5 py-2 text-[11px] font-bold text-slate-600 dark:border-white/10 dark:bg-surface-800/80 dark:text-neutral-300">
                       <span className="flex items-center gap-1.5">
                         <span>Available Registered Batteries</span>
@@ -2434,7 +2436,7 @@ function ClientBatteriesPage() {
                 )}
 
                 {cameraOpen && (
-                  <div className="mt-3">
+                  <div className="mt-3 shrink-0">
                     <QrScanner
                       onScan={(value) => {
                         handleAddBattery(value);
@@ -2444,55 +2446,75 @@ function ClientBatteriesPage() {
                     />
                   </div>
                 )}
+              </div>
+              </div>
 
-                {scannedBatteries.length > 0 && (
-                  <ul className="mt-3 flex flex-col gap-2 max-h-60 overflow-y-auto no-scrollbar">
-                    {scannedBatteries.map((b, idx) => (
-                      <li
-                        key={b.id}
-                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-blue-200 bg-white p-2.5 dark:border-blue-900/40 dark:bg-surface-900"
-                      >
-                        <div className="flex items-center gap-2">
-                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-neutral-300">
-                            {idx + 1}
-                          </span>
-                          <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
-                            {b.code}
-                          </span>
-                        </div>
+              {/* Right: added batteries list — its own scroll area */}
+              <div className="flex min-h-0 flex-col lg:col-span-5">
+                <div className="mb-2 flex shrink-0 items-center justify-between">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">
+                    Added Batteries
+                  </h3>
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500 shadow-xs dark:bg-surface-800 dark:text-neutral-400">
+                    {scannedBatteries.length} added
+                  </span>
+                </div>
+                <div className="min-h-[220px] flex-1 overflow-y-auto rounded-xl border border-slate-200 dark:border-white/10">
+                  {scannedBatteries.length === 0 ? (
+                    <div className="flex h-full items-center justify-center p-6 text-center text-xs text-slate-400 dark:text-neutral-500">
+                      Batteries you add on the left will appear here.
+                    </div>
+                  ) : (
+                    <ul className="flex flex-col gap-2 p-2">
+                      {scannedBatteries.map((b, idx) => (
+                        <li
+                          key={b.id}
+                          className="flex shrink-0 flex-col gap-2 rounded-lg border border-blue-200 bg-white p-2.5 dark:border-blue-900/40 dark:bg-surface-900"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex items-center gap-2">
+                              <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-neutral-300">
+                                {idx + 1}
+                              </span>
+                              <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                                {b.code}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => removeScanned(idx)}
+                              className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
+                              title="Remove"
+                            >
+                              ✕
+                            </button>
+                          </div>
 
-                        <div className="flex items-center gap-2 flex-1 sm:justify-end">
-                          <input
-                            type="text"
-                            value={b.serial}
-                            onChange={(e) => updateScannedField(idx, 'serial', e.target.value)}
-                            placeholder="Serial (optional)"
-                            className="w-28 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
-                          />
-                          <input
-                            type="text"
-                            value={b.issue}
-                            onChange={(e) => updateScannedField(idx, 'issue', e.target.value)}
-                            placeholder="Defect reason (optional)"
-                            className="flex-1 sm:w-44 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
-                          />
-                          <button
-                            type="button"
-                            onClick={() => removeScanned(idx)}
-                            className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
-                            title="Remove"
-                          >
-                            ✕
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                  </ul>
-                )}
+                          <div className="flex flex-col gap-1.5">
+                            <input
+                              type="text"
+                              value={b.serial}
+                              onChange={(e) => updateScannedField(idx, 'serial', e.target.value)}
+                              placeholder="Serial (optional)"
+                              className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                            />
+                            <input
+                              type="text"
+                              value={b.issue}
+                              onChange={(e) => updateScannedField(idx, 'issue', e.target.value)}
+                              placeholder="Defect reason (optional)"
+                              className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                            />
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-white/5">
               <button
                 type="button"
                 onClick={() => setPackModalOpen(false)}
