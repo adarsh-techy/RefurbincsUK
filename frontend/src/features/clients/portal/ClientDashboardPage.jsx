@@ -1139,7 +1139,7 @@ function ClientDashboardPage() {
 
             <div>
               <label className="block text-xs font-bold text-slate-700 dark:text-neutral-200 mb-1">
-                Specific Battery Codes or Serials <span className="text-[11px] font-normal text-slate-400 dark:text-neutral-400">(Optional)</span>
+                Specific Battery Codes <span className="text-[11px] font-normal text-slate-400 dark:text-neutral-400">(Optional)</span>
               </label>
               <textarea
                 rows={2}

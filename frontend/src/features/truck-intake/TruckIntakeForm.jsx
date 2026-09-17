@@ -118,10 +118,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
       }
 
       setScannedBatteries((prev) => [...prev, battery]);
-      flashFeedback(
-        'good',
-        `✓ ${battery.battery_code}${battery.serial_number ? ` (SN: ${battery.serial_number})` : ''} added to intake.`
-      );
+      flashFeedback('good', `✓ ${battery.battery_code} added to intake.`);
       setScanInput('');
       setShowScanSuggestions(false);
 
@@ -396,11 +393,6 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
                                     {b.status?.replace('_', ' ') || 'Returned'}
                                   </span>
                                 </div>
-                                {b.serial_number && (
-                                  <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono mt-0.5">
-                                    SN: {b.serial_number}
-                                  </span>
-                                )}
                               </div>
                               <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/40 shrink-0">
                                 + Add
@@ -523,11 +515,6 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
                           <span className="font-mono font-bold text-slate-900 dark:text-white truncate">
                             {b.battery_code}
                           </span>
-                          {b.serial_number && (
-                            <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono">
-                              SN: {b.serial_number}
-                            </span>
-                          )}
                         </div>
                       </div>
 

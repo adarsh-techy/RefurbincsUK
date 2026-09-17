@@ -2437,11 +2437,6 @@ function ClientBatteriesPage() {
                                 <div className="font-mono font-bold text-slate-900 group-hover:text-white dark:text-white">
                                   {b.battery_code}
                                 </div>
-                                {b.serial_number && (
-                                  <div className="text-[10px] text-slate-500 group-hover:text-blue-100 dark:text-neutral-400">
-                                    Serial: {b.serial_number}
-                                  </div>
-                                )}
                               </div>
                             </div>
 
@@ -2518,16 +2513,9 @@ function ClientBatteriesPage() {
                           <div className="flex flex-col gap-1.5">
                             <input
                               type="text"
-                              value={b.serial}
-                              onChange={(e) => updateScannedField(idx, 'serial', e.target.value)}
-                              placeholder="Serial (optional)"
-                              className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
-                            />
-                            <input
-                              type="text"
                               value={b.issue}
                               onChange={(e) => updateScannedField(idx, 'issue', e.target.value)}
-                              placeholder="Defect reason (optional)"
+                              placeholder="Defect reason / notes (optional)"
                               className="w-full rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
                             />
                           </div>
