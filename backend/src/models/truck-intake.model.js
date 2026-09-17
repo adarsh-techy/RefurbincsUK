@@ -49,16 +49,59 @@ async function remove(id) {
 }
 
 async function verifyArrival(id, userId) {
-  const { rows } = await db.query(
-    `UPDATE truck_intakes
-     SET status = 'verified',
-         verified_at = now(),
-         verified_by_user_id = $2
-     WHERE id = $1
-     RETURNING *`,
-    [id, userId]
-  );
-  return rows[0];
+  const intakeId = Number(id);
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    const { rows } = await client.query(
+      `UPDATE truck_intakes
+       SET status = 'verified',
+           verified_at = now(),
+           verified_by_user_id = $2
+       WHERE id = $1
+       RETURNING *`,
+      [intakeId, userId]
+    );
+
+    if (rows.length === 0) {
+      await client.query('ROLLBACK');
+      return null;
+    }
+
+    const intake = rows[0];
+
+    // Start cycle intake visit for each battery on this truck upon physical arrival verification
+    await client.query(
+      `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at)
+       SELECT b.id, $1, now()
+       FROM batteries b
+       WHERE b.truck_intake_id = $1
+         AND NOT EXISTS (
+           SELECT 1 FROM battery_visits bv
+           WHERE bv.battery_id = b.id AND bv.truck_intake_id = $1
+         )`,
+      [intakeId]
+    );
+
+    // Set battery statuses to in_repair (if not already marked unserviceable/recycled)
+    await client.query(
+      `UPDATE batteries
+       SET status = 'in_repair',
+           started_by_user_id = NULL
+       WHERE truck_intake_id = $1
+         AND status NOT IN ('unserviceable', 'recycled', 'tested_parts_removed')`,
+      [intakeId]
+    );
+
+    await client.query('COMMIT');
+    return intake;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 async function findPage({ limit = 15, offset = 0, search, date }) {

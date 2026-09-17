@@ -450,14 +450,6 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
            RETURNING *`,
           [battery.id, clientName, item.serial, intakeId, item.issue ? `[Packed for Repair by Client]: ${item.issue}` : null]
         );
-        if (intakeId) {
-          await client.query(
-            `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at)
-             VALUES ($1, $2, now())
-             ON CONFLICT DO NOTHING`,
-            [battery.id, intakeId]
-          );
-        }
         processed.push(updatedRows[0]);
       } else {
         // Create new battery registered directly under this client and marked in_repair
@@ -467,14 +459,6 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
            RETURNING *`,
           [item.code, clientName, item.serial, intakeId, item.issue ? `[Packed for Repair by Client]: ${item.issue}` : null]
         );
-        if (intakeId && newRows[0]) {
-          await client.query(
-            `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at)
-             VALUES ($1, $2, now())
-             ON CONFLICT DO NOTHING`,
-            [newRows[0].id, intakeId]
-          );
-        }
         processed.push(newRows[0]);
       }
     }
@@ -668,10 +652,6 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
            RETURNING *`,
           [b.id, clientName, intake.id, issueDescription ? `[Client Truck Intake ${truck}]: ${issueDescription}` : null]
         );
-        await client.query(
-          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
-          [b.id, intake.id]
-        );
         processedBatteries.push(updated[0]);
       } else {
         const { rows: created } = await client.query(
@@ -680,22 +660,7 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
            RETURNING *`,
           [item.code, clientName, intake.id, issueDescription ? `[Client Truck Intake ${truck}]: ${issueDescription}` : null]
         );
-        await client.query(
-          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
-          [created[0].id, intake.id]
-        );
         processedBatteries.push(created[0]);
-      }
-    }
-
-    if (processedBatteries.length > 0) {
-      try {
-        await serviceModel.applyMandatoryServicesToBatteries(
-          processedBatteries.map((b) => b.id),
-          { queryRunner: client, notes: `Mandatory Intake Service Fee (Client Dispatch ${truck})` }
-        );
-      } catch (svcErr) {
-        console.error('Error applying mandatory services on client truck intake:', svcErr);
       }
     }
 
@@ -793,10 +758,6 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
            RETURNING *`,
           [b.id, clientName, item.serial, intakeId, item.issue ? `[Packed for Repair]: ${item.issue}` : null]
         );
-        await client.query(
-          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
-          [b.id, intakeId]
-        );
         processed.push(updated[0]);
       } else {
         const { rows: created } = await client.query(
@@ -804,10 +765,6 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
            VALUES ($1, $2, NULLIF($3::text, ''), CASE WHEN NULLIF($3::text, '') IS NOT NULL THEN 'client' ELSE NULL END, $4, 'in_repair', $5::text, now())
            RETURNING *`,
           [item.code, clientName, item.serial, intakeId, item.issue ? `[Packed for Repair]: ${item.issue}` : null]
-        );
-        await client.query(
-          `INSERT INTO battery_visits (battery_id, truck_intake_id, created_at) VALUES ($1, $2, now()) ON CONFLICT DO NOTHING`,
-          [created[0].id, intakeId]
         );
         processed.push(created[0]);
       }
@@ -822,17 +779,6 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
       `UPDATE truck_intakes SET battery_count = $1 WHERE id = $2`,
       [countRows[0].count, intakeId]
     );
-
-    if (processed.length > 0) {
-      try {
-        await serviceModel.applyMandatoryServicesToBatteries(
-          processed.map((b) => b.id),
-          { queryRunner: client, notes: `Mandatory Intake Service Fee (Client Batch #${intakeId})` }
-        );
-      } catch (svcErr) {
-        console.error('Error applying mandatory services on client batch intake:', svcErr);
-      }
-    }
 
     await client.query('COMMIT');
     return { added: processed, count: countRows[0].count };

@@ -65,18 +65,6 @@ async function createIntakeWithBatteries({
   );
 
   const allBatteries = [...newBatteries, ...revisitedBatteries];
-  const allBatteryIds = allBatteries.map((b) => b.id);
-
-  if (allBatteryIds.length > 0) {
-    try {
-      await serviceModel.applyMandatoryServicesToBatteries(allBatteryIds, {
-        notes: `Mandatory Intake Service Fee (Truck Intake #${intake.id})`,
-      });
-    } catch (svcErr) {
-      console.error('Error auto-applying mandatory services on truck intake:', svcErr);
-    }
-  }
-
   return { intake, batteries: allBatteries };
 }
 

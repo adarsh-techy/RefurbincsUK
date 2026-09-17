@@ -165,82 +165,54 @@ function TruckIntakeDetailPage() {
             maxHeight="440px"
             emptyMessage="No batteries recorded for this intake."
             columns={[
-            {
-              key: 'battery_code',
-              label: 'Battery ID',
-              render: (b) => (
-                <Link
-                  to={`/batteries/${b.battery_code}`}
-                  className="font-medium text-blue-700 hover:underline dark:text-blue-400"
-                >
-                  {b.battery_code}
-                </Link>
-              ),
-            },
-            ...(isPending
-              ? [
-                  {
-                    key: 'scanned',
-                    label: 'Scanned In',
-                    render: (b) => {
-                      const code = b.battery_code.toUpperCase();
-                      const at = scannedAt[code];
-                      return scannedSet.has(code) ? (
-                        <span className="inline-flex flex-col items-start gap-0.5">
-                          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2 py-0.5 text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                            ✓ Verified
-                          </span>
-                          {at && (
-                            <span className="text-[10px] font-semibold text-slate-400 dark:text-neutral-500">
-                              {at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-bold text-slate-500 dark:border-white/10 dark:bg-white/5 dark:text-neutral-400">
-                          Awaiting Scan
-                        </span>
-                      );
-                    },
-                  },
-                ]
-              : []),
-            {
-              key: 'created_at',
-              label: 'Date',
-              render: (b) => new Date(b.created_at).toLocaleDateString(),
-            },
-            {
-              key: 'last_repaired_at',
-              label: 'Previous Service Date',
-              render: (b) =>
-                b.last_repaired_at ? (
-                  <span className="block whitespace-normal text-xs">
-                    <span
-                      className={
-                        isThisMonth(b.last_repaired_at)
-                          ? 'font-semibold text-critical-600 dark:text-red-400'
-                          : undefined
-                      }
-                    >
-                      {new Date(b.last_repaired_at).toLocaleDateString()}
-                    </span>
-                    {b.last_repaired_parts && (
-                      <span className="text-slate-400 dark:text-neutral-500"> · {b.last_repaired_parts}</span>
-                    )}
-                  </span>
-                ) : (
-                  '—'
+              {
+                key: 'battery_code',
+                label: 'Battery ID',
+                render: (b) => (
+                  <Link
+                    to={`/batteries/${b.battery_code}`}
+                    className="font-semibold text-blue-700 hover:underline dark:text-blue-400"
+                  >
+                    {b.battery_code}
+                  </Link>
                 ),
-            },
-            {
-              key: 'status',
-              label: 'Status',
-              render: (b) => <StatusBadge status={b.status} />,
-            },
-          ]}
-          rows={batteries}
-        />
+              },
+              {
+                key: 'created_at',
+                label: 'Date',
+                render: (b) => new Date(b.created_at).toLocaleDateString(),
+              },
+              {
+                key: 'last_repaired_at',
+                label: 'Previous Service Date',
+                render: (b) =>
+                  b.last_repaired_at ? (
+                    <span className="block whitespace-normal text-xs">
+                      <span
+                        className={
+                          isThisMonth(b.last_repaired_at)
+                            ? 'font-semibold text-critical-600 dark:text-red-400'
+                            : undefined
+                        }
+                      >
+                        {new Date(b.last_repaired_at).toLocaleDateString()}
+                      </span>
+                      {b.last_repaired_parts && (
+                        <span className="text-slate-400 dark:text-neutral-500"> · {b.last_repaired_parts}</span>
+                      )}
+                    </span>
+                  ) : (
+                    '—'
+                  ),
+              },
+              {
+                key: 'status',
+                label: 'Status',
+                render: (b) => <StatusBadge status={b.status} />,
+              },
+            ]}
+            rows={batteries}
+          />
         </div>
       </div>
     </div>

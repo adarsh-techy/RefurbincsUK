@@ -273,17 +273,12 @@ async function create({ batteryCode, truckIntakeId }) {
      VALUES ($1, $2) RETURNING *`,
     [batteryCode, truckIntakeId]
   );
-  const battery = rows[0];
-  await db.query(
-    'INSERT INTO battery_visits (battery_id, truck_intake_id) VALUES ($1, $2)',
-    [battery.id, truckIntakeId]
-  );
-  return battery;
+  return rows[0];
 }
 
 // Batched form of create, for a truck intake's brand-new batteries — one
-// multi-row INSERT (plus one multi-row battery_visits INSERT) instead of a
-// per-battery round-trip.
+// multi-row INSERT linking them to the truck intake. Intake cycle visit is
+// stamped at arrival verification time.
 async function createMany(batteryCodes, truckIntakeId) {
   if (batteryCodes.length === 0) return [];
   const { rows } = await db.query(
@@ -291,11 +286,6 @@ async function createMany(batteryCodes, truckIntakeId) {
      SELECT unnest($1::text[]), $2::int
      RETURNING *`,
     [batteryCodes, truckIntakeId]
-  );
-  await db.query(
-    `INSERT INTO battery_visits (battery_id, truck_intake_id)
-     SELECT unnest($1::int[]), $2::int`,
-    [rows.map((r) => r.id), truckIntakeId]
   );
   return rows;
 }
@@ -332,36 +322,22 @@ async function listSerialNumbers() {
   return rows.map((r) => r.serial_number);
 }
 
-// Attaches an already-tracked battery (identified by scanning its existing
-// QR code) to a NEW truck intake, without touching its original
-// truck_intake_id — so its full history keeps every truck that's ever
-// brought it in, not just the first. Status resets to 'in_repair' since
-// it's back for another round.
+// Attaches an already-tracked battery to a new truck intake.
+// Visit cycle is recorded when shipment arrival is verified.
 async function addVisit(batteryId, truckIntakeId) {
-  await db.query(
-    'INSERT INTO battery_visits (battery_id, truck_intake_id) VALUES ($1, $2)',
-    [batteryId, truckIntakeId]
-  );
   const { rows } = await db.query(
-    `UPDATE batteries SET status = 'in_repair', started_by_user_id = NULL WHERE id = $1 RETURNING *`,
-    [batteryId]
+    `UPDATE batteries SET truck_intake_id = $2 WHERE id = $1 RETURNING *`,
+    [batteryId, truckIntakeId]
   );
   return rows[0];
 }
 
-// Batched form of addVisit, for a truck intake's scanned-in returning
-// batteries — one multi-row battery_visits INSERT plus one bulk status
-// UPDATE instead of two queries per battery.
+// Batched form of addVisit, linking scanned-in returning batteries to a new truck intake.
 async function addVisitMany(batteryIds, truckIntakeId) {
   if (batteryIds.length === 0) return [];
-  await db.query(
-    `INSERT INTO battery_visits (battery_id, truck_intake_id)
-     SELECT unnest($1::int[]), $2::int`,
-    [batteryIds, truckIntakeId]
-  );
   const { rows } = await db.query(
-    `UPDATE batteries SET status = 'in_repair', started_by_user_id = NULL WHERE id = ANY($1::int[]) RETURNING *`,
-    [batteryIds]
+    `UPDATE batteries SET truck_intake_id = $2 WHERE id = ANY($1::int[]) RETURNING *`,
+    [batteryIds, truckIntakeId]
   );
   return rows;
 }
