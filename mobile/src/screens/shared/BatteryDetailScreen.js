@@ -11,11 +11,12 @@ import {
 } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
 import { useNavigation, useRoute } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import ImageViewerModal from '../../components/ui/ImageViewerModal';
 import formatDuration from '../../utils/format-duration';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 function generateBatchId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -253,6 +254,20 @@ export default function BatteryDetailScreen() {
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const pendingExitActionRef = useRef(null);
   const allowExitRef = useRef(false);
+
+  // Fullscreen photo lightbox viewer state
+  const [lightboxVisible, setLightboxVisible] = useState(false);
+  const [lightboxImages, setLightboxImages] = useState([]);
+  const [lightboxIndex, setLightboxIndex] = useState(0);
+  const [lightboxTitle, setLightboxTitle] = useState('Battery Photo');
+
+  function openPhotoViewer(images, index = 0, title = 'Battery Photo') {
+    if (!images || images.length === 0) return;
+    setLightboxImages(images);
+    setLightboxIndex(index);
+    setLightboxTitle(title);
+    setLightboxVisible(true);
+  }
 
   const isInitialLoad = useRef(true);
 
@@ -678,7 +693,18 @@ export default function BatteryDetailScreen() {
                 <View className="flex-row items-center gap-2 mb-2">
                   {issuePhotos.map((p, idx) => (
                     <View key={idx} className="relative rounded-xl border border-slate-200 bg-slate-100 overflow-hidden">
-                      <Image source={{ uri: p.uri }} className="w-16 h-16 rounded-xl" resizeMode="cover" />
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          openPhotoViewer(
+                            issuePhotos.map((item) => item.uri),
+                            idx,
+                            `Upload Preview ${idx + 1} of ${issuePhotos.length}`
+                          )
+                        }
+                      >
+                        <Image source={{ uri: p.uri }} className="w-16 h-16 rounded-xl" resizeMode="cover" />
+                      </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleRemovePhoto(idx)}
                         className="absolute top-1 right-1 h-5 w-5 rounded-full bg-slate-900/80 items-center justify-center"
@@ -779,7 +805,18 @@ export default function BatteryDetailScreen() {
                 <View className="flex-row items-center gap-2 mb-2">
                   {issuePhotos.map((p, idx) => (
                     <View key={idx} className="relative rounded-xl border border-slate-200 bg-slate-100 overflow-hidden">
-                      <Image source={{ uri: p.uri }} className="w-16 h-16 rounded-xl" resizeMode="cover" />
+                      <TouchableOpacity
+                        activeOpacity={0.8}
+                        onPress={() =>
+                          openPhotoViewer(
+                            issuePhotos.map((item) => item.uri),
+                            idx,
+                            `Upload Preview ${idx + 1} of ${issuePhotos.length}`
+                          )
+                        }
+                      >
+                        <Image source={{ uri: p.uri }} className="w-16 h-16 rounded-xl" resizeMode="cover" />
+                      </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => handleRemovePhoto(idx)}
                         className="absolute top-1 right-1 h-5 w-5 rounded-full bg-slate-900/80 items-center justify-center"
@@ -966,20 +1003,36 @@ export default function BatteryDetailScreen() {
 
           {issues[0].photo_urls && issues[0].photo_urls.length > 0 && (
             <View className="mt-3 border-t border-red-200/60 pt-2.5">
-              <Text className="text-[11px] font-bold text-red-800 mb-2">
-                Attached Photos ({issues[0].photo_urls.length})
-              </Text>
-              <View className="flex-row items-center gap-2">
+              <View className="flex-row items-center justify-between mb-2">
+                <Text className="text-[11px] font-bold text-red-800">
+                  Attached Photos ({issues[0].photo_urls.length})
+                </Text>
+                <Text className="text-[10px] text-red-700/80 font-semibold">Tap to enlarge</Text>
+              </View>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
                 {issues[0].photo_urls.map((photo, pIdx) => {
-                  const apiRoot = (apiClient.defaults.baseURL || '').replace(/\/api\/?$/, '');
-                  const imgUri = photo.startsWith('http') ? photo : `${apiRoot}${photo.startsWith('/') ? photo : `/${photo}`}`;
+                  const imgUri = resolveImageUrl(photo);
                   return (
-                    <View key={pIdx} className="h-16 w-16 rounded-xl border border-red-200 overflow-hidden bg-white shadow-2xs">
+                    <TouchableOpacity
+                      key={pIdx}
+                      activeOpacity={0.8}
+                      onPress={() =>
+                        openPhotoViewer(
+                          issues[0].photo_urls,
+                          pIdx,
+                          `${battery.battery_code} · Unserviceable Photo ${pIdx + 1}`
+                        )
+                      }
+                      className="h-20 w-20 rounded-2xl border-2 border-red-200 overflow-hidden bg-slate-900 shadow-2xs relative active:scale-95"
+                    >
                       <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
-                    </View>
+                      <View className="absolute bottom-1 right-1 rounded-md bg-black/60 px-1 py-0.5">
+                        <Icon name="zoomIn" color="#ffffff" size={10} />
+                      </View>
+                    </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
           )}
         </View>
@@ -1392,6 +1445,40 @@ export default function BatteryDetailScreen() {
                               <Text className="mt-1 text-[11px] text-slate-500 italic">
                                 "{event.notes}"
                               </Text>
+                            )}
+                            {event.photos && event.photos.length > 0 && (
+                              <View className="mt-2.5 pt-2 border-t border-slate-100">
+                                <View className="flex-row items-center justify-between mb-1.5">
+                                  <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                    Defect Photos ({event.photos.length})
+                                  </Text>
+                                  <Text className="text-[9px] text-sky-600 font-semibold">Tap to enlarge</Text>
+                                </View>
+                                <View className="flex-row flex-wrap gap-2">
+                                  {event.photos.map((photo, pIdx) => {
+                                    const imgUri = resolveImageUrl(photo);
+                                    return (
+                                      <TouchableOpacity
+                                        key={pIdx}
+                                        activeOpacity={0.8}
+                                        onPress={() =>
+                                          openPhotoViewer(
+                                            event.photos,
+                                            pIdx,
+                                            `${battery.battery_code} · Issue Photo ${pIdx + 1}`
+                                          )
+                                        }
+                                        className="h-16 w-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 shadow-2xs relative active:scale-95"
+                                      >
+                                        <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
+                                        <View className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5">
+                                          <Icon name="zoomIn" color="#ffffff" size={8} />
+                                        </View>
+                                      </TouchableOpacity>
+                                    );
+                                  })}
+                                </View>
+                              </View>
                             )}
                             {event.price !== undefined && event.price > 0 && (
                               <Text className="mt-1 text-[10px] font-bold text-emerald-600">
@@ -1840,6 +1927,15 @@ export default function BatteryDetailScreen() {
           </View>
         </View>
       </Modal>
+
+      {/* ── Fullscreen Photo Lightbox Modal ────────────────────────────────────── */}
+      <ImageViewerModal
+        visible={lightboxVisible}
+        images={lightboxImages}
+        initialIndex={lightboxIndex}
+        title={lightboxTitle}
+        onClose={() => setLightboxVisible(false)}
+      />
     </ScrollView>
   );
 }

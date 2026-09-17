@@ -381,10 +381,10 @@ async function findVisitHistory(batteryId) {
 // unserviceable.
 async function findIssueHistory(batteryId) {
   const { rows } = await db.query(
-    `SELECT bi.id, bi.note, bi.reported_at, bi.photo_urls, ir.label AS reason_label, s.name AS staff_name
+    `SELECT bi.id, bi.note, bi.reported_at, bi.photo_urls, COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason_label, s.name AS staff_name
      FROM battery_issues bi
-     JOIN issue_reasons ir ON ir.id = bi.reason_id
-     JOIN staff s ON s.id = bi.staff_id
+     LEFT JOIN issue_reasons ir ON ir.id = bi.reason_id
+     LEFT JOIN staff s ON s.id = bi.staff_id
      WHERE bi.battery_id = $1
      ORDER BY bi.reported_at DESC`,
     [batteryId]

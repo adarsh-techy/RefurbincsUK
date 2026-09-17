@@ -105,7 +105,8 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
           ? `Review and rate your received delivery containing ${allCodes.length} refurbished batteries.`
           : 'Help our engineering team continually optimize battery longevity, safety, and turnaround.'
       }
-      size="xl"
+      size="3xl"
+      className="max-h-[90vh]"
       onClose={onClose}
     >
       {submitted ? (
@@ -213,7 +214,7 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
               </span>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
               {PRESET_FEEDBACK_OPTIONS.map((tag) => {
                 const isSelected = selectedTags.includes(tag);
                 return (
@@ -221,7 +222,7 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none ${
+                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none text-left ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/30 dark:bg-blue-500'
                         : 'bg-slate-100/90 text-slate-700 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-white/10 border border-slate-200/80 dark:border-white/5'
@@ -254,18 +255,18 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-white/10">
+          <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl px-4 py-2.5 text-xs font-bold text-slate-500 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-white/5 cursor-pointer transition-colors"
+              className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5 cursor-pointer transition-colors"
             >
               Skip / Dismiss
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-6 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md shadow-blue-600/30 hover:bg-blue-700 active:scale-95 disabled:opacity-50 cursor-pointer transition-all"
+              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 active:scale-95 disabled:opacity-50 cursor-pointer transition-all dark:bg-blue-600 dark:hover:bg-blue-500"
             >
               <FiSend className="w-3.5 h-3.5" />
               <span>{submitting ? 'Submitting…' : 'Submit Feedback'}</span>

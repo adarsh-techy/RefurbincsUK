@@ -1490,24 +1490,31 @@ function ClientBatteriesPage() {
                     </svg>
                     Received & Verified
                   </span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      const codes = (selectedBatch.batteries || []).map((b) => b.battery_code).filter(Boolean);
-                      setRatingModalData({
-                        isOpen: true,
-                        batteryCode: codes[0] || '',
-                        batteryCodes: codes,
-                        truckNumber: selectedBatch.truckNumber || '',
-                        driverName: selectedBatch.driverName || '',
-                        returnId: selectedBatch.intakeId || selectedBatch.returnId || null,
-                      });
-                    }}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-600 transition-colors cursor-pointer"
-                  >
-                    <FiStar className="w-3.5 h-3.5 fill-white text-white" />
-                    <span>Rate Delivery Batch</span>
-                  </button>
+                  {isReturnRated(selectedBatch.intakeId || selectedBatch.returnId) ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
+                      <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                      <span>Rated — Thank You!</span>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const codes = (selectedBatch.batteries || []).map((b) => b.battery_code).filter(Boolean);
+                        setRatingModalData({
+                          isOpen: true,
+                          batteryCode: codes[0] || '',
+                          batteryCodes: codes,
+                          truckNumber: selectedBatch.truckNumber || '',
+                          driverName: selectedBatch.driverName || '',
+                          returnId: selectedBatch.intakeId || selectedBatch.returnId || null,
+                        });
+                      }}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-600 transition-colors cursor-pointer"
+                    >
+                      <FiStar className="w-3.5 h-3.5 fill-white text-white" />
+                      <span>Rate Delivery Batch</span>
+                    </button>
+                  )}
                 </div>
               )
             ) : selectedBatch.intakeStatus === 'pending_arrival' ? (
@@ -2260,6 +2267,11 @@ function ClientBatteriesPage() {
                                     <span>📷</span>
                                     <span>Scan to Verify</span>
                                   </button>
+                                ) : isReturnRated(batch.intakeId || batch.returnId) ? (
+                                  <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
+                                    <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                    <span>Rated</span>
+                                  </span>
                                 ) : (
                                   <button
                                     type="button"

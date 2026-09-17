@@ -117,7 +117,10 @@ async function myRatings(req, res, next) {
       return res.status(404).json({ message: 'Client profile not found.' });
     }
 
-    const ratings = await ratingModel.findByClient(client.id);
+    // High limit: the client portal uses this list to decide whether a
+    // delivery's Rate button should be hidden, so it needs the client's full
+    // rating history, not just the most recent 20.
+    const ratings = await ratingModel.findByClient(client.id, 1000);
     res.json({ data: ratings });
   } catch (err) {
     next(err);

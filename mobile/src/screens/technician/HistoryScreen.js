@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Image,
   Modal,
   ScrollView,
   Text,
@@ -13,6 +14,7 @@ import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import formatDuration from '../../utils/format-duration';
+import { resolveImageUrl } from '../../utils/imageUrl';
 
 const DATE_FILTERS = [
   { id: 'all', label: 'All Dates' },
@@ -605,6 +607,23 @@ export default function HistoryScreen() {
                         {item.note ? (
                           <Text className="mt-1 text-xs text-rose-600 leading-relaxed">{item.note}</Text>
                         ) : null}
+                        {item.photo_urls && item.photo_urls.length > 0 && (
+                          <View className="mt-2 pt-2 border-t border-rose-200/60">
+                            <View className="flex-row items-center gap-1.5 mb-1.5">
+                              <Icon name="photo" color="#be123c" size={12} />
+                              <Text className="text-[10px] font-bold text-rose-800">
+                                {item.photo_urls.length} Attached Photo{item.photo_urls.length > 1 ? 's' : ''}
+                              </Text>
+                            </View>
+                            <View className="flex-row items-center gap-2">
+                              {item.photo_urls.map((photo, pIdx) => (
+                                <View key={pIdx} className="h-12 w-12 rounded-lg border border-rose-200 overflow-hidden bg-white shadow-2xs">
+                                  <Image source={{ uri: resolveImageUrl(photo) }} className="h-full w-full" resizeMode="cover" />
+                                </View>
+                              ))}
+                            </View>
+                          </View>
+                        )}
                       </View>
 
                       <View className="mt-2 flex-row items-center justify-between">
