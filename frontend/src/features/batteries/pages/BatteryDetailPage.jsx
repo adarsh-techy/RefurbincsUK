@@ -119,6 +119,17 @@ const EVENT_META = {
       />
     ),
   },
+  part_removed: {
+    label: 'Part Removed & Restocked',
+    dot: 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300',
+    icon: (
+      <path
+        fillRule="evenodd"
+        d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.09 3.05 14.5 3.447 14.5 3.978v.255a49.19 49.19 0 0 0-5 0v-.255c0-.53.41-.928.864-.952ZM10 9.75a.75.75 0 0 1 .75.75v6a.75.75 0 0 1-1.5 0v-6a.75.75 0 0 1 .75-.75Zm4.5.75a.75.75 0 0 0-1.5 0v6a.75.75 0 0 0 1.5 0v-6Z"
+        clipRule="evenodd"
+      />
+    ),
+  },
 };
 
 function buildEvents(visits, history, returns, issues, services = []) {
@@ -134,15 +145,33 @@ function buildEvents(visits, history, returns, issues, services = []) {
   });
 
   history.forEach((h) => {
+    const isRemoved = !!h.removed_at;
+    const partCost = Number(h.price) + Number(h.labor_charge || 0);
+
     events.push({
       key: `repair-${h.id}`,
       type: 'repair',
       date: h.repaired_at,
-      primary: `${h.part_name} · by ${h.staff_name}`,
-      price: Number(h.price) + Number(h.labor_charge || 0),
+      primary: `${h.part_name} · by ${h.staff_name}${isRemoved ? ' (Removed)' : ''}`,
+      price: isRemoved ? 0 : partCost,
+      originalPrice: partCost,
       notes: h.notes,
       durationSeconds: h.duration_seconds != null ? Number(h.duration_seconds) : null,
+      isRemoved,
     });
+
+    if (h.removed_at) {
+      events.push({
+        key: `removed-${h.id}`,
+        type: 'part_removed',
+        date: h.removed_at,
+        primary: `${h.part_name} · Removed by ${h.removed_by_staff_name || 'Workshop Staff'}`,
+        notes: `Restocked to inventory (-£${partCost.toFixed(2)})`,
+        price: -partCost,
+        isDeduction: true,
+        removedByStaffName: h.removed_by_staff_name,
+      });
+    }
   });
 
   services.forEach((s) => {
@@ -1096,10 +1125,11 @@ function BatteryDetailPage() {
 
   // ── ADMIN & TECHNICIAN INTERNAL VIEW ──────────────────────────────────────
   const cycles = buildCycles(buildEvents(visits || [], history || [], returns || [], issues || [], services || []));
-  const totalSpent = (history || []).reduce(
-    (sum, h) => sum + Number(h.price) + Number(h.labor_charge || 0),
-    0
-  ) + (services || []).reduce((sum, s) => sum + Number(s.rate || 0), 0);
+  const totalSpent =
+    (history || []).reduce(
+      (sum, h) => (h.removed_at ? sum : sum + Number(h.price) + Number(h.labor_charge || 0)),
+      0
+    ) + (services || []).reduce((sum, s) => sum + Number(s.rate || 0), 0);
   const repairVisits = new Set((history || []).map((h) => h.batch_id)).size;
   // Every part logged in the same repair batch shares that batch's single
   // duration_seconds value (see repair.model.js's create()), so summing
@@ -1463,8 +1493,18 @@ function BatteryDetailPage() {
                                 </span>
                               )}
                               {!isTechnician && event.price !== undefined && (
-                                <span className="rounded-full bg-brand-50 px-2.5 py-0.5 text-xs font-semibold text-brand-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-                                  £{Number(event.price).toFixed(2)}
+                                <span
+                                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
+                                    event.isDeduction
+                                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                                      : event.isRemoved
+                                        ? 'bg-slate-100 text-slate-500 line-through dark:bg-white/10 dark:text-neutral-400'
+                                        : 'bg-brand-50 text-brand-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                  }`}
+                                >
+                                  {event.isDeduction
+                                    ? `-£${Math.abs(Number(event.price)).toFixed(2)}`
+                                    : `£${Number(event.price || event.originalPrice || 0).toFixed(2)}`}
                                 </span>
                               )}
                               {event.notes && (

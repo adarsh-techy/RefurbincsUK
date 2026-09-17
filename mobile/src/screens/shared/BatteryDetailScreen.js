@@ -119,16 +119,36 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
   });
 
   history.forEach((h) => {
+    const isRemoved = !!h.removed_at;
+    const partCost = Number(h.price || 0) + Number(h.labor_charge || 0);
+
     events.push({
       key: `repair-${h.id}`,
       type: 'repair',
-      label: 'Repair Logged',
+      label: isRemoved ? 'Part Fitted (Removed)' : 'Repair Logged',
       icon: 'wrench',
       date: h.repaired_at,
-      primary: `${h.part_name} · by ${h.staff_name || 'Technician'}`,
-      price: Number(h.price || 0) + Number(h.labor_charge || 0),
+      primary: `${h.part_name} · by ${h.staff_name || 'Technician'}${isRemoved ? ' (Removed)' : ''}`,
+      price: isRemoved ? 0 : partCost,
+      originalPrice: partCost,
       notes: h.notes,
+      isRemoved,
     });
+
+    if (h.removed_at) {
+      events.push({
+        key: `removed-${h.id}`,
+        type: 'part_removed',
+        label: 'Part Removed & Restocked',
+        icon: 'package',
+        date: h.removed_at,
+        primary: `Removed: ${h.part_name} · by ${h.removed_by_staff_name || 'Workshop Staff'}`,
+        notes: `Restocked to inventory (-£${partCost.toFixed(2)})`,
+        price: -partCost,
+        isDeduction: true,
+        removedByStaffName: h.removed_by_staff_name,
+      });
+    }
   });
 
   services.forEach((s) => {
@@ -226,6 +246,7 @@ export default function BatteryDetailScreen() {
   const [passToTechSubmitting, setPassToTechSubmitting] = useState(false);
   const [showCantServiceAlertModal, setShowCantServiceAlertModal] = useState(false);
   const [cantServiceAlertData, setCantServiceAlertData] = useState(null);
+  const [showRemovePartsSuccessModal, setShowRemovePartsSuccessModal] = useState(false);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -623,6 +644,7 @@ export default function BatteryDetailScreen() {
       });
       setSelectedRemovalIds([]);
       await load();
+      setShowRemovePartsSuccessModal(true);
     } catch (err) {
       setRemovePartsError(err.response?.data?.message || err.message);
     } finally {
@@ -1017,7 +1039,10 @@ export default function BatteryDetailScreen() {
   const cycles = buildCycles(buildEvents(visits, history, returns, issues, services));
   const isClientLocked = battery.serial_number_added_by_role === 'client';
   const totalSpent =
-    history.reduce((sum, h) => sum + Number(h.price || 0) + Number(h.labor_charge || 0), 0) +
+    history.reduce((sum, h) => {
+      if (h.removed_at) return sum;
+      return sum + Number(h.price || 0) + Number(h.labor_charge || 0);
+    }, 0) +
     services.reduce((sum, s) => sum + Number(s.rate || 0), 0);
 
   return (
@@ -1236,7 +1261,7 @@ export default function BatteryDetailScreen() {
         <>
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
-          {battery.status === 'in_repair' && (
+          {battery.status === 'in_repair' && pendingPartsRemoval.length === 0 && (
             <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
               <Text className="text-sm font-bold text-slate-900">Ready to start?</Text>
               <Text className="mt-0.5 mb-3 text-xs text-slate-400">
@@ -2259,6 +2284,54 @@ export default function BatteryDetailScreen() {
               >
                 <Icon name="camera" color="#64748b" size={14} />
                 <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Parts Removed & Restocked Success Modal ───────────────────────── */}
+      <Modal
+        visible={showRemovePartsSuccessModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowRemovePartsSuccessModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-6">
+          <View className="w-full max-w-sm rounded-3xl border border-emerald-200 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800">
+              <Icon name="checkCircle" color="#059669" size={24} />
+            </View>
+            <Text className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">
+              Parts Removed &amp; Restocked
+            </Text>
+            <Text className="mb-5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              The parts have been successfully removed from{' '}
+              <Text className="font-bold text-slate-800 dark:text-slate-200">{battery?.battery_code}</Text> and
+              restocked back into inventory.
+            </Text>
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowRemovePartsSuccessModal(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowRemovePartsSuccessModal(false)}
+                className="items-center rounded-xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
+              >
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  View Battery Details
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

@@ -395,10 +395,12 @@ async function findIssueHistory(batteryId) {
 async function findRepairHistory(batteryId) {
   const { rows } = await db.query(
     `SELECT r.id, r.batch_id, r.quantity_used, r.notes, r.repaired_at, r.price, r.labor_charge,
-            r.duration_seconds, s.id AS staff_id, s.user_id, s.name AS staff_name, p.name AS part_name
+            r.duration_seconds, r.removed_at, r.removed_by_staff_id, s.id AS staff_id, s.user_id, s.name AS staff_name, p.name AS part_name,
+            rs.name AS removed_by_staff_name
      FROM repairs r
      JOIN staff s ON s.id = r.staff_id
      JOIN parts p ON p.id = r.part_id
+     LEFT JOIN staff rs ON rs.id = r.removed_by_staff_id
      WHERE r.battery_id = $1
      ORDER BY r.repaired_at DESC`,
     [batteryId]
