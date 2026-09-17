@@ -1585,7 +1585,7 @@ export default function BatteryDetailScreen() {
                         {cycleTotal > 0 && (
                           <View className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
                             <Text className="text-[10px] font-extrabold text-blue-700">
-                              £{cycleTotal.toFixed(2)}
+                              Total: £{cycleTotal.toFixed(2)}
                             </Text>
                           </View>
                         )}

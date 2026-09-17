@@ -1476,7 +1476,7 @@ function BatteryDetailPage() {
                   <div className="flex items-center gap-2">
                     {!isTechnician && cycleTotal > 0 && (
                       <span className="inline-flex items-center gap-1 rounded-full bg-white/70 px-2.5 py-0.5 text-xs font-bold text-brand-700 dark:bg-surface-800/80 dark:text-emerald-300">
-                        £{cycleTotal.toFixed(2)}
+                        Total: £{cycleTotal.toFixed(2)}
                       </span>
                     )}
                     <span
