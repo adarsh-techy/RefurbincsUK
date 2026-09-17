@@ -159,7 +159,8 @@ async function findByCode(batteryCode) {
             ti.truck_number AS intake_truck_number,
             ti.driver_name AS intake_driver_name,
             ti.intake_at AS intake_at,
-            u.name AS started_by_name
+            u.name AS started_by_name,
+            EXISTS (SELECT 1 FROM battery_ratings br WHERE br.battery_code = b.battery_code) AS already_rated
      FROM batteries b
      LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
      LEFT JOIN users u ON u.id = b.started_by_user_id

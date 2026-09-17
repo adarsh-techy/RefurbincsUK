@@ -412,37 +412,16 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
     let intakeId = null;
 
     if (truck) {
-      // Find today's truck intake for this client and truck number, or create
-      // one. Matched with punctuation/whitespace stripped so "KL18 ABCD 123",
-      // "KL18-ABCD-123" and "KL18ABCD123" are all treated as the same truck —
-      // the truck number field is cleared after each submit, so a client
-      // retyping it a little differently the next time shouldn't fork off a
-      // separate, unmerged intake.
-      const { rows: intakeRows } = await client.query(
-        `SELECT id FROM truck_intakes
-         WHERE client_id = $1
-           AND regexp_replace(upper(truck_number), '[^A-Z0-9]', '', 'g') = regexp_replace(upper($2), '[^A-Z0-9]', '', 'g')
-           AND intake_at::date = now()::date
-         ORDER BY id DESC LIMIT 1`,
-        [clientId, truck]
+      // Always create a new truck intake row for this batch, even if the
+      // same truck number was used earlier. Each packing action creates a
+      // fresh, independent shipment.
+      const { rows: newIntakeRows } = await client.query(
+        `INSERT INTO truck_intakes (truck_number, driver_name, client_id, battery_count, status, intake_at, created_at)
+         VALUES ($1, $2, $3, $4, 'pending_arrival', now(), now())
+         RETURNING id`,
+        [truck, driver || 'Driver', clientId, items.length]
       );
-
-      if (intakeRows.length > 0) {
-        intakeId = intakeRows[0].id;
-        // battery_count is recomputed from the actual linked rows below,
-        // once every item's been processed — incrementing by items.length
-        // here would double-count whenever an item in this batch is a
-        // battery already linked to this same truck (e.g. the client
-        // re-adds a battery already packed onto today's still-open truck).
-      } else {
-        const { rows: newIntakeRows } = await client.query(
-          `INSERT INTO truck_intakes (truck_number, driver_name, client_id, battery_count, status, intake_at, created_at)
-           VALUES ($1, $2, $3, $4, 'pending_arrival', now(), now())
-           RETURNING id`,
-          [truck, driver || 'Driver', clientId, items.length]
-        );
-        intakeId = newIntakeRows[0].id;
-      }
+      intakeId = newIntakeRows[0].id;
     }
 
     const processed = [];

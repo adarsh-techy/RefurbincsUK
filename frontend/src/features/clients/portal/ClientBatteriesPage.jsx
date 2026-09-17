@@ -96,6 +96,28 @@ function ClientBatteriesPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // Delivery batches (return_id) the client has already rated — once rated,
+  // the Rate button is replaced with a "Rated" badge instead of letting them
+  // submit feedback again for the same shipment.
+  const [ratedReturnIds, setRatedReturnIds] = useState(() => new Set());
+  function loadRatedReturns() {
+    apiClient
+      .get('/ratings/my')
+      .then(({ data: result }) => {
+        const ids = (result.data || [])
+          .map((r) => r.return_id)
+          .filter((id) => id !== null && id !== undefined)
+          .map(String);
+        setRatedReturnIds(new Set(ids));
+      })
+      .catch(() => {
+        // non-blocking — worst case the Rate button just stays visible
+      });
+  }
+  function isReturnRated(id) {
+    return id !== null && id !== undefined && ratedReturnIds.has(String(id));
+  }
+
   // Default view is 'batch_table' (Admin-style Table View), with toggle to 'cards'
   const [viewMode, setViewMode] = useState('batch_table');
 
@@ -248,6 +270,11 @@ function ClientBatteriesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [effectiveBucket]);
 
+  useEffect(() => {
+    loadRatedReturns();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Group batteries by Truck Intake Batch
   const rawBatches = useMemo(() => {
     if (!data || data.length === 0) return [];
@@ -304,13 +331,6 @@ function ClientBatteriesPage() {
     // truck arrival status.
     return sorted;
   }, [data, effectiveBucket]);
-
-  // Existing truck numbers for suggestions datalist
-  const existingTruckNumbers = useMemo(() => {
-    return Array.from(
-      new Set(rawBatches.map((b) => b.truckNumber).filter(Boolean))
-    );
-  }, [rawBatches]);
 
   // Filtered Batches based on Search and Date
   const batches = useMemo(() => {
@@ -1001,23 +1021,30 @@ function ClientBatteriesPage() {
             </>
           )}
           {effectiveBucket === 'received' && (
-            <button
-              type="button"
-              onClick={() => {
-                setRatingModalData({
-                  isOpen: true,
-                  batteryCode: row.battery_code,
-                  batteryCodes: [row.battery_code],
-                  truckNumber: selectedBatch?.truckNumber || '',
-                  driverName: selectedBatch?.driverName || '',
-                  returnId: selectedBatch?.intakeId || selectedBatch?.returnId || null,
-                });
-              }}
-              className="inline-flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer"
-            >
-              <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
-              <span>Rate</span>
-            </button>
+            isReturnRated(selectedBatch?.intakeId || selectedBatch?.returnId) ? (
+              <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
+                <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span>Rated</span>
+              </span>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  setRatingModalData({
+                    isOpen: true,
+                    batteryCode: row.battery_code,
+                    batteryCodes: [row.battery_code],
+                    truckNumber: selectedBatch?.truckNumber || '',
+                    driverName: selectedBatch?.driverName || '',
+                    returnId: selectedBatch?.intakeId || selectedBatch?.returnId || null,
+                  });
+                }}
+                className="inline-flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer"
+              >
+                <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+                <span>Rate</span>
+              </button>
+            )
           )}
           <Link
             to={`/batteries/${encodeURIComponent(row.battery_code)}`}
@@ -1345,6 +1372,11 @@ function ClientBatteriesPage() {
                 <span>📷</span>
                 <span>Scan to Verify</span>
               </button>
+            ) : isReturnRated(batch.intakeId || batch.returnId) ? (
+              <span className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
+                <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                <span>Rated</span>
+              </span>
             ) : (
               <button
                 type="button"
@@ -2306,18 +2338,12 @@ function ClientBatteriesPage() {
                 <label className={labelClasses}>Truck Number (optional)</label>
                 <input
                   type="text"
-                  list="client-truck-numbers"
                   value={truckNumber}
                   onChange={(e) => setTruckNumber(e.target.value)}
                   placeholder="e.g. GB21 XYZ or LD68 FGH"
                   autoComplete="off"
                   className={formInputClasses}
                 />
-                <datalist id="client-truck-numbers">
-                  {existingTruckNumbers.map((num) => (
-                    <option key={num} value={num} />
-                  ))}
-                </datalist>
               </div>
 
               <div className="shrink-0">
@@ -2834,6 +2860,7 @@ function ClientBatteriesPage() {
           }
           onSuccess={() => {
             loadData();
+            loadRatedReturns();
           }}
         />
       )}

@@ -266,7 +266,7 @@ function buildCycles(events) {
 }
 
 // ── CLIENT-SPECIFIC ELEGANT, VIBRANT & INTERACTIVE BATTERY VIEW ────────────
-function ClientBatteryDetailView({ battery, history = [], returns = [], visits = [], issues = [], services = [], qrDataUrl, onDownloadQr }) {
+function ClientBatteryDetailView({ battery, history = [], returns = [], visits = [], issues = [], services = [], qrDataUrl, onDownloadQr, onReload }) {
   const navigate = useNavigate();
   const [showRatingModal, setShowRatingModal] = useState(false);
 
@@ -449,7 +449,7 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
                   <span>Last Service: <strong>{new Date(battery.last_service_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
                 </span>
               )}
-              {isReturned && (
+              {isReturned && !battery.already_rated && (
                 <button
                   type="button"
                   onClick={() => setShowRatingModal(true)}
@@ -458,6 +458,12 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
                   <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
                   <span>Rate Service Quality</span>
                 </button>
+              )}
+              {isReturned && battery.already_rated && (
+                <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-slate-500 border border-slate-200 dark:bg-white/5 dark:border-white/10 dark:text-neutral-400">
+                  <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
+                  <span>Rated — Thank You!</span>
+                </span>
               )}
             </div>
           </div>
@@ -909,7 +915,10 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
         <RatingModal
           batteryCode={battery.battery_code}
           onClose={() => setShowRatingModal(false)}
-          onSuccess={() => setShowRatingModal(false)}
+          onSuccess={() => {
+            setShowRatingModal(false);
+            if (onReload) onReload();
+          }}
         />
       )}
     </div>
@@ -1080,6 +1089,7 @@ function BatteryDetailPage() {
         services={services}
         qrDataUrl={qrDataUrl}
         onDownloadQr={handleDownloadQr}
+        onReload={load}
       />
     );
   }

@@ -27,12 +27,6 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
     [rawClients]
   );
 
-  const { data: pastIntakes } = useFetchList('/truck-intakes');
-  const existingTruckNumbers = useMemo(
-    () => [...new Set((pastIntakes || []).map((i) => i.truck_number).filter(Boolean))],
-    [pastIntakes]
-  );
-
   const [form, setForm] = useState({
     truckNumber: intake?.truck_number || '',
     driverName: intake?.driver_name || '',
@@ -234,7 +228,6 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
               </label>
               <input
                 type="text"
-                list="intake-truck-numbers"
                 value={form.truckNumber}
                 onChange={(e) => updateField('truckNumber', e.target.value.toUpperCase())}
                 placeholder="e.g. GB21 XYZ"
@@ -242,11 +235,6 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
                 className={`${inputClasses} font-mono uppercase`}
                 required
               />
-              <datalist id="intake-truck-numbers">
-                {existingTruckNumbers.map((num) => (
-                  <option key={num} value={num} />
-                ))}
-              </datalist>
             </div>
 
             <div>
