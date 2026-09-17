@@ -56,54 +56,9 @@ function ServiceForm({ service, defaultIsMandatory = false, onSaved, onCancel })
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
-        {/* Service Type Selection */}
-        <div>
-          <label className={labelClasses}>Fee & Service Category</label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-            <button
-              type="button"
-              onClick={() => updateField('isMandatory', false)}
-              className={`flex flex-col text-left p-3 rounded-lg border transition-all cursor-pointer ${
-                !form.isMandatory
-                  ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30 dark:border-blue-500'
-                  : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-surface-700 dark:bg-surface-800 dark:hover:bg-surface-700'
-              }`}
-            >
-              <span className={`text-xs font-bold ${!form.isMandatory ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-neutral-200'}`}>
-                Workshop Service
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
-                Applied manually by technicians during testing & repairs.
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => updateField('isMandatory', true)}
-              className={`flex flex-col text-left p-3 rounded-lg border transition-all cursor-pointer ${
-                form.isMandatory
-                  ? 'border-amber-500 bg-amber-50/60 dark:bg-amber-950/30 dark:border-amber-500'
-                  : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-surface-700 dark:bg-surface-800 dark:hover:bg-surface-700'
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <span className={`text-xs font-bold ${form.isMandatory ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-neutral-200'}`}>
-                  Mandatory Fee
-                </span>
-                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-200/70 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
-                  Auto-Intake
-                </span>
-              </div>
-              <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
-                Automatically added to every battery during truck intake.
-              </span>
-            </button>
-          </div>
-        </div>
-
         <div>
           <label className={labelClasses}>
-            {form.isMandatory ? 'Fee Name *' : 'Service Name *'}
+            {form.isMandatory ? 'Mandatory Fee Name *' : 'Service Name *'}
           </label>
           <input
             type="text"
