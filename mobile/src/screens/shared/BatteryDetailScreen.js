@@ -1200,10 +1200,12 @@ export default function BatteryDetailScreen() {
           <View className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
             <View className="mb-1 flex-row items-center gap-2">
               <Icon name="wrench" color="#b45309" size={16} />
-              <Text className="text-sm font-bold text-amber-900">Parts Pending Removal</Text>
+              <Text className="text-sm font-bold text-amber-900">Mandatory: Remove All Fitted Parts</Text>
             </View>
             <Text className="mb-3 text-[11px] text-amber-800/80 leading-relaxed">
-              These parts were already fitted to this battery. Check off the parts you have physically removed to restock inventory:
+              {fromScan
+                ? 'This battery failed testing. All previously fitted parts must be physically removed and restocked into inventory:'
+                : 'This battery failed testing and has fitted parts pending removal. To remove parts, the battery must be scanned with the camera:'}
             </Text>
 
           <View className="gap-2">
@@ -1212,10 +1214,11 @@ export default function BatteryDetailScreen() {
               return (
                 <TouchableOpacity
                   key={p.id}
+                  disabled={!fromScan}
                   onPress={() => toggleRemovalId(p.id)}
                   className={`flex-row items-center justify-between rounded-xl border p-3 ${
                     isChecked ? 'border-amber-500 bg-amber-100/70' : 'border-amber-200 bg-white'
-                  }`}
+                  } ${!fromScan ? 'opacity-90' : ''}`}
                 >
                   <View className="flex-row items-center gap-2.5 flex-1 pr-2">
                     <View
@@ -1227,7 +1230,7 @@ export default function BatteryDetailScreen() {
                     </View>
                     <Text className="text-xs font-bold text-slate-900">{p.part_name}</Text>
                   </View>
-                  <Text className="text-[10px] text-slate-500">Qty {p.quantity_used}</Text>
+                  <Text className="text-[10px] text-slate-500 font-semibold">Qty {p.quantity_used}</Text>
                 </TouchableOpacity>
               );
             })}
@@ -1237,19 +1240,42 @@ export default function BatteryDetailScreen() {
             <Text className="mt-2 text-xs font-medium text-red-600">{removePartsError}</Text>
           )}
 
-          <TouchableOpacity
-            onPress={handleRemoveParts}
-            disabled={removingParts || selectedRemovalIds.length === 0}
-            className="mt-3 items-center rounded-xl bg-amber-600 py-3 shadow-md disabled:opacity-50"
-          >
-            {removingParts ? (
-              <ActivityIndicator color="#fff" />
-            ) : (
-              <Text className="text-xs font-bold text-white">
-                Confirm Removal & Restock ({selectedRemovalIds.length})
+          {fromScan ? (
+            <TouchableOpacity
+              onPress={handleRemoveParts}
+              disabled={removingParts || selectedRemovalIds.length === 0}
+              className="mt-3 items-center rounded-xl bg-amber-600 py-3.5 shadow-md disabled:opacity-50 active:bg-amber-700"
+            >
+              {removingParts ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-xs font-bold text-white">
+                  Confirm Removal &amp; Restock All Parts ({pendingPartsRemoval.length})
+                </Text>
+              )}
+            </TouchableOpacity>
+          ) : (
+            <View className="mt-3 gap-2">
+              <TouchableOpacity
+                onPress={() => {
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+              >
+                <Icon name="camera" color="#ffffff" size={15} />
+                <Text className="text-xs font-bold text-white">
+                  Scan Battery with Camera to Remove Parts
+                </Text>
+              </TouchableOpacity>
+              <Text className="text-center text-[10px] font-medium text-amber-700/80">
+                🔒 View mode only — physical QR scan required to process parts removal.
               </Text>
-            )}
-          </TouchableOpacity>
+            </View>
+          )}
         </View>
       )}
 

@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const serviceModel = require('./service.model');
 
 // Fetches one page of batteries, newest first. Requests limit+1 rows so the
 // caller can tell whether there's another page without a separate COUNT(*).
@@ -525,13 +526,40 @@ async function setBlocked(id, blocked) {
 // it's in_progress. Returns undefined if the battery doesn't exist or isn't
 // in a startable state.
 async function startWork(id, userId) {
-  const { rows } = await db.query(
-    `UPDATE batteries SET status = 'in_progress', work_started_at = now(), started_by_user_id = $2
-     WHERE id = $1 AND status = 'in_repair'
-     RETURNING *`,
-    [id, userId]
-  );
-  return rows[0];
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows } = await client.query(
+      `UPDATE batteries SET status = 'in_progress', work_started_at = now(), started_by_user_id = $2
+       WHERE id = $1 AND status = 'in_repair'
+       RETURNING *`,
+      [id, userId]
+    );
+    const battery = rows[0];
+    if (!battery) {
+      await client.query('ROLLBACK');
+      return undefined;
+    }
+
+    // Resolve staff_id for userId if any
+    const staffRes = await client.query('SELECT id FROM staff WHERE user_id = $1', [userId]);
+    const staffId = staffRes.rows[0]?.id || null;
+
+    // Automatically apply mandatory intake service fees if not already applied
+    await serviceModel.applyMandatoryServicesToBatteries(id, {
+      queryRunner: client,
+      staffId,
+      notes: 'Mandatory Intake Service Fee',
+    });
+
+    await client.query('COMMIT');
+    return battery;
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 // A technician verifying a battery works after its parts were replaced —
