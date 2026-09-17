@@ -1168,14 +1168,14 @@ function ClientDashboardPage() {
                 type="button"
                 disabled={submittingTruck}
                 onClick={() => setShowAddTruckModal(false)}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10 cursor-pointer"
+                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
               >
                 Cancel
               </button>
               <button
                 type="submit"
                 disabled={submittingTruck}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2 text-xs font-black text-white shadow-xs hover:bg-emerald-700 disabled:opacity-50 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 transition-all cursor-pointer"
               >
                 {submittingTruck ? (
                   <>

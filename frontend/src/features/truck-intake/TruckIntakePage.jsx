@@ -145,7 +145,8 @@ function TruckIntakePage() {
               ? 'Record a truck delivering batteries for repair.'
               : 'Update the truck/driver details for this intake.'
           }
-          size="2xl"
+          size="5xl"
+          className="max-h-[92vh] flex flex-col"
           onClose={() => setFormTarget(null)}
         >
           <TruckIntakeForm

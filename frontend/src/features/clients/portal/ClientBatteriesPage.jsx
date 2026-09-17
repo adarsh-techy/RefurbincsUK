@@ -2539,21 +2539,42 @@ function ClientBatteriesPage() {
               </div>
             </div>
 
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 pt-2 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => setPackModalOpen(false)}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={packing || (scannedBatteries.length === 0 && !scanInput.trim())}
-                className="rounded-md bg-green-600 px-5 py-2 text-sm font-medium text-white shadow-xs hover:bg-green-700 disabled:opacity-50 transition-all dark:bg-emerald-600 dark:hover:bg-emerald-500"
-              >
-                {packing ? 'Saving…' : `Record Intake (${scannedBatteries.length + (scanInput.trim() ? 1 : 0)} Batteries)`}
-              </button>
+            {/* Sticky Frosted-Glass Bottom Right Actions Bar */}
+            <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-200/90 bg-white/95 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                {scannedBatteries.length > 0 ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>{scannedBatteries.length} batteries staged for intake</span>
+                  </span>
+                ) : (
+                  <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">
+                    Scan or pick batteries on the left to add them
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={() => setPackModalOpen(false)}
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={packing || (scannedBatteries.length === 0 && !scanInput.trim())}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                >
+                  <span>✓</span>
+                  <span>
+                    {packing
+                      ? 'Recording Intake…'
+                      : `Record Intake (${scannedBatteries.length + (scanInput.trim() ? 1 : 0)} Batteries)`}
+                  </span>
+                </button>
+              </div>
             </div>
           </form>
         </Modal>
