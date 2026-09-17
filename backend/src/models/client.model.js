@@ -1,4 +1,5 @@
 const db = require('../config/db');
+const serviceModel = require('./service.model');
 
 // Joins in the linked login account's email and permissions so the Clients page
 // and permission management can view and manage client dashboard access.
@@ -687,6 +688,17 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
       }
     }
 
+    if (processedBatteries.length > 0) {
+      try {
+        await serviceModel.applyMandatoryServicesToBatteries(
+          processedBatteries.map((b) => b.id),
+          { queryRunner: client, notes: `Mandatory Intake Service Fee (Client Dispatch ${truck})` }
+        );
+      } catch (svcErr) {
+        console.error('Error applying mandatory services on client truck intake:', svcErr);
+      }
+    }
+
     await client.query('COMMIT');
 
     return {
@@ -810,6 +822,17 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
       `UPDATE truck_intakes SET battery_count = $1 WHERE id = $2`,
       [countRows[0].count, intakeId]
     );
+
+    if (processed.length > 0) {
+      try {
+        await serviceModel.applyMandatoryServicesToBatteries(
+          processed.map((b) => b.id),
+          { queryRunner: client, notes: `Mandatory Intake Service Fee (Client Batch #${intakeId})` }
+        );
+      } catch (svcErr) {
+        console.error('Error applying mandatory services on client batch intake:', svcErr);
+      }
+    }
 
     await client.query('COMMIT');
     return { added: processed, count: countRows[0].count };

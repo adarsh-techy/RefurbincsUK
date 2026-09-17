@@ -1,5 +1,6 @@
 const truckIntakeModel = require('../models/truck-intake.model');
 const batteryModel = require('../models/battery.model');
+const serviceModel = require('../models/service.model');
 const auditLogModel = require('../models/audit-log.model');
 const truckIntakeService = require('../services/truck-intake.service');
 const { parseTruckIntakeSheet } = require('../utils/parse-truck-intake-sheet');
@@ -187,6 +188,18 @@ async function verifyArrival(req, res, next) {
     if (!intake) {
       return res.status(404).json({ message: 'Truck intake not found.' });
     }
+
+    try {
+      const batteries = await batteryModel.findByTruckIntakeId(intake.id);
+      if (batteries && batteries.length > 0) {
+        await serviceModel.applyMandatoryServicesToBatteries(batteries.map((b) => b.id), {
+          notes: `Mandatory Intake Service Fee (Verified Truck #${intake.truck_number})`,
+        });
+      }
+    } catch (svcErr) {
+      console.error('Error applying mandatory services on verifyArrival:', svcErr);
+    }
+
     await auditLogModel.record({
       userId: req.user.id,
       action: 'verify_arrival',

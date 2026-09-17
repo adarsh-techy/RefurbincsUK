@@ -5,13 +5,14 @@ const inputClasses =
   'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30';
 const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
 
-function ServiceForm({ service, onSaved, onCancel }) {
+function ServiceForm({ service, defaultIsMandatory = false, onSaved, onCancel }) {
   const isEdit = Boolean(service);
   const [form, setForm] = useState({
     name: service?.name || '',
     description: service?.description || '',
     rate: service ? String(service.rate) : '',
     active: service ? service.active : true,
+    isMandatory: service ? Boolean(service.is_mandatory) : Boolean(defaultIsMandatory),
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
@@ -37,6 +38,7 @@ function ServiceForm({ service, onSaved, onCancel }) {
         rate: rateNum,
         sortOrder: 0,
         active: form.active,
+        is_mandatory: form.isMandatory,
       };
       if (isEdit) {
         await apiClient.patch(`/services/${service.id}`, payload);
@@ -54,20 +56,69 @@ function ServiceForm({ service, onSaved, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
+        {/* Service Type Selection */}
         <div>
-          <label className={labelClasses}>Service Name *</label>
+          <label className={labelClasses}>Fee & Service Category</label>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+            <button
+              type="button"
+              onClick={() => updateField('isMandatory', false)}
+              className={`flex flex-col text-left p-3 rounded-lg border transition-all cursor-pointer ${
+                !form.isMandatory
+                  ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/30 dark:border-blue-500'
+                  : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-surface-700 dark:bg-surface-800 dark:hover:bg-surface-700'
+              }`}
+            >
+              <span className={`text-xs font-bold ${!form.isMandatory ? 'text-blue-700 dark:text-blue-400' : 'text-slate-800 dark:text-neutral-200'}`}>
+                Workshop Service
+              </span>
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
+                Applied manually by technicians during testing & repairs.
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => updateField('isMandatory', true)}
+              className={`flex flex-col text-left p-3 rounded-lg border transition-all cursor-pointer ${
+                form.isMandatory
+                  ? 'border-amber-500 bg-amber-50/60 dark:bg-amber-950/30 dark:border-amber-500'
+                  : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-surface-700 dark:bg-surface-800 dark:hover:bg-surface-700'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className={`text-xs font-bold ${form.isMandatory ? 'text-amber-700 dark:text-amber-400' : 'text-slate-800 dark:text-neutral-200'}`}>
+                  Mandatory Fee
+                </span>
+                <span className="px-1.5 py-0.2 rounded text-[10px] font-semibold bg-amber-200/70 text-amber-800 dark:bg-amber-900/60 dark:text-amber-200">
+                  Auto-Intake
+                </span>
+              </div>
+              <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
+                Automatically added to every battery during truck intake.
+              </span>
+            </button>
+          </div>
+        </div>
+
+        <div>
+          <label className={labelClasses}>
+            {form.isMandatory ? 'Fee Name *' : 'Service Name *'}
+          </label>
           <input
             type="text"
             value={form.name}
             onChange={(e) => updateField('name', e.target.value)}
-            placeholder="Enter service name"
+            placeholder={form.isMandatory ? 'e.g. Mandatory Intake & Diagnostic Fee' : 'e.g. Cell Balancing & Calibration'}
             className={inputClasses}
             required
           />
         </div>
 
         <div>
-          <label className={labelClasses}>Service Rate (£) *</label>
+          <label className={labelClasses}>
+            {form.isMandatory ? 'Mandatory Fee Rate (£) *' : 'Service Rate (£) *'}
+          </label>
           <div className="relative">
             <span className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 font-medium">£</span>
             <input
@@ -82,7 +133,9 @@ function ServiceForm({ service, onSaved, onCancel }) {
             />
           </div>
           <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            Standard rate charged when this service is applied to a battery during testing or maintenance.
+            {form.isMandatory
+              ? 'This fixed fee will be automatically attached to every battery received on truck intake.'
+              : 'Standard rate charged when this service is applied to a battery during testing or maintenance.'}
           </p>
         </div>
 
@@ -91,7 +144,7 @@ function ServiceForm({ service, onSaved, onCancel }) {
           <textarea
             value={form.description}
             onChange={(e) => updateField('description', e.target.value)}
-            placeholder="Describe what this service entails..."
+            placeholder={form.isMandatory ? 'Describe the purpose of this mandatory intake fee...' : 'Describe what this service entails...'}
             rows={3}
             className={inputClasses}
           />
@@ -105,7 +158,7 @@ function ServiceForm({ service, onSaved, onCancel }) {
               onChange={(e) => updateField('active', e.target.checked)}
               className="h-4 w-4 rounded border-slate-300 dark:border-surface-600"
             />
-            Active (available for technicians during testing)
+            Active {form.isMandatory ? '(auto-applied on new battery intakes)' : '(available for technicians during testing)'}
           </label>
         )}
       </div>
@@ -123,9 +176,11 @@ function ServiceForm({ service, onSaved, onCancel }) {
         <button
           type="submit"
           disabled={submitting}
-          className="rounded-md bg-blue-600 px-5 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+          className={`rounded-md px-5 py-2 text-sm font-medium text-white shadow-sm disabled:opacity-50 cursor-pointer ${
+            form.isMandatory ? 'bg-amber-600 hover:bg-amber-700' : 'bg-blue-600 hover:bg-blue-700'
+          }`}
         >
-          {submitting ? 'Saving…' : isEdit ? 'Save Changes' : 'Create Service'}
+          {submitting ? 'Saving…' : isEdit ? 'Save Changes' : form.isMandatory ? 'Create Mandatory Fee' : 'Create Service'}
         </button>
       </div>
     </form>

@@ -1,5 +1,6 @@
 const truckIntakeModel = require('../models/truck-intake.model');
 const batteryModel = require('../models/battery.model');
+const serviceModel = require('../models/service.model');
 
 // Creates one truck intake record plus a uniquely-coded battery row for each
 // brand-new battery delivered (batteryCount), and attaches any already-
@@ -63,7 +64,20 @@ async function createIntakeWithBatteries({
     intake.id
   );
 
-  return { intake, batteries: [...newBatteries, ...revisitedBatteries] };
+  const allBatteries = [...newBatteries, ...revisitedBatteries];
+  const allBatteryIds = allBatteries.map((b) => b.id);
+
+  if (allBatteryIds.length > 0) {
+    try {
+      await serviceModel.applyMandatoryServicesToBatteries(allBatteryIds, {
+        notes: `Mandatory Intake Service Fee (Truck Intake #${intake.id})`,
+      });
+    } catch (svcErr) {
+      console.error('Error auto-applying mandatory services on truck intake:', svcErr);
+    }
+  }
+
+  return { intake, batteries: allBatteries };
 }
 
 module.exports = { createIntakeWithBatteries };

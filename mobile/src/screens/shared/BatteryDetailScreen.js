@@ -444,7 +444,7 @@ export default function BatteryDetailScreen() {
     if (result?.battery?.status !== 'in_testing' || isClient) return;
     apiClient
       .get('/services', { params: { activeOnly: true } })
-      .then(({ data }) => setAvailableServices(data))
+      .then(({ data }) => setAvailableServices((data || []).filter((s) => !s.is_mandatory)))
       .catch(() => setAvailableServices([]));
   }, [result?.battery?.status, isClient]);
 

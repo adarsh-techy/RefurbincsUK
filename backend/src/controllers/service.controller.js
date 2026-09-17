@@ -3,7 +3,13 @@ const serviceModel = require('../models/service.model');
 async function list(req, res, next) {
   try {
     const activeOnly = req.query.activeOnly === 'true';
-    const services = await serviceModel.findAll({ activeOnly });
+    const isMandatory =
+      req.query.isMandatory !== undefined
+        ? req.query.isMandatory === 'true'
+        : req.query.is_mandatory !== undefined
+          ? req.query.is_mandatory === 'true'
+          : undefined;
+    const services = await serviceModel.findAll({ activeOnly, isMandatory });
     res.json(services);
   } catch (err) {
     next(err);
@@ -35,6 +41,10 @@ async function create(req, res, next) {
     const sortOrder = Number(req.body.sortOrder) || 0;
     const description = typeof req.body.description === 'string' ? req.body.description.trim() : '';
     const active = req.body.active !== false;
+    const isMandatory =
+      req.body.is_mandatory !== undefined
+        ? Boolean(req.body.is_mandatory)
+        : Boolean(req.body.isMandatory);
 
     const existingOrder = await serviceModel.findBySortOrder(sortOrder);
     if (existingOrder && sortOrder !== 0) {
@@ -47,6 +57,7 @@ async function create(req, res, next) {
       rate,
       sortOrder,
       active,
+      isMandatory,
     });
     res.status(201).json(service);
   } catch (err) {
@@ -82,6 +93,12 @@ async function update(req, res, next) {
 
     const description = req.body.description !== undefined ? (typeof req.body.description === 'string' ? req.body.description.trim() : '') : existing.description;
     const active = req.body.active !== undefined ? Boolean(req.body.active) : existing.active;
+    const isMandatory =
+      req.body.is_mandatory !== undefined
+        ? Boolean(req.body.is_mandatory)
+        : req.body.isMandatory !== undefined
+          ? Boolean(req.body.isMandatory)
+          : existing.is_mandatory;
 
     const updated = await serviceModel.update(id, {
       name,
@@ -89,6 +106,7 @@ async function update(req, res, next) {
       rate,
       active,
       sortOrder,
+      isMandatory,
     });
     res.json(updated);
   } catch (err) {

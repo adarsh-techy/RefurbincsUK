@@ -382,7 +382,8 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
   }
 
   if (battery.status === 'in_testing') {
-    const selectedServicesTotal = (availableServices || [])
+    const workshopServices = (availableServices || []).filter((s) => !s.is_mandatory);
+    const selectedServicesTotal = workshopServices
       .filter((s) => selectedServiceIds.includes(s.id))
       .reduce((sum, s) => sum + Number(s.rate || 0), 0);
 
@@ -399,13 +400,13 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
 
         {canTest ? (
           <div className="space-y-4">
-            {availableServices && availableServices.length > 0 && (
+            {workshopServices.length > 0 && (
               <div>
                 <label className="mb-2 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
                   Select Completed Services & Diagnostics
                 </label>
                 <div className="space-y-2 rounded-lg border border-slate-200 bg-white p-3 dark:border-white/10 dark:bg-surface-800 max-h-56 overflow-y-auto">
-                  {availableServices.map((service) => {
+                  {workshopServices.map((service) => {
                     const isChecked = selectedServiceIds.includes(service.id);
                     return (
                       <label
