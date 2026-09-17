@@ -36,8 +36,31 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState(null);
 
-  const [scannedCodes, setScannedCodes] = useState([]);
-  const [scannedAt, setScannedAt] = useState({}); // { [code]: Date }
+  const activeIntakeId = intakeId || data?.intake?.id || initialData?.intake?.id;
+  const storageKey = activeIntakeId ? `truck_verify_scanned_${activeIntakeId}` : null;
+  const storageTimeKey = activeIntakeId ? `truck_verify_scanned_at_${activeIntakeId}` : null;
+
+  // Initialize scannedCodes from sessionStorage so navigating to inspect battery and clicking back preserves progress
+  const [scannedCodes, setScannedCodes] = useState(() => {
+    if (!activeIntakeId) return [];
+    try {
+      const saved = sessionStorage.getItem(`truck_verify_scanned_${activeIntakeId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [scannedAt, setScannedAt] = useState(() => {
+    if (!activeIntakeId) return {};
+    try {
+      const saved = sessionStorage.getItem(`truck_verify_scanned_at_${activeIntakeId}`);
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const [scanInput, setScanInput] = useState('');
   const [scanFeedback, setScanFeedback] = useState(null); // { tone: 'good'|'warn'|'bad', message }
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -50,6 +73,30 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
   const feedbackTimeoutRef = useRef(null);
   const suggestionsBlurTimeoutRef = useRef(null);
   const scanInputRef = useRef(null);
+
+  // Sync to sessionStorage on each scan
+  useEffect(() => {
+    if (storageKey && scannedCodes.length > 0) {
+      sessionStorage.setItem(storageKey, JSON.stringify(scannedCodes));
+    }
+    if (storageTimeKey && Object.keys(scannedAt).length > 0) {
+      sessionStorage.setItem(storageTimeKey, JSON.stringify(scannedAt));
+    }
+  }, [storageKey, storageTimeKey, scannedCodes, scannedAt]);
+
+  // Global Enter listener to acknowledge repeat intake alert
+  useEffect(() => {
+    if (!repeatAlertData) return;
+    function handleKeyDown(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        setRepeatAlertData(null);
+        setTimeout(() => scanInputRef.current?.focus(), 60);
+      }
+    }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [repeatAlertData]);
 
   useEffect(() => {
     if (!initialData && intakeId) {
@@ -213,6 +260,12 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
     try {
       const activeId = intakeId || data?.intake?.id;
       const res = await apiClient.patch(`/truck-intakes/${activeId}/verify-arrival`);
+      if (storageKey) {
+        sessionStorage.removeItem(storageKey);
+      }
+      if (storageTimeKey) {
+        sessionStorage.removeItem(storageTimeKey);
+      }
       if (onSuccess) {
         onSuccess(res.data);
       }
@@ -236,8 +289,8 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
             : 'Verifying truck shipment batteries'
         }
         onClose={onClose}
-        size="5xl"
-        className="max-h-[92vh] flex flex-col"
+        size="6xl"
+        className="max-h-[94vh] flex flex-col"
       >
         {loading ? (
           <TableState>Loading truck shipment details…</TableState>
@@ -590,7 +643,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
       {repeatAlertData && (
         <Modal
           title=""
-          size="lg"
+          size="2xl"
           onClose={() => {
             setRepeatAlertData(null);
             setTimeout(() => scanInputRef.current?.focus(), 50);
@@ -598,53 +651,56 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
         >
           <div className="space-y-4">
             {/* Alert Header Banner */}
-            <div className="flex items-start gap-3.5 rounded-2xl border border-amber-300/90 bg-amber-50/90 p-4 dark:border-amber-700/60 dark:bg-amber-950/40">
-              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-amber-500 text-white shadow-xs dark:bg-amber-600">
-                <FiAlertTriangle className="h-6 w-6" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-amber-900 dark:bg-amber-900/80 dark:text-amber-200">
-                    Repeat Intake Flag
-                  </span>
-                  <span className="font-mono text-xs font-bold text-amber-800 dark:text-amber-300">
-                    {getMonthName()}
-                  </span>
+            <div className="relative overflow-hidden rounded-2xl border border-amber-300 bg-gradient-to-br from-amber-50 via-amber-50/80 to-amber-100/50 p-4.5 dark:border-amber-700/60 dark:from-amber-950/50 dark:via-amber-950/30 dark:to-surface-900 shadow-sm">
+              <div className="flex items-start gap-3.5">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-amber-500 to-amber-600 text-white shadow-md shadow-amber-500/20">
+                  <FiAlertTriangle className="h-6 w-6 stroke-[2.5]" />
                 </div>
-                <h3 className="text-lg font-black text-slate-900 dark:text-white mt-1">
-                  {repeatAlertData.count === 2
-                    ? '2nd Time Intake in Current Month'
-                    : `${repeatAlertData.count}th Time Intake in Current Month`}
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-neutral-300 mt-0.5 leading-relaxed">
-                  Battery <strong className="font-mono font-bold text-slate-900 dark:text-white">{repeatAlertData.battery?.battery_code}</strong> has arrived at the workshop facility <strong>{repeatAlertData.count} times</strong> during <strong>{getMonthName()}</strong>.
-                </p>
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-200/90 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-950 dark:bg-amber-900/90 dark:text-amber-200 border border-amber-300/80 dark:border-amber-700">
+                      <FiRepeat className="w-3 h-3" />
+                      <span>Repeat Intake Flag</span>
+                    </span>
+                    <span className="font-mono text-xs font-bold text-amber-800 dark:text-amber-300">
+                      {getMonthName()}
+                    </span>
+                  </div>
+                  <h3 className="text-xl font-black text-slate-900 dark:text-white mt-1 tracking-tight">
+                    {repeatAlertData.count === 2
+                      ? '2nd Time Intake in Current Month'
+                      : `${repeatAlertData.count}th Time Intake in Current Month`}
+                  </h3>
+                  <p className="text-xs text-slate-600 dark:text-neutral-300 mt-1 leading-relaxed">
+                    Battery <strong className="font-mono font-black text-slate-950 dark:text-white px-1.5 py-0.5 rounded bg-amber-200/60 dark:bg-amber-900/60 border border-amber-300/50">{repeatAlertData.battery?.battery_code}</strong> has arrived at the workshop facility <strong className="text-amber-950 dark:text-amber-200 font-bold">{repeatAlertData.count} times</strong> during <strong>{getMonthName()}</strong>.
+                  </p>
+                </div>
               </div>
             </div>
 
             {/* Battery Profile Meta Card */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 rounded-xl border border-slate-200 bg-slate-50/80 p-3.5 text-xs dark:border-white/10 dark:bg-surface-800">
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3.5 text-xs dark:border-white/10 dark:bg-surface-800/80 shadow-2xs">
+              <div className="rounded-xl bg-white p-2.5 dark:bg-surface-900 border border-slate-100 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400 block mb-0.5">
                   Battery ID
                 </span>
                 <span className="font-mono font-black text-sm text-blue-600 dark:text-blue-400">
                   {repeatAlertData.battery?.battery_code}
                 </span>
               </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">
+              <div className="rounded-xl bg-white p-2.5 dark:bg-surface-900 border border-slate-100 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400 block mb-0.5">
                   Physical Serial Number
                 </span>
-                <span className="font-mono font-bold text-slate-700 dark:text-neutral-200">
+                <span className="font-mono font-bold text-slate-800 dark:text-neutral-200 truncate block">
                   {repeatAlertData.battery?.serial_number || '—'}
                 </span>
               </div>
-              <div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">
+              <div className="rounded-xl bg-white p-2.5 dark:bg-surface-900 border border-slate-100 dark:border-white/5">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400 block mb-0.5">
                   Fleet Client
                 </span>
-                <span className="font-bold text-slate-800 dark:text-neutral-200 truncate block">
+                <span className="font-bold text-slate-900 dark:text-white truncate block">
                   {repeatAlertData.battery?.client_name || intake?.client_name || 'Fleet Client'}
                 </span>
               </div>
@@ -652,12 +708,14 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
 
             {/* Chronological Intake History in this Month */}
             <div className="space-y-2">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 flex items-center gap-1.5">
-                <FiClock className="w-3.5 h-3.5 text-blue-500" />
-                <span>Intake Trips Recorded in {getMonthName()} ({repeatAlertData.visits?.length || repeatAlertData.count})</span>
-              </h4>
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 flex items-center gap-1.5">
+                  <FiClock className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Intake Trips Recorded in {getMonthName()} ({repeatAlertData.visits?.length || repeatAlertData.count})</span>
+                </h4>
+              </div>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
                 {(repeatAlertData.visits || []).map((v, idx) => {
                   const isCurrent = v.truck_intake_id === Number(intakeId || data?.intake?.id) || v.is_current_intake;
                   return (
@@ -665,23 +723,23 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                       key={v.visit_id || v.truck_intake_id || idx}
                       className={`rounded-xl border p-3 text-xs transition-all ${
                         isCurrent
-                          ? 'border-emerald-300 bg-emerald-50/60 dark:border-emerald-800/60 dark:bg-emerald-950/30'
+                          ? 'border-emerald-300 bg-emerald-50/70 dark:border-emerald-800/60 dark:bg-emerald-950/40 shadow-2xs'
                           : 'border-slate-200 bg-white dark:border-white/10 dark:bg-surface-800'
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
                           <span
-                            className={`rounded-lg px-2 py-0.5 font-bold text-[10px] uppercase ${
+                            className={`rounded-lg px-2.5 py-0.5 font-bold text-[10px] uppercase tracking-wide ${
                               isCurrent
-                                ? 'bg-emerald-600 text-white'
+                                ? 'bg-emerald-600 text-white shadow-xs'
                                 : 'bg-slate-200 text-slate-700 dark:bg-surface-700 dark:text-neutral-200'
                             }`}
                           >
                             Trip #{idx + 1} {isCurrent ? '(Current)' : '(Previous)'}
                           </span>
-                          <span className="font-bold text-slate-800 dark:text-neutral-200 flex items-center gap-1">
-                            <FiTruck className="w-3 h-3 text-slate-400" />
+                          <span className="font-bold text-slate-900 dark:text-white flex items-center gap-1">
+                            <FiTruck className="w-3.5 h-3.5 text-slate-400" />
                             <span>Truck {v.truck_number || '—'}</span>
                           </span>
                         </div>
@@ -690,13 +748,13 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                         </span>
                       </div>
 
-                      <div className="mt-1.5 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-neutral-400">
+                      <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-[11px] text-slate-600 dark:text-neutral-400">
                         <span>
                           Driver: <strong className="text-slate-800 dark:text-neutral-200">{v.driver_name || '—'}</strong>
                         </span>
                         {isCurrent ? (
-                          <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-                            <FiCheckCircle className="w-3 h-3" />
+                          <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1 bg-emerald-100/60 dark:bg-emerald-950/60 px-2 py-0.5 rounded-md">
+                            <FiCheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                             <span>Verified on Arrival</span>
                           </span>
                         ) : (
@@ -711,7 +769,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
 
                 {/* If no detailed visits array but count > 1, show fallback rows */}
                 {(!repeatAlertData.visits || repeatAlertData.visits.length === 0) && (
-                  <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-xs text-amber-900 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300">
+                  <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-3.5 text-xs text-amber-900 dark:border-amber-800/40 dark:bg-amber-950/30 dark:text-amber-300">
                     This battery has <strong>{repeatAlertData.count} recorded intakes</strong> in {getMonthName()}. Please inspect previous service history to check if the battery experiences recurring faults.
                   </div>
                 )}
@@ -719,20 +777,22 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
             </div>
 
             {/* Quality & Maintenance Advisory */}
-            <div className="rounded-xl border border-blue-200 bg-blue-50/50 p-3 text-xs dark:border-blue-900/40 dark:bg-blue-950/20 text-blue-900 dark:text-blue-300 flex items-start gap-2">
-              <FiCpu className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 dark:text-blue-400" />
-              <p className="leading-snug">
-                <strong>Workshop Advisory:</strong> Repeat intakes within the same month may indicate recurring cell imbalances, intermittent BMS communication errors, or rapid fleet rotation. Thorough diagnostic capacity testing is recommended.
+            <div className="rounded-2xl border border-blue-200 bg-gradient-to-r from-blue-50/80 via-blue-50/50 to-indigo-50/40 p-3.5 text-xs dark:border-blue-900/40 dark:bg-blue-950/20 text-blue-900 dark:text-blue-200 flex items-start gap-2.5 shadow-2xs">
+              <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-blue-100 dark:bg-blue-900/60 text-blue-600 dark:text-blue-300">
+                <FiCpu className="w-4 h-4" />
+              </div>
+              <p className="leading-relaxed">
+                <strong className="font-bold">Workshop Advisory:</strong> Repeat intakes within the same month may indicate recurring cell imbalances, intermittent BMS communication errors, or rapid fleet rotation. Thorough diagnostic capacity testing is recommended.
               </p>
             </div>
 
             {/* Modal Actions */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3 border-t border-slate-200 dark:border-white/10">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3 pt-3.5 border-t border-slate-200/80 dark:border-white/10">
               <a
                 href={`/batteries/${encodeURIComponent(repeatAlertData.battery?.battery_code)}`}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer"
+                className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 cursor-pointer transition-colors"
               >
                 <span>Inspect Full Battery History</span>
                 <FiExternalLink className="w-3.5 h-3.5" />
@@ -745,10 +805,10 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                   setRepeatAlertData(null);
                   setTimeout(() => scanInputRef.current?.focus(), 50);
                 }}
-                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-xs cursor-pointer"
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 px-6 py-2.5 text-xs font-bold text-white hover:from-emerald-700 hover:to-teal-700 transition-all shadow-md active:scale-95 cursor-pointer"
               >
-                <span>Acknowledge & Continue Scanning</span>
-                <span className="rounded-md bg-white/20 px-1.5 py-0.5 text-[10px] font-mono">Enter ↵</span>
+                <span>Acknowledge &amp; Continue Scanning</span>
+                <span className="rounded-md bg-white/25 px-1.5 py-0.5 text-[10px] font-mono font-bold">Enter ↵</span>
               </button>
             </div>
           </div>
