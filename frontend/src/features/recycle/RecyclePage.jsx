@@ -113,7 +113,8 @@ function RecyclePage() {
         <Modal
           title="Record a Recycle Shipment"
           description="Send unserviceable batteries out for recycling."
-          size="2xl"
+          size="5xl"
+          className="max-h-[92vh] flex flex-col"
           onClose={() => setShowForm(false)}
         >
           <RecycleForm onCreated={handleCreated} onCancel={() => setShowForm(false)} />

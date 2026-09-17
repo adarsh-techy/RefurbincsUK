@@ -394,10 +394,10 @@ function ClientInvoicesPage() {
           size="5xl"
         >
           <div className="space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/10">
-              <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-neutral-400">
-                {previewData.isImg ? <FiImage className="w-4 h-4 text-blue-500" /> : <FiFileText className="w-4 h-4 text-red-500" />}
-                <span>{previewData.invoice.file_name || 'Invoice Document'}</span>
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 pb-3 dark:border-white/10">
+              <div className="flex min-w-0 items-center gap-2 text-xs text-slate-500 dark:text-neutral-400">
+                {previewData.isImg ? <FiImage className="w-4 h-4 shrink-0 text-blue-500" /> : <FiFileText className="w-4 h-4 shrink-0 text-red-500" />}
+                <span className="truncate">{previewData.invoice.file_name || 'Invoice Document'}</span>
               </div>
               <div className="flex items-center gap-2">
                 <a

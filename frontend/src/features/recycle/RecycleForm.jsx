@@ -1,16 +1,14 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { FiCheckCircle, FiPackage, FiTruck, FiUser, FiRepeat, FiAlertCircle, FiShield, FiBriefcase } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
 const inputClasses =
-  'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/30';
-const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
+  'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs transition-colors';
+const labelClasses = 'mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300';
 
-// Same scan-to-add flow as Record Return, scoped to 'unserviceable' batteries
-// instead of a single client's 'repaired' ones — a recycle shipment can carry
-// batteries from any client, since they're all terminal/dead either way.
 function RecycleForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({ vehicleNumber: '', driverName: '' });
   const [recycleClientId, setRecycleClientId] = useState('');
@@ -20,26 +18,37 @@ function RecycleForm({ onCreated, onCancel }) {
 
   const [scanInput, setScanInput] = useState('');
   const [addedBatteries, setAddedBatteries] = useState([]);
-  const [scanError, setScanError] = useState(null);
+  const [scanFeedback, setScanFeedback] = useState(null); // { tone: 'good'|'warn'|'bad', message }
   const [scanLoading, setScanLoading] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
-  const [unserviceableCodes, setUnserviceableCodes] = useState([]);
+  const [unserviceableBatteryList, setUnserviceableBatteryList] = useState([]);
   const [showScanSuggestions, setShowScanSuggestions] = useState(false);
+
+  const scanInputRef = useRef(null);
+  const feedbackTimeoutRef = useRef(null);
 
   useEffect(() => {
     let cancelled = false;
     apiClient
-      .get('/batteries', { params: { status: 'unserviceable', limit: 100 } })
+      .get('/batteries', { params: { status: 'unserviceable', limit: 200 } })
       .then(({ data }) => {
-        if (!cancelled) setUnserviceableCodes((data.data || []).map((b) => b.battery_code));
+        if (!cancelled) setUnserviceableBatteryList(data.data || []);
       })
       .catch(() => {
-        if (!cancelled) setUnserviceableCodes([]);
+        if (!cancelled) setUnserviceableBatteryList([]);
       });
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => () => clearTimeout(feedbackTimeoutRef.current), []);
+
+  function flashFeedback(tone, message) {
+    clearTimeout(feedbackTimeoutRef.current);
+    setScanFeedback({ tone, message });
+    feedbackTimeoutRef.current = setTimeout(() => setScanFeedback(null), 4000);
+  }
 
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
@@ -49,30 +58,33 @@ function RecycleForm({ onCreated, onCancel }) {
     const code = extractBatteryCode(rawValue);
     if (!code) return;
 
-    setScanError(null);
     setScanLoading(true);
     try {
       const { data } = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
       const battery = data.battery;
+
       if (addedBatteries.some((b) => b.id === battery.id)) {
-        setScanError(`${battery.battery_code} has already been added.`);
+        flashFeedback('warn', `${battery.battery_code} is already in this recycle manifest.`);
         return;
       }
       if (battery.status !== 'unserviceable') {
-        setScanError(`${battery.battery_code} isn't marked unserviceable (currently ${battery.status.replace('_', ' ')}).`);
+        flashFeedback('bad', `${battery.battery_code} is not marked unserviceable (status: ${battery.status.replace('_', ' ')}).`);
         return;
       }
       if (data.pendingPartsRemoval?.length > 0) {
-        setScanError(
-          `${battery.battery_code} still has ${data.pendingPartsRemoval.length} part(s) fitted that need to be removed and restocked first.`
-        );
+        flashFeedback('bad', `${battery.battery_code} still has ${data.pendingPartsRemoval.length} fitted part(s) that must be removed & restocked first.`);
         return;
       }
+
       setAddedBatteries((prev) => [...prev, battery]);
+      flashFeedback('good', `✓ ${battery.battery_code}${battery.serial_number ? ` (SN: ${battery.serial_number})` : ''} added to recycle manifest.`);
+      setScanInput('');
+      setShowScanSuggestions(false);
     } catch (err) {
-      setScanError(
+      flashFeedback(
+        'bad',
         err.response?.status === 404
-          ? `No battery found for code "${code}".`
+          ? `No battery found with code "${code}".`
           : err.response?.data?.message || err.message
       );
     } finally {
@@ -81,41 +93,35 @@ function RecycleForm({ onCreated, onCancel }) {
   }
 
   function removeAdded(id) {
+    const item = addedBatteries.find((b) => b.id === id);
     setAddedBatteries((prev) => prev.filter((b) => b.id !== id));
+    if (item) {
+      flashFeedback('warn', `${item.battery_code} removed from manifest.`);
+    }
   }
 
-  // Once added, a battery drops out of the pool — one battery, one add.
-  const addedCodes = new Set(addedBatteries.map((b) => b.battery_code));
-  const availableCodes = unserviceableCodes.filter((code) => !addedCodes.has(code));
-
-  const scanInputIsAvailable = availableCodes.some(
-    (code) => code.toLowerCase() === scanInput.trim().toLowerCase()
+  // Filter unserviceable candidate batteries
+  const addedIds = useMemo(() => new Set(addedBatteries.map((b) => b.id)), [addedBatteries]);
+  const availableBatteries = useMemo(
+    () => unserviceableBatteryList.filter((b) => !addedIds.has(b.id)),
+    [unserviceableBatteryList, addedIds]
   );
-  const scanSuggestions = availableCodes.filter((code) =>
-    code.toLowerCase().includes(scanInput.trim().toLowerCase())
-  );
 
-  function selectScanCode(code) {
-    setScanInput(code);
-    setShowScanSuggestions(false);
-  }
-
-  function submitScanInput() {
-    if (!scanInput.trim() || !scanInputIsAvailable) return;
-    handleScanValue(scanInput);
-    setScanInput('');
-  }
-
-  function handleScanKeyDown(e) {
-    if (e.key !== 'Enter') return;
-    e.preventDefault();
-    submitScanInput();
-  }
+  const scanSuggestions = useMemo(() => {
+    const q = scanInput.trim().toLowerCase();
+    if (!q) return availableBatteries.slice(0, 15);
+    return availableBatteries.filter(
+      (b) =>
+        b.battery_code.toLowerCase().includes(q) ||
+        (b.serial_number && b.serial_number.toLowerCase().includes(q)) ||
+        (b.client_name && b.client_name.toLowerCase().includes(q))
+    );
+  }, [availableBatteries, scanInput]);
 
   async function handleSubmit(e) {
     e.preventDefault();
     if (addedBatteries.length === 0) {
-      setError('Scan at least one unserviceable battery to recycle.');
+      setError('Please add at least one unserviceable battery to recycle.');
       return;
     }
 
@@ -136,24 +142,37 @@ function RecycleForm({ onCreated, onCancel }) {
     }
   }
 
+  const recycleClients = (clients || []).filter((c) => c.user_role === 'recycle_client');
+
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-      <div className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <form onSubmit={handleSubmit} className="flex flex-col min-h-[580px] max-h-[75vh]">
+      {/* 1. Top Logistics Details Header Card */}
+      <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           <div>
-            <label className={labelClasses}>Vehicle Number</label>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <FiTruck className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Vehicle / Truck Number</span>
+              </span>
+            </label>
             <input
               type="text"
               value={form.vehicleNumber}
-              onChange={(e) => updateField('vehicleNumber', e.target.value)}
+              onChange={(e) => updateField('vehicleNumber', e.target.value.toUpperCase())}
               placeholder="e.g. GB21 XYZ"
-              className={inputClasses}
+              className={`${inputClasses} font-mono uppercase`}
               required
             />
           </div>
 
           <div>
-            <label className={labelClasses}>Driver Name</label>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <FiUser className="w-3.5 h-3.5 text-purple-500" />
+                <span>Driver Name</span>
+              </span>
+            </label>
             <input
               type="text"
               value={form.driverName}
@@ -163,165 +182,308 @@ function RecycleForm({ onCreated, onCancel }) {
               required
             />
           </div>
-        </div>
 
-        <div>
-          <label className={labelClasses}>Assign Recycle Client (Optional)</label>
-          <select
-            value={recycleClientId}
-            onChange={(e) => setRecycleClientId(e.target.value)}
-            className={inputClasses}
-          >
-            <option value="">None (General Recycling)</option>
-            {(clients || [])
-              .filter((c) => c.user_role === 'recycle_client')
-              .map((c) => (
+          <div>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <FiBriefcase className="w-3.5 h-3.5 text-blue-500" />
+                <span>Recycle Partner (Optional)</span>
+              </span>
+            </label>
+            <select
+              value={recycleClientId}
+              onChange={(e) => setRecycleClientId(e.target.value)}
+              className={inputClasses}
+            >
+              <option value="">None (General Smelting / Recycling)</option>
+              {recycleClients.map((c) => (
                 <option key={c.id} value={c.id}>
                   {c.name}
                 </option>
               ))}
-          </select>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            If assigned, this shipment will be visible on that partner's recycle portal.
-          </p>
-        </div>
-
-        <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
-          <div className="mb-1 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">Scan Batteries (recycling)</h3>
-            <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
-              {addedBatteries.length} added
-            </span>
+            </select>
           </div>
-          <p className="mb-3 text-xs text-slate-500 dark:text-neutral-400">
-            Only batteries marked unserviceable can be added — scan, type, or pick from the list below.
-          </p>
-
-          <div className="flex gap-2">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                value={scanInput}
-                onChange={(e) => setScanInput(e.target.value)}
-                onKeyDown={handleScanKeyDown}
-                onFocus={() => setShowScanSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowScanSuggestions(false), 150)}
-                placeholder="Scan or type a battery code, then press Enter"
-                autoComplete="off"
-                disabled={scanLoading}
-                className={`${inputClasses} disabled:cursor-not-allowed disabled:opacity-50`}
-              />
-
-              {showScanSuggestions && scanSuggestions.length > 0 && (
-                <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-blue-200 bg-white py-1 shadow-lg dark:border-blue-800/40 dark:bg-black">
-                  {scanSuggestions.map((code) => (
-                    <li key={code}>
-                      <button
-                        type="button"
-                        onMouseDown={(e) => e.preventDefault()}
-                        onClick={() => selectScanCode(code)}
-                        className="block w-full px-3 py-2 text-left text-sm text-slate-700 hover:bg-blue-50 dark:text-neutral-100 dark:hover:bg-blue-900/30"
-                      >
-                        {code}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
-
-              {scanInput.trim() && !scanInputIsAvailable && (
-                <p className="mt-1.5 text-xs text-critical-600 dark:text-red-400">
-                  Not an unserviceable battery.
-                </p>
-              )}
-            </div>
-            <button
-              type="button"
-              onClick={submitScanInput}
-              disabled={scanLoading || !scanInputIsAvailable}
-              className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => setCameraOpen((prev) => !prev)}
-              className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
-            >
-              {cameraOpen ? 'Close Camera' : 'Use Camera'}
-            </button>
-          </div>
-
-          {scanError && <p className="mt-2 text-xs text-critical-600 dark:text-red-400">{scanError}</p>}
-
-          {cameraOpen && (
-            <div className="mt-3">
-              <QrScanner onScan={(value) => handleScanValue(value)} onClose={() => setCameraOpen(false)} />
-            </div>
-          )}
-
-          {addedBatteries.length > 0 && (
-            <ul className="mt-3 flex flex-col gap-2">
-              {addedBatteries.map((b) => (
-                <li
-                  key={b.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white p-2.5 dark:border-surface-700 dark:bg-surface-900"
-                >
-                  <span className="text-sm font-medium text-slate-800 dark:text-neutral-100">{b.battery_code}</span>
-                  <button
-                    type="button"
-                    onClick={() => removeAdded(b.id)}
-                    className="rounded-md p-1.5 text-slate-400 hover:bg-critical-50 hover:text-critical-600 dark:text-neutral-500 dark:hover:bg-red-500/10 dark:hover:text-red-400"
-                    aria-label={`Remove ${b.battery_code}`}
-                    title="Remove"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.36-9.36a.75.75 0 0 0-1.06-1.06L10 9.94 7.7 7.64a.75.75 0 0 0-1.06 1.06L8.94 11l-2.3 2.3a.75.75 0 1 0 1.06 1.06L10 12.06l2.3 2.3a.75.75 0 0 0 1.06-1.06L11.06 11l2.3-2.3Z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        <div>
-          <label className={labelClasses}>Total Batteries</label>
-          <p className="rounded-md border border-dashed border-slate-200 px-3.5 py-2.5 text-sm font-semibold text-pink-700 dark:border-surface-700 dark:text-pink-400">
-            {addedBatteries.length}
-          </p>
-          <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-            Scanned unserviceable batteries, added automatically.
-          </p>
         </div>
       </div>
 
-      {error && <p className="text-sm text-critical-600 dark:text-red-400">{error}</p>}
+      {/* 2. Middle 2-Column Work Area */}
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto pr-1 pb-4 lg:grid-cols-12">
+        {/* Left Column: Battery Scanning & Selection (7 cols) */}
+        <div className="flex min-h-0 flex-col space-y-4 lg:col-span-7">
+          <div className="relative">
+            <div className="flex items-center justify-between mb-1.5">
+              <label className={labelClasses}>
+                Scan / Pick Unserviceable Batteries
+              </label>
+              <span className="text-[11px] font-bold text-slate-500 dark:text-neutral-400">
+                {availableBatteries.length} unserviceable units available
+              </span>
+            </div>
 
-      <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-surface-700">
-        {onCancel && (
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  ref={scanInputRef}
+                  type="text"
+                  value={scanInput}
+                  onChange={(e) => {
+                    setScanInput(e.target.value.toUpperCase());
+                    setShowScanSuggestions(true);
+                  }}
+                  onFocus={() => setShowScanSuggestions(true)}
+                  onBlur={() => setTimeout(() => setShowScanSuggestions(false), 250)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      if (scanInput.trim()) {
+                        handleScanValue(scanInput);
+                      }
+                    } else if (e.key === 'Escape') {
+                      setShowScanSuggestions(false);
+                    }
+                  }}
+                  placeholder="Scan QR or enter unserviceable battery code…"
+                  autoComplete="off"
+                  disabled={scanLoading}
+                  className={`${inputClasses} font-mono disabled:cursor-not-allowed disabled:opacity-50`}
+                />
+
+                {/* Suggestions Dropdown */}
+                {showScanSuggestions && scanSuggestions.length > 0 && (
+                  <ul className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-800">
+                    <li className="border-b border-slate-100 px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-white/10 dark:text-neutral-400 bg-slate-50/50 dark:bg-surface-900/50">
+                      {scanInput.trim()
+                        ? `Matching Unserviceable Units (${scanSuggestions.length})`
+                        : `Available for Recycling (${availableBatteries.length})`}
+                    </li>
+                    {scanSuggestions.map((b) => (
+                      <li key={b.id || b.battery_code}>
+                        <button
+                          type="button"
+                          onMouseDown={(e) => e.preventDefault()}
+                          onClick={() => handleScanValue(b.battery_code)}
+                          className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-medium text-slate-800 hover:bg-emerald-50 hover:text-emerald-900 dark:text-neutral-100 dark:hover:bg-surface-700 dark:hover:text-emerald-300 transition-colors border-b border-slate-100/60 dark:border-white/5 last:border-b-0 cursor-pointer"
+                        >
+                          <div className="flex flex-col min-w-0 pr-2">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                                {b.battery_code}
+                              </span>
+                              {b.client_name && (
+                                <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
+                                  {b.client_name}
+                                </span>
+                              )}
+                            </div>
+                            {b.serial_number && (
+                              <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono mt-0.5">
+                                SN: {b.serial_number}
+                              </span>
+                            )}
+                          </div>
+                          <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/40 shrink-0">
+                            + Add
+                          </span>
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <button
+                type="button"
+                onClick={() => handleScanValue(scanInput)}
+                disabled={scanLoading || !scanInput.trim()}
+                className="shrink-0 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                Add
+              </button>
+              <button
+                type="button"
+                onClick={() => setCameraOpen((v) => !v)}
+                className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-bold shadow-2xs transition-colors cursor-pointer ${
+                  cameraOpen
+                    ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-300'
+                    : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700'
+                }`}
+              >
+                <span>{cameraOpen ? '✕ Close Camera' : '📷 Camera'}</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback Toast */}
+          {scanFeedback && (
+            <div
+              className={`rounded-xl px-4 py-2.5 text-xs font-bold flex items-center gap-2 border transition-all ${
+                scanFeedback.tone === 'good'
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40'
+                  : scanFeedback.tone === 'warn'
+                    ? 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40'
+                    : 'bg-red-50 text-red-900 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/40'
+              }`}
+            >
+              <span>{scanFeedback.tone === 'good' ? '✅' : scanFeedback.tone === 'warn' ? '⚠️' : '❌'}</span>
+              <span className="flex-1">{scanFeedback.message}</span>
+            </div>
+          )}
+
+          {/* Camera Scanner View */}
+          {cameraOpen && (
+            <div className="rounded-2xl border border-slate-200 bg-slate-900 p-3 text-white overflow-hidden shadow-sm dark:border-white/10">
+              <div className="mb-2 flex items-center justify-between text-xs font-bold">
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                  <span>Ready to Scan Battery Barcode / QR</span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setCameraOpen(false)}
+                  className="text-slate-400 hover:text-white text-xs cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+              <QrScanner onScan={(value) => handleScanValue(value)} />
+            </div>
+          )}
+
+          {/* Environmental Compliance Notice */}
+          <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600 dark:border-white/10 dark:bg-surface-800/60 dark:text-neutral-300">
+            <span className="font-bold text-slate-800 dark:text-white uppercase tracking-wider text-[10px] block mb-1 flex items-center gap-1.5">
+              <FiShield className="w-3.5 h-3.5 text-emerald-600" />
+              <span>Environmental & Material Recovery Notice</span>
+            </span>
+            <p className="text-[11px] leading-relaxed text-slate-500 dark:text-neutral-400">
+              Only packs verified as degraded beyond repair (unserviceable) and stripped of reusable components are eligible for raw materials recycling.
+            </p>
+          </div>
+        </div>
+
+        {/* Right Column: Added Batteries Manifest (5 cols) */}
+        <div className="flex min-h-0 flex-col space-y-2 lg:col-span-5">
+          <div className="flex items-center justify-between">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+              Recycle Shipment Manifest ({addedBatteries.length})
+            </h4>
+            <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+              {addedBatteries.length} batteries staged
+            </span>
+          </div>
+
+          <div className="min-h-[220px] flex-1 divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-slate-200 bg-white dark:divide-white/5 dark:border-white/10 dark:bg-surface-900 shadow-2xs">
+            {addedBatteries.length === 0 ? (
+              <div className="flex flex-col items-center justify-center p-8 text-center h-full min-h-[200px]">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-surface-800 dark:text-neutral-500 mb-2">
+                  <FiPackage className="w-5 h-5" />
+                </div>
+                <p className="text-xs font-bold text-slate-700 dark:text-neutral-200">
+                  No batteries staged for recycling yet
+                </p>
+                <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-1 max-w-xs">
+                  Scan QR codes or select unserviceable packs from the dropdown on the left.
+                </p>
+              </div>
+            ) : (
+              addedBatteries.map((b, idx) => (
+                <div
+                  key={b.id || idx}
+                  className="flex items-center justify-between px-3.5 py-2.5 text-xs hover:bg-slate-50 dark:hover:bg-surface-800/60 transition-colors"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
+                      {idx + 1}
+                    </span>
+                    <div className="flex flex-col min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono font-bold text-slate-900 dark:text-white truncate">
+                          {b.battery_code}
+                        </span>
+                        {b.client_name && (
+                          <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] font-semibold text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
+                            {b.client_name}
+                          </span>
+                        )}
+                      </div>
+                      {b.serial_number && (
+                        <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono">
+                          SN: {b.serial_number}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    <span className="inline-flex items-center gap-1 rounded-lg bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800 dark:bg-rose-900/60 dark:text-rose-200">
+                      Unserviceable
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => removeAdded(b.id)}
+                      className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:text-neutral-500 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors cursor-pointer"
+                      title="Remove from shipment"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-xl bg-red-50 border border-red-200 p-3 text-xs font-semibold text-red-700 dark:bg-red-950/30 dark:border-red-900/40 dark:text-red-300 flex items-center gap-2">
+          <FiAlertCircle className="w-4 h-4 shrink-0" />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* 3. FIXED BOTTOM RIGHT ACTIONS FOOTER */}
+      <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-200/90 bg-white/95 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
+        <div className="flex items-center gap-2">
+          {addedBatteries.length > 0 ? (
+            <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+              <FiCheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+              <span>{addedBatteries.length} unserviceable batteries staged for recycling</span>
+            </span>
+          ) : (
+            <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">
+              Scan or pick unserviceable batteries to create shipment
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-2.5">
+          {onCancel && (
+            <button
+              type="button"
+              onClick={onCancel}
+              className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+          )}
+
           <button
-            type="button"
-            onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800"
+            type="submit"
+            disabled={submitting || addedBatteries.length === 0}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
           >
-            Cancel
+            <span>✓</span>
+            <span>
+              {submitting
+                ? 'Recording Shipment…'
+                : `Record Recycle Shipment (${addedBatteries.length} ${addedBatteries.length === 1 ? 'battery' : 'batteries'})`}
+            </span>
           </button>
-        )}
-        <button
-          type="submit"
-          disabled={submitting}
-          className="rounded-md bg-brand-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-        >
-          {submitting ? 'Recording…' : `Record Recycle (${addedBatteries.length})`}
-        </button>
+        </div>
       </div>
     </form>
   );
 }
 
 export default RecycleForm;
+
