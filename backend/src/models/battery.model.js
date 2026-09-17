@@ -37,6 +37,10 @@ async function findPage({
   if (status) {
     if (status === 'registered') {
       conditions.push(`(b.status = 'registered' OR (b.status = 'returned' AND NOT EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id) AND NOT EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = b.id) AND b.truck_intake_id IS NULL))`);
+    } else if (status.includes(',')) {
+      const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
+      params.push(statuses);
+      conditions.push(`b.status = ANY($${params.length})`);
     } else {
       params.push(status);
       conditions.push(`b.status = $${params.length}`);
@@ -66,10 +70,10 @@ async function findPage({
     conditions.push('b.qr_generated_at IS NULL');
   }
   // Excludes batteries with nothing left for a technician to do — for the
-  // Service screen's scan/search suggestions, so an already-completed or
+  // Active filter for technician queues - terminal states are excluded so a
   // returned battery never shows up as something to start work on.
   if (activeOnly) {
-    conditions.push(`b.status NOT IN ('repaired', 'returned', 'unserviceable', 'recycled')`);
+    conditions.push(`b.status NOT IN ('repaired', 'returned', 'unserviceable', 'recycled', 'tested_parts_removed')`);
   }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -427,19 +431,24 @@ async function findPendingPartsRemoval(batteryId) {
 
 // Reclaims the checked parts back to inventory stock: restocks each part's
 // quantity by however much was used, then stamps the repair row so it
-// doesn't show up as pending again. Only touches repair rows that actually
-// belong to this battery and haven't already been removed, so re-submitting
-// or double-checking the same part is a no-op rather than double-restocking.
-async function removeParts(batteryId, repairIds, staffId) {
+// Reclaims parts back to inventory stock: restocks each part's quantity
+// by however much was used, stamps the repair row with removed_at & removed_by_staff_id,
+// and moves the battery status to 'tested_parts_removed' (Tested - Parts Removed).
+async function removeParts(batteryId, repairIds = [], staffId) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
-    const { rows: targets } = await client.query(
-      `SELECT id, part_id, quantity_used FROM repairs
-       WHERE battery_id = $1 AND id = ANY($2::int[]) AND removed_at IS NULL
-       FOR UPDATE`,
-      [batteryId, repairIds]
-    );
+    const hasSpecificIds = Array.isArray(repairIds) && repairIds.length > 0;
+    const queryStr = hasSpecificIds
+      ? `SELECT id, part_id, quantity_used FROM repairs
+         WHERE battery_id = $1 AND id = ANY($2::int[]) AND removed_at IS NULL
+         FOR UPDATE`
+      : `SELECT id, part_id, quantity_used FROM repairs
+         WHERE battery_id = $1 AND removed_at IS NULL
+         FOR UPDATE`;
+    const queryParams = hasSpecificIds ? [batteryId, repairIds] : [batteryId];
+
+    const { rows: targets } = await client.query(queryStr, queryParams);
     for (const t of targets) {
       await client.query('UPDATE parts SET quantity = quantity + $2 WHERE id = $1', [
         t.part_id,
@@ -450,8 +459,18 @@ async function removeParts(batteryId, repairIds, staffId) {
         [t.id, staffId]
       );
     }
+
+    // Set battery status to 'tested_parts_removed'
+    const { rows: batteryRows } = await client.query(
+      `UPDATE batteries
+       SET status = 'tested_parts_removed'
+       WHERE id = $1
+       RETURNING *`,
+      [batteryId]
+    );
+
     await client.query('COMMIT');
-    return { removedCount: targets.length };
+    return { removedCount: targets.length, battery: batteryRows[0] };
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;

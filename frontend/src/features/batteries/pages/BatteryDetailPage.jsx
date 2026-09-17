@@ -212,12 +212,12 @@ const PROCESS_STEPS = ['Intake', 'Repair In Progress', 'Testing & QA', 'Repair C
 const STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, in_testing: 2, testing: 2, repair_testing: 2, repaired: 3, returned: 4 };
 
 const UNSERVICEABLE_STEPS = ['Intake', 'In Progress', 'Unserviceable', 'Recycled'];
-const UNSERVICEABLE_STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, unserviceable: 2, recycled: 3 };
+const UNSERVICEABLE_STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, unserviceable: 2, tested_parts_removed: 2, recycled: 3 };
 const UNSERVICEABLE_DANGER_INDEX = 2;
 
 function ProcessStepper({ isOngoing, batteryStatus }) {
   const isUnserviceableFlow =
-    isOngoing && (batteryStatus === 'unserviceable' || batteryStatus === 'recycled');
+    isOngoing && (batteryStatus === 'unserviceable' || batteryStatus === 'tested_parts_removed' || batteryStatus === 'recycled');
   const steps = isUnserviceableFlow ? UNSERVICEABLE_STEPS : PROCESS_STEPS;
   const stepIndex = isUnserviceableFlow ? UNSERVICEABLE_STATUS_STEP_INDEX : STATUS_STEP_INDEX;
 
@@ -302,7 +302,10 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
   // An unserviceable battery's fitted parts are being reclaimed back to
   // inventory (see Parts Pending Removal), not staying in the battery — so
   // the client shouldn't see them listed as a completed service visit.
-  const isUnserviceableForHistory = battery.status === 'unserviceable' || battery.status === 'recycled';
+  const isUnserviceableForHistory =
+    battery.status === 'unserviceable' ||
+    battery.status === 'tested_parts_removed' ||
+    battery.status === 'recycled';
 
   // Distinct repair cycles / batches
   const repairBatches = {};
@@ -373,7 +376,10 @@ function ClientBatteryDetailView({ battery, history = [], returns = [], visits =
   const isReturned = battery.status === 'returned';
   const isInService = battery.status === 'in_progress' || battery.status === 'in_testing' || battery.status === 'repaired';
   const isPacked = battery.status === 'in_repair';
-  const isUnserviceable = battery.status === 'unserviceable' || battery.status === 'recycled';
+  const isUnserviceable =
+    battery.status === 'unserviceable' ||
+    battery.status === 'tested_parts_removed' ||
+    battery.status === 'recycled';
 
   // Client Status Stepper Configuration
   const CLIENT_STEPS = [
@@ -1289,13 +1295,18 @@ function BatteryDetailPage() {
         </button>
       </div>
 
-      {(battery.status === 'unserviceable' || battery.status === 'recycled') && result.issues?.[0] && (
+      {(battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && result.issues?.[0] && (
         <div className="mb-6 rounded-xl border border-critical-200 bg-critical-50 p-5 dark:border-red-500/30 dark:bg-red-500/10 shadow-xs">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="flex-1">
-              <h2 className="mb-1 text-sm font-semibold text-critical-700 dark:text-red-300">
-                {result.issues[0].reason_label}
-              </h2>
+              <div className="flex items-center gap-2 mb-1">
+                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-critical-100 text-critical-800 dark:bg-red-950/60 dark:text-red-300">
+                  {battery.status === 'tested_parts_removed' ? 'Tested - Parts Removed' : 'Unserviceable'}
+                </span>
+                <h2 className="text-sm font-semibold text-critical-700 dark:text-red-300">
+                  {result.issues[0].reason_label}
+                </h2>
+              </div>
               {result.issues[0].note && (
                 <p className="mb-1 text-sm text-slate-600 dark:text-neutral-300">{result.issues[0].note}</p>
               )}
@@ -1303,6 +1314,27 @@ function BatteryDetailPage() {
                 Reported by {result.issues[0].staff_name} on{' '}
                 {new Date(result.issues[0].reported_at).toLocaleString()}
               </p>
+
+              {/* Full Audit Trail: Fitted parts & Removed parts */}
+              {history.some((h) => h.removed_at) && (
+                <div className="mt-3 pt-3 border-t border-red-200/80 dark:border-red-800/40">
+                  <span className="text-xs font-bold text-red-900 dark:text-red-200 block mb-1">
+                    Fitted Parts Removed &amp; Restocked:
+                  </span>
+                  <div className="space-y-1">
+                    {history
+                      .filter((h) => h.removed_at)
+                      .map((h, hIdx) => (
+                        <p key={hIdx} className="text-xs text-red-800 dark:text-red-300">
+                          • <span className="font-semibold">{h.part_name}</span> (Qty {h.quantity_used}) — fitted by{' '}
+                          <span className="font-semibold">{h.staff_name}</span> and removed by{' '}
+                          <span className="font-semibold">{h.removed_by_staff_name || 'Technician'}</span> on{' '}
+                          {new Date(h.removed_at).toLocaleString()}
+                        </p>
+                      ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             {result.issues[0].photo_urls && result.issues[0].photo_urls.length > 0 && (
@@ -1386,7 +1418,10 @@ function BatteryDetailPage() {
           {cycles.map((cycle, i) => {
             const isOngoing = i === cycles.length - 1 && !cycle.some((e) => e.type === 'return');
             const isUnserviceableCycle =
-              isOngoing && (battery.status === 'unserviceable' || battery.status === 'recycled');
+              isOngoing &&
+              (battery.status === 'unserviceable' ||
+                battery.status === 'tested_parts_removed' ||
+                battery.status === 'recycled');
             const cardTone = isUnserviceableCycle
               ? 'red'
               : !isOngoing

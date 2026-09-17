@@ -8,6 +8,7 @@ const STATUS_OPTIONS = [
   { value: 'repaired', label: 'Repair Completed' },
   { value: 'returned', label: 'Returned to Client' },
   { value: 'unserviceable', label: 'Unserviceable' },
+  { value: 'tested_parts_removed', label: 'Tested - Parts Removed' },
   { value: 'recycled', label: 'Recycled' },
 ];
 

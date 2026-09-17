@@ -22,6 +22,7 @@ const VALID_STATUSES = new Set([
   'returned',
   'unserviceable',
   'recycled',
+  'tested_parts_removed',
 ]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -502,9 +503,6 @@ async function removeParts(req, res, next) {
     const repairIds = Array.isArray(req.body.repairIds)
       ? req.body.repairIds.map(Number).filter(Boolean)
       : [];
-    if (repairIds.length === 0) {
-      return res.status(400).json({ message: 'Select at least one part to remove.' });
-    }
     const staff = await staffModel.findByUserId(req.user.id);
     if (!staff) {
       return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
@@ -513,6 +511,10 @@ async function removeParts(req, res, next) {
     if (result.removedCount === 0) {
       return res.status(409).json({ message: 'These parts were already removed or do not belong to this battery.' });
     }
+    if (result.battery) {
+      realtime.broadcastBatteryUpdated(result.battery);
+    }
+    realtime.broadcastUnserviceableCount().catch((err) => console.error('broadcastUnserviceableCount:', err));
     res.json(result);
   } catch (err) {
     next(err);

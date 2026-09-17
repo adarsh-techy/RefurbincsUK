@@ -21,6 +21,8 @@ const STATUS_MAP = {
   repaired: { tone: 'good', label: 'Repair Completed' },
   returned: { tone: 'info', label: 'Returned to Client' },
   unserviceable: { tone: 'critical', label: 'Unserviceable' },
+  tested_parts_removed: { tone: 'critical', label: 'Tested - Parts Removed' },
+  unserviceable_parts_removed: { tone: 'critical', label: 'Tested - Parts Removed' },
   recycled: { tone: 'neutral', label: 'Recycled' },
 };
 
@@ -63,6 +65,8 @@ const CLIENT_STATUS_MAP = {
   repaired: { tone: 'good', label: 'Repaired & Ready' },
   returned: { tone: 'good', label: 'Received Back' },
   unserviceable: { tone: 'critical', label: 'Unserviceable (Not Repairable)' },
+  tested_parts_removed: { tone: 'critical', label: 'Unserviceable (Parts Removed)' },
+  unserviceable_parts_removed: { tone: 'critical', label: 'Unserviceable (Parts Removed)' },
   recycled: { tone: 'neutral', label: 'Recycled' },
 };
 

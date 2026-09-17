@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
 import useFetchList from '../../../utils/use-fetch-list';
@@ -50,6 +50,12 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
   const [selectedRemovalIds, setSelectedRemovalIds] = useState([]);
   const [removingParts, setRemovingParts] = useState(false);
   const [removePartsError, setRemovePartsError] = useState(null);
+
+  useEffect(() => {
+    if (pendingPartsRemoval?.length > 0) {
+      setSelectedRemovalIds(pendingPartsRemoval.map((p) => p.id));
+    }
+  }, [pendingPartsRemoval]);
 
   function toggleService(serviceId) {
     setSelectedServiceIds((prev) =>
@@ -173,7 +179,11 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
 
   async function handleRemoveParts() {
     if (selectedRemovalIds.length === 0) {
-      setRemovePartsError('Select at least one part to remove');
+      setRemovePartsError('Please select fitted parts to remove.');
+      return;
+    }
+    if (selectedRemovalIds.length < pendingPartsRemoval.length) {
+      setRemovePartsError('Mandatory: All fitted parts must be removed before proceeding.');
       return;
     }
     setRemovingParts(true);
@@ -312,10 +322,9 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
   if (battery.status === 'unserviceable' && pendingPartsRemoval.length > 0) {
     return (
       <div className="mb-6 rounded-xl border border-amber-200 bg-amber-50 p-5 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
-        <h2 className="mb-1 text-sm font-semibold text-amber-900 dark:text-amber-200">Parts Pending Removal</h2>
+        <h2 className="mb-1 text-sm font-semibold text-amber-900 dark:text-amber-200">Mandatory: Remove All Fitted Parts</h2>
         <p className="mb-4 text-sm text-amber-700 dark:text-amber-300">
-          These parts were fitted before this battery failed testing. Check off what you've
-          physically removed to restock it — the rest stay flagged until they're pulled too.
+          This battery failed testing. All previously fitted parts must be physically removed and restocked before this battery can be finalized as <span className="font-semibold text-red-600 dark:text-red-400">Tested - Parts Removed</span>.
         </p>
 
         <div className="space-y-2">
@@ -339,7 +348,7 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
                   />
                   <span className="text-sm font-medium text-slate-900 dark:text-neutral-100">{p.part_name}</span>
                 </span>
-                <span className="text-xs text-slate-500 dark:text-neutral-400">Qty {p.quantity_used}</span>
+                <span className="text-xs font-semibold text-slate-600 dark:text-neutral-300">Qty {p.quantity_used}</span>
               </label>
             );
           })}
@@ -354,8 +363,8 @@ function TechnicianRepairPanel({ battery, pendingPartsRemoval = [], onUpdated })
           className="mt-4 w-full rounded-lg bg-amber-600 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-amber-500 disabled:opacity-50 cursor-pointer"
         >
           {removingParts
-            ? 'Removing…'
-            : `Confirm Removal & Restock (${selectedRemovalIds.length})`}
+            ? 'Removing & Restocking…'
+            : `Confirm Removal of All Fitted Parts (${pendingPartsRemoval.length})`}
         </button>
       </div>
     );

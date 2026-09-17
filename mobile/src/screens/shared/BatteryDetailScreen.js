@@ -366,23 +366,36 @@ export default function BatteryDetailScreen() {
           (s) => s.service_name === 'Passed back to Technician'
         );
         const isPassedBack = data.battery?.status === 'in_repair' && !!latestPassBack;
+        const isTestedPartsRemoved =
+          data.battery?.status === 'tested_parts_removed' ||
+          (data.battery?.status === 'unserviceable' && !hasPendingPartsRemoval && (data.history || []).some((h) => h.removed_at));
+        const isUnserviceableTerminal =
+          data.battery?.status === 'unserviceable' ||
+          data.battery?.status === 'tested_parts_removed' ||
+          data.battery?.status === 'recycled';
 
-        if (
-          fromScan &&
-          data.battery?.status !== 'in_repair' &&
-          !isOwnInProgress &&
-          !canTestInTesting &&
-          !hasPendingPartsRemoval
-        ) {
-          setBlockedStatus(data.battery.status);
-          return;
-        }
-        // A tester scanning a battery that's already been repaired and is
-        // waiting on them — surface who repaired it and when before they
-        // dive into the testing form below.
-        if (fromScan && canTestInTesting) {
-          setRepairedByInfo(data.history?.[0] || null);
-          setShowRepairedByModal(true);
+        if (fromScan && isTestedPartsRemoved) {
+          const removedParts = (data.history || []).filter((h) => h.removed_at);
+          const fittedParts = data.history || [];
+          setCantServiceAlertData({
+            mode: 'already_reclaimed',
+            batteryCode: data.battery.battery_code,
+            status: data.battery.status,
+            fittedBy: fittedParts[0]?.staff_name || 'Technician',
+            fittedAt: fittedParts[0]?.repaired_at || null,
+            fittedParts,
+            testedBy: data.issues?.[0]?.staff_name || latestPassBack?.staff_name || 'Tester / Supervisor',
+            testedAt: data.issues?.[0]?.reported_at || latestPassBack?.completed_at || null,
+            issueReason: data.issues?.[0]?.reason_label || data.issues?.[0]?.reason || (latestPassBack ? 'Failed Testing Diagnostics' : 'Unserviceable Unit'),
+            issueNote: data.issues?.[0]?.note || latestPassBack?.notes || null,
+            passBackStaff: latestPassBack?.staff_name || null,
+            passBackAt: latestPassBack?.completed_at || null,
+            passBackNote: latestPassBack?.notes || null,
+            removedBy: removedParts[0]?.removed_by_staff_name || 'Technician',
+            removedAt: removedParts[0]?.removed_at || null,
+            removedParts,
+          });
+          setShowCantServiceAlertModal(true);
         } else if (
           fromScan &&
           (isPassedBack ||
@@ -393,6 +406,9 @@ export default function BatteryDetailScreen() {
             : (data.history || []).filter((h) => !h.removed_at);
 
           setCantServiceAlertData({
+            mode: 'pending_removal',
+            batteryCode: data.battery.battery_code,
+            status: data.battery.status,
             staffName:
               latestPassBack?.staff_name ||
               data.issues?.[0]?.staff_name ||
@@ -405,8 +421,22 @@ export default function BatteryDetailScreen() {
             parts: fittedParts,
             isPassedBack,
             isUnserviceable: data.battery?.status === 'unserviceable',
+            fittedBy: (data.history || [])[0]?.staff_name || 'Technician',
+            fittedAt: (data.history || [])[0]?.repaired_at || null,
           });
           setShowCantServiceAlertModal(true);
+        } else if (
+          fromScan &&
+          data.battery?.status !== 'in_repair' &&
+          !isOwnInProgress &&
+          !canTestInTesting &&
+          !hasPendingPartsRemoval
+        ) {
+          setBlockedStatus(data.battery.status);
+          return;
+        } else if (fromScan && canTestInTesting) {
+          setRepairedByInfo(data.history?.[0] || null);
+          setShowRepairedByModal(true);
         }
       }
       setResult(data);
@@ -416,6 +446,12 @@ export default function BatteryDetailScreen() {
       setLoading(false);
     }
   }, [code, fromScan, currentUserId, isClient, canTest]);
+
+  useEffect(() => {
+    if (result?.pendingPartsRemoval && result.pendingPartsRemoval.length > 0) {
+      setSelectedRemovalIds(result.pendingPartsRemoval.map((p) => p.id));
+    }
+  }, [result?.pendingPartsRemoval]);
 
   useEffect(() => {
     load();
@@ -2141,150 +2177,246 @@ export default function BatteryDetailScreen() {
         onRequestClose={() => setShowCantServiceAlertModal(false)}
       >
         <View className="flex-1 items-center justify-center bg-black/60 px-5">
-          <View className="w-full max-w-sm rounded-3xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+          <View className={`w-full max-w-sm rounded-3xl border p-6 shadow-2xl ${
+            cantServiceAlertData?.mode === 'already_reclaimed'
+              ? 'border-red-300 dark:border-red-800 bg-white dark:bg-slate-900'
+              : 'border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900'
+          }`}>
             {/* Top Icon & Badge */}
-            <View className="flex-row items-center justify-between mb-4">
-              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
-                <Icon name="alertTriangle" color="#d97706" size={24} />
+            <View className="flex-row items-center justify-between mb-3">
+              <View className={`h-12 w-12 items-center justify-center rounded-2xl ${
+                cantServiceAlertData?.mode === 'already_reclaimed'
+                  ? 'bg-red-500/10 border border-red-500/20'
+                  : 'bg-amber-500/10 border border-amber-500/20'
+              }`}>
+                <Icon
+                  name={cantServiceAlertData?.mode === 'already_reclaimed' ? 'slash' : 'alertTriangle'}
+                  color={cantServiceAlertData?.mode === 'already_reclaimed' ? '#dc2626' : '#d97706'}
+                  size={24}
+                />
               </View>
-              <View className="rounded-full bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800/60 px-3 py-1">
-                <Text className="text-[11px] font-bold text-amber-600 dark:text-amber-400">
-                  Can't Service · Passed to Tech
+              <View className={`rounded-full px-3 py-1 border ${
+                cantServiceAlertData?.mode === 'already_reclaimed'
+                  ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/60'
+                  : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60'
+              }`}>
+                <Text className={`text-[11px] font-bold ${
+                  cantServiceAlertData?.mode === 'already_reclaimed'
+                    ? 'text-red-700 dark:text-red-400'
+                    : 'text-amber-700 dark:text-amber-400'
+                }`}>
+                  {cantServiceAlertData?.mode === 'already_reclaimed'
+                    ? 'Tested - Parts Removed'
+                    : 'Can\'t Service · Mandatory Removal'}
                 </Text>
               </View>
             </View>
 
             <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
-              Battery Can't Service
+              {cantServiceAlertData?.mode === 'already_reclaimed'
+                ? 'Battery Cannot Be Serviced'
+                : 'Battery Can\'t Service'}
             </Text>
-            <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              This battery failed testing and was passed back for technician review:
+            <Text className="mt-0.5 mb-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              {cantServiceAlertData?.mode === 'already_reclaimed'
+                ? 'This battery failed testing diagnostics and all fitted parts were already removed and restocked:'
+                : 'This battery failed testing and requires mandatory removal of all fitted parts before closing:'}
             </Text>
 
-            {/* Details Card */}
-            <View className="mb-4 rounded-2xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/30 p-3.5 space-y-2">
-              {/* Battery Code */}
-              <View className="flex-row items-center justify-between py-1 border-b border-amber-200/60 dark:border-amber-800/60">
-                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Battery ID</Text>
-                <Text className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                  {battery?.battery_code || code}
-                </Text>
-              </View>
-
-              {/* Marked By */}
-              <View className="flex-row items-center justify-between py-1 border-b border-amber-200/60 dark:border-amber-800/60">
-                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Marked By</Text>
-                <View className="flex-row items-center gap-1.5">
-                  <Icon name="user" color="#b45309" size={13} />
-                  <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                    {cantServiceAlertData?.staffName || 'Supervisor / Tester'}
+            {cantServiceAlertData?.mode === 'already_reclaimed' ? (
+              /* Full 4-Step Audit Trail for Tested & Parts Removed */
+              <ScrollView nestedScrollEnabled className="mb-4 max-h-72 space-y-2.5">
+                {/* 1. Fitted By */}
+                <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3">
+                  <View className="flex-row items-center gap-1.5 mb-1">
+                    <Icon name="wrench" color="#2563eb" size={13} />
+                    <Text className="text-[11px] font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider">
+                      1. Parts Fitted By
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-bold text-slate-900 dark:text-white">
+                    {cantServiceAlertData.fittedBy}
                   </Text>
+                  {cantServiceAlertData.fittedAt && (
+                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
+                      {new Date(cantServiceAlertData.fittedAt).toLocaleString()}
+                    </Text>
+                  )}
+                  {cantServiceAlertData.fittedParts && cantServiceAlertData.fittedParts.length > 0 && (
+                    <Text className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 font-medium">
+                      Fitted: {cantServiceAlertData.fittedParts.map((p) => p.part_name).filter(Boolean).join(', ')}
+                    </Text>
+                  )}
                 </View>
-              </View>
 
-              {/* Timestamp */}
-              {cantServiceAlertData?.date && (
-                <View className="flex-row items-center justify-between py-1 border-b border-amber-200/60 dark:border-amber-800/60">
-                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Date &amp; Time</Text>
-                  <Text className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                    {new Date(cantServiceAlertData.date).toLocaleDateString('en-GB', {
-                      day: '2-digit',
-                      month: 'short',
-                      year: 'numeric',
-                    })} · {new Date(cantServiceAlertData.date).toLocaleTimeString([], {
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                {/* 2. Tested & Reported By */}
+                <View className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/30 p-3">
+                  <View className="flex-row items-center gap-1.5 mb-1">
+                    <Icon name="alertCircle" color="#dc2626" size={13} />
+                    <Text className="text-[11px] font-bold text-red-900 dark:text-red-300 uppercase tracking-wider">
+                      2. Tested &amp; Reported Can't Service
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-bold text-red-950 dark:text-red-100">
+                    {cantServiceAlertData.testedBy}
                   </Text>
+                  {cantServiceAlertData.testedAt && (
+                    <Text className="text-[10px] text-red-800/80 dark:text-red-300/80 mt-0.5">
+                      {new Date(cantServiceAlertData.testedAt).toLocaleString()}
+                    </Text>
+                  )}
+                  <View className="mt-1 rounded-lg bg-white/90 dark:bg-slate-900 p-2 border border-red-200/80 dark:border-red-900/40">
+                    <Text className="text-xs font-bold text-red-900 dark:text-red-200">
+                      {cantServiceAlertData.issueReason}
+                    </Text>
+                    {cantServiceAlertData.issueNote && (
+                      <Text className="text-[11px] text-red-700 dark:text-red-300 italic mt-0.5">
+                        "{cantServiceAlertData.issueNote}"
+                      </Text>
+                    )}
+                  </View>
                 </View>
-              )}
 
-              {/* Tester Notes */}
-              {cantServiceAlertData?.note && (
-                <View className="pt-1">
-                  <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
-                    Tester Note:
+                {/* 3. Parts Removed By */}
+                <View className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 p-3">
+                  <View className="flex-row items-center gap-1.5 mb-1">
+                    <Icon name="checkCircle" color="#b45309" size={13} />
+                    <Text className="text-[11px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
+                      3. All Fitted Parts Reclaimed
+                    </Text>
+                  </View>
+                  <Text className="text-xs font-bold text-amber-950 dark:text-amber-100">
+                    Removed by {cantServiceAlertData.removedBy || 'Technician'}
                   </Text>
-                  <Text className="text-xs text-slate-800 dark:text-slate-200 italic font-medium">
-                    "{cantServiceAlertData.note}"
-                  </Text>
+                  {cantServiceAlertData.removedAt && (
+                    <Text className="text-[10px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">
+                      {new Date(cantServiceAlertData.removedAt).toLocaleString()}
+                    </Text>
+                  )}
+                  {cantServiceAlertData.removedParts && cantServiceAlertData.removedParts.length > 0 && (
+                    <Text className="text-[11px] text-amber-900 dark:text-amber-200 mt-1 font-semibold">
+                      Reclaimed to Stock: {cantServiceAlertData.removedParts.map((p) => p.part_name).filter(Boolean).join(', ')}
+                    </Text>
+                  )}
                 </View>
-              )}
-            </View>
-
-            {/* Instruction Callout */}
-            <View className="mb-4 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-100/70 dark:bg-amber-900/40 p-3 flex-row items-start gap-2.5">
-              <Icon name="wrench" color="#b45309" size={16} />
-              <View className="flex-1">
-                <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                  Please Remove The Fitted Part(s)
-                </Text>
-                <Text className="text-[11px] text-amber-800 dark:text-amber-300 mt-0.5 leading-snug">
-                  The following parts were already fitted to this battery and must be removed:
-                </Text>
-              </View>
-            </View>
-
-            {/* Already Fitted Parts List */}
-            <View className="mb-5 max-h-36">
-              <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-2">
-                Already Fitted Parts ({cantServiceAlertData?.parts?.length || 0})
-              </Text>
-              {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 ? (
-                <ScrollView nestedScrollEnabled className="space-y-1.5 max-h-32">
-                  {cantServiceAlertData.parts.map((p, pIdx) => (
-                    <View
-                      key={p.id || pIdx}
-                      className="flex-row items-center justify-between rounded-xl border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-3 py-2"
-                    >
-                      <View className="flex-row items-center gap-2 flex-1 pr-2">
-                        <View className="h-6 w-6 rounded-lg bg-amber-500/10 items-center justify-center">
-                          <Icon name="package" color="#d97706" size={12} />
-                        </View>
-                        <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>
-                          {p.part_name}
-                        </Text>
-                      </View>
-                      <View className="rounded-md bg-slate-200/80 dark:bg-slate-800 px-2 py-0.5">
-                        <Text className="text-[11px] font-semibold text-slate-700 dark:text-slate-300">
-                          Qty {p.quantity_used || 1}
-                        </Text>
-                      </View>
+              </ScrollView>
+            ) : (
+              /* Pending Removal Breakdown */
+              <>
+                <View className="mb-3 rounded-2xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/30 p-3 space-y-1.5">
+                  <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
+                    <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Battery ID</Text>
+                    <Text className="text-xs font-mono font-bold text-slate-900 dark:text-white">
+                      {battery?.battery_code || code}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
+                    <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Fitted By</Text>
+                    <Text className="text-xs font-bold text-slate-900 dark:text-white">
+                      {cantServiceAlertData?.fittedBy || 'Technician'}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
+                    <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tested &amp; Reported By</Text>
+                    <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                      {cantServiceAlertData?.staffName || 'Supervisor / Tester'}
+                    </Text>
+                  </View>
+                  {cantServiceAlertData?.note && (
+                    <View className="pt-0.5">
+                      <Text className="text-[11px] text-amber-900 dark:text-amber-200 italic">
+                        "{cantServiceAlertData.note}"
+                      </Text>
                     </View>
-                  ))}
-                </ScrollView>
-              ) : (
-                <View className="rounded-xl border border-dashed border-slate-300 dark:border-slate-700 p-3 items-center">
-                  <Text className="text-xs text-slate-500 dark:text-slate-400">
-                    No specific parts recorded — inspect battery physically.
-                  </Text>
+                  )}
                 </View>
-              )}
-            </View>
+
+                <View className="mb-4 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-100/70 dark:bg-amber-900/40 p-2.5 flex-row items-start gap-2">
+                  <Icon name="wrench" color="#b45309" size={15} />
+                  <View className="flex-1">
+                    <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                      Mandatory: Remove All Fitted Parts
+                    </Text>
+                    <Text className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">
+                      All parts must be physically removed and restocked into inventory.
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Fitted Parts List */}
+                <View className="mb-4 max-h-28">
+                  {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 && (
+                    <ScrollView nestedScrollEnabled className="space-y-1">
+                      {cantServiceAlertData.parts.map((p, pIdx) => (
+                        <View
+                          key={p.id || pIdx}
+                          className="flex-row items-center justify-between rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-2.5 py-1.5"
+                        >
+                          <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>
+                            {p.part_name}
+                          </Text>
+                          <Text className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                            Qty {p.quantity_used || 1}
+                          </Text>
+                        </View>
+                      ))}
+                    </ScrollView>
+                  )}
+                </View>
+              </>
+            )}
 
             {/* Modal Actions */}
-            <View className="gap-2.5">
-              <TouchableOpacity
-                onPress={() => setShowCantServiceAlertModal(false)}
-                className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
-              >
-                <Text className="text-xs font-bold text-white">Proceed &amp; Remove Parts</Text>
-              </TouchableOpacity>
+            <View className="gap-2">
+              {cantServiceAlertData?.mode === 'already_reclaimed' ? (
+                <>
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowCantServiceAlertModal(false);
+                      allowExitRef.current = true;
+                      navigation.navigate('Main', {
+                        screen: 'Service',
+                        params: { autoScan: Date.now() },
+                      });
+                    }}
+                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-red-600 py-3.5 shadow-md active:bg-red-700"
+                  >
+                    <Icon name="camera" color="#ffffff" size={16} />
+                    <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
+                  </TouchableOpacity>
 
-              <TouchableOpacity
-                onPress={() => {
-                  setShowCantServiceAlertModal(false);
-                  allowExitRef.current = true;
-                  navigation.navigate('Main', {
-                    screen: 'Service',
-                    params: { autoScan: Date.now() },
-                  });
-                }}
-                className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
-              >
-                <Icon name="camera" color="#64748b" size={14} />
-                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
-              </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => setShowCantServiceAlertModal(false)}
+                    className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-2.5 border border-slate-200 dark:border-slate-700"
+                  >
+                    <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">View Battery Record</Text>
+                  </TouchableOpacity>
+                </>
+              ) : (
+                <>
+                  <TouchableOpacity
+                    onPress={() => setShowCantServiceAlertModal(false)}
+                    className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
+                  >
+                    <Text className="text-xs font-bold text-white">Proceed to Remove All Fitted Parts</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    onPress={() => {
+                      setShowCantServiceAlertModal(false);
+                      allowExitRef.current = true;
+                      navigation.navigate('Main', {
+                        screen: 'Service',
+                        params: { autoScan: Date.now() },
+                      });
+                    }}
+                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-2.5 border border-slate-200 dark:border-slate-700"
+                  >
+                    <Icon name="camera" color="#64748b" size={14} />
+                    <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
+                  </TouchableOpacity>
+                </>
+              )}
             </View>
           </View>
         </View>

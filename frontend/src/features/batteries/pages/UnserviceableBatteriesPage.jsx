@@ -5,6 +5,7 @@ import DataTable from '../../../components/ui/table/DataTable';
 import TableState from '../../../components/ui/table/TableState';
 import InfiniteScrollTrigger from '../../../components/ui/table/InfiniteScrollTrigger';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
+import Badge from '../../../components/ui/primitives/Badge';
 import ImageLightboxModal from '../../../components/ui/overlays/ImageLightboxModal';
 import { resolveImageUrl } from '../../../utils/image-url';
 import { socket } from '../../../services/socket-client';
@@ -29,7 +30,7 @@ function UnserviceableBatteriesPage() {
   }, [search]);
 
   const { items, loading, hasMore, error, loadMore, refetch } = useInfiniteList('/batteries', PAGE_SIZE, {
-    status: 'unserviceable',
+    status: 'unserviceable,tested_parts_removed',
     search: debouncedSearch || undefined,
     date: date || undefined,
   });
@@ -50,6 +51,11 @@ function UnserviceableBatteriesPage() {
           {row.battery_code}
         </Link>
       ),
+    },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (row) => <Badge status={row.status} />,
     },
     { key: 'client_name', label: 'Client', render: (row) => row.client_name || '—' },
     { key: 'issue_reason', label: 'Reason', render: (row) => row.issue_reason || '—' },

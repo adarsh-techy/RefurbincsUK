@@ -9,7 +9,7 @@ async function getTotals() {
       -- which would drop back down once a battery is returned).
       (SELECT COUNT(*) FROM repairs) AS repaired,
       (SELECT COUNT(*) FROM batteries WHERE status = 'returned') AS returned,
-      (SELECT COUNT(*) FROM batteries WHERE status = 'unserviceable') AS unserviceable,
+      (SELECT COUNT(*) FROM batteries WHERE status IN ('unserviceable', 'tested_parts_removed')) AS unserviceable,
       (SELECT COUNT(*) FROM batteries WHERE status = 'recycled') AS recycled,
       (SELECT COUNT(*) FROM parts WHERE quantity <= 5) AS low_stock_parts
   `);

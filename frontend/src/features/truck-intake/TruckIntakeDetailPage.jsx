@@ -47,10 +47,10 @@ function TruckIntakeDetailPage() {
   const repairedCount = batteries.filter((b) => b.status === 'repaired').length;
   const returnedCount = batteries.filter((b) => b.status === 'returned').length;
   const inRepairCount = batteries.filter(
-    (b) => !['repaired', 'returned', 'unserviceable', 'recycled'].includes(b.status)
+    (b) => !['repaired', 'returned', 'unserviceable', 'recycled', 'tested_parts_removed'].includes(b.status)
   ).length;
   const unserviceableCount = batteries.filter(
-    (b) => b.status === 'unserviceable' || b.status === 'recycled'
+    (b) => b.status === 'unserviceable' || b.status === 'recycled' || b.status === 'tested_parts_removed'
   ).length;
   const isPending = intake.status === 'pending_arrival';
 

@@ -30,7 +30,7 @@ function RecycleForm({ onCreated, onCancel }) {
   useEffect(() => {
     let cancelled = false;
     apiClient
-      .get('/batteries', { params: { status: 'unserviceable', limit: 200 } })
+      .get('/batteries', { params: { status: 'unserviceable,tested_parts_removed', limit: 200 } })
       .then(({ data }) => {
         if (!cancelled) setUnserviceableBatteryList(data.data || []);
       })
@@ -67,7 +67,7 @@ function RecycleForm({ onCreated, onCancel }) {
         flashFeedback('warn', `${battery.battery_code} is already in this recycle manifest.`);
         return;
       }
-      if (battery.status !== 'unserviceable') {
+      if (battery.status !== 'unserviceable' && battery.status !== 'tested_parts_removed') {
         flashFeedback('bad', `${battery.battery_code} is not marked unserviceable (status: ${battery.status.replace('_', ' ')}).`);
         return;
       }
