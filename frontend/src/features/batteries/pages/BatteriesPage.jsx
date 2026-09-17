@@ -29,7 +29,7 @@ const STATUS_FILTERS = [
   { value: 'repaired', label: 'Repair Completed' },
   { value: 'returned', label: 'Returned to Client' },
   { value: 'unserviceable', label: 'Unserviceable' },
-  { value: 'tested_parts_removed', label: 'Tested - Parts Removed' },
+  { value: 'tested_parts_removed', label: 'Unserviceable (Test Failed)' },
   { value: 'recycled', label: 'Recycled' },
 ];
 

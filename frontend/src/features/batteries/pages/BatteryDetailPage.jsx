@@ -1301,7 +1301,7 @@ function BatteryDetailPage() {
             <div className="flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-critical-100 text-critical-800 dark:bg-red-950/60 dark:text-red-300">
-                  {battery.status === 'tested_parts_removed' ? 'Tested - Parts Removed' : 'Unserviceable'}
+                  {battery.status === 'tested_parts_removed' ? 'Unserviceable · Test Failed' : 'Unserviceable'}
                 </span>
                 <h2 className="text-sm font-semibold text-critical-700 dark:text-red-300">
                   {result.issues[0].reason_label}

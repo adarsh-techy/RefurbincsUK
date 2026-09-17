@@ -22,6 +22,7 @@ const STATUS_MAP = {
   repaired: { tone: 'good', label: 'Completed' },
   returned: { tone: 'info', label: 'Returned' },
   unserviceable: { tone: 'critical', label: 'Unserviceable' },
+  tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
   recycled: { tone: 'neutral', label: 'Recycled' },
 };
 
@@ -37,5 +38,15 @@ export function Badge({ tone = 'neutral', children }) {
 // Convenience wrapper for the battery status enum specifically.
 export function StatusBadge({ status }) {
   const meta = STATUS_MAP[status] || { tone: 'neutral', label: status };
+  if (meta.subLabel) {
+    return (
+      <View className="items-start gap-0.5">
+        <Badge tone={meta.tone}>{meta.label}</Badge>
+        <Text className="text-[10px] font-bold text-red-600 dark:text-red-400 pl-1">
+          {meta.subLabel}
+        </Text>
+      </View>
+    );
+  }
   return <Badge tone={meta.tone}>{meta.label}</Badge>;
 }

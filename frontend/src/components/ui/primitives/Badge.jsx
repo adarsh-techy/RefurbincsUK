@@ -21,8 +21,8 @@ const STATUS_MAP = {
   repaired: { tone: 'good', label: 'Repair Completed' },
   returned: { tone: 'info', label: 'Returned to Client' },
   unserviceable: { tone: 'critical', label: 'Unserviceable' },
-  tested_parts_removed: { tone: 'critical', label: 'Tested - Parts Removed' },
-  unserviceable_parts_removed: { tone: 'critical', label: 'Tested - Parts Removed' },
+  tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
+  unserviceable_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
   recycled: { tone: 'neutral', label: 'Recycled' },
 };
 
@@ -46,6 +46,16 @@ export function StatusBadge({ status }) {
     tone: 'neutral',
     label: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
   };
+  if (meta.subLabel) {
+    return (
+      <div className="inline-flex flex-col items-start gap-0.5">
+        <Badge tone={meta.tone}>{meta.label}</Badge>
+        <span className="text-[10px] font-bold text-red-600 dark:text-red-400 pl-1 tracking-tight">
+          {meta.subLabel}
+        </span>
+      </div>
+    );
+  }
   return <Badge tone={meta.tone}>{meta.label}</Badge>;
 }
 
@@ -65,8 +75,8 @@ const CLIENT_STATUS_MAP = {
   repaired: { tone: 'good', label: 'Repaired & Ready' },
   returned: { tone: 'good', label: 'Received Back' },
   unserviceable: { tone: 'critical', label: 'Unserviceable (Not Repairable)' },
-  tested_parts_removed: { tone: 'critical', label: 'Unserviceable (Parts Removed)' },
-  unserviceable_parts_removed: { tone: 'critical', label: 'Unserviceable (Parts Removed)' },
+  tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
+  unserviceable_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
   recycled: { tone: 'neutral', label: 'Recycled' },
 };
 
@@ -78,6 +88,16 @@ export function ClientStatusBadge({ status }) {
     tone: 'neutral',
     label: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
   };
+  if (meta.subLabel) {
+    return (
+      <div className="inline-flex flex-col items-start gap-0.5">
+        <Badge tone={meta.tone}>{meta.label}</Badge>
+        <span className="text-[10px] font-bold text-red-600 dark:text-red-400 pl-1 tracking-tight">
+          {meta.subLabel}
+        </span>
+      </div>
+    );
+  }
   return <Badge tone={meta.tone}>{meta.label}</Badge>;
 }
 
