@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
@@ -92,6 +92,7 @@ function ClientBatteriesPage() {
 
   const [data, setData] = useState([]);
   const [allRegisteredBatteries, setAllRegisteredBatteries] = useState([]);
+  const dataRequestIdRef = useRef(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -205,15 +206,24 @@ function ClientBatteriesPage() {
   function loadData() {
     setLoading(true);
     setError(null);
+    // Guards against out-of-order responses: if the page's initial fetch
+    // (fired on mount/bucket change) is still in flight when a pack/add
+    // action calls loadData() again, an older response can resolve AFTER
+    // the newer one and silently overwrite the just-saved data with stale
+    // data. Only the response from the most recently issued request wins.
+    const requestId = ++dataRequestIdRef.current;
     apiClient
       .get('/clients/me/batteries', { params: effectiveBucket === 'all' ? {} : { bucket: effectiveBucket } })
       .then(({ data: result }) => {
+        if (requestId !== dataRequestIdRef.current) return;
         setData(result.data || []);
       })
       .catch((err) => {
+        if (requestId !== dataRequestIdRef.current) return;
         setError(err.response?.data?.message || err.message);
       })
       .finally(() => {
+        if (requestId !== dataRequestIdRef.current) return;
         setLoading(false);
       });
 
@@ -221,6 +231,7 @@ function ClientBatteriesPage() {
     apiClient
       .get('/clients/me/batteries')
       .then(({ data: result }) => {
+        if (requestId !== dataRequestIdRef.current) return;
         setAllRegisteredBatteries(result.data || []);
       })
       .catch(() => {
@@ -718,13 +729,27 @@ function ClientBatteriesPage() {
       (b) => b.battery_code.toUpperCase() === code
     );
     if (existing) {
-      if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(existing.status)) {
-        setPackError(`Battery ${code} is already in the repair pipeline (${existing.status.replace('_', ' ')}).`);
-        return;
-      }
-      if (existing.status === 'unserviceable') {
-        setPackError(`Battery ${code} has been marked as unserviceable.`);
-        return;
+      // Already packed onto THIS SAME truck's shipment, which hasn't
+      // arrived/been verified yet — that's not a conflict, it's the client
+      // continuing to build the same still-open batch, so let it through
+      // instead of blocking with a confusing "already in pipeline" error.
+      const normalizeTruck = (v) => (v || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+      const sameOpenTruckBatch =
+        existing.status === 'in_repair' &&
+        existing.intake_status === 'pending_arrival' &&
+        truckNumber.trim() &&
+        existing.truck_number &&
+        normalizeTruck(existing.truck_number) === normalizeTruck(truckNumber);
+
+      if (!sameOpenTruckBatch) {
+        if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(existing.status)) {
+          setPackError(`Battery ${code} is already in the repair pipeline (${existing.status.replace('_', ' ')}).`);
+          return;
+        }
+        if (existing.status === 'unserviceable') {
+          setPackError(`Battery ${code} has been marked as unserviceable.`);
+          return;
+        }
       }
     }
 

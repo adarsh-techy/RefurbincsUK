@@ -232,36 +232,62 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
         title="Scan to Verify Shipment Arrival"
         description={
           intake
-            ? `Truck: ${intake.truck_number} · Driver: ${intake.driver_name}${intake.client_name ? ` · Client: ${intake.client_name}` : ''}`
-            : 'Verifying truck batteries'
+            ? `Truck: ${intake.truck_number || '—'} · Driver: ${intake.driver_name || '—'}${intake.client_name ? ` · Client: ${intake.client_name}` : ''}`
+            : 'Verifying truck shipment batteries'
         }
         onClose={onClose}
-        size="4xl"
-        className="h-[88vh] max-h-[92vh]"
+        size="5xl"
+        className="max-h-[92vh] flex flex-col"
       >
         {loading ? (
           <TableState>Loading truck shipment details…</TableState>
         ) : error ? (
           <TableState tone="error">{error}</TableState>
         ) : (
-          <div className="flex h-full flex-col justify-between space-y-4">
-            {/* Progress Header */}
-            <div className="shrink-0 rounded-2xl border border-slate-200 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-surface-800/80">
-              <div className="flex flex-wrap items-center justify-between gap-2 text-sm font-semibold">
-                <span className="text-slate-700 dark:text-neutral-200">Verification Progress</span>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs font-bold text-slate-500 dark:text-neutral-400">
-                    {remainingBatteries.length} remaining
+          <div className="flex flex-col min-h-[580px] max-h-[75vh]">
+            {/* 1. Top Metadata & Progress Banner */}
+            <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3 py-1 text-xs font-black text-white dark:bg-white dark:text-slate-900">
+                    <FiTruck className="w-3.5 h-3.5" />
+                    <span>{intake?.truck_number || 'TRUCK'}</span>
                   </span>
-                  <span className="rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-black text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300">
-                    {scannedSet.size} / {expectedCodes.length} verified (
-                    {expectedCodes.length > 0 ? Math.round((scannedSet.size / expectedCodes.length) * 100) : 0}%)
+                  {intake?.driver_name && (
+                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 dark:text-neutral-300">
+                      <FiUser className="w-3.5 h-3.5 text-slate-400" />
+                      <span>{intake.driver_name}</span>
+                    </span>
+                  )}
+                  {intake?.client_name && (
+                    <span className="rounded-lg bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 border border-blue-200/80 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-800/40">
+                      {intake.client_name}
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold text-slate-500 dark:text-neutral-400">
+                    {remainingBatteries.length > 0 ? (
+                      <span className="text-amber-600 dark:text-amber-400 font-bold">
+                        {remainingBatteries.length} remaining
+                      </span>
+                    ) : (
+                      <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                        All scanned
+                      </span>
+                    )}
+                  </span>
+                  <span className="rounded-xl bg-emerald-100 px-3 py-1 text-xs font-black text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50">
+                    {scannedSet.size} / {expectedCodes.length} verified ({expectedCodes.length > 0 ? Math.round((scannedSet.size / expectedCodes.length) * 100) : 0}%)
                   </span>
                 </div>
               </div>
-              <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-surface-700">
+
+              {/* Progress Bar */}
+              <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-surface-700">
                 <div
-                  className="h-full bg-emerald-500 transition-all duration-300"
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-300 rounded-full"
                   style={{
                     width: `${expectedCodes.length > 0 ? (scannedSet.size / expectedCodes.length) * 100 : 0}%`,
                   }}
@@ -269,16 +295,15 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
               </div>
             </div>
 
-            <div className="grid flex-1 grid-cols-1 gap-5 lg:grid-cols-12">
-              {/* Left Column: Scanning & Suggestions (7 cols) */}
-              <div className="flex flex-col space-y-4 lg:col-span-7">
-                {/* Input with Auto-Suggestions */}
+            {/* 2. Middle 2-Column Work Area (Scrollable) */}
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto pr-1 pb-4 lg:grid-cols-12">
+              {/* Left Column: Input & Live Controls (7 cols) */}
+              <div className="flex min-h-0 flex-col space-y-4 lg:col-span-7">
+                {/* Search / Scan Input */}
                 <div className="relative">
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
-                      Scan or Type Battery Code / Serial
-                    </label>
-                  </div>
+                  <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300 mb-1.5">
+                    Scan Barcode / QR or Type Battery ID
+                  </label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
                       <input
@@ -301,17 +326,19 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                             setShowSuggestions(false);
                           }
                         }}
-                        placeholder="Type battery code or serial number…"
+                        placeholder="Scan QR or enter battery ID / serial…"
                         autoComplete="off"
                         autoFocus
-                        className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3 text-base font-medium text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-hidden focus:ring-2 focus:ring-brand-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100"
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs font-mono"
                       />
+
+                      {/* Dropdown Suggestions */}
                       {showSuggestions && suggestions.length > 0 && (
-                        <ul className="absolute z-30 mt-1 max-h-80 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-800">
-                          <li className="border-b border-slate-100 px-4 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-white/10 dark:text-neutral-400">
+                        <ul className="absolute z-30 mt-1 max-h-72 w-full overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-800">
+                          <li className="border-b border-slate-100 px-3.5 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:border-white/10 dark:text-neutral-400 bg-slate-50/50 dark:bg-surface-900/50">
                             {scanInput.trim()
                               ? `Matching Batteries On Truck (${suggestions.length})`
-                              : `Still On Truck (${remainingBatteries.length})`}
+                              : `Unscanned On Truck (${remainingBatteries.length})`}
                           </li>
                           {suggestions.map((item) => (
                             <li key={item.battery_code}>
@@ -319,90 +346,126 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                                 type="button"
                                 onMouseDown={(e) => e.preventDefault()}
                                 onClick={() => handleScan(item.battery_code)}
-                                className="flex w-full items-center justify-between px-4 py-3 text-left text-sm font-medium text-slate-800 hover:bg-brand-50 hover:text-brand-800 dark:text-neutral-100 dark:hover:bg-surface-700 dark:hover:text-emerald-300"
+                                className="flex w-full items-center justify-between px-3.5 py-2.5 text-left text-xs font-medium text-slate-800 hover:bg-emerald-50 hover:text-emerald-900 dark:text-neutral-100 dark:hover:bg-surface-700 dark:hover:text-emerald-300 transition-colors border-b border-slate-100/60 dark:border-white/5 last:border-b-0 cursor-pointer"
                               >
-                                <div className="flex flex-col">
+                                <div className="flex flex-col min-w-0 pr-2">
                                   <div className="flex items-center gap-2">
-                                    <span className="font-mono font-bold text-base">{item.battery_code}</span>
+                                    <span className="font-mono font-bold text-sm text-slate-900 dark:text-white">
+                                      {item.battery_code}
+                                    </span>
                                     {item.intake_count_this_month > 1 && (
-                                      <span className="inline-flex items-center gap-1 rounded-md bg-amber-100 px-2 py-0.5 text-[10px] font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/60">
+                                      <span className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/80">
                                         <FiRepeat className="w-2.5 h-2.5" />
-                                        <span>{item.intake_count_this_month}x this month</span>
+                                        <span>{item.intake_count_this_month}x this mo</span>
                                       </span>
                                     )}
                                   </div>
                                   {item.serial_number && (
-                                    <span className="text-xs text-slate-500 dark:text-neutral-400">
+                                    <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono mt-0.5">
                                       SN: {item.serial_number}
                                     </span>
                                   )}
                                 </div>
-                                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                  + Verify Now
+                                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/40 shrink-0">
+                                  + Verify
                                 </span>
                               </button>
                             </li>
                           ))}
                           {remainingBatteries.length > suggestions.length && (
-                            <li className="border-t border-slate-100 px-4 py-2 text-xs text-slate-400 dark:border-white/10 dark:text-neutral-500">
+                            <li className="border-t border-slate-100 px-3.5 py-2 text-[11px] text-slate-400 dark:border-white/10 dark:text-neutral-500">
                               +{remainingBatteries.length - suggestions.length} more batteries — type to filter
                             </li>
                           )}
                         </ul>
                       )}
                     </div>
+
                     <button
                       type="button"
                       onClick={() => handleScan(scanInput)}
                       disabled={!scanInput.trim()}
-                      className="shrink-0 rounded-xl bg-brand-600 px-5 py-3 text-sm font-bold text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                      className="shrink-0 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors cursor-pointer"
                     >
                       Verify
                     </button>
                     <button
                       type="button"
                       onClick={() => setCameraOpen((v) => !v)}
-                      className="shrink-0 rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-bold shadow-2xs transition-colors cursor-pointer ${
+                        cameraOpen
+                          ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-300'
+                          : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700'
+                      }`}
                     >
-                      {cameraOpen ? 'Close Camera' : '📷 Camera'}
+                      <span>{cameraOpen ? '✕ Close Camera' : '📷 Camera'}</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Scan Feedback */}
+                {/* Scan Feedback Banner */}
                 {scanFeedback && (
                   <div
-                    className={`rounded-xl px-4 py-3 text-sm font-bold ${
+                    className={`rounded-xl px-4 py-2.5 text-xs font-bold flex items-center gap-2 border transition-all ${
                       scanFeedback.tone === 'good'
-                        ? 'bg-emerald-50 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300'
+                        ? 'bg-emerald-50 text-emerald-900 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40'
                         : scanFeedback.tone === 'warn'
-                          ? 'bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300'
-                          : 'bg-red-50 text-red-800 dark:bg-red-950/40 dark:text-red-300'
+                          ? 'bg-amber-50 text-amber-900 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40'
+                          : 'bg-red-50 text-red-900 border-red-200 dark:bg-red-950/40 dark:text-red-300 dark:border-red-800/40'
                     }`}
                   >
-                    {scanFeedback.message}
+                    <span>{scanFeedback.tone === 'good' ? '✅' : scanFeedback.tone === 'warn' ? '⚠️' : '❌'}</span>
+                    <span className="flex-1">{scanFeedback.message}</span>
                   </div>
                 )}
 
-                {/* Camera Component */}
+                {/* Camera Scanner Container */}
                 {cameraOpen && (
-                  <div className="overflow-hidden rounded-2xl border border-slate-200 p-2 dark:border-white/10">
-                    <QrScanner onScan={handleScan} onClose={() => setCameraOpen(false)} />
+                  <div className="rounded-2xl border border-slate-200 bg-slate-900 p-3 text-white overflow-hidden shadow-sm dark:border-white/10">
+                    <div className="mb-2 flex items-center justify-between text-xs font-bold">
+                      <span className="flex items-center gap-1.5 text-emerald-400">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+                        <span>Live Scanner Ready</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setCameraOpen(false)}
+                        className="text-slate-400 hover:text-white text-xs"
+                      >
+                        Done
+                      </button>
+                    </div>
+                    <QrScanner
+                      onScan={(value) => {
+                        handleScan(value);
+                      }}
+                    />
                   </div>
                 )}
+
+                {/* Quick Info & Verification Guide Card */}
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/60 p-3.5 text-xs text-slate-600 dark:border-white/10 dark:bg-surface-800/60 dark:text-neutral-300">
+                  <span className="font-bold text-slate-800 dark:text-white uppercase tracking-wider text-[10px] block mb-1">
+                    Shipment Verification Protocol
+                  </span>
+                  <p className="text-[11px] leading-relaxed text-slate-500 dark:text-neutral-400">
+                    Verify each battery physical code upon offloading the truck. Once all <strong>{expectedCodes.length} batteries</strong> are verified, the confirmation button below will unlock.
+                  </p>
+                </div>
               </div>
 
               {/* Right Column: Manifest Checklist (5 cols) */}
-              <div className="flex flex-col space-y-2 lg:col-span-5">
+              <div className="flex min-h-0 flex-col space-y-2 lg:col-span-5">
                 <div className="flex items-center justify-between">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
                     Shipment Manifest ({batteriesList.length})
                   </h4>
-                  <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                    {scannedSet.size} scanned
+                  <span className="text-[11px] font-bold text-slate-500 dark:text-neutral-400">
+                    {scannedSet.size} of {batteriesList.length} scanned
                   </span>
                 </div>
-                <div className="max-h-[48vh] min-h-[220px] flex-1 divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-slate-200 dark:divide-white/5 dark:border-white/10">
+
+                <div className="min-h-[220px] flex-1 divide-y divide-slate-100 overflow-y-auto rounded-2xl border border-slate-200 bg-white dark:divide-white/5 dark:border-white/10 dark:bg-surface-900 shadow-2xs">
                   {batteriesList.map((b) => {
                     const code = b.battery_code.toUpperCase();
                     const isScanned = scannedSet.has(code);
@@ -412,20 +475,20 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                     return (
                       <div
                         key={code}
-                        className={`flex items-center justify-between px-4 py-2.5 text-xs transition-colors ${
+                        className={`flex items-center justify-between px-3.5 py-2.5 text-xs transition-colors ${
                           isScanned
-                            ? 'bg-emerald-50/50 dark:bg-emerald-950/30'
+                            ? 'bg-emerald-50/60 dark:bg-emerald-950/20'
                             : 'hover:bg-slate-50 dark:hover:bg-surface-800'
                         }`}
                       >
                         <div className="flex flex-col min-w-0 pr-2">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="font-mono font-bold text-slate-800 dark:text-neutral-200">
+                            <span className="font-mono font-bold text-slate-900 dark:text-white">
                               {code}
                             </span>
                             {isRepeat && (
                               <span
-                                className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[10px] font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/60"
+                                className="inline-flex items-center gap-0.5 rounded-md bg-amber-100 px-1.5 py-0.5 text-[9px] font-extrabold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-300/80 dark:border-amber-800/60"
                                 title={`This battery has ${b.intake_count_this_month} intakes in ${getMonthName()}`}
                               >
                                 <span>⚠️</span>
@@ -434,38 +497,37 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                             )}
                           </div>
                           {b.serial_number && (
-                            <span className="text-[11px] text-slate-400 dark:text-neutral-500 font-mono">
+                            <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono">
                               SN: {b.serial_number}
                             </span>
                           )}
                           {at && (
-                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400">
-                              {at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                            <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
+                              Scanned at {at.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                             </span>
                           )}
                         </div>
+
                         {isScanned ? (
                           <div className="flex items-center gap-1.5 shrink-0">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-100 px-2 py-1 text-[11px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
+                            <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-100 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:bg-emerald-900/60 dark:text-emerald-200">
                               ✓ Verified
                             </span>
                             <button
                               type="button"
                               onClick={() => handleUnverify(code)}
-                              title="Remove verification"
-                              aria-label={`Remove verification for ${code}`}
-                              className="flex h-6 w-6 items-center justify-center rounded-md text-slate-400 hover:bg-red-50 hover:text-red-600 dark:text-neutral-500 dark:hover:bg-red-950/40 dark:hover:text-red-400"
+                              title="Undo verification"
+                              aria-label={`Undo verification for ${code}`}
+                              className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:text-neutral-500 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors cursor-pointer"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                                <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
-                              </svg>
+                              ✕
                             </button>
                           </div>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleScan(code)}
-                            className="rounded-md border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-surface-700 dark:text-neutral-300 dark:hover:bg-surface-600 shrink-0"
+                            className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:border-white/10 dark:bg-surface-700 dark:text-neutral-300 dark:hover:bg-surface-600 shrink-0 shadow-2xs transition-colors cursor-pointer"
                           >
                             Mark Scanned
                           </button>
@@ -477,30 +539,46 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
               </div>
             </div>
 
-            {/* Modal Actions Footer */}
-            <div className="flex shrink-0 flex-col gap-3 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end dark:border-white/10">
-              <button
-                type="button"
-                onClick={onClose}
-                className="rounded-xl border border-slate-300 px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-300 dark:hover:bg-surface-800"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmArrival}
-                disabled={!allScanned || confirming}
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-sm font-bold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <span>✓</span>
-                <span>
-                  {confirming
-                    ? 'Confirming…'
-                    : allScanned
-                      ? 'Confirm Truck Arrived & Verified'
-                      : `Scan all ${expectedCodes.length} batteries (${remainingCodes.length} left)`}
-                </span>
-              </button>
+            {/* 3. FIXED BOTTOM RIGHT ACTIONS FOOTER */}
+            <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-200/90 bg-white/95 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
+              <div className="flex items-center gap-2">
+                {allScanned ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                    <FiCheckCircle className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                    <span>All {expectedCodes.length} batteries verified · Ready to confirm arrival</span>
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 dark:text-neutral-400">
+                    <FiClock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>{remainingCodes.length} of {expectedCodes.length} batteries remaining to scan</span>
+                  </span>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmArrival}
+                  disabled={!allScanned || confirming}
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                >
+                  <span>✓</span>
+                  <span>
+                    {confirming
+                      ? 'Confirming Arrival…'
+                      : allScanned
+                        ? 'Confirm Truck Arrived & Verified'
+                        : `Scan Remaining (${remainingCodes.length} left)`}
+                  </span>
+                </button>
+              </div>
             </div>
           </div>
         )}

@@ -412,10 +412,17 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
     let intakeId = null;
 
     if (truck) {
-      // Find today's truck intake for this client and truck number, or create one
+      // Find today's truck intake for this client and truck number, or create
+      // one. Matched with punctuation/whitespace stripped so "KL18 ABCD 123",
+      // "KL18-ABCD-123" and "KL18ABCD123" are all treated as the same truck —
+      // the truck number field is cleared after each submit, so a client
+      // retyping it a little differently the next time shouldn't fork off a
+      // separate, unmerged intake.
       const { rows: intakeRows } = await client.query(
-        `SELECT id FROM truck_intakes 
-         WHERE client_id = $1 AND upper(truck_number) = upper($2) AND intake_at::date = now()::date
+        `SELECT id FROM truck_intakes
+         WHERE client_id = $1
+           AND regexp_replace(upper(truck_number), '[^A-Z0-9]', '', 'g') = regexp_replace(upper($2), '[^A-Z0-9]', '', 'g')
+           AND intake_at::date = now()::date
          ORDER BY id DESC LIMIT 1`,
         [clientId, truck]
       );
