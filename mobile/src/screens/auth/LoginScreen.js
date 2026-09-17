@@ -83,9 +83,14 @@ export default function LoginScreen() {
 
   useEffect(() => {
     AsyncStorage.getItem('custom_server_url').then((val) => {
-      if (val) {
+      if (val && !val.includes('192.0.0.2')) {
         setServerUrl(val);
         apiClient.defaults.baseURL = val;
+      } else {
+        const fresh = getBaseUrl();
+        setServerUrl(fresh);
+        apiClient.defaults.baseURL = fresh;
+        if (val) AsyncStorage.removeItem('custom_server_url');
       }
     });
   }, []);
@@ -384,6 +389,19 @@ export default function LoginScreen() {
                 className="flex-1 rounded-xl bg-emerald-600 py-2.5 items-center justify-center"
               >
                 <Text className="text-xs font-bold text-white">Save</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={async () => {
+                  await AsyncStorage.removeItem('custom_server_url');
+                  const fresh = getBaseUrl();
+                  setServerUrl(fresh);
+                  apiClient.defaults.baseURL = fresh;
+                  setTestResult({ success: true, message: `Reset to: ${fresh}` });
+                }}
+                className="rounded-xl bg-slate-100 dark:bg-slate-800 px-3 py-2.5 items-center justify-center"
+              >
+                <Text className="text-xs font-bold text-slate-600 dark:text-slate-300">Reset</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
