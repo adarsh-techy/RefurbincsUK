@@ -52,7 +52,7 @@ function Modal({ title, description, onClose, size = 'md', className = '', child
             ✕
           </button>
         </div>
-        <div className="no-scrollbar overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">{children}</div>
+        <div className="no-scrollbar overflow-y-auto flex-1 min-h-0 flex flex-col px-4 py-4 sm:px-6 sm:py-5">{children}</div>
       </div>
     </div>
   );

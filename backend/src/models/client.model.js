@@ -429,10 +429,11 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
 
       if (intakeRows.length > 0) {
         intakeId = intakeRows[0].id;
-        await client.query(
-          `UPDATE truck_intakes SET battery_count = battery_count + $2 WHERE id = $1`,
-          [intakeId, items.length]
-        );
+        // battery_count is recomputed from the actual linked rows below,
+        // once every item's been processed — incrementing by items.length
+        // here would double-count whenever an item in this batch is a
+        // battery already linked to this same truck (e.g. the client
+        // re-adds a battery already packed onto today's still-open truck).
       } else {
         const { rows: newIntakeRows } = await client.query(
           `INSERT INTO truck_intakes (truck_number, driver_name, client_id, battery_count, status, intake_at, created_at)
@@ -496,6 +497,17 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
         }
         processed.push(newRows[0]);
       }
+    }
+
+    if (intakeId) {
+      // Recount from the actual linked rows rather than trusting items.length,
+      // so re-submitting a battery already on this truck (allowed by the
+      // client so it can keep adding to a still-open shipment) never
+      // inflates the displayed count.
+      await client.query(
+        `UPDATE truck_intakes SET battery_count = (SELECT COUNT(*)::int FROM batteries WHERE truck_intake_id = $1) WHERE id = $1`,
+        [intakeId]
+      );
     }
 
     await client.query('COMMIT');

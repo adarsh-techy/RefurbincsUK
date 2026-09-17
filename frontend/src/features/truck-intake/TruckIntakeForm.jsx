@@ -224,7 +224,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
 
   return (
     <>
-      <form onSubmit={handleSubmit} className="flex flex-col min-h-[580px] max-h-[75vh]">
+      <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
         {/* 1. Top Logistics Details Header Card */}
         <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
