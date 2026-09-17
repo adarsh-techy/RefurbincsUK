@@ -40,11 +40,14 @@ export function StatusBadge({ status }) {
   const meta = STATUS_MAP[status] || { tone: 'neutral', label: status };
   if (meta.subLabel) {
     return (
-      <View className="items-start gap-0.5">
+      <View className="items-start gap-1">
         <Badge tone={meta.tone}>{meta.label}</Badge>
-        <Text className="text-[10px] font-bold text-red-600 dark:text-red-400 pl-1">
-          {meta.subLabel}
-        </Text>
+        <View className="flex-row items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
+          <View className="h-1.5 w-1.5 rounded-full bg-red-500" />
+          <Text className="text-[9.5px] font-bold text-red-600 dark:text-red-400">
+            {meta.subLabel}
+          </Text>
+        </View>
       </View>
     );
   }

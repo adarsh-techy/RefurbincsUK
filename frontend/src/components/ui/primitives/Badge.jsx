@@ -48,9 +48,10 @@ export function StatusBadge({ status }) {
   };
   if (meta.subLabel) {
     return (
-      <div className="inline-flex flex-col items-start gap-0.5">
+      <div className="inline-flex flex-col items-start gap-1">
         <Badge tone={meta.tone}>{meta.label}</Badge>
-        <span className="text-[10px] font-bold text-red-600 dark:text-red-400 pl-1 tracking-tight">
+        <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[9.5px] font-bold tracking-tight text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-200/80 dark:border-red-900/40 shadow-2xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
           {meta.subLabel}
         </span>
       </div>
@@ -90,9 +91,10 @@ export function ClientStatusBadge({ status }) {
   };
   if (meta.subLabel) {
     return (
-      <div className="inline-flex flex-col items-start gap-0.5">
+      <div className="inline-flex flex-col items-start gap-1">
         <Badge tone={meta.tone}>{meta.label}</Badge>
-        <span className="text-[10px] font-bold text-red-600 dark:text-red-400 pl-1 tracking-tight">
+        <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-1.5 py-0.5 text-[9.5px] font-bold tracking-tight text-red-700 dark:bg-red-950/60 dark:text-red-300 border border-red-200/80 dark:border-red-900/40 shadow-2xs">
+          <span className="h-1.5 w-1.5 rounded-full bg-red-500"></span>
           {meta.subLabel}
         </span>
       </div>
