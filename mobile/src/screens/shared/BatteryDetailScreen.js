@@ -1221,14 +1221,12 @@ export default function BatteryDetailScreen() {
             <Text className="mt-1 text-xs text-slate-400 italic">No serial number assigned</Text>
           )}
         </View>
-        {(isClient || (!isClientLocked && isStaff)) && (
+        {isClient && !battery.serial_number && (
           <TouchableOpacity
             onPress={openSerialModal}
             className="rounded-xl bg-blue-50 px-3.5 py-2 border border-blue-200 active:bg-blue-100"
           >
-            <Text className="text-xs font-bold text-blue-600">
-              {battery.serial_number ? 'Edit' : '+ Assign Number'}
-            </Text>
+            <Text className="text-xs font-bold text-blue-600">+ Assign Number</Text>
           </TouchableOpacity>
         )}
       </View>
