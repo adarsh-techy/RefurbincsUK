@@ -72,31 +72,33 @@ function ClientDetailPage() {
         }
       />
 
-      <div className="mb-6 flex flex-wrap items-center gap-4 rounded-xl border-l-4 border-y border-r border-slate-200 bg-gradient-to-r from-emerald-50 to-white p-5 shadow-sm dark:border-y-surface-700 dark:border-r-surface-700 dark:from-emerald-500/15 dark:to-black border-brand-500">
-        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-emerald-500/15 dark:text-emerald-300">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6">
-            <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2c0-2.76-3.58-5-8-5Z" />
-          </svg>
-        </span>
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-3">
-            {STATUS_BREAKDOWN.map((s) => (
-              <span key={s.key} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-neutral-300">
-                <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
-                {s.label}: <span className="font-semibold text-slate-800 dark:text-neutral-100">{stats[s.key]}</span>
-              </span>
-            ))}
+      <div className="mb-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 rounded-2xl border-l-4 border-y border-r border-slate-200 bg-gradient-to-r from-emerald-50/70 via-white to-emerald-50/30 p-4 sm:p-5 shadow-sm dark:border-y-surface-700 dark:border-r-surface-700 dark:from-emerald-500/10 dark:via-surface-900 dark:to-surface-850 border-emerald-500">
+        <div className="flex items-start sm:items-center gap-3.5 min-w-0">
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300 shadow-2xs">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+              <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-4.42 0-8 2.24-8 5v2a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-2c0-2.76-3.58-5-8-5Z" />
+            </svg>
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              {STATUS_BREAKDOWN.map((s) => (
+                <span key={s.key} className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-neutral-300">
+                  <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
+                  {s.label}: <span className="font-bold text-slate-900 dark:text-white">{stats[s.key]}</span>
+                </span>
+              ))}
+            </div>
+            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+              Client since {client.created_at ? new Date(client.created_at).toLocaleDateString() : '—'}
+            </p>
           </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
-            Client since {client.created_at ? new Date(client.created_at).toLocaleDateString() : '—'}
-          </p>
         </div>
 
         <Link
           to={`/certificates/client/${client.id}`}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 dark:border dark:border-white/10 transition-colors shadow-2xs shrink-0 cursor-pointer"
+          className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-4 py-2.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 dark:border dark:border-white/10 transition-colors shadow-2xs shrink-0 cursor-pointer"
         >
-          <span>🏆 Milestone & ESG Impact</span>
+          <span>🏆 Milestone &amp; ESG Impact</span>
           <span>→</span>
         </Link>
       </div>
@@ -107,8 +109,8 @@ function ClientDetailPage() {
         <StatCard label="Balance" value={`£${Number(stats.balance).toFixed(2)}`} tone="warning" />
       </div>
 
-      <div className="rounded-xl border border-blue-300 bg-white p-5 shadow-sm dark:border-blue-800/40 dark:bg-black">
-        <h2 className="mb-4 border-b border-slate-200 pb-4 text-sm font-semibold text-slate-800 dark:border-surface-700 dark:text-neutral-100">
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm dark:border-white/10 dark:bg-surface-900">
+        <h2 className="mb-4 border-b border-slate-100 pb-4 text-sm font-bold text-slate-900 dark:border-white/5 dark:text-white">
           Billing History
         </h2>
 

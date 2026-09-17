@@ -398,49 +398,99 @@ function ClientDashboardPage() {
           </div>
         </div>
       )}
-      {/* ── Top Header Section (Clean & Professional) ────────────────────── */}
-      <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-5 dark:border-white/10">
-        <div className="flex items-center gap-3.5">
+      {/* ── Top Header Section (Clean & 100% Responsive) ────────────────── */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5 dark:border-white/10">
+        <div className="flex items-center gap-3.5 min-w-0">
           {client?.logo_path && (
             <img
               src={logoUrl(client.logo_path)}
               alt={`${client.name} logo`}
-              className="h-10 w-10 shrink-0 rounded-xl border border-slate-200/80 bg-white object-contain p-1 shadow-2xs dark:border-white/10 dark:bg-surface-850"
+              className="h-10 w-10 sm:h-12 sm:w-12 shrink-0 rounded-2xl border border-slate-200/80 bg-white object-contain p-1 shadow-2xs dark:border-white/10 dark:bg-surface-850"
             />
           )}
-          <div>
-            <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-              Fleet Dashboard
+          <div className="min-w-0">
+            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white truncate">
+              {client?.name ? `${client.name} · Fleet Hub` : 'Fleet Dashboard'}
             </h1>
-            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5 truncate sm:whitespace-normal">
               Live battery tracking, workshop repair progress, and fleet analytics.
             </p>
           </div>
         </div>
+
+        {/* Responsive Quick Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2 sm:gap-2.5 w-full sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setShowAddTruckModal(true)}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer"
+          >
+            <FiTruck className="w-4 h-4" />
+            <span>Add Truck Intake</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setShowScanModal(true)}
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 active:scale-95 transition-all cursor-pointer"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="w-4 h-4 text-emerald-600 dark:text-emerald-400">
+              <path d="M12 9a3.75 3.75 0 1 0 0 7.5A3.75 3.75 0 0 0 12 9Z" />
+              <path fillRule="evenodd" d="M9.344 3.071a49.52 49.52 0 0 1 5.312 0c.967.052 1.83.585 2.332 1.39l.821 1.317c.24.383.645.643 1.11.71.386.054.77.113 1.152.177 1.432.239 2.429 1.493 2.429 2.909V18a3 3 0 0 1-3 3H4.5a3 3 0 0 1-3-3V9.574c0-1.416.997-2.67 2.429-2.909.382-.064.766-.123 1.151-.178a1.56 1.56 0 0 0 1.11-.71l.822-1.315a2.75 2.75 0 0 1 2.332-1.39ZM6.75 12.75a5.25 5.25 0 1 1 10.5 0 5.25 5.25 0 0 1-10.5 0Zm12-1.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" clipRule="evenodd" />
+            </svg>
+            <span>Scan Battery</span>
+          </button>
+        </div>
       </div>
 
+      {/* ── Quick Battery Lookup Bar ───────────────────────────────────────── */}
+      <form onSubmit={handleInlineSubmit} className="relative flex items-center">
+        <div className="relative w-full">
+          <input
+            type="text"
+            value={inlineSearch}
+            onChange={(e) => setInlineSearch(e.target.value)}
+            placeholder="Quick Search: Enter Battery ID (e.g. UBE-0001, BAT-16-147) or physical serial number…"
+            className="w-full rounded-2xl border border-slate-200/90 bg-white py-3 pl-11 pr-24 text-xs sm:text-sm font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs"
+          />
+          <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400 dark:text-neutral-500">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+              <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
+            </svg>
+          </div>
+          <button
+            type="submit"
+            disabled={!inlineSearch.trim()}
+            style={{ backgroundColor: accent }}
+            className="absolute inset-y-1.5 right-1.5 inline-flex items-center gap-1 rounded-xl px-3.5 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-40 transition-all cursor-pointer"
+          >
+            <span>Search</span>
+            <FiArrowRight className="w-3 h-3" />
+          </button>
+        </div>
+      </form>
+
       {/* ── Key Metrics Cards (Financial & Volume) ────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         {/* Total Batteries */}
         <Link
           to="/my/batteries"
-          className="group relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/80 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-emerald-400/60"
+          className="group relative overflow-hidden rounded-3xl border border-slate-200/80 bg-white p-4.5 sm:p-5 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-500/80 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-emerald-400/60"
         >
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold tracking-wider text-slate-400 uppercase dark:text-neutral-500">
+            <span className="text-[11px] sm:text-xs font-bold tracking-wider text-slate-400 uppercase dark:text-neutral-500">
               Total Fleet
             </span>
-            <div className="flex h-10 w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 transition-colors group-hover:bg-emerald-50 group-hover:text-emerald-600 dark:bg-white/10 dark:text-neutral-300 dark:group-hover:bg-emerald-950/60 dark:group-hover:text-emerald-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+            <div className="flex h-9 w-9 sm:h-10 sm:w-10 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 transition-colors group-hover:bg-emerald-50 group-hover:text-emerald-600 dark:bg-white/10 dark:text-neutral-300 dark:group-hover:bg-emerald-950/60 dark:group-hover:text-emerald-400">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4.5 w-4.5 sm:h-5 sm:w-5">
                 <path d="M7 2a1 1 0 0 0-1 1v1H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2h-1V3a1 1 0 1 0-2 0v1H8V3a1 1 0 0 0-1-1Zm10 10h-2v3h-2v-3h-2v-2h2V7h2v3h2v2Z" />
               </svg>
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-3xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors dark:text-white dark:group-hover:text-emerald-400">
+            <span className="text-2xl sm:text-3xl font-black text-slate-900 group-hover:text-emerald-600 transition-colors dark:text-white dark:group-hover:text-emerald-400">
               {totalBatteries.toLocaleString()}
             </span>
-            <div className="mt-1 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
+            <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
               <span>Total registered units</span>
               <span className="font-bold text-emerald-600 group-hover:translate-x-0.5 transition-transform dark:text-emerald-400">View All →</span>
             </div>
@@ -624,7 +674,7 @@ function ClientDashboardPage() {
       {/* ── Two Column Hub: Recent Batteries & Help Center ─────────────── */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
         {/* Left Column: Recent Batteries Table */}
-        <div className="lg:col-span-8 rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-surface-900">
+        <div className="lg:col-span-8 rounded-3xl border border-slate-200/80 bg-white p-4.5 sm:p-6 shadow-sm dark:border-white/10 dark:bg-surface-900">
           <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <h3 className="text-base font-bold text-slate-900 dark:text-white">
@@ -636,7 +686,7 @@ function ClientDashboardPage() {
             </div>
             <Link
               to="/my/batteries/received"
-              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+              className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 self-start sm:self-auto"
             >
               View All ({totalBatteries}) →
             </Link>
@@ -647,8 +697,8 @@ function ClientDashboardPage() {
               No batteries registered yet under your account.
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="overflow-x-auto -mx-4.5 px-4.5 sm:mx-0 sm:px-0">
+              <table className="w-full min-w-[500px] text-left text-xs">
                 <thead className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-white/5 dark:text-neutral-500">
                   <tr>
                     <th className="pb-3 pr-4">Battery ID</th>
@@ -705,7 +755,7 @@ function ClientDashboardPage() {
         </div>
 
         {/* Right Column: Direct Help & Support Hub */}
-        <div className="lg:col-span-4 flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-surface-900">
+        <div className="lg:col-span-4 flex flex-col justify-between rounded-3xl border border-slate-200/80 bg-white p-4.5 sm:p-6 shadow-sm dark:border-white/10 dark:bg-surface-900">
           <div>
             <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/5">
               <div className="flex items-center gap-2">
@@ -715,7 +765,7 @@ function ClientDashboardPage() {
                   </svg>
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Help & Support</h3>
+                  <h3 className="text-sm font-bold text-slate-900 dark:text-white">Help &amp; Support</h3>
                   <p className="text-[11px] text-slate-400 dark:text-neutral-400">Direct line to operations team</p>
                 </div>
               </div>
@@ -745,7 +795,7 @@ function ClientDashboardPage() {
                       <span className="font-mono font-bold text-slate-900 dark:text-white">
                         {t.ticket_number}
                       </span>
-                      <span className="rounded-md bg-slate-100 px-1.5 py-0.2 text-[10px] font-bold capitalize text-slate-700 dark:bg-white/10 dark:text-neutral-300">
+                      <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold capitalize text-slate-700 dark:bg-white/10 dark:text-neutral-300">
                         {t.status}
                       </span>
                     </div>
