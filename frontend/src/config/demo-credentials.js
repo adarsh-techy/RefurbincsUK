@@ -1,7 +1,6 @@
 /**
  * Demo Login Credentials
  * Dedicated configuration file for quick-fill credentials on the Login page.
- * Can be overridden via environment variables if provided.
  */
 export const DEMO_CREDENTIALS = {
   superAdmin: {
@@ -27,6 +26,36 @@ export const DEMO_CREDENTIALS = {
     email: import.meta.env.VITE_DEMO_RECYCLE_EMAIL || 'recycle@gmail.com',
     password: import.meta.env.VITE_DEMO_RECYCLE_PASSWORD || '12345678',
     tone: 'teal',
+  },
+};
+
+export const MOBILE_DEMO_CREDENTIALS = {
+  adarsh: {
+    id: 'adarsh',
+    label: 'Adarsh',
+    icon: '🔧',
+    role: 'Technician',
+    email: 'adarsh@gmail.com',
+    password: '12345678',
+    tone: 'blue',
+  },
+  akhil: {
+    id: 'akhil',
+    label: 'Akhil',
+    icon: '⚡',
+    role: 'Technician',
+    email: 'akhil@gmail.com',
+    password: '12345678',
+    tone: 'violet',
+  },
+  akshay: {
+    id: 'akshay',
+    label: 'Akshay',
+    icon: '🛠️',
+    role: 'Technician',
+    email: 'akshay@gmail.com',
+    password: '12345678',
+    tone: 'indigo',
   },
 };
 

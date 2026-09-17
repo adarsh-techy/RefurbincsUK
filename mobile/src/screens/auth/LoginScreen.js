@@ -194,27 +194,16 @@ export default function LoginScreen() {
             <Text className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Quick Fill Logins
             </Text>
-            <View className="flex-row flex-wrap gap-2">
+            <View className="flex-row gap-2">
               <TouchableOpacity
                 onPress={() => {
                   setEmail('adarsh@gmail.com');
                   setPassword('12345678');
                 }}
-                className="flex-1 min-w-[45%] rounded-xl border border-dashed border-blue-500/50 bg-blue-500/10 py-2.5 px-2 items-center"
+                className="flex-1 rounded-xl border border-dashed border-blue-500/50 bg-blue-500/10 py-2 px-1.5 items-center"
               >
                 <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">Adarsh</Text>
-                <Text className="text-[10px] text-slate-500 dark:text-slate-400">adarsh@gmail.com</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => {
-                  setEmail('akshay@gmail.com');
-                  setPassword('12345678');
-                }}
-                className="flex-1 min-w-[45%] rounded-xl border border-dashed border-indigo-500/50 bg-indigo-500/10 py-2.5 px-2 items-center"
-              >
-                <Text className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Akshay</Text>
-                <Text className="text-[10px] text-slate-500 dark:text-slate-400">akshay@gmail.com</Text>
+                <Text className="text-[9px] text-slate-500 dark:text-slate-400 truncate">adarsh@gmail.com</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
@@ -222,21 +211,21 @@ export default function LoginScreen() {
                   setEmail('akhil@gmail.com');
                   setPassword('12345678');
                 }}
-                className="flex-1 min-w-[45%] rounded-xl border border-dashed border-violet-500/50 bg-violet-500/10 py-2.5 px-2 items-center"
+                className="flex-1 rounded-xl border border-dashed border-violet-500/50 bg-violet-500/10 py-2 px-1.5 items-center"
               >
                 <Text className="text-xs font-bold text-violet-600 dark:text-violet-400">Akhil</Text>
-                <Text className="text-[10px] text-slate-500 dark:text-slate-400">akhil@gmail.com</Text>
+                <Text className="text-[9px] text-slate-500 dark:text-slate-400 truncate">akhil@gmail.com</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 onPress={() => {
-                  setEmail('humanforest@gmail.com');
+                  setEmail('akshay@gmail.com');
                   setPassword('12345678');
                 }}
-                className="flex-1 min-w-[45%] rounded-xl border border-dashed border-emerald-500/50 bg-emerald-500/10 py-2.5 px-2 items-center"
+                className="flex-1 rounded-xl border border-dashed border-indigo-500/50 bg-indigo-500/10 py-2 px-1.5 items-center"
               >
-                <Text className="text-xs font-bold text-emerald-600 dark:text-emerald-400">HumanForest</Text>
-                <Text className="text-[10px] text-slate-500 dark:text-slate-400">Client Demo</Text>
+                <Text className="text-xs font-bold text-indigo-600 dark:text-indigo-400">Akshay</Text>
+                <Text className="text-[9px] text-slate-500 dark:text-slate-400 truncate">akshay@gmail.com</Text>
               </TouchableOpacity>
             </View>
           </View>

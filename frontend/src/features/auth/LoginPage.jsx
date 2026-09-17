@@ -4,7 +4,7 @@ import { Link, useNavigate } from 'react-router-dom';
 import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/logo.png';
-import DEMO_CREDENTIALS from '../../config/demo-credentials';
+import { DEMO_CREDENTIALS, MOBILE_DEMO_CREDENTIALS } from '../../config/demo-credentials';
 
 const inputClasses =
   'w-full rounded-md border border-surface-600 bg-black py-2.5 pl-10 pr-3.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
@@ -45,13 +45,14 @@ function LoginPage() {
             <p className="mt-1 text-sm text-neutral-400">Sign in to continue</p>
           </div>
 
-          {/* Demo quick-fill credentials from demo-credentials config */}
+          {/* Demo quick-fill credentials */}
           <div className="mt-4 flex flex-col gap-2">
             <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium px-0.5">
               <span>Quick Fill Credentials:</span>
             </div>
 
-            <div className="grid grid-cols-3 gap-2">
+            {/* Desktop / Tablet view: Super Admin, HumanForest, Recycle Client */}
+            <div className="hidden sm:grid sm:grid-cols-3 gap-2">
               <button
                 type="button"
                 onClick={() => {
@@ -86,6 +87,45 @@ function LoginPage() {
                 title={`Recycle: ${DEMO_CREDENTIALS.recycle.email}`}
               >
                 ♻️ Recycle Client
+              </button>
+            </div>
+
+            {/* Mobile View: Adarsh, Akhil, Akshay */}
+            <div className="grid grid-cols-3 gap-2 sm:hidden">
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(MOBILE_DEMO_CREDENTIALS.adarsh.email);
+                  setPassword(MOBILE_DEMO_CREDENTIALS.adarsh.password);
+                }}
+                className="rounded-md border border-dashed border-blue-500/50 bg-blue-500/10 px-2 py-2 text-[11px] font-medium text-blue-400 transition hover:bg-blue-500/20 truncate cursor-pointer text-center"
+                title={`Adarsh: ${MOBILE_DEMO_CREDENTIALS.adarsh.email}`}
+              >
+                🔧 Adarsh
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(MOBILE_DEMO_CREDENTIALS.akhil.email);
+                  setPassword(MOBILE_DEMO_CREDENTIALS.akhil.password);
+                }}
+                className="rounded-md border border-dashed border-violet-500/50 bg-violet-500/10 px-2 py-2 text-[11px] font-medium text-violet-400 transition hover:bg-violet-500/20 truncate cursor-pointer text-center"
+                title={`Akhil: ${MOBILE_DEMO_CREDENTIALS.akhil.email}`}
+              >
+                ⚡ Akhil
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(MOBILE_DEMO_CREDENTIALS.akshay.email);
+                  setPassword(MOBILE_DEMO_CREDENTIALS.akshay.password);
+                }}
+                className="rounded-md border border-dashed border-indigo-500/50 bg-indigo-500/10 px-2 py-2 text-[11px] font-medium text-indigo-400 transition hover:bg-indigo-500/20 truncate cursor-pointer text-center"
+                title={`Akshay: ${MOBILE_DEMO_CREDENTIALS.akshay.email}`}
+              >
+                🛠️ Akshay
               </button>
             </div>
           </div>
