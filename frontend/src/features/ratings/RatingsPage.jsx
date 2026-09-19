@@ -553,8 +553,20 @@ function RatingsPage() {
                         </span>
                       </td>
                       <td className="py-3 px-3.5">
-                        {r.battery_code ? (
-                          <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md dark:bg-blue-950/60 dark:text-blue-300">
+                        {r.battery_codes && r.battery_codes.length > 0 ? (
+                          <div className="flex flex-wrap gap-1">
+                            {r.battery_codes.map((code) => (
+                              <Link
+                                key={code}
+                                to={`/batteries/${encodeURIComponent(code)}`}
+                                className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md dark:bg-blue-950/60 dark:text-blue-300 text-[11px] hover:underline"
+                              >
+                                {code}
+                              </Link>
+                            ))}
+                          </div>
+                        ) : r.battery_code ? (
+                          <span className="font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md dark:bg-blue-950/60 dark:text-blue-300 text-[11px]">
                             {r.battery_code}
                           </span>
                         ) : (
@@ -608,6 +620,12 @@ function RatingsPage() {
               ? r.preset_tags
               : typeof r.preset_tags === 'string'
               ? JSON.parse(r.preset_tags || '[]')
+              : [];
+
+            const batteryList = Array.isArray(r.battery_codes) && r.battery_codes.length > 0
+              ? r.battery_codes
+              : r.battery_code
+              ? r.battery_code.split(',').map((s) => s.trim()).filter(Boolean)
               : [];
 
             const theme = RATING_CARD_THEME[r.rating] || RATING_CARD_THEME[5];
@@ -664,16 +682,21 @@ function RatingsPage() {
                     </div>
                   </div>
 
-                  {/* ── Meta Ribbon: Battery Unit & Return Info ── */}
+                  {/* ── Meta Ribbon: Battery Unit(s) & Return Info ── */}
                   <div className="flex flex-wrap items-center gap-2 p-2.5 rounded-xl bg-slate-50/80 dark:bg-surface-900/60 border border-slate-100 dark:border-white/5">
-                    {r.battery_code ? (
-                      <Link
-                        to={`/batteries/${encodeURIComponent(r.battery_code)}`}
-                        className="inline-flex items-center gap-1.5 font-mono font-bold text-xs text-blue-700 bg-blue-50/90 dark:bg-blue-950/60 dark:text-blue-300 px-2.5 py-0.5 rounded-lg hover:underline transition-colors border border-blue-200/60 dark:border-blue-800/40"
-                      >
-                        <span>🔋</span>
-                        <span>{r.battery_code}</span>
-                      </Link>
+                    {batteryList.length > 0 ? (
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {batteryList.map((code) => (
+                          <Link
+                            key={code}
+                            to={`/batteries/${encodeURIComponent(code)}`}
+                            className="inline-flex items-center gap-1 font-mono font-bold text-xs text-blue-700 bg-blue-50/90 dark:bg-blue-950/60 dark:text-blue-300 px-2 py-0.5 rounded-lg hover:underline transition-colors border border-blue-200/60 dark:border-blue-800/40"
+                          >
+                            <span>🔋</span>
+                            <span>{code}</span>
+                          </Link>
+                        ))}
+                      </div>
                     ) : (
                       <span className="text-xs text-slate-400 font-mono">General Service</span>
                     )}

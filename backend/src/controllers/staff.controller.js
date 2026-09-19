@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const bcrypt = require('bcryptjs');
 const staffModel = require('../models/staff.model');
+const trashModel = require('../models/trash.model');
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'staff-docs');
 
@@ -135,7 +136,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const staff = await staffModel.findById(req.params.id);
+    if (!staff) {
+      return res.status(404).json({ message: 'Staff member not found' });
+    }
+
     await staffModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: staff.id,
+        itemType: 'staff',
+        title: staff.name || `Staff Member #${staff.id}`,
+        subtitle: `Role: ${staff.role || 'technician'} • Email: ${staff.email || 'N/A'} • Employee ID: ${staff.employee_id || 'N/A'}`,
+        itemData: staff,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging staff to trash:', trashErr);
+    }
+
     res.status(204).end();
   } catch (err) {
     // FK violation: this staff member has repair history.

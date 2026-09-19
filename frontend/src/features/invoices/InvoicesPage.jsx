@@ -89,7 +89,8 @@ function InvoicesPage() {
     ])
       .then(([invRes, clientRes]) => {
         setInvoices(invRes.data || []);
-        setClients(clientRes.data || []);
+        const fleetClients = (clientRes.data || []).filter((c) => c.user_role !== 'recycle_client');
+        setClients(fleetClients);
       })
       .catch((err) => {
         setError(err.response?.data?.message || err.message);
@@ -517,7 +518,7 @@ function InvoicesPage() {
             onChange={(e) => setClientFilter(e.target.value)}
             className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
           >
-            <option value="">All Clients</option>
+            <option value="">All Fleet Clients</option>
             {clients.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
@@ -617,7 +618,7 @@ function InvoicesPage() {
               <div className="flex items-center justify-between">
                 <label className="text-xs font-extrabold uppercase tracking-wider text-slate-800 dark:text-neutral-200 flex items-center gap-1.5">
                   <FiUser className="w-3.5 h-3.5 text-emerald-500" />
-                  <span>Target Client Account <span className="text-red-500">*</span></span>
+                  <span>Target Fleet Client Account <span className="text-red-500">*</span></span>
                 </label>
                 {selectedClientObj && (
                   <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-0.5 rounded-full border border-emerald-200 dark:border-emerald-800/40">
@@ -632,7 +633,7 @@ function InvoicesPage() {
                 required
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white shadow-2xs"
               >
-                <option value="">-- Choose a Client Account --</option>
+                <option value="">-- Choose a Fleet Client Account --</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.invoice_email ? `• Billing: ${c.invoice_email}` : (c.email || c.login_email) ? `• Login: ${c.email || c.login_email}` : ''}

@@ -1,4 +1,5 @@
 const serviceModel = require('../models/service.model');
+const trashModel = require('../models/trash.model');
 
 async function list(req, res, next) {
   try {
@@ -116,7 +117,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const service = await serviceModel.findById(req.params.id);
+    if (!service) {
+      return res.status(404).json({ message: 'Service not found' });
+    }
+
     await serviceModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: service.id,
+        itemType: 'service',
+        title: service.name || `Service #${service.id}`,
+        subtitle: `Fee: £${service.fee || 0} • Mandatory: ${service.is_mandatory ? 'Yes' : 'No'}`,
+        itemData: service,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging service to trash:', trashErr);
+    }
+
     res.status(204).end();
   } catch (err) {
     next(err);

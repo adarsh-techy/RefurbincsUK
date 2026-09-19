@@ -55,6 +55,8 @@ const RatingDetailPage = lazy(() => import('../features/ratings/RatingDetailPage
 const CertificatesPage = lazy(() => import('../features/certificates/CertificatesPage'));
 const ClientMilestoneDetailPage = lazy(() => import('../features/certificates/ClientMilestoneDetailPage'));
 const ClientCertificatesPage = lazy(() => import('../features/clients/portal/ClientCertificatesPage'));
+const TrashPage = lazy(() => import('../features/trash/TrashPage'));
+const TrashDetailPage = lazy(() => import('../features/trash/TrashDetailPage'));
 
 function HistoryRouter() {
   const user = useSelector((state) => state.auth.user);
@@ -96,6 +98,8 @@ function AppRoutes() {
             <Route path="/batteries/unserviceable" element={<UnserviceableBatteriesPage />} />
             <Route path="/batteries-qr-code" element={<GenerateQrPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
+            <Route path="/trash" element={<TrashPage />} />
+            <Route path="/trash/:id" element={<TrashDetailPage />} />
           </Route>
 
           <Route element={<ProtectedRoute permission="truck_intakes" />}>

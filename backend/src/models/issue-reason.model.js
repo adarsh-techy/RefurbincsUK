@@ -39,8 +39,13 @@ async function update(id, { label, active, sortOrder }) {
   return rows[0];
 }
 
+async function findById(id) {
+  const { rows } = await db.query('SELECT * FROM issue_reasons WHERE id = $1', [id]);
+  return rows[0];
+}
+
 async function remove(id) {
   await db.query('DELETE FROM issue_reasons WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, findBySortOrder, create, update, remove };
+module.exports = { findAll, findById, findBySortOrder, create, update, remove };

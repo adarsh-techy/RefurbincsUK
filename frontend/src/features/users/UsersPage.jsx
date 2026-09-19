@@ -182,7 +182,14 @@ function UsersPage() {
 
       {loading && <TableState>Loading…</TableState>}
       {error && <TableState tone="error">{error}</TableState>}
-      {!loading && !error && <DataTable columns={columns} rows={data} headerColor="blue" showRowNumber />}
+      {!loading && !error && (
+        <DataTable
+          columns={columns}
+          rows={(data || []).filter((row) => row.role === 'admin' || row.role === 'super_admin')}
+          headerColor="blue"
+          showRowNumber
+        />
+      )}
     </div>
   );
 }

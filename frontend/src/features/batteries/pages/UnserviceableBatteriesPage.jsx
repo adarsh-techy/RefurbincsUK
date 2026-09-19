@@ -17,6 +17,7 @@ function UnserviceableBatteriesPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [date, setDate] = useState('');
+  const [statusFilter, setStatusFilter] = useState('unserviceable,tested_parts_removed');
   const [lightboxState, setLightboxState] = useState({
     isOpen: false,
     images: [],
@@ -30,7 +31,7 @@ function UnserviceableBatteriesPage() {
   }, [search]);
 
   const { items, loading, hasMore, error, loadMore, refetch } = useInfiniteList('/batteries', PAGE_SIZE, {
-    status: 'unserviceable,tested_parts_removed',
+    status: statusFilter,
     search: debouncedSearch || undefined,
     date: date || undefined,
   });
@@ -126,6 +127,22 @@ function UnserviceableBatteriesPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <label htmlFor="unserviceable-status-filter" className="text-xs font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-wider">
+            Status
+          </label>
+          <select
+            id="unserviceable-status-filter"
+            value={statusFilter}
+            onChange={(e) => setStatusFilter(e.target.value)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200"
+          >
+            <option value="unserviceable,tested_parts_removed">All Unserviceable</option>
+            <option value="unserviceable">Unserviceable Only</option>
+            <option value="tested_parts_removed">Test Failed (Parts Removed)</option>
+          </select>
+        </div>
+
+        <div className="flex items-center gap-2">
           <label htmlFor="unserviceable-date-filter" className="text-xs font-bold text-slate-600 dark:text-neutral-300 uppercase tracking-wider">
             Created on
           </label>
@@ -138,12 +155,13 @@ function UnserviceableBatteriesPage() {
           />
         </div>
 
-        {(search || date) && (
+        {(search || date || statusFilter !== 'unserviceable,tested_parts_removed') && (
           <button
             type="button"
             onClick={() => {
               setSearch('');
               setDate('');
+              setStatusFilter('unserviceable,tested_parts_removed');
             }}
             className="text-xs font-bold text-rose-600 hover:text-rose-700 dark:text-rose-400 dark:hover:text-rose-300 cursor-pointer transition-colors"
           >

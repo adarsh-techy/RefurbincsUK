@@ -2,6 +2,7 @@ const truckIntakeModel = require('../models/truck-intake.model');
 const batteryModel = require('../models/battery.model');
 const serviceModel = require('../models/service.model');
 const auditLogModel = require('../models/audit-log.model');
+const trashModel = require('../models/trash.model');
 const truckIntakeService = require('../services/truck-intake.service');
 const { parseTruckIntakeSheet } = require('../utils/parse-truck-intake-sheet');
 const realtime = require('../realtime');
@@ -163,7 +164,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const intake = await truckIntakeModel.findById(req.params.id);
+    if (!intake) {
+      return res.status(404).json({ message: 'Truck intake not found' });
+    }
+
     await truckIntakeModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: intake.id,
+        itemType: 'truck_intake',
+        title: `Truck Intake #${intake.truck_number || intake.id}`,
+        subtitle: `Driver: ${intake.driver_name || 'N/A'} • Client: ${intake.client_name || 'N/A'}`,
+        itemData: intake,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging truck intake to trash:', trashErr);
+    }
+
     await auditLogModel.record({
       userId: req.user.id,
       action: 'delete',

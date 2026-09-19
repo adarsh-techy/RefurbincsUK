@@ -21,9 +21,50 @@ async function create({ clientId, clientUserId, batteryId, batteryCode, returnId
 }
 
 async function findAll({ clientId, rating, search, startDate, endDate, limit = 50, offset = 0 }) {
-  let query = `
+  let whereConditions = ['1=1'];
+  const params = [];
+
+  if (clientId) {
+    params.push(clientId);
+    whereConditions.push(`br.client_id = $${params.length}`);
+  }
+
+  if (rating) {
+    params.push(rating);
+    whereConditions.push(`br.rating = $${params.length}`);
+  }
+
+  if (startDate) {
+    params.push(startDate);
+    whereConditions.push(`br.created_at >= $${params.length}::timestamptz`);
+  }
+
+  if (endDate) {
+    params.push(endDate);
+    whereConditions.push(`br.created_at <= $${params.length}::timestamptz`);
+  }
+
+  if (search) {
+    params.push(`%${search.trim()}%`);
+    whereConditions.push(
+      `(br.battery_code ILIKE $${params.length} OR br.custom_feedback ILIKE $${params.length} OR c.name ILIKE $${params.length})`
+    );
+  }
+
+  const whereClause = whereConditions.join(' AND ');
+
+  const query = `
     SELECT 
-      br.*,
+      MIN(br.id) AS id,
+      br.client_id,
+      br.client_user_id,
+      br.return_id,
+      br.rating,
+      br.preset_tags,
+      br.custom_feedback,
+      MIN(br.created_at) AS created_at,
+      string_agg(DISTINCT br.battery_code, ', ' ORDER BY br.battery_code) AS battery_code,
+      array_agg(DISTINCT br.battery_code ORDER BY br.battery_code) AS battery_codes,
       c.name AS client_name,
       c.logo_path AS client_logo_path,
       u.email AS user_email,
@@ -31,36 +72,22 @@ async function findAll({ clientId, rating, search, startDate, endDate, limit = 5
     FROM battery_ratings br
     LEFT JOIN clients c ON c.id = br.client_id
     LEFT JOIN users u ON u.id = br.client_user_id
-    WHERE 1=1
+    WHERE ${whereClause}
+    GROUP BY 
+      COALESCE(br.return_id, br.id),
+      br.client_id,
+      br.client_user_id,
+      br.return_id,
+      br.rating,
+      br.preset_tags,
+      br.custom_feedback,
+      c.name,
+      c.logo_path,
+      u.email,
+      u.name
+    ORDER BY MIN(br.created_at) DESC
+    LIMIT $${params.length + 1} OFFSET $${params.length + 2}
   `;
-  const params = [];
-
-  if (clientId) {
-    params.push(clientId);
-    query += ` AND br.client_id = $${params.length}`;
-  }
-
-  if (rating) {
-    params.push(rating);
-    query += ` AND br.rating = $${params.length}`;
-  }
-
-  if (startDate) {
-    params.push(startDate);
-    query += ` AND br.created_at >= $${params.length}::timestamptz`;
-  }
-
-  if (endDate) {
-    params.push(endDate);
-    query += ` AND br.created_at <= $${params.length}::timestamptz`;
-  }
-
-  if (search) {
-    params.push(`%${search.trim()}%`);
-    query += ` AND (br.battery_code ILIKE $${params.length} OR br.custom_feedback ILIKE $${params.length} OR c.name ILIKE $${params.length})`;
-  }
-
-  query += ` ORDER BY br.created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
   params.push(limit, offset);
 
   const { rows } = await db.query(query, params);
@@ -91,6 +118,16 @@ async function findById(id) {
   if (!rows[0]) return null;
 
   const ratingRecord = rows[0];
+
+  if (ratingRecord.return_id) {
+    const { rows: batchRows } = await db.query(
+      `SELECT battery_code FROM battery_ratings WHERE return_id = $1 ORDER BY battery_code`,
+      [ratingRecord.return_id]
+    );
+    ratingRecord.battery_codes = batchRows.map((r) => r.battery_code).filter(Boolean);
+  } else {
+    ratingRecord.battery_codes = ratingRecord.battery_code ? [ratingRecord.battery_code] : [];
+  }
 
   // Optionally fetch latest repairs on this battery
   if (ratingRecord.battery_id) {
@@ -125,15 +162,15 @@ async function getStats({ clientId = null, startDate = null, endDate = null } = 
 
   if (clientId) {
     params.push(clientId);
-    whereClauses.push(`client_id = $${params.length}`);
+    whereClauses.push(`br.client_id = $${params.length}`);
   }
   if (startDate) {
     params.push(startDate);
-    whereClauses.push(`created_at >= $${params.length}::timestamptz`);
+    whereClauses.push(`br.created_at >= $${params.length}::timestamptz`);
   }
   if (endDate) {
     params.push(endDate);
-    whereClauses.push(`created_at <= $${params.length}::timestamptz`);
+    whereClauses.push(`br.created_at <= $${params.length}::timestamptz`);
   }
 
   const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
@@ -141,15 +178,21 @@ async function getStats({ clientId = null, startDate = null, endDate = null } = 
   const { rows } = await db.query(
     `SELECT 
       COUNT(*) AS total_reviews,
-      COALESCE(ROUND(AVG(rating)::numeric, 2), 0) AS average_rating,
-      COUNT(*) FILTER (WHERE rating = 5) AS stars_5,
-      COUNT(*) FILTER (WHERE rating = 4) AS stars_4,
-      COUNT(*) FILTER (WHERE rating = 3) AS stars_3,
-      COUNT(*) FILTER (WHERE rating = 2) AS stars_2,
-      COUNT(*) FILTER (WHERE rating = 1) AS stars_1,
-      COUNT(*) FILTER (WHERE rating >= 4) AS positive_count
-     FROM battery_ratings
-     ${whereSql}`,
+      COALESCE(ROUND(AVG(sub.rating)::numeric, 1), 0) AS average_rating,
+      COUNT(*) FILTER (WHERE ROUND(sub.rating) = 5) AS stars_5,
+      COUNT(*) FILTER (WHERE ROUND(sub.rating) = 4) AS stars_4,
+      COUNT(*) FILTER (WHERE ROUND(sub.rating) = 3) AS stars_3,
+      COUNT(*) FILTER (WHERE ROUND(sub.rating) = 2) AS stars_2,
+      COUNT(*) FILTER (WHERE ROUND(sub.rating) = 1) AS stars_1,
+      COUNT(*) FILTER (WHERE sub.rating >= 4) AS positive_count
+     FROM (
+       SELECT 
+         COALESCE(br.return_id, br.id) AS review_key,
+         AVG(br.rating) AS rating
+       FROM battery_ratings br
+       ${whereSql}
+       GROUP BY COALESCE(br.return_id, br.id)
+     ) sub`,
     params
   );
 

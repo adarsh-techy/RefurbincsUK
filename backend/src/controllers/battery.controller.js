@@ -5,6 +5,7 @@ const staffModel = require('../models/staff.model');
 const clientModel = require('../models/client.model');
 const recycleModel = require('../models/recycle.model');
 const serviceModel = require('../models/service.model');
+const trashModel = require('../models/trash.model');
 const realtime = require('../realtime');
 
 const ISSUE_PHOTOS_DIR = path.join(__dirname, '..', '..', 'uploads', 'issue-photos');
@@ -23,6 +24,7 @@ const VALID_STATUSES = new Set([
   'unserviceable',
   'recycled',
   'tested_parts_removed',
+  'registered',
 ]);
 const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -46,7 +48,16 @@ async function list(req, res, next) {
   try {
     const limit = Math.min(Math.max(Number(req.query.limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
-    const status = VALID_STATUSES.has(req.query.status) ? req.query.status : undefined;
+    let status;
+    if (typeof req.query.status === 'string' && req.query.status.trim()) {
+      const parts = req.query.status
+        .split(',')
+        .map((s) => s.trim())
+        .filter((s) => VALID_STATUSES.has(s));
+      if (parts.length > 0) {
+        status = parts.join(',');
+      }
+    }
     const date = DATE_PATTERN.test(req.query.date) ? req.query.date : undefined;
     const q =
       typeof req.query.q === 'string' && req.query.q.trim()
@@ -128,7 +139,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const battery = await batteryModel.findById(req.params.id);
+    if (!battery) {
+      return res.status(404).json({ message: 'Battery not found' });
+    }
+
     await batteryModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: battery.id,
+        itemType: 'battery',
+        title: `Battery ${battery.battery_code || ('#' + battery.id)}`,
+        subtitle: `Client: ${battery.client_name || 'Unassigned'} • Status: ${battery.status || 'N/A'}`,
+        itemData: battery,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging battery to trash:', trashErr);
+    }
+
     realtime.broadcastUnserviceableCount().catch((err) => console.error('broadcastUnserviceableCount:', err));
     res.status(204).end();
   } catch (err) {
@@ -343,7 +373,7 @@ async function repeatIntakesThisMonth(req, res, next) {
 // Powers the Unserviceable Batteries page's 100-battery popup alert.
 async function unserviceableCount(req, res, next) {
   try {
-    res.json({ count: await batteryModel.countByStatus('unserviceable') });
+    res.json({ count: await batteryModel.countByStatus(['unserviceable', 'tested_parts_removed']) });
   } catch (err) {
     next(err);
   }

@@ -36,14 +36,51 @@ const STATUS_FILTERS = [
 const VALID_STATUS_FILTERS = new Set(STATUS_FILTERS.map((f) => f.value).filter(Boolean));
 
 function BatteriesPage() {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const initialStatus = searchParams.get('status') || '';
   const initialClient = searchParams.get('clientName') || searchParams.get('client') || '';
 
-  const [status, setStatus] = useState(VALID_STATUS_FILTERS.has(initialStatus) ? initialStatus : '');
+  const [status, setStatus] = useState(initialStatus);
   const [clientName, setClientName] = useState(initialClient);
   const [date, setDate] = useState('');
   const [clients, setClients] = useState([]);
+
+  // Sync state if URL query params change (e.g. browser back/forward or external links)
+  useEffect(() => {
+    const s = searchParams.get('status') || '';
+    setStatus(s);
+    const c = searchParams.get('clientName') || searchParams.get('client') || '';
+    setClientName(c);
+  }, [searchParams]);
+
+  const handleStatusChange = (newStatus) => {
+    setStatus(newStatus);
+    const params = new URLSearchParams(searchParams);
+    if (newStatus) {
+      params.set('status', newStatus);
+    } else {
+      params.delete('status');
+    }
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleClientChange = (newClient) => {
+    setClientName(newClient);
+    const params = new URLSearchParams(searchParams);
+    if (newClient) {
+      params.set('clientName', newClient);
+    } else {
+      params.delete('clientName');
+    }
+    setSearchParams(params, { replace: true });
+  };
+
+  const handleResetFilters = () => {
+    setStatus('');
+    setClientName('');
+    setDate('');
+    setSearchParams({}, { replace: true });
+  };
 
   useEffect(() => {
     apiClient
@@ -140,16 +177,30 @@ function BatteriesPage() {
         description="Every battery ever taken in, tracked by its unique ID."
         titleClassName="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2.5">
           <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-2xs dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>
-              Total Batteries:{' '}
+              {status || clientName || date ? 'Matching Batteries: ' : 'Total Batteries: '}
               <strong className="ml-1 text-base font-bold text-emerald-950 dark:text-emerald-100">
                 {(total || 0).toLocaleString()}
               </strong>
             </span>
           </div>
+
+          {status && (
+            <div className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-2xs dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300">
+              <span>Status: {STATUS_FILTERS.find((f) => f.value === status)?.label || status}</span>
+              <button
+                type="button"
+                onClick={() => handleStatusChange('')}
+                className="ml-1 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200"
+                title="Clear status filter"
+              >
+                ✕
+              </button>
+            </div>
+          )}
         </div>
       </PageHeader>
 
@@ -165,7 +216,7 @@ function BatteriesPage() {
             <select
               id="battery-client-filter"
               value={clientName}
-              onChange={(e) => setClientName(e.target.value)}
+              onChange={(e) => handleClientChange(e.target.value)}
               className="appearance-none rounded-xl border border-slate-300 bg-white py-1.5 pl-3 pr-8 text-sm font-semibold text-slate-800 shadow-2xs focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100"
             >
               <option value="">All Clients</option>
@@ -184,14 +235,14 @@ function BatteriesPage() {
         {/* ── Status Pill Filter ──────────────────────────────────────── */}
         <div className="flex flex-col gap-1">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
-            Status
+            Status Filter
           </span>
           <div className="flex flex-wrap rounded-xl border border-slate-300 p-0.5 dark:border-surface-600">
             {STATUS_FILTERS.map((f) => (
               <button
                 key={f.value}
                 type="button"
-                onClick={() => setStatus(f.value)}
+                onClick={() => handleStatusChange(f.value)}
                 className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
                   status === f.value
                     ? 'bg-emerald-700 text-white dark:bg-emerald-600 shadow-2xs'
@@ -233,11 +284,7 @@ function BatteriesPage() {
         {(status || clientName || date) && (
           <button
             type="button"
-            onClick={() => {
-              setStatus('');
-              setClientName('');
-              setDate('');
-            }}
+            onClick={handleResetFilters}
             className="self-end rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-600 transition-colors hover:bg-slate-200 dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-white/20"
           >
             Reset Filters

@@ -54,7 +54,7 @@ async function broadcastRepeatIntakes() {
 // Recomputes how many batteries are marked unserviceable
 async function broadcastUnserviceableCount() {
   if (!io) return;
-  const count = await batteryModel.countByStatus('unserviceable');
+  const count = await batteryModel.countByStatus(['unserviceable', 'tested_parts_removed']);
   io.emit('batteries:unserviceable-count', count);
 }
 

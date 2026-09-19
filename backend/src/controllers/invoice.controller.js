@@ -3,6 +3,7 @@ const path = require('path');
 const invoiceModel = require('../models/invoice.model');
 const clientModel = require('../models/client.model');
 const auditLogModel = require('../models/audit-log.model');
+const trashModel = require('../models/trash.model');
 const mailerService = require('../services/mailer.service');
 
 const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'invoices');
@@ -205,6 +206,19 @@ async function remove(req, res, next) {
     }
 
     await invoiceModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: existing.id,
+        itemType: 'invoice',
+        title: `Invoice #${existing.invoice_number || existing.id}`,
+        subtitle: `Client: ${existing.client_name || 'N/A'} • Total: £${existing.total_amount || 0} • Status: ${existing.status || 'N/A'}`,
+        itemData: existing,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging invoice to trash:', trashErr);
+    }
 
     await auditLogModel.record({
       userId: req.user.id,

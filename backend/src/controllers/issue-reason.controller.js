@@ -1,4 +1,5 @@
 const issueReasonModel = require('../models/issue-reason.model');
+const trashModel = require('../models/trash.model');
 
 async function list(req, res, next) {
   try {
@@ -58,7 +59,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const reason = await issueReasonModel.findById(req.params.id);
+    if (!reason) {
+      return res.status(404).json({ message: 'Reason not found' });
+    }
+
     await issueReasonModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: reason.id,
+        itemType: 'issue_reason',
+        title: reason.label || `Reason #${reason.id}`,
+        subtitle: `Sort Order: ${reason.sort_order} • Active: ${reason.active ? 'Yes' : 'No'}`,
+        itemData: reason,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging issue reason to trash:', trashErr);
+    }
+
     res.status(204).end();
   } catch (err) {
     // FK violation: this reason has already been used to report an issue.

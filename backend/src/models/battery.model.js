@@ -35,16 +35,29 @@ async function findPage({
     params.push(clientName);
     conditions.push(`(lower(b.client_name) = lower($${params.length}) OR EXISTS (SELECT 1 FROM truck_intakes ti JOIN clients c ON c.id = ti.client_id WHERE ti.id = b.truck_intake_id AND lower(c.name) = lower($${params.length})))`);
   }
+  const effectiveStatusExpr = `(CASE
+    WHEN b.status = 'returned' 
+         AND NOT EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)
+         AND NOT EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = b.id)
+         AND b.truck_intake_id IS NULL
+      THEN 'registered'
+    ELSE b.status
+  END)`;
+
   if (status) {
     if (status === 'registered') {
-      conditions.push(`(b.status = 'registered' OR (b.status = 'returned' AND NOT EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id) AND NOT EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = b.id) AND b.truck_intake_id IS NULL))`);
+      conditions.push(`${effectiveStatusExpr} = 'registered'`);
+    } else if (status === 'returned') {
+      conditions.push(`${effectiveStatusExpr} = 'returned'`);
+    } else if (status === 'unserviceable') {
+      conditions.push(`${effectiveStatusExpr} IN ('unserviceable', 'tested_parts_removed')`);
     } else if (status.includes(',')) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
       params.push(statuses);
-      conditions.push(`b.status = ANY($${params.length})`);
+      conditions.push(`${effectiveStatusExpr} = ANY($${params.length})`);
     } else {
       params.push(status);
-      conditions.push(`b.status = $${params.length}`);
+      conditions.push(`${effectiveStatusExpr} = $${params.length}`);
     }
   }
   if (date) {
@@ -697,6 +710,15 @@ async function countByClientName(clientName) {
 
 // Powers the Unserviceable Batteries page's 100-battery popup alert.
 async function countByStatus(status) {
+  if (Array.isArray(status)) {
+    const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM batteries WHERE status = ANY($1)', [status]);
+    return rows[0].count;
+  }
+  if (typeof status === 'string' && status.includes(',')) {
+    const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
+    const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM batteries WHERE status = ANY($1)', [statuses]);
+    return rows[0].count;
+  }
   const { rows } = await db.query('SELECT COUNT(*)::int AS count FROM batteries WHERE status = $1', [status]);
   return rows[0].count;
 }

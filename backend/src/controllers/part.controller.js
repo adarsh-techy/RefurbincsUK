@@ -1,4 +1,5 @@
 const partModel = require('../models/part.model');
+const trashModel = require('../models/trash.model');
 const realtime = require('../realtime');
 
 async function list(req, res, next) {
@@ -66,7 +67,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const part = await partModel.findById(req.params.id);
+    if (!part) {
+      return res.status(404).json({ message: 'Part not found' });
+    }
+
     await partModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: part.id,
+        itemType: 'part',
+        title: part.name || `Part #${part.id}`,
+        subtitle: `SKU: ${part.sku || 'N/A'} • Cost: £${part.cost || 0} • Stock: ${part.quantity || 0}`,
+        itemData: part,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging part to trash:', trashErr);
+    }
+
     realtime.broadcastOutOfStockParts().catch((err) => console.error('broadcastOutOfStockParts:', err));
     res.status(204).end();
   } catch (err) {

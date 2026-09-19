@@ -6,7 +6,13 @@ const { PERMISSIONS } = require('../config/permissions');
 
 async function list(req, res, next) {
   try {
-    res.json(await userModel.findAll());
+    let roles = ['admin', 'super_admin'];
+    if (req.query.role === 'all') {
+      roles = undefined;
+    } else if (req.query.role) {
+      roles = req.query.role.split(',').map((r) => r.trim()).filter(Boolean);
+    }
+    res.json(await userModel.findAll({ roles }));
   } catch (err) {
     next(err);
   }

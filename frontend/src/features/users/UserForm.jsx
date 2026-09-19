@@ -109,7 +109,6 @@ function UserForm({ targetUser, onSaved, onCancel }) {
           >
             <option value="admin">Admin</option>
             <option value="super_admin">Super Admin</option>
-            <option value="recycle_client">Recycle Client</option>
           </select>
         </div>
 

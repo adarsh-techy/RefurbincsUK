@@ -21,6 +21,7 @@ router.use('/ratings', require('./rating.routes'));
 router.use('/certificates', require('./certificate.routes'));
 router.use('/services', require('./service.routes'));
 router.use('/notifications', require('./notification.routes'));
+router.use('/trash', require('./trash.routes'));
 
 module.exports = router;
 

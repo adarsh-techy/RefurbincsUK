@@ -46,6 +46,45 @@ const TIER_CARDS = {
   Emerald: 'border-emerald-300/80 bg-white dark:bg-surface-850 dark:border-emerald-800/40',
 };
 
+const TIER_THEMES = {
+  Bronze: {
+    badge: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/50',
+    border: 'border-amber-200 hover:border-amber-300 dark:border-amber-900/40 dark:hover:border-amber-700/60',
+    dot: 'bg-amber-500',
+    topBar: 'bg-amber-500',
+  },
+  Silver: {
+    badge: 'bg-slate-100 text-slate-800 border-slate-200 dark:bg-slate-800/80 dark:text-slate-200 dark:border-slate-700/50',
+    border: 'border-slate-200 hover:border-slate-300 dark:border-slate-700/60 dark:hover:border-slate-600',
+    dot: 'bg-slate-400',
+    topBar: 'bg-slate-400',
+  },
+  Gold: {
+    badge: 'bg-yellow-50 text-yellow-800 border-yellow-200 dark:bg-yellow-950/60 dark:text-yellow-300 dark:border-yellow-800/50',
+    border: 'border-yellow-200 hover:border-yellow-300 dark:border-yellow-900/40 dark:hover:border-yellow-700/60',
+    dot: 'bg-yellow-500',
+    topBar: 'bg-yellow-500',
+  },
+  Platinum: {
+    badge: 'bg-indigo-50 text-indigo-800 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800/50',
+    border: 'border-indigo-200 hover:border-indigo-300 dark:border-indigo-900/40 dark:hover:border-indigo-700/60',
+    dot: 'bg-indigo-500',
+    topBar: 'bg-indigo-500',
+  },
+  Diamond: {
+    badge: 'bg-cyan-50 text-cyan-800 border-cyan-200 dark:bg-cyan-950/60 dark:text-cyan-300 dark:border-cyan-800/50',
+    border: 'border-cyan-200 hover:border-cyan-300 dark:border-cyan-900/40 dark:hover:border-cyan-700/60',
+    dot: 'bg-cyan-500',
+    topBar: 'bg-cyan-500',
+  },
+  Emerald: {
+    badge: 'bg-emerald-50 text-emerald-800 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50',
+    border: 'border-emerald-200 hover:border-emerald-300 dark:border-emerald-900/40 dark:hover:border-emerald-700/60',
+    dot: 'bg-emerald-500',
+    topBar: 'bg-emerald-500',
+  },
+};
+
 function CertificatesPage() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -622,75 +661,99 @@ function CertificatesPage() {
       ) : (
         /* Tab 3: Milestone Rules Architecture & Standards */
         <div className="space-y-6">
-          <div className="rounded-2xl border border-slate-200 bg-slate-50/80 p-5 dark:border-white/10 dark:bg-surface-850 shadow-xs">
-            <div className="flex items-start gap-3.5">
-              <div className="p-2.5 rounded-2xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300 shrink-0">
-                <FiSliders className="w-5 h-5" />
+          {/* Header Card: Milestone Governance */}
+          <div className="rounded-2xl border border-slate-200/90 bg-gradient-to-r from-emerald-50/40 via-white to-blue-50/30 p-5 dark:border-white/10 dark:from-surface-850 dark:via-surface-850 dark:to-surface-850 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-center gap-3.5">
+                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0 shadow-2xs">
+                  <FiSliders className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
+                      Automated Milestone Governance & ISO Decarbonization Rules
+                    </h3>
+                    <span className="hidden sm:inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-semibold text-emerald-700 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50">
+                      ISO 14064
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+                    Certificates are automatically awarded when fleet partners reach verified service thresholds.
+                  </p>
+                </div>
               </div>
-              <div>
-                <h3 className="text-sm font-black text-slate-900 dark:text-white">
-                  Automated Milestone Governance & ISO Decarbonization Rules
-                </h3>
-                <p className="text-xs text-slate-600 dark:text-neutral-300 mt-1 leading-relaxed max-w-3xl">
-                  Certificates are automatically awarded when a fleet partner reaches verified service thresholds. Each serviced battery represents an audited environmental saving of <span className="font-bold text-emerald-700 dark:text-emerald-400">15.2 kg CO₂</span> and <span className="font-bold text-blue-700 dark:text-blue-400">2.8 kg toxic landfill diversion</span>.
-                </p>
+
+              {/* Verified standard conversion metrics */}
+              <div className="flex items-center gap-2 self-start sm:self-auto shrink-0 flex-wrap">
+                <div className="flex items-center gap-1.5 rounded-xl border border-emerald-200/80 bg-white dark:bg-surface-800 dark:border-emerald-800/40 px-3 py-1.5 text-xs font-semibold text-emerald-800 dark:text-emerald-300 shadow-2xs">
+                  <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                  <span>15.2 kg CO₂ / pack</span>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-xl border border-blue-200/80 bg-white dark:bg-surface-800 dark:border-blue-800/40 px-3 py-1.5 text-xs font-semibold text-blue-800 dark:text-blue-300 shadow-2xs">
+                  <span className="h-2 w-2 rounded-full bg-blue-500" />
+                  <span>2.8 kg E-Waste / pack</span>
+                </div>
               </div>
             </div>
           </div>
 
           {/* 6 Milestone Tier Rules Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
             {milestoneTiers.map((tier) => {
-              const bStyle = TIER_BADGES[tier.badge] || TIER_BADGES.Gold;
-              const cardAccent = TIER_CARDS[tier.badge] || TIER_CARDS.Gold;
+              const theme = TIER_THEMES[tier.badge] || TIER_THEMES.Gold;
+              const cleanTitle = tier.title?.split('—')[0]?.trim() || tier.title;
 
               return (
                 <div
                   key={tier.count}
-                  className={`rounded-2xl border p-5 shadow-xs transition-all flex flex-col justify-between ${cardAccent}`}
+                  className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border bg-white dark:bg-surface-850 p-5 shadow-xs transition-all duration-200 hover:-translate-y-1 hover:shadow-md ${theme.border}`}
                 >
+                  {/* Subtle top accent bar */}
+                  <div className={`absolute inset-x-0 top-0 h-1 ${theme.topBar}`} />
+
                   <div>
-                    <div className="flex items-center justify-between">
-                      <span className={`inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-black uppercase border ${bStyle}`}>
+                    {/* Header: Tier Badge & Threshold Count */}
+                    <div className="flex items-center justify-between gap-2">
+                      <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold border ${theme.badge}`}>
                         <FiAward className="w-3.5 h-3.5" />
-                        <span>{tier.badge} Rule</span>
+                        <span>{tier.badge} Tier</span>
                       </span>
-                      <span className="font-mono text-sm font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-surface-800 px-2.5 py-0.5 rounded-lg border border-slate-200/60 dark:border-white/10">
-                        {tier.count.toLocaleString()} Packs
+                      <span className="font-mono text-xs font-black text-slate-800 dark:text-neutral-200 bg-slate-100 dark:bg-surface-800 px-2.5 py-1 rounded-lg border border-slate-200/70 dark:border-white/10">
+                        {tier.count.toLocaleString()} Batteries
                       </span>
                     </div>
 
-                    <h3 className="font-black text-sm text-slate-900 dark:text-white mt-3.5">
-                      {tier.title}
-                    </h3>
-                    <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
-                      {tier.subtitle}
-                    </p>
+                    {/* Clean Title */}
+                    <h4 className="font-bold text-base text-slate-900 dark:text-white mt-4 tracking-tight">
+                      {cleanTitle}
+                    </h4>
 
-                    {/* Impact Rule Multipliers */}
-                    <div className="grid grid-cols-2 gap-2 mt-4 p-3 rounded-xl bg-slate-50 dark:bg-surface-900/80 border border-slate-200/70 dark:border-white/5 text-center">
+                    {/* Impact Stats */}
+                    <div className="mt-4 grid grid-cols-2 gap-2 rounded-xl bg-slate-50/90 dark:bg-surface-900/60 p-3 border border-slate-100 dark:border-white/5">
                       <div>
-                        <span className="text-[10px] uppercase font-extrabold text-emerald-800 dark:text-emerald-400 block">
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block">
                           CO₂ Reduction
                         </span>
-                        <span className="font-black text-xs text-slate-900 dark:text-white block mt-0.5">
-                          ~{(tier.co2Kg / 1000).toFixed(1)} Metric Tons
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400 block mt-0.5">
+                          ~{(tier.co2Kg / 1000).toFixed(1)} Tons
                         </span>
                       </div>
-                      <div>
-                        <span className="text-[10px] uppercase font-extrabold text-blue-800 dark:text-blue-400 block">
-                          E-Waste Diversion
+                      <div className="border-l border-slate-200/80 dark:border-white/10 pl-2.5">
+                        <span className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 block">
+                          E-Waste Saved
                         </span>
-                        <span className="font-black text-xs text-slate-900 dark:text-white block mt-0.5">
-                          {tier.ewasteKg.toLocaleString()} kg Diverted
+                        <span className="text-sm font-bold text-blue-600 dark:text-blue-400 block mt-0.5">
+                          {tier.ewasteKg.toLocaleString()} kg
                         </span>
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-white/10 flex items-center justify-between">
-                    <span className="text-[11px] font-bold text-slate-500 dark:text-neutral-400">
-                      Auto-Issued on Threshold
+                  {/* Card Footer: Status & Action */}
+                  <div className="mt-5 pt-3 border-t border-slate-100 dark:border-white/5 flex items-center justify-between gap-2">
+                    <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
+                      <span className={`h-1.5 w-1.5 rounded-full ${theme.dot}`} />
+                      Automated rule
                     </span>
                     <button
                       type="button"
@@ -706,10 +769,10 @@ function CertificatesPage() {
                           issued_at: new Date().toISOString(),
                         });
                       }}
-                      className="inline-flex items-center gap-1 text-xs font-bold text-slate-700 hover:text-slate-950 dark:text-neutral-300 dark:hover:text-white underline cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold text-slate-700 hover:text-slate-900 hover:bg-slate-100 dark:text-neutral-300 dark:hover:text-white dark:hover:bg-surface-800 transition-colors cursor-pointer"
                     >
                       <FiEye className="w-3.5 h-3.5" />
-                      <span>Preview Theme</span>
+                      <span>Preview</span>
                     </button>
                   </div>
                 </div>

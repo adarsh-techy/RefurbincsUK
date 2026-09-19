@@ -3,7 +3,14 @@ const db = require('../config/db');
 const PUBLIC_COLUMNS =
   'id, name, email, role, permissions, must_change_password, active, created_at';
 
-async function findAll() {
+async function findAll({ roles } = {}) {
+  if (Array.isArray(roles) && roles.length > 0) {
+    const { rows } = await db.query(
+      `SELECT ${PUBLIC_COLUMNS} FROM users WHERE role = ANY($1) ORDER BY name`,
+      [roles]
+    );
+    return rows;
+  }
   const { rows } = await db.query(`SELECT ${PUBLIC_COLUMNS} FROM users ORDER BY name`);
   return rows;
 }

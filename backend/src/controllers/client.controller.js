@@ -4,6 +4,7 @@ const bcrypt = require('bcryptjs');
 const clientModel = require('../models/client.model');
 const invoiceModel = require('../models/invoice.model');
 const recycleModel = require('../models/recycle.model');
+const trashModel = require('../models/trash.model');
 
 // A client's own logo — uploaded here by an admin, shown back on that
 // client's own dashboard. Stored on disk the same way invoice PDFs are
@@ -161,7 +162,26 @@ async function update(req, res, next) {
 
 async function remove(req, res, next) {
   try {
+    const client = await clientModel.findById(req.params.id);
+    if (!client) {
+      return res.status(404).json({ message: 'Client not found' });
+    }
+
     await clientModel.remove(req.params.id);
+
+    try {
+      await trashModel.record({
+        originalId: client.id,
+        itemType: 'client',
+        title: client.name || `Client #${client.id}`,
+        subtitle: `Email: ${client.email || 'N/A'} • Phone: ${client.phone || 'N/A'} • Status: ${client.status || 'active'}`,
+        itemData: client,
+        user: req.user,
+      });
+    } catch (trashErr) {
+      console.error('Error logging client to trash:', trashErr);
+    }
+
     res.status(204).end();
   } catch (err) {
     // FK violation: this client is tagged on a truck intake.
