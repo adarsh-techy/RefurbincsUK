@@ -717,32 +717,39 @@ function FinanceDetailPage() {
                             </div>
                           </td>
                           <td className="py-3 px-3.5">
-                            {b.staffList.length > 0 ? (
-                              <div className="flex flex-col gap-0.5">
-                                {b.staffList.map((st, sIdx) =>
-                                  st.id ? (
-                                    <Link
-                                      key={sIdx}
-                                      to={`/staff/${st.id}`}
-                                      className="font-medium text-blue-600 hover:underline dark:text-blue-400 block truncate max-w-[130px]"
-                                      title={st.name}
-                                    >
-                                      {st.name}
-                                    </Link>
-                                  ) : (
-                                    <span
-                                      key={sIdx}
-                                      className="text-slate-500 dark:text-neutral-400 block truncate max-w-[130px]"
-                                      title={st.name}
-                                    >
-                                      {st.name}
-                                    </span>
-                                  )
-                                )}
-                              </div>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
+                            {(() => {
+                              const realStaff = b.staffList.filter(
+                                (s) => s.name && !s.name.toLowerCase().includes('system') && !s.name.toLowerCase().includes('auto')
+                              );
+                              const staffToRender = realStaff.length > 0 ? realStaff : b.staffList;
+
+                              return staffToRender.length > 0 ? (
+                                <div className="flex flex-col gap-0.5">
+                                  {staffToRender.map((st, sIdx) =>
+                                    st.id ? (
+                                      <Link
+                                        key={sIdx}
+                                        to={`/staff/${st.id}`}
+                                        className="font-medium text-blue-600 hover:underline dark:text-blue-400 block truncate max-w-[130px]"
+                                        title={st.name}
+                                      >
+                                        {st.name}
+                                      </Link>
+                                    ) : (
+                                      <span
+                                        key={sIdx}
+                                        className="text-slate-500 dark:text-neutral-400 block truncate max-w-[130px]"
+                                        title={st.name}
+                                      >
+                                        {st.name}
+                                      </span>
+                                    )
+                                  )}
+                                </div>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              );
+                            })()}
                           </td>
                           <td className="py-3 px-3.5">
                             <div className="flex flex-wrap gap-1 max-w-[280px]">
