@@ -7,6 +7,7 @@ const TONES = {
   critical: { bg: 'bg-red-500/15', text: 'text-red-700 dark:text-red-400' },
   testing: { bg: 'bg-blue-500/15', text: 'text-blue-700 dark:text-blue-400' },
   neutral: { bg: 'bg-slate-200 dark:bg-slate-700', text: 'text-slate-700 dark:text-slate-200' },
+  black: { bg: 'bg-black dark:bg-black', text: 'text-white dark:text-white' },
 };
 
 // battery/status strings from the API (snake_case) mapped to a tone +
@@ -23,7 +24,7 @@ const STATUS_MAP = {
   returned: { tone: 'info', label: 'Returned' },
   unserviceable: { tone: 'critical', label: 'Unserviceable' },
   tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
-  recycled: { tone: 'neutral', label: 'Recycled' },
+  recycled: { tone: 'black', label: 'Recycled' },
 };
 
 export function Badge({ tone = 'neutral', children }) {
@@ -40,14 +41,15 @@ export function StatusBadge({ status }) {
   const meta = STATUS_MAP[status] || { tone: 'neutral', label: status };
   if (meta.subLabel) {
     return (
-      <View className="items-start gap-1">
-        <Badge tone={meta.tone}>{meta.label}</Badge>
-        <View className="flex-row items-center gap-1 rounded-md bg-red-500/10 px-1.5 py-0.5 border border-red-500/20">
-          <View className="h-1.5 w-1.5 rounded-full bg-red-500" />
-          <Text className="text-[9.5px] font-bold text-red-600 dark:text-red-400">
-            {meta.subLabel}
-          </Text>
-        </View>
+      <View className="flex-row items-center self-start gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1">
+        <View className="h-1.5 w-1.5 rounded-full bg-red-500" />
+        <Text className="text-xs font-medium text-red-700 dark:text-red-400">
+          {meta.label}
+        </Text>
+        <Text className="text-xs text-red-400 dark:text-red-600">·</Text>
+        <Text className="text-[11px] font-bold text-red-600 dark:text-red-400">
+          {meta.subLabel}
+        </Text>
       </View>
     );
   }

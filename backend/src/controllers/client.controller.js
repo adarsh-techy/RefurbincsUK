@@ -387,7 +387,7 @@ async function updateMyTruckIntake(req, res, next) {
       return res.status(409).json({ message: 'Your account is not linked to a client record.' });
     }
     const { truckNumber, driverName } = req.body;
-    const intake = await clientModel.updateClientTruckIntake(client.id, req.params.id, {
+    const intake = await clientModel.updateClientTruckIntake(client.id, client.name, req.params.id, {
       truckNumber,
       driverName,
     });
@@ -479,6 +479,34 @@ async function updateMyBattery(req, res, next) {
   }
 }
 
+async function mySortGroups(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    const clientId = client?.id || null;
+    const userId = req.user.id;
+    const groups = await clientModel.findSortGroups(clientId, userId);
+    res.json({ data: groups });
+  } catch (err) {
+    next(err);
+  }
+}
+
+async function updateMySortGroups(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    const clientId = client?.id || null;
+    const userId = req.user.id;
+    const { groups } = req.body;
+    if (!Array.isArray(groups)) {
+      return res.status(400).json({ message: 'Groups must be an array.' });
+    }
+    const updated = await clientModel.replaceSortGroups(clientId, userId, groups);
+    res.json({ data: updated });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   list,
   getById,
@@ -497,6 +525,8 @@ module.exports = {
   removeBatteryFromMyTruckIntake,
   deleteMyTruckIntake,
   updateMyBattery,
+  mySortGroups,
+  updateMySortGroups,
   myInvoices,
 };
 

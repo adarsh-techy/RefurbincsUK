@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useSelector } from 'react-redux';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
@@ -15,6 +16,13 @@ const DEBOUNCE_MS = 250;
 export default function ServiceScreen() {
   const navigation = useNavigation();
   const route = useRoute();
+  const currentUser = useSelector((state) => state.auth.user);
+  const staffRole = (currentUser?.staff_role || currentUser?.role || '').toLowerCase();
+  const canTest =
+    currentUser?.role === 'super_admin' ||
+    currentUser?.role === 'admin' ||
+    staffRole === 'supervisor';
+
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -38,16 +46,22 @@ export default function ServiceScreen() {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await apiClient.get('/batteries', {
-          params: { q: manualCode.trim(), limit: SUGGESTION_LIMIT, activeOnly: true },
-        });
+        const params = {
+          q: manualCode.trim(),
+          limit: SUGGESTION_LIMIT,
+          intakedOnly: 'true',
+        };
+        if (canTest) {
+          params.includeTesting = 'true';
+        }
+        const { data } = await apiClient.get('/batteries', { params });
         setSuggestions(data.data);
       } catch {
         setSuggestions([]);
       }
     }, DEBOUNCE_MS);
     return () => clearTimeout(debounceRef.current);
-  }, [manualCode]);
+  }, [manualCode, canTest]);
 
   function goToBattery(raw) {
     const code = extractBatteryCode(raw);

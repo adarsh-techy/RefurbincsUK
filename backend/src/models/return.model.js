@@ -1,26 +1,38 @@
 const db = require('../config/db');
 
-async function create({ truckNumber, driverName, clientId, batteryIds }) {
+async function create({ truckNumber, driverName, clientId, batteryIds, returnedAt, documentUrl, documentName }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
+    const finalReturnedAt = returnedAt ? new Date(returnedAt) : new Date();
+
     const { rows } = await client.query(
-      `INSERT INTO returns (truck_number, driver_name, battery_count, client_id, status)
-       VALUES ($1, $2, $3, $4, 'pending_verification') RETURNING *`,
-      [truckNumber, driverName, batteryIds.length, clientId || null]
+      `INSERT INTO returns (truck_number, driver_name, battery_count, client_id, status, returned_at, document_url, document_name)
+       VALUES ($1, $2, $3, $4, 'pending_verification', $5, $6, $7) RETURNING *`,
+      [
+        truckNumber,
+        driverName,
+        batteryIds.length,
+        clientId || null,
+        finalReturnedAt,
+        documentUrl || null,
+        documentName || null,
+      ]
     );
     const returnRecord = rows[0];
 
-    await client.query(
-      `INSERT INTO return_batteries (return_id, battery_id)
-       SELECT $1::int, unnest($2::int[])`,
-      [returnRecord.id, batteryIds]
-    );
-    await client.query(
-      `UPDATE batteries SET status = 'returned' WHERE id = ANY($1::int[])`,
-      [batteryIds]
-    );
+    if (batteryIds && batteryIds.length > 0) {
+      await client.query(
+        `INSERT INTO return_batteries (return_id, battery_id)
+         SELECT $1::int, unnest($2::int[])`,
+        [returnRecord.id, batteryIds]
+      );
+      await client.query(
+        `UPDATE batteries SET status = 'returned' WHERE id = ANY($1::int[])`,
+        [batteryIds]
+      );
+    }
 
     await client.query('COMMIT');
     return returnRecord;
@@ -87,10 +99,25 @@ async function findBatteries(returnId) {
 // truck_number/driver_name/client_id are editable — which batteries were
 // returned is not (changing that would need to re-run the status
 // transitions; out of scope for a quick correction).
-async function update(id, { truckNumber, driverName, clientId }) {
+async function update(id, { truckNumber, driverName, clientId, returnedAt, documentUrl, documentName }) {
+  const fields = ['truck_number = $2', 'driver_name = $3', 'client_id = $4'];
+  const values = [id, truckNumber, driverName, clientId || null];
+  let idx = 5;
+  if (returnedAt) {
+    fields.push(`returned_at = $${idx++}`);
+    values.push(new Date(returnedAt));
+  }
+  if (documentUrl !== undefined) {
+    fields.push(`document_url = $${idx++}`);
+    values.push(documentUrl);
+  }
+  if (documentName !== undefined) {
+    fields.push(`document_name = $${idx++}`);
+    values.push(documentName);
+  }
   const { rows } = await db.query(
-    `UPDATE returns SET truck_number = $2, driver_name = $3, client_id = $4 WHERE id = $1 RETURNING *`,
-    [id, truckNumber, driverName, clientId || null]
+    `UPDATE returns SET ${fields.join(', ')} WHERE id = $1 RETURNING *`,
+    values
   );
   return rows[0];
 }

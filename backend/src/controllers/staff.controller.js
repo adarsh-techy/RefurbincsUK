@@ -23,6 +23,21 @@ async function list(req, res, next) {
 // loginEmail/tempPassword are optional — supplying both also grants this
 // staff member a technician login account, which must set its own password
 // on first login (see must_change_password).
+// Only two workshop roles exist: plain technicians repair, supervisors also
+// test/sign off (see battery.controller.js). Anything else is rejected.
+const STAFF_ROLES = ['technician', 'supervisor'];
+
+function normalizeStaffRole(role) {
+  if (role === undefined || role === null || role === '') return undefined;
+  const value = String(role).trim().toLowerCase();
+  if (!STAFF_ROLES.includes(value)) {
+    const err = new Error('Workshop role must be either technician or supervisor.');
+    err.status = 400;
+    throw err;
+  }
+  return value;
+}
+
 async function create(req, res, next) {
   try {
     const {
@@ -65,7 +80,7 @@ async function create(req, res, next) {
       name,
       phone,
       salary,
-      role,
+      role: normalizeStaffRole(role) || 'technician',
       email: finalEmail,
       passwordHash,
       passportNumber: finalPassport,
@@ -117,7 +132,7 @@ async function update(req, res, next) {
       phone,
       active,
       salary,
-      role,
+      role: normalizeStaffRole(role),
       email: email !== undefined ? email : undefined,
       passportNumber: (passportNumber !== undefined ? passportNumber : passport_number),
       niNumber: (niNumber !== undefined ? niNumber : ni_number),

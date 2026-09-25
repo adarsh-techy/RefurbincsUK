@@ -39,7 +39,9 @@ export function resolveImageUrl(path, explicitToken = null) {
   // If path is an authenticated upload and token is present, append token
   if (
     token &&
-    (fullUrl.includes('/uploads/issue-photos') || fullUrl.includes('/uploads/staff-docs'))
+    (fullUrl.includes('/uploads/issue-photos') ||
+      fullUrl.includes('/uploads/staff-docs') ||
+      fullUrl.includes('/uploads/return-docs'))
   ) {
     if (!fullUrl.includes('token=')) {
       const separator = fullUrl.includes('?') ? '&' : '?';

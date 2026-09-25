@@ -33,23 +33,42 @@ router.patch('/:id/client', batteryController.updateClient);
 // Assigning or updating physical Battery Number (serial_number).
 // Open to admin and client (client-locked once client sets it).
 router.patch('/:id/serial-number', batteryController.updateSerialNumber);
-// A technician claiming a battery to start work on — before any part is
+// A technician or staff claiming a battery to start work on — before any part is
 // logged, so it shows as actively being worked on rather than just queued.
-router.patch('/:id/start-work', requireRole('technician'), batteryController.startWork);
-// A technician (Supervisor/Manager only, enforced in the controller), staff
+router.patch(
+  '/:id/start-work',
+  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  batteryController.startWork
+);
+// A supervisor or admin starting the test timer when scanning/opening an in_testing battery.
+router.patch(
+  '/:id/start-testing',
+  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  batteryController.startTesting
+);
+// A technician (Supervisor only, enforced in the controller), staff
 // member, or admin confirming a battery works after its parts were replaced.
 router.patch(
   '/:id/complete-testing',
   requireRole('technician', 'staff', 'admin', 'super_admin'),
   batteryController.completeTesting
 );
-// A technician (mid-repair) or a tester — supervisor/manager, during
+// A technician (mid-repair) or a supervisor, during
 // testing — reporting that a battery can't be serviced, with up to 3 photos.
-router.patch('/:id/report-issue', requireRole('technician'), uploadIssuePhotos.array('photos', 3), batteryController.reportIssue);
+router.patch(
+  '/:id/report-issue',
+  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  uploadIssuePhotos.array('photos', 3),
+  batteryController.reportIssue
+);
 // Reclaiming parts fitted during repair from a battery that failed testing —
 // open to the same workshop logins as report-issue/complete-testing.
-router.patch('/:id/remove-parts', requireRole('technician'), batteryController.removeParts);
-// A supervisor/manager/tester passing a battery back to the technician pool
+router.patch(
+  '/:id/remove-parts',
+  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  batteryController.removeParts
+);
+// A supervisor passing a battery back to the technician pool
 router.patch(
   '/:id/pass-to-tech',
   requireRole('technician', 'staff', 'admin', 'super_admin'),

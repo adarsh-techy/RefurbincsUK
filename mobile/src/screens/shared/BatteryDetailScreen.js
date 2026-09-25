@@ -144,7 +144,8 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
         date: h.removed_at,
         primary: `Removed: ${h.part_name} · by ${h.removed_by_staff_name || 'Workshop Staff'}`,
         notes: `Restocked to inventory (-£${partCost.toFixed(2)})`,
-        price: -partCost,
+        price: 0,
+        deductedPrice: partCost,
         isDeduction: true,
         removedByStaffName: h.removed_by_staff_name,
       });
@@ -152,10 +153,16 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
   });
 
   services.forEach((s) => {
+    const isDiagFee =
+      !s.service_name ||
+      s.service_name.toLowerCase().includes('diagnostic') ||
+      s.service_name.toLowerCase().includes('fee') ||
+      s.is_mandatory;
+
     events.push({
       key: `service-${s.id}`,
       type: 'service',
-      label: 'Testing Service',
+      label: isDiagFee ? 'Diagnostic Fee' : 'Testing Service',
       icon: 'flask',
       date: s.completed_at,
       primary: `${s.service_name}${s.staff_name ? ` · by ${s.staff_name}` : ''}`,
@@ -218,7 +225,7 @@ export default function BatteryDetailScreen() {
   const canTest =
     currentUser?.role === 'super_admin' ||
     currentUser?.role === 'admin' ||
-    ['supervisor', 'manager', 'tester', 'qa'].includes(staffRole);
+    staffRole === 'supervisor';
   const isTechnicianOnly = isStaff && !canTest;
 
   const [result, setResult] = useState(null);
@@ -360,7 +367,6 @@ export default function BatteryDetailScreen() {
         const isOwnInProgress =
           data.battery?.status === 'in_progress' &&
           data.battery?.started_by_user_id === currentUserId;
-        const canTestInTesting = canTest && data.battery?.status === 'in_testing';
         const hasPendingPartsRemoval = (data.pendingPartsRemoval?.length || 0) > 0;
         const latestPassBack = (data.services || []).find(
           (s) => s.service_name === 'Passed back to Technician'
@@ -384,7 +390,7 @@ export default function BatteryDetailScreen() {
             fittedBy: fittedParts[0]?.staff_name || 'Technician',
             fittedAt: fittedParts[0]?.repaired_at || null,
             fittedParts,
-            testedBy: data.issues?.[0]?.staff_name || latestPassBack?.staff_name || 'Tester / Supervisor',
+            testedBy: data.issues?.[0]?.staff_name || latestPassBack?.staff_name || 'Supervisor',
             testedAt: data.issues?.[0]?.reported_at || latestPassBack?.completed_at || null,
             issueReason: data.issues?.[0]?.reason_label || data.issues?.[0]?.reason || (latestPassBack ? 'Failed Testing Diagnostics' : 'Unserviceable Unit'),
             issueNote: data.issues?.[0]?.note || latestPassBack?.notes || null,
@@ -412,7 +418,7 @@ export default function BatteryDetailScreen() {
             staffName:
               latestPassBack?.staff_name ||
               data.issues?.[0]?.staff_name ||
-              'Supervisor / Tester',
+              'Supervisor',
             note: latestPassBack?.notes || data.issues?.[0]?.note || null,
             date:
               latestPassBack?.completed_at ||
@@ -428,6 +434,7 @@ export default function BatteryDetailScreen() {
         } else if (
           fromScan &&
           data.battery?.status !== 'in_repair' &&
+          data.battery?.status !== 'tested_parts_removed' &&
           !isOwnInProgress &&
           !canTestInTesting &&
           !hasPendingPartsRemoval
@@ -527,10 +534,26 @@ export default function BatteryDetailScreen() {
     );
   }
 
+  async function handleStartTesting() {
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      const { data: updatedBattery } = await apiClient.patch(`/batteries/${result.battery.id}/start-testing`);
+      setResult((prev) => (prev ? { ...prev, battery: updatedBattery } : prev));
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handleCompleteTesting() {
     setSubmitting(true);
     setActionError(null);
     try {
+      if (!result.battery.testing_started_at) {
+        await apiClient.patch(`/batteries/${result.battery.id}/start-testing`);
+      }
       await apiClient.patch(`/batteries/${result.battery.id}/complete-testing`, {
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
@@ -713,7 +736,7 @@ export default function BatteryDetailScreen() {
       setNotes('');
       await load();
       // A technician who can't test just gets a done confirmation. A
-      // manager/supervisor doing their own repair gets a choice: test this
+      // supervisor doing their own repair gets a choice: test this
       // battery right now, or step away and leave it queued for testing.
       if (canTest) {
         setShowTestChoiceModal(true);
@@ -1170,7 +1193,7 @@ export default function BatteryDetailScreen() {
               <Text className="text-xs text-amber-800 mt-1 mb-2 leading-relaxed">
                 Marked by{' '}
                 <Text className="font-bold text-amber-950">
-                  {passBack.staff_name || 'Supervisor / Manager'}
+                  {passBack.staff_name || 'Supervisor'}
                 </Text>
                 {passBack.completed_at
                   ? ` on ${new Date(passBack.completed_at).toLocaleString()}`
@@ -1192,7 +1215,7 @@ export default function BatteryDetailScreen() {
         })()}
 
       {/* ── Parts Pending Removal (unserviceable or in_repair battery, parts fitted during
-           repair before it failed testing — technician or manager/
+           repair before it failed testing — technician or
            supervisor reclaims them here before it can proceed) ────── */}
       {!isClient &&
         (battery.status === 'unserviceable' || battery.status === 'in_repair') &&
@@ -1323,11 +1346,24 @@ export default function BatteryDetailScreen() {
         <>
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
-          {battery.status === 'in_repair' && pendingPartsRemoval.length === 0 && (
+          {(battery.status === 'in_repair' || battery.status === 'tested_parts_removed') && pendingPartsRemoval.length === 0 && (
             <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-              <Text className="text-sm font-bold text-slate-900">Ready to start?</Text>
+              <View className="flex-row items-center justify-between mb-1">
+                <Text className="text-sm font-bold text-slate-900">
+                  {battery.status === 'tested_parts_removed'
+                    ? 'Parts Removed · Ready for Rework'
+                    : 'Ready to start?'}
+                </Text>
+                <View className="rounded-full bg-blue-100 px-2.5 py-0.5">
+                  <Text className="text-[10px] font-bold text-blue-700">
+                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </Text>
+                </View>
+              </View>
               <Text className="mt-0.5 mb-3 text-xs text-slate-400">
-                This battery hasn't been touched yet. Starting work marks it as in progress.
+                {battery.status === 'tested_parts_removed'
+                  ? 'All fitted parts have been reclaimed. Tap Start Work to begin rework on this battery and record your start time.'
+                  : "This battery hasn't been touched yet. Starting work marks it as in progress."}
               </Text>
               <TouchableOpacity
                 onPress={handleStartWork}
@@ -1407,105 +1443,126 @@ export default function BatteryDetailScreen() {
 
           {battery.status === 'in_testing' && (
             <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-              <View className="mb-3 flex-row items-center justify-between rounded-xl bg-blue-100/70 border border-blue-200 px-3.5 py-2.5">
-                <Text className="text-xs font-bold text-blue-800">Time in testing</Text>
-                <Text className="text-base font-extrabold text-blue-700">
-                  {formatDuration(testingElapsedSeconds)}
-                </Text>
-              </View>
               {canTest ? (
                 <>
-                  {availableServices.length > 0 && (
-                    <View className="mb-3">
-                      <View className="flex-row items-center justify-between mb-2">
-                        <Text className="text-xs font-bold text-slate-900">
-                          Services Performed ({selectedServiceIds.length})
+                  {!battery.testing_started_at ? (
+                    <View className="rounded-2xl border border-blue-200 bg-white p-4 shadow-sm">
+                      <View className="flex-row items-center gap-2 mb-1">
+                        <Icon name="clock" color="#2563eb" size={16} />
+                        <Text className="text-sm font-bold text-slate-900">Ready to Begin Testing?</Text>
+                      </View>
+                      <Text className="mt-0.5 mb-3 text-xs text-slate-500">
+                        Tap below to start testing this battery and begin the timer.
+                      </Text>
+                      <TouchableOpacity
+                        onPress={handleStartTesting}
+                        disabled={submitting}
+                        className="items-center rounded-xl bg-blue-600 py-3 shadow-md active:bg-blue-700"
+                      >
+                        <Text className="text-xs font-bold text-white">Start Testing Timer</Text>
+                      </TouchableOpacity>
+                    </View>
+                  ) : (
+                    <>
+                      <View className="mb-3 flex-row items-center justify-between rounded-xl bg-blue-100/70 border border-blue-200 px-3.5 py-2.5">
+                        <Text className="text-xs font-bold text-blue-800">Time in testing</Text>
+                        <Text className="text-base font-extrabold text-blue-700 font-mono">
+                          {formatDuration(testingElapsedSeconds)}
                         </Text>
-                        {availableServices
-                          .filter((s) => selectedServiceIds.includes(s.id))
-                          .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0 && (
-                          <Text className="text-xs font-extrabold text-emerald-600">
-                            +£
+                      </View>
+                      {availableServices.length > 0 && (
+                        <View className="mb-3">
+                          <View className="flex-row items-center justify-between mb-2">
+                            <Text className="text-xs font-bold text-slate-900">
+                              Services Performed ({selectedServiceIds.length})
+                            </Text>
                             {availableServices
                               .filter((s) => selectedServiceIds.includes(s.id))
-                              .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                              .toFixed(2)}
-                          </Text>
-                        )}
-                      </View>
-                      <View className="gap-2">
-                        {availableServices.map((s) => {
-                          const isChecked = selectedServiceIds.includes(s.id);
-                          return (
-                            <TouchableOpacity
-                              key={s.id}
-                              onPress={() => toggleService(s.id)}
-                              className={`flex-row items-center justify-between rounded-xl border p-3 ${
-                                isChecked
-                                  ? 'border-blue-500 bg-blue-100/70'
-                                  : 'border-slate-200 bg-white'
-                              }`}
-                            >
-                              <View className="flex-row items-center gap-2.5 flex-1 pr-2">
-                                <View
-                                  className={`h-5 w-5 rounded-md border items-center justify-center ${
+                              .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0 && (
+                              <Text className="text-xs font-extrabold text-emerald-600">
+                                +£
+                                {availableServices
+                                  .filter((s) => selectedServiceIds.includes(s.id))
+                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0)
+                                  .toFixed(2)}
+                              </Text>
+                            )}
+                          </View>
+                          <View className="gap-2">
+                            {availableServices.map((s) => {
+                              const isChecked = selectedServiceIds.includes(s.id);
+                              return (
+                                <TouchableOpacity
+                                  key={s.id}
+                                  onPress={() => toggleService(s.id)}
+                                  className={`flex-row items-center justify-between rounded-xl border p-3 ${
                                     isChecked
-                                      ? 'border-blue-600 bg-blue-600'
-                                      : 'border-slate-300 bg-white'
+                                      ? 'border-blue-500 bg-blue-100/70'
+                                      : 'border-slate-200 bg-white'
                                   }`}
                                 >
-                                  {isChecked && <Icon name="check" color="#ffffff" size={12} strokeWidth={3} />}
-                                </View>
-                                <View className="flex-1">
-                                  <Text className="text-xs font-bold text-slate-900">{s.name}</Text>
-                                  {s.description ? (
-                                    <Text className="text-[10px] text-slate-500" numberOfLines={1}>
-                                      {s.description}
-                                    </Text>
-                                  ) : null}
-                                </View>
-                              </View>
-                              <Text className="text-xs font-bold text-emerald-600">
-                                +£{Number(s.rate || 0).toFixed(2)}
-                              </Text>
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  )}
+                                  <View className="flex-row items-center gap-2.5 flex-1 pr-2">
+                                    <View
+                                      className={`h-5 w-5 rounded-md border items-center justify-center ${
+                                        isChecked
+                                          ? 'border-blue-600 bg-blue-600'
+                                          : 'border-slate-300 bg-white'
+                                      }`}
+                                    >
+                                      {isChecked && <Icon name="check" color="#ffffff" size={12} strokeWidth={3} />}
+                                    </View>
+                                    <View className="flex-1">
+                                      <Text className="text-xs font-bold text-slate-900">{s.name}</Text>
+                                      {s.description ? (
+                                        <Text className="text-[10px] text-slate-500" numberOfLines={1}>
+                                          {s.description}
+                                        </Text>
+                                      ) : null}
+                                    </View>
+                                  </View>
+                                  <Text className="text-xs font-bold text-emerald-600">
+                                    +£{Number(s.rate || 0).toFixed(2)}
+                                  </Text>
+                                </TouchableOpacity>
+                              );
+                            })}
+                          </View>
+                        </View>
+                      )}
 
-                  <TextInput
-                    value={testingNotes}
-                    onChangeText={setTestingNotes}
-                    placeholder="Testing notes (optional)"
-                    placeholderTextColor="#94a3b8"
-                    className="mb-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900"
-                  />
+                      <TextInput
+                        value={testingNotes}
+                        onChangeText={setTestingNotes}
+                        placeholder="Testing notes (optional)"
+                        placeholderTextColor="#94a3b8"
+                        className="mb-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900"
+                      />
 
-                  <TouchableOpacity
-                    onPress={handleCompleteTesting}
-                    disabled={submitting}
-                    className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
-                  >
-                    {submitting ? (
-                      <ActivityIndicator color="#fff" />
-                    ) : (
-                      <Text className="text-sm font-bold text-white">
-                        Complete Testing{' '}
-                        {availableServices
-                          .filter((s) => selectedServiceIds.includes(s.id))
-                          .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0
-                          ? `(+£${availableServices
+                      <TouchableOpacity
+                        onPress={handleCompleteTesting}
+                        disabled={submitting}
+                        className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
+                      >
+                        {submitting ? (
+                          <ActivityIndicator color="#fff" />
+                        ) : (
+                          <Text className="text-sm font-bold text-white">
+                            Complete Testing{' '}
+                            {availableServices
                               .filter((s) => selectedServiceIds.includes(s.id))
-                              .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                              .toFixed(2)})`
-                          : ''}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                              .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0
+                              ? `(+£${availableServices
+                                  .filter((s) => selectedServiceIds.includes(s.id))
+                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0)
+                                  .toFixed(2)})`
+                              : ''}
+                          </Text>
+                        )}
+                      </TouchableOpacity>
 
-                  {renderTestingUnserviceableSection()}
+                      {renderTestingUnserviceableSection()}
+                    </>
+                  )}
                 </>
               ) : (
                 <View className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
@@ -1570,10 +1627,21 @@ export default function BatteryDetailScreen() {
             <View className="gap-4">
               {cycles.map((cycle, i) => {
                 const isOngoing = i === cycles.length - 1 && !cycle.some((e) => e.type === 'return');
-                const cycleTotal = cycle.reduce(
-                  (sum, event) => sum + (event.price !== undefined ? Number(event.price) : 0),
+                const isUnserviceableCycle =
+                  cycle.some((e) => e.type === 'issue' || e.type === 'recycle') ||
+                  (isOngoing && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status));
+
+                const cycleRepairs = cycle.filter((e) => e.type === 'repair');
+                const cycleServices = cycle.filter((e) => e.type === 'service');
+                const cyclePartsTotal = cycleRepairs
+                  .filter((r) => !r.isRemoved)
+                  .reduce((sum, r) => sum + (Number(r.price) || 0), 0);
+                const cycleServicesTotal = cycleServices.reduce(
+                  (sum, s) => sum + (Number(s.price) || 0),
                   0
                 );
+                const cycleTotal = Math.max(0, cyclePartsTotal + cycleServicesTotal);
+
                 return (
                   <View
                     key={`cycle-${i}`}
@@ -1582,20 +1650,39 @@ export default function BatteryDetailScreen() {
                     <View className="flex-row items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
                       <Text className="text-xs font-black tracking-widest text-slate-700">CYCLE {i + 1}</Text>
                       <View className="flex-row items-center gap-2">
-                        {cycleTotal > 0 && (
-                          <View className="rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
+                        {cycleTotal > 0 ? (
+                          <View className="flex-row items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
                             <Text className="text-[10px] font-extrabold text-blue-700">
                               Total: £{cycleTotal.toFixed(2)}
+                            </Text>
+                            {isUnserviceableCycle && cycleServicesTotal > 0 && cyclePartsTotal === 0 && (
+                              <Text className="text-[9px] font-bold text-red-600">
+                                (Diagnostic)
+                              </Text>
+                            )}
+                          </View>
+                        ) : (
+                          <View className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5">
+                            <Text className="text-[10px] font-medium text-slate-500">
+                              No Charge
                             </Text>
                           </View>
                         )}
                         <View className={`rounded-full px-2.5 py-0.5 border ${
-                          isOngoing ? 'bg-amber-50 border-amber-200' : 'bg-emerald-50 border-emerald-200'
+                          isUnserviceableCycle
+                            ? 'bg-rose-50 border-rose-200'
+                            : isOngoing
+                              ? 'bg-amber-50 border-amber-200'
+                              : 'bg-emerald-50 border-emerald-200'
                         }`}>
                           <Text className={`text-[10px] font-extrabold ${
-                            isOngoing ? 'text-amber-700' : 'text-emerald-700'
+                            isUnserviceableCycle
+                              ? 'text-rose-700'
+                              : isOngoing
+                                ? 'text-amber-700'
+                                : 'text-emerald-700'
                           }`}>
-                            {isOngoing ? 'With Shop' : 'Completed'}
+                            {isUnserviceableCycle ? 'Unserviceable' : isOngoing ? 'With Shop' : 'Completed'}
                           </Text>
                         </View>
                       </View>
@@ -1869,7 +1956,7 @@ export default function BatteryDetailScreen() {
         );
       })()}
 
-      {/* ── Test Now / Exit Choice Modal (For a manager/supervisor who just
+      {/* ── Test Now / Exit Choice Modal (For a supervisor who just
            repaired a battery themselves and can also test it) ──────────── */}
       <Modal
         visible={showTestChoiceModal}
@@ -2345,7 +2432,7 @@ export default function BatteryDetailScreen() {
                   <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
                     <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tested &amp; Reported By</Text>
                     <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                      {cantServiceAlertData?.staffName || 'Supervisor / Tester'}
+                      {cantServiceAlertData?.staffName || 'Supervisor'}
                     </Text>
                   </View>
                   {cantServiceAlertData?.note && (
@@ -2396,6 +2483,25 @@ export default function BatteryDetailScreen() {
             <View className="gap-2">
               {cantServiceAlertData?.mode === 'already_reclaimed' ? (
                 <>
+                  <View className="flex-row items-center justify-between rounded-xl bg-slate-100 dark:bg-slate-800 px-3.5 py-2 mb-1 border border-slate-200 dark:border-slate-700">
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Scan Time</Text>
+                    <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </Text>
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={async () => {
+                      setShowCantServiceAlertModal(false);
+                      await handleStartWork();
+                    }}
+                    disabled={submitting}
+                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+                  >
+                    <Icon name="play" color="#ffffff" size={16} />
+                    <Text className="text-sm font-bold text-white">Start Work Now</Text>
+                  </TouchableOpacity>
+
                   <TouchableOpacity
                     onPress={() => {
                       setShowCantServiceAlertModal(false);
@@ -2405,26 +2511,34 @@ export default function BatteryDetailScreen() {
                         params: { autoScan: Date.now() },
                       });
                     }}
-                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-red-600 py-3.5 shadow-md active:bg-red-700"
+                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
                   >
-                    <Icon name="camera" color="#ffffff" size={16} />
-                    <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
+                    <Icon name="camera" color="#64748b" size={16} />
+                    <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     onPress={() => setShowCantServiceAlertModal(false)}
-                    className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-2.5 border border-slate-200 dark:border-slate-700"
+                    className="items-center rounded-2xl py-2"
                   >
-                    <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">View Battery Record</Text>
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">View Battery Record</Text>
                   </TouchableOpacity>
                 </>
               ) : (
                 <>
+                  <View className="flex-row items-center justify-between rounded-xl bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2 mb-1 border border-amber-200 dark:border-amber-800">
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Scan Time</Text>
+                    <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </Text>
+                  </View>
+
                   <TouchableOpacity
                     onPress={() => setShowCantServiceAlertModal(false)}
-                    className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
+                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
                   >
-                    <Text className="text-xs font-bold text-white">Proceed to Remove All Fitted Parts</Text>
+                    <Icon name="play" color="#ffffff" size={16} />
+                    <Text className="text-sm font-bold text-white">Start Work</Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity

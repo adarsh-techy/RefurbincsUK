@@ -11,6 +11,8 @@ const labelClasses = 'mb-1.5 block text-xs font-bold uppercase tracking-wider te
 
 function RecycleForm({ onCreated, onCancel }) {
   const [form, setForm] = useState({ vehicleNumber: '', driverName: '' });
+  const [pricePerKg, setPricePerKg] = useState('3.40');
+  const [totalWeightKg, setTotalWeightKg] = useState('');
   const [recycleClientId, setRecycleClientId] = useState('');
   const { data: clients } = useFetchList('/clients');
   const [submitting, setSubmitting] = useState(false);
@@ -133,6 +135,8 @@ function RecycleForm({ onCreated, onCancel }) {
         driverName: form.driverName,
         batteryIds: addedBatteries.map((b) => b.id),
         recycleClientId: recycleClientId || undefined,
+        totalWeightKg: totalWeightKg !== '' ? Number(totalWeightKg) : undefined,
+        pricePerKg: pricePerKg !== '' ? Number(pricePerKg) : 3.40,
       });
       onCreated();
     } catch (err) {
@@ -147,7 +151,7 @@ function RecycleForm({ onCreated, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
       {/* 1. Top Logistics Details Header Card */}
-      <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
+      <div className="shrink-0 mb-3 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           <div>
             <label className={labelClasses}>
@@ -202,6 +206,67 @@ function RecycleForm({ onCreated, onCancel }) {
                 </option>
               ))}
             </select>
+          </div>
+        </div>
+      </div>
+
+      {/* 2. Separate Weight & Pricing Card */}
+      <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-3">
+          <div>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <span className="text-emerald-600 font-black text-sm">£</span>
+                <span>Rate per kg (£/kg)</span>
+              </span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={pricePerKg}
+              onChange={(e) => setPricePerKg(e.target.value)}
+              placeholder="3.40"
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <span className="text-slate-500 font-black text-sm">⚖</span>
+                <span>Total Weight (kg)</span>
+              </span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              value={totalWeightKg}
+              onChange={(e) => setTotalWeightKg(e.target.value)}
+              placeholder="e.g. 120.50"
+              className={inputClasses}
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <span className="text-emerald-600 font-black text-sm">£</span>
+                <span>Calculated Total Payout</span>
+              </span>
+            </label>
+            <div className={`${inputClasses} flex items-center justify-between bg-emerald-50/60 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/40`}>
+              <span className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                {pricePerKg || '3.40'} × {totalWeightKg || '0'} kg
+              </span>
+              <span className="font-bold text-emerald-700 dark:text-emerald-300 text-base tabular-nums">
+                £{(
+                  (parseFloat(pricePerKg) || 3.40) *
+                  (parseFloat(totalWeightKg) || 0)
+                ).toFixed(2)}
+              </span>
+            </div>
           </div>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,6 +24,8 @@ export default function ClientSortingScreen() {
   const user = useSelector((state) => state.auth.user);
   const [groups, setGroups] = useState([]);
   const [loaded, setLoaded] = useState(false);
+  const [loadError, setLoadError] = useState(null);
+  const lastSavedRef = useRef(null);
   const [registeredBatteries, setRegisteredBatteries] = useState([]);
 
   const [nameModalOpen, setNameModalOpen] = useState(false);
@@ -38,16 +40,37 @@ export default function ClientSortingScreen() {
   const [addError, setAddError] = useState(null);
 
   useEffect(() => {
-    AsyncStorage.getItem(storageKey(user?.id))
-      .then((raw) => setGroups(raw ? JSON.parse(raw) : []))
-      .catch(() => setGroups([]))
-      .finally(() => setLoaded(true));
+    AsyncStorage.removeItem(storageKey(user?.id)).catch(() => {});
+    setLoadError(null);
+    apiClient
+      .get('/clients/me/sort-groups')
+      .then(({ data }) => {
+        const serverGroups = data?.data || [];
+        lastSavedRef.current = JSON.stringify(serverGroups);
+        setGroups(serverGroups);
+        // Only enable the save effect after a successful load — saving [] on
+        // top of a failed load would delete every group stored server-side.
+        setLoaded(true);
+      })
+      .catch(() => {
+        setLoadError('Could not load your sort groups. Pull to refresh before making changes.');
+      });
   }, [user?.id]);
 
+  // Auto-save on change. Skips when the groups are identical to what the
+  // server last gave us (i.e. right after load), since the PUT is a
+  // delete-and-reinsert of every row.
   useEffect(() => {
-    if (!loaded) return;
-    AsyncStorage.setItem(storageKey(user?.id), JSON.stringify(groups)).catch(() => {});
-  }, [groups, loaded, user?.id]);
+    if (!loaded || loadError) return;
+    const serialized = JSON.stringify(groups);
+    if (serialized === lastSavedRef.current) return;
+    apiClient
+      .put('/clients/me/sort-groups', { groups })
+      .then(() => {
+        lastSavedRef.current = serialized;
+      })
+      .catch(() => {});
+  }, [groups, loaded, loadError]);
 
   useEffect(() => {
     apiClient
@@ -276,7 +299,11 @@ export default function ClientSortingScreen() {
         </TouchableOpacity>
       </View>
 
-      {!loaded ? (
+      {loadError ? (
+        <View className="flex-1 items-center justify-center px-6">
+          <Text className="text-center text-sm font-semibold text-rose-600 dark:text-rose-400">{loadError}</Text>
+        </View>
+      ) : !loaded ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#38bdf8" />
         </View>

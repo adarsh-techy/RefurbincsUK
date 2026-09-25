@@ -36,9 +36,11 @@ async function login(req, res, next) {
     }
 
     let staffRole = undefined;
-    if (user.role === 'technician') {
-      const staff = await staffModel.findByUserId(user.id);
-      staffRole = staff?.role || 'technician';
+    const staff = await staffModel.findByUserId(user.id);
+    if (staff?.role) {
+      staffRole = staff.role;
+    } else if (user.role === 'technician') {
+      staffRole = 'technician';
     }
     const clientLogoPath = await attachClientLogo(user);
 
@@ -95,9 +97,11 @@ async function register(req, res, next) {
 
 async function me(req, res) {
   let staffRole = undefined;
-  if (req.user.role === 'technician') {
-    const staff = await staffModel.findByUserId(req.user.id);
-    staffRole = staff?.role || 'technician';
+  const staff = await staffModel.findByUserId(req.user.id);
+  if (staff?.role) {
+    staffRole = staff.role;
+  } else if (req.user.role === 'technician') {
+    staffRole = 'technician';
   }
   const clientLogoPath = await attachClientLogo(req.user);
   res.json({ user: { ...req.user, staff_role: staffRole, client_logo_path: clientLogoPath } });

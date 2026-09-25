@@ -71,7 +71,7 @@ function FinancePage() {
       .reverse()
       .map((item) => ({
         label: item.label,
-        count: item.repairRevenue,
+        count: item.totalRevenue ?? item.repairRevenue,
       }));
   }, [breakdown]);
 
@@ -104,7 +104,7 @@ function FinancePage() {
       {/* Header */}
       <PageHeader
         title="Finance & Billing"
-        description="Comprehensive repair revenue, parts vs labor margins, staff payroll, and profit analysis."
+        description="Comprehensive repair revenue, recycling revenue, and total financial performance."
         titleClassName="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400"
       />
 
@@ -209,36 +209,30 @@ function FinancePage() {
       {!loading && !error && (
         <>
           {/* KPI Stat Cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard
-              label="Repair Revenue"
-              value={formatMoney(totals.repairRevenue)}
+              label="Total Revenue"
+              value={formatMoney(totals.totalRevenue)}
               tone="good"
+              sub={`All repairs, services & recycling`}
+            />
+            <StatCard
+              label="Repair Cost"
+              value={formatMoney(totals.repairRevenue)}
+              tone="neutral"
               sub={`Parts: ${formatMoney(totals.partsRevenue)} · Labor: ${formatMoney(totals.laborRevenue)}`}
             />
             <StatCard
-              label="Labor Revenue"
-              value={formatMoney(totals.laborRevenue)}
+              label="Service & Intake Fees"
+              value={formatMoney(totals.servicesRevenue)}
               tone="info"
-              sub="Direct service earnings"
+              sub={`${totals.servicesCount || 0} service / intake fee items`}
             />
             <StatCard
-              label="Parts Revenue"
-              value={formatMoney(totals.partsRevenue)}
-              tone="neutral"
-              sub="Inventory components billed"
-            />
-            <StatCard
-              label="Staff Salary (Monthly)"
-              value={formatMoney(totals.staffSalaryTotal)}
+              label="Recycle Revenue"
+              value={formatMoney(totals.recycleRevenue)}
               tone="warning"
-              sub="Active technician payroll"
-            />
-            <StatCard
-              label="Net Profit"
-              value={formatMoney(totals.netProfit)}
-              tone={totals.netProfit >= 0 ? 'good' : 'critical'}
-              sub={totals.netProfit >= 0 ? 'Profitable operation' : 'Below payroll cost'}
+              sub="Scrap and battery recycling revenue"
             />
           </div>
 
@@ -255,7 +249,7 @@ function FinancePage() {
                   </h3>
                 </div>
                 <span className="text-xs font-bold text-slate-400 dark:text-neutral-500">
-                  {breakdown.length} period{breakdown.length === 1 ? '' : 's'} tracked
+                  {breakdown.length} period{breakdown.length === 1 ? '' : 's'} tracked · {totals.batteriesCount || 0} total batteries
                 </span>
               </div>
               <div className="pt-2">
@@ -272,7 +266,7 @@ function FinancePage() {
                   {breakdownType === 'month' ? 'Monthly Financial Breakdown' : 'Daily Financial Breakdown'}
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-neutral-400">
-                  Click on any {breakdownType === 'month' ? 'month' : 'day'} row to view its itemized statements, client distribution, and technician logs.
+                  Click on any {breakdownType === 'month' ? 'month' : 'day'} row to view its itemized statements, client distribution, battery fees, and technician logs.
                 </p>
               </div>
 
@@ -309,9 +303,10 @@ function FinancePage() {
                         {breakdownType === 'month' ? 'Month' : 'Date'}
                       </th>
                       <th className="py-3 px-3.5 min-w-[130px]">Total Revenue</th>
-                      <th className="py-3 px-3.5 min-w-[120px]">Labor Billed</th>
-                      <th className="py-3 px-3.5 min-w-[120px]">Parts Billed</th>
-                      <th className="py-3 px-3.5 min-w-[120px]">Repairs Logged</th>
+                      <th className="py-3 px-3.5 min-w-[120px]">Repair Cost</th>
+                      <th className="py-3 px-3.5 min-w-[130px]">Service & Fees</th>
+                      <th className="py-3 px-3.5 min-w-[120px]">Recycle Revenue</th>
+                      <th className="py-3 px-3.5 min-w-[120px]">Jobs Logged</th>
                       <th className="py-3 px-3.5 min-w-[130px]">Batteries Serviced</th>
                       <th className="py-3 px-3.5 min-w-[120px] text-right">Action</th>
                     </tr>
@@ -319,7 +314,7 @@ function FinancePage() {
                   <tbody className="divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-surface-850">
                     {filteredBreakdown.length === 0 ? (
                       <tr>
-                        <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-neutral-500">
+                        <td colSpan={9} className="py-12 text-center text-slate-400 dark:text-neutral-500">
                           <div className="flex flex-col items-center justify-center gap-2">
                             <FiCalendar className="w-8 h-8 text-slate-300 dark:text-neutral-600" />
                             <p className="font-semibold">
@@ -357,19 +352,22 @@ function FinancePage() {
                             </Link>
                           </td>
                           <td className="py-3 px-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                            {formatMoney(row.totalRevenue)}
+                          </td>
+                          <td className="py-3 px-3.5 font-mono text-slate-700 dark:text-neutral-300">
                             {formatMoney(row.repairRevenue)}
                           </td>
-                          <td className="py-3 px-3.5 font-mono text-slate-700 dark:text-neutral-300">
-                            {formatMoney(row.laborRevenue)}
+                          <td className="py-3 px-3.5 font-mono text-purple-600 dark:text-purple-400">
+                            {formatMoney(row.servicesRevenue || 0)}
                           </td>
-                          <td className="py-3 px-3.5 font-mono text-slate-700 dark:text-neutral-300">
-                            {formatMoney(row.partsRevenue)}
+                          <td className="py-3 px-3.5 font-mono text-blue-600 dark:text-blue-400">
+                            {formatMoney(row.recycleRevenue || 0)}
                           </td>
                           <td className="py-3 px-3.5 font-semibold text-slate-800 dark:text-neutral-200">
-                            {row.repairsCount} job{row.repairsCount === 1 ? '' : 's'}
+                            {(row.repairsCount || 0) + (row.servicesCount || 0)} job{((row.repairsCount || 0) + (row.servicesCount || 0)) === 1 ? '' : 's'}
                           </td>
                           <td className="py-3 px-3.5 text-slate-600 dark:text-neutral-400">
-                            {row.batteriesCount} unit{row.batteriesCount === 1 ? '' : 's'}
+                            {row.batteriesCount || 0} unit{row.batteriesCount === 1 ? '' : 's'}
                           </td>
                           <td className="py-3 px-3.5 text-right">
                             <Link

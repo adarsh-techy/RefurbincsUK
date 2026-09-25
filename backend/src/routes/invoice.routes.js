@@ -37,11 +37,11 @@ router.use(requireAuth);
 // File download / view (accessible by admin and authorized clients)
 router.get('/:id/download', invoiceController.downloadFile);
 
-// Admin-managed routes (super_admin, admin)
-router.get('/', requireRole('super_admin', 'admin'), invoiceController.list);
-router.get('/:id', requireRole('super_admin', 'admin'), invoiceController.getById);
-router.post('/', requireRole('super_admin', 'admin'), upload.single('pdfFile'), invoiceController.create);
-router.patch('/:id', requireRole('super_admin', 'admin'), upload.single('pdfFile'), invoiceController.update);
+// Admin-managed routes (super_admin only)
+router.get('/', requireRole('super_admin'), invoiceController.list);
+router.get('/:id', requireRole('super_admin'), invoiceController.getById);
+router.post('/', requireRole('super_admin'), upload.single('pdfFile'), invoiceController.create);
+router.patch('/:id', requireRole('super_admin'), upload.single('pdfFile'), invoiceController.update);
 router.delete('/:id', requireRole('super_admin'), invoiceController.remove);
 
 module.exports = router;

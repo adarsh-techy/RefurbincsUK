@@ -115,11 +115,6 @@ function StaffPage() {
       },
     },
     {
-      key: 'salary',
-      label: 'Monthly Salary',
-      render: (row) => `£${Number(row.salary).toFixed(2)}`,
-    },
-    {
       key: 'active',
       label: 'Status',
       render: (row) => <Badge tone={row.active ? 'good' : 'neutral'}>{row.active ? 'Active' : 'Inactive'}</Badge>,
@@ -154,7 +149,7 @@ function StaffPage() {
           description={
             formTarget === 'new'
               ? 'Enroll a new technician or workshop employee with role permissions and compliance docs.'
-              : 'Update this staff member’s profile, compliance credentials, and salary details.'
+              : 'Update this staff member’s profile and compliance credentials.'
           }
           onClose={() => setFormTarget(null)}
         >

@@ -87,14 +87,14 @@ export default function ProfileScreen() {
             <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">Testing Access</Text>
             <Text
               className={`text-xs font-bold ${
-                user?.staff_role === 'supervisor' || user?.staff_role === 'manager'
+                user?.staff_role === 'supervisor'
                   ? 'text-emerald-600 dark:text-emerald-400'
                   : 'text-amber-600 dark:text-amber-400'
               }`}
             >
-              {user?.staff_role === 'supervisor' || user?.staff_role === 'manager'
+              {user?.staff_role === 'supervisor'
                 ? 'Authorized'
-                : 'Supervisors & Managers only'}
+                : 'Supervisors only'}
             </Text>
           </View>
         )}

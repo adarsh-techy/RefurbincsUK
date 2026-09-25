@@ -33,35 +33,79 @@ const STATUS_FILTERS = [
   { value: 'recycled', label: 'Recycled' },
 ];
 
-const VALID_STATUS_FILTERS = new Set(STATUS_FILTERS.map((f) => f.value).filter(Boolean));
+/** Parse URL status param (comma-separated) into a Set of valid values */
+function parseStatusParam(raw) {
+  if (!raw) return new Set();
+  return new Set(
+    raw
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => STATUS_FILTERS.some((f) => f.value === s && f.value !== ''))
+  );
+}
 
 function BatteriesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const initialStatus = searchParams.get('status') || '';
   const initialClient = searchParams.get('clientName') || searchParams.get('client') || '';
 
-  const [status, setStatus] = useState(initialStatus);
+  // Multi-select status stored as a Set
+  const [selectedStatuses, setSelectedStatuses] = useState(() =>
+    parseStatusParam(searchParams.get('status') || '')
+  );
   const [clientName, setClientName] = useState(initialClient);
   const [date, setDate] = useState('');
   const [clients, setClients] = useState([]);
 
   // Sync state if URL query params change (e.g. browser back/forward or external links)
   useEffect(() => {
-    const s = searchParams.get('status') || '';
-    setStatus(s);
+    setSelectedStatuses(parseStatusParam(searchParams.get('status') || ''));
     const c = searchParams.get('clientName') || searchParams.get('client') || '';
     setClientName(c);
   }, [searchParams]);
 
-  const handleStatusChange = (newStatus) => {
-    setStatus(newStatus);
-    const params = new URLSearchParams(searchParams);
-    if (newStatus) {
-      params.set('status', newStatus);
-    } else {
+  /** Toggle one status value in/out of the selection */
+  const handleStatusToggle = (value) => {
+    if (value === '') {
+      // "All" pill -> clear everything
+      setSelectedStatuses(new Set());
+      const params = new URLSearchParams(searchParams);
       params.delete('status');
+      setSearchParams(params, { replace: true });
+      return;
     }
-    setSearchParams(params, { replace: true });
+
+    setSelectedStatuses((prev) => {
+      const next = new Set(prev);
+      if (next.has(value)) {
+        next.delete(value);
+      } else {
+        next.add(value);
+      }
+      const params = new URLSearchParams(searchParams);
+      if (next.size > 0) {
+        params.set('status', [...next].join(','));
+      } else {
+        params.delete('status');
+      }
+      setSearchParams(params, { replace: true });
+      return next;
+    });
+  };
+
+  /** Remove a single status from the active selection (badge x button) */
+  const handleRemoveStatus = (value) => {
+    setSelectedStatuses((prev) => {
+      const next = new Set(prev);
+      next.delete(value);
+      const params = new URLSearchParams(searchParams);
+      if (next.size > 0) {
+        params.set('status', [...next].join(','));
+      } else {
+        params.delete('status');
+      }
+      setSearchParams(params, { replace: true });
+      return next;
+    });
   };
 
   const handleClientChange = (newClient) => {
@@ -76,7 +120,7 @@ function BatteriesPage() {
   };
 
   const handleResetFilters = () => {
-    setStatus('');
+    setSelectedStatuses(new Set());
     setClientName('');
     setDate('');
     setSearchParams({}, { replace: true });
@@ -91,8 +135,11 @@ function BatteriesPage() {
       .catch(() => {});
   }, []);
 
+  // Comma-separated status string for the API (empty -> no filter)
+  const statusParam = selectedStatuses.size > 0 ? [...selectedStatuses].join(',') : undefined;
+
   const { items, loading, hasMore, total, error, loadMore, refetch } = useInfiniteList('/batteries', PAGE_SIZE, {
-    status: status || undefined,
+    status: statusParam,
     clientName: clientName || undefined,
     date: date || undefined,
   });
@@ -122,14 +169,20 @@ function BatteriesPage() {
         row.client_name ? (
           <span className="font-semibold text-slate-800 dark:text-neutral-200">{row.client_name}</span>
         ) : (
-          <span className="text-slate-400">—</span>
+          <span className="text-slate-400">-</span>
         ),
     },
     {
       key: 'status',
       label: 'Status',
       sortValue: (row) => row.status || 'registered',
-      render: (row) => <StatusBadge status={row.status} />,
+      render: (row) => (
+        <StatusBadge
+          status={row.status}
+          isPassedBack={row.is_passed_back}
+          hasPendingParts={Number(row.pending_parts_count || 0) > 0}
+        />
+      ),
     },
     {
       key: 'created_at',
@@ -147,28 +200,30 @@ function BatteriesPage() {
             <p>{new Date(row.last_repaired_at).toLocaleString()}</p>
             {row.repairs_this_month > 1 && (
               <p className="mt-0.5 whitespace-normal text-xs font-medium text-warning-600">
-                ⟳ Repaired {row.repairs_this_month}x this month (
+                Repaired {row.repairs_this_month}x this month (
                 {row.repairs_this_month_dates.map(formatShortDate).join(', ')})
               </p>
             )}
           </div>
         ) : (
-          '—'
+          '-'
         ),
     },
     {
       key: 'last_repaired_parts',
       label: 'Part(s) Changed',
       sortValue: (row) => row.last_repaired_parts || '',
-      render: (row) => row.last_repaired_parts || '—',
+      render: (row) => row.last_repaired_parts || '-',
     },
     {
       key: 'last_repaired_by',
       label: 'Repaired By',
       sortValue: (row) => row.last_repaired_by || '',
-      render: (row) => row.last_repaired_by || '—',
+      render: (row) => row.last_repaired_by || '-',
     },
   ];
+
+  const hasFilters = selectedStatuses.size > 0 || clientName || date;
 
   return (
     <div>
@@ -181,33 +236,37 @@ function BatteriesPage() {
           <div className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50/90 px-4 py-2 text-sm font-semibold text-emerald-800 shadow-2xs dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300">
             <span className="h-2.5 w-2.5 rounded-full bg-emerald-500 animate-pulse" />
             <span>
-              {status || clientName || date ? 'Matching Batteries: ' : 'Total Batteries: '}
+              {hasFilters ? 'Matching Batteries: ' : 'Total Batteries: '}
               <strong className="ml-1 text-base font-bold text-emerald-950 dark:text-emerald-100">
                 {(total || 0).toLocaleString()}
               </strong>
             </span>
           </div>
 
-          {status && (
-            <div className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-2xs dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300">
-              <span>Status: {STATUS_FILTERS.find((f) => f.value === status)?.label || status}</span>
+          {/* Active status badges - one per selected status */}
+          {[...selectedStatuses].map((s) => (
+            <div
+              key={s}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-semibold text-blue-800 shadow-2xs dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300"
+            >
+              <span>{STATUS_FILTERS.find((f) => f.value === s)?.label || s}</span>
               <button
                 type="button"
-                onClick={() => handleStatusChange('')}
+                onClick={() => handleRemoveStatus(s)}
                 className="ml-1 rounded-full text-blue-500 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-200"
-                title="Clear status filter"
+                title={`Remove filter`}
               >
-                ✕
+                x
               </button>
             </div>
-          )}
+          ))}
         </div>
       </PageHeader>
 
       <div className="mb-8 flex flex-wrap items-end gap-3 rounded-2xl border border-blue-200/80 bg-white/60 p-4 shadow-2xs dark:border-blue-900/40 dark:bg-surface-900/60">
         <BatteryLookup />
 
-        {/* ── Client Filter Dropdown ──────────────────────────────────── */}
+        {/* Client Filter Dropdown */}
         <div className="flex flex-col gap-1">
           <label htmlFor="battery-client-filter" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
             Client
@@ -232,30 +291,39 @@ function BatteriesPage() {
           </div>
         </div>
 
-        {/* ── Status Pill Filter ──────────────────────────────────────── */}
+        {/* Status Pill Filter (multi-select) */}
         <div className="flex flex-col gap-1">
           <span className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
             Status Filter
+            {selectedStatuses.size > 0 && (
+              <span className="ml-2 inline-flex items-center justify-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white">
+                {selectedStatuses.size}
+              </span>
+            )}
           </span>
           <div className="flex flex-wrap rounded-xl border border-slate-300 p-0.5 dark:border-surface-600">
-            {STATUS_FILTERS.map((f) => (
-              <button
-                key={f.value}
-                type="button"
-                onClick={() => handleStatusChange(f.value)}
-                className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  status === f.value
-                    ? 'bg-emerald-700 text-white dark:bg-emerald-600 shadow-2xs'
-                    : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800'
-                }`}
-              >
-                {f.label}
-              </button>
-            ))}
+            {STATUS_FILTERS.map((f) => {
+              const isAll = f.value === '';
+              const isActive = isAll ? selectedStatuses.size === 0 : selectedStatuses.has(f.value);
+              return (
+                <button
+                  key={f.value}
+                  type="button"
+                  onClick={() => handleStatusToggle(f.value)}
+                  className={`rounded-lg px-2.5 py-1 text-xs font-semibold transition-colors ${
+                    isActive
+                      ? 'bg-emerald-700 text-white dark:bg-emerald-600 shadow-2xs'
+                      : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* ── Created on Date Filter ─────────────────────────────────── */}
+        {/* Created on Date Filter */}
         <div className="flex flex-col gap-1">
           <label htmlFor="battery-date-filter" className="text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
             Created on
@@ -281,7 +349,7 @@ function BatteriesPage() {
         </div>
 
         {/* Clear All Filters Button */}
-        {(status || clientName || date) && (
+        {hasFilters && (
           <button
             type="button"
             onClick={handleResetFilters}
@@ -299,12 +367,12 @@ function BatteriesPage() {
           Showing <span className="font-bold text-slate-800 dark:text-neutral-200">{items.length}</span> of{' '}
           <span className="font-bold text-slate-800 dark:text-neutral-200">{(total || 0).toLocaleString()}</span>{' '}
           {total === 1 ? 'battery' : 'batteries'}
-          {(status || clientName || date) ? ' (filtered)' : ''}
+          {hasFilters ? ' (filtered)' : ''}
         </div>
       </div>
 
       {items.length === 0 && loading ? (
-        <TableState>Loading…</TableState>
+        <TableState>Loading...</TableState>
       ) : (
         <>
           <DataTable

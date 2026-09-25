@@ -18,8 +18,8 @@ import ServiceForm from './ServiceForm';
 function ServicesPage() {
   const { data, loading, error, refetch } = useFetchList('/services');
   const user = useSelector((state) => state.auth.user);
-  const canManage = hasPermission(user, 'services');
   const isSuperAdmin = user?.role === 'super_admin';
+  const canManage = hasPermission(user, 'services') && isSuperAdmin;
 
   // formTarget: null = closed, { mode: 'new', isMandatory: boolean } or { mode: 'edit', service: object }
   const [formTarget, setFormTarget] = useState(null);
@@ -61,15 +61,19 @@ function ServicesPage() {
         </div>
       ),
     },
-    {
-      key: 'rate',
-      label: 'Standard Rate',
-      render: (row) => (
-        <span className="font-bold text-emerald-600 dark:text-emerald-400">
-          £{Number(row.rate || 0).toFixed(2)}
-        </span>
-      ),
-    },
+    ...(isSuperAdmin
+      ? [
+          {
+            key: 'rate',
+            label: 'Standard Rate',
+            render: (row) => (
+              <span className="font-bold text-emerald-600 dark:text-emerald-400">
+                £{Number(row.rate || 0).toFixed(2)}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       key: 'active',
       label: 'Status',
@@ -113,15 +117,19 @@ function ServicesPage() {
         </div>
       ),
     },
-    {
-      key: 'rate',
-      label: 'Intake Fee Rate',
-      render: (row) => (
-        <span className="font-bold text-amber-600 dark:text-amber-400">
-          £{Number(row.rate || 0).toFixed(2)}
-        </span>
-      ),
-    },
+    ...(isSuperAdmin
+      ? [
+          {
+            key: 'rate',
+            label: 'Intake Fee Rate',
+            render: (row) => (
+              <span className="font-bold text-amber-600 dark:text-amber-400">
+                £{Number(row.rate || 0).toFixed(2)}
+              </span>
+            ),
+          },
+        ]
+      : []),
     {
       key: 'active',
       label: 'Status',

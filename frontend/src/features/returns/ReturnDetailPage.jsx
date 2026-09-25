@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { FiFileText, FiDownload } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import PageHeader from '../../components/ui/primitives/PageHeader';
 import TableState from '../../components/ui/table/TableState';
 import { StatusBadge } from '../../components/ui/primitives/Badge';
 import StatCard from '../../components/ui/primitives/StatCard';
 import DataTable from '../../components/ui/table/DataTable';
+import { resolveImageUrl } from '../../utils/image-url';
 
 // Return detail page: which batteries shipped out on this return, and the
 // service each one had just before shipping — reached by clicking the
@@ -87,6 +89,21 @@ function ReturnDetailPage() {
                 {new Date(returnRecord.returned_at).toLocaleTimeString()}
               </span>
             </span>
+            {returnRecord.document_url && (
+              <span>
+                Document:{' '}
+                <a
+                  href={resolveImageUrl(returnRecord.document_url)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-emerald-600 hover:text-emerald-700 hover:underline dark:text-emerald-400 inline-flex items-center gap-1.5"
+                >
+                  <FiFileText className="w-3.5 h-3.5" />
+                  <span>{returnRecord.document_name || 'View Return Document'}</span>
+                  <FiDownload className="w-3 h-3 opacity-70" />
+                </a>
+              </span>
+            )}
           </span>
         }
       />

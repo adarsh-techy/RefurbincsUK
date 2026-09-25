@@ -79,11 +79,15 @@ function RepairsPage() {
       label: 'Status',
       render: (row) => <StatusBadge status={row.battery_status} />,
     },
-    {
-      key: 'price',
-      label: 'Price',
-      render: (row) => `£${Number(row.price).toFixed(2)}`,
-    },
+    ...(isSuperAdmin
+      ? [
+          {
+            key: 'price',
+            label: 'Price',
+            render: (row) => `£${Number(row.price).toFixed(2)}`,
+          },
+        ]
+      : []),
     {
       key: 'repaired_at',
       label: 'Date/Time',

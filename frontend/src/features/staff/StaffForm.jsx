@@ -4,7 +4,6 @@ import {
   FiMail,
   FiPhone,
   FiShield,
-  FiDollarSign,
   FiUploadCloud,
   FiFileText,
   FiCheckCircle,
@@ -31,7 +30,6 @@ function StaffForm({ staff, onSaved, onCancel }) {
     email: staff?.email || staff?.login_email || '',
     role: staff?.role || 'technician',
     active: staff?.active ?? true,
-    salary: staff ? String(staff.salary) : '0',
     passportNumber: staff?.passport_number || '',
     niNumber: staff?.ni_number || '',
     shareCode: staff?.share_code || '',
@@ -68,7 +66,6 @@ function StaffForm({ staff, onSaved, onCancel }) {
       if (form.phone) formData.append('phone', form.phone.trim());
       if (form.email) formData.append('email', form.email.trim().toLowerCase());
       formData.append('role', form.role || 'technician');
-      formData.append('salary', Number(form.salary) || 0);
 
       if (form.passportNumber) formData.append('passportNumber', form.passportNumber.trim());
       if (form.niNumber) formData.append('niNumber', form.niNumber.trim().toUpperCase());
@@ -162,7 +159,6 @@ function StaffForm({ staff, onSaved, onCancel }) {
             >
               <option value="technician">Technician — Workshop Repairs only</option>
               <option value="supervisor">Supervisor — Repairs & Testing Signoff</option>
-              <option value="manager">Manager — Full Workshop Signoff & Operations</option>
             </select>
           </div>
 
@@ -194,28 +190,6 @@ function StaffForm({ staff, onSaved, onCancel }) {
               placeholder="e.g. +44 7700 900123"
               className={inputClasses}
             />
-          </div>
-
-          {/* Salary */}
-          <div className="sm:col-span-2">
-            <label className={labelClasses}>
-              <FiDollarSign className="h-3.5 w-3.5 text-slate-400" />
-              <span>Monthly Salary (£)</span>
-            </label>
-            <div className="relative">
-              <span className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 font-bold text-slate-400 dark:text-neutral-500">
-                £
-              </span>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                value={form.salary}
-                onChange={(e) => updateField('salary', e.target.value)}
-                placeholder="0.00"
-                className={`${inputClasses} pl-8`}
-              />
-            </div>
           </div>
         </div>
       </div>

@@ -109,7 +109,7 @@ function ClientsPage() {
           description={
             formTarget === 'new' ? 'Add a new client.' : 'Update this client’s details.'
           }
-          size="3xl"
+          size="5xl"
           className="min-h-[580px] md:min-h-[640px]"
           onClose={() => setFormTarget(null)}
         >

@@ -375,21 +375,6 @@ function StaffDetailPage() {
               </div>
             </div>
           </div>
-
-          {/* Salary & Quick Stats Badge */}
-          <div className="flex items-center gap-3 self-start md:self-auto rounded-xl border border-slate-100 bg-slate-50/80 p-3.5 dark:border-white/5 dark:bg-surface-900/60">
-            <div className="p-2.5 rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400">
-              <FiDollarSign className="w-5 h-5" />
-            </div>
-            <div>
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400 block">
-                Monthly Salary
-              </span>
-              <span className="text-lg font-black text-slate-900 dark:text-white">
-                £{Number(staff.salary || 0).toFixed(2)}
-              </span>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -512,7 +497,7 @@ function StaffDetailPage() {
       </div>
 
       {/* KPI Performance Stat Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+      <div className={`grid grid-cols-2 ${isSuperAdmin ? 'lg:grid-cols-5' : 'lg:grid-cols-3'} gap-3.5`}>
         <StatCard
           label="Total Completed"
           value={completedVisits.length}
@@ -531,18 +516,22 @@ function StaffDetailPage() {
           tone="warn"
           sub="Mid-cycle / in testing"
         />
-        <StatCard
-          label="Avg Duration"
-          value={avgDurationFormatted}
-          tone="neutral"
-          sub="Start to completion"
-        />
-        <StatCard
-          label="Labor Value"
-          value={`£${totalLaborValue.toFixed(2)}`}
-          tone="good"
-          sub="Total repair value"
-        />
+        {isSuperAdmin && (
+          <StatCard
+            label="Avg Duration"
+            value={avgDurationFormatted}
+            tone="neutral"
+            sub="Start to completion"
+          />
+        )}
+        {isSuperAdmin && (
+          <StatCard
+            label="Labor Value"
+            value={`£${totalLaborValue.toFixed(2)}`}
+            tone="good"
+            sub="Total repair value"
+          />
+        )}
       </div>
 
       {/* 14-Day Activity Chart */}
@@ -757,15 +746,15 @@ function StaffDetailPage() {
                     <th className="py-3 px-3.5 min-w-[150px]">Battery Code</th>
                     <th className="py-3 px-3.5 min-w-[110px]">Status</th>
                     <th className="py-3 px-3.5 min-w-[180px]">Parts Changed</th>
-                    <th className="py-3 px-3.5 min-w-[120px]">Duration</th>
-                    <th className="py-3 px-3.5 min-w-[100px]">Labor / Price</th>
+                    {isSuperAdmin && <th className="py-3 px-3.5 min-w-[120px]">Duration</th>}
+                    {isSuperAdmin && <th className="py-3 px-3.5 min-w-[100px]">Labor / Price</th>}
                     <th className="py-3 px-3.5 min-w-[180px]">Notes</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-surface-850">
                   {filteredVisits.length === 0 ? (
                     <tr>
-                      <td colSpan={8} className="py-12 text-center text-slate-400 dark:text-neutral-500">
+                      <td colSpan={isSuperAdmin ? 8 : 6} className="py-12 text-center text-slate-400 dark:text-neutral-500">
                         <div className="flex flex-col items-center justify-center gap-2">
                           <FiTool className="w-8 h-8 text-slate-300 dark:text-neutral-600" />
                           <p className="font-semibold">
@@ -848,21 +837,25 @@ function StaffDetailPage() {
                           </td>
 
                           {/* Duration */}
-                          <td className="py-3 px-3.5">
-                            {r.duration_seconds != null ? (
-                              <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-neutral-300">
-                                <FiClock className="w-3.5 h-3.5 text-slate-400" />
-                                {formatDuration(r.duration_seconds)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400 dark:text-neutral-500">—</span>
-                            )}
-                          </td>
+                          {isSuperAdmin && (
+                            <td className="py-3 px-3.5">
+                              {r.duration_seconds != null ? (
+                                <span className="inline-flex items-center gap-1 font-semibold text-slate-700 dark:text-neutral-300">
+                                  <FiClock className="w-3.5 h-3.5 text-slate-400" />
+                                  {formatDuration(r.duration_seconds)}
+                                </span>
+                              ) : (
+                                <span className="text-slate-400 dark:text-neutral-500">—</span>
+                              )}
+                            </td>
+                          )}
 
                           {/* Labor / Price */}
-                          <td className="py-3 px-3.5 font-bold text-slate-900 dark:text-white">
-                            £{Number(r.labor_charge || r.price || 0).toFixed(2)}
-                          </td>
+                          {isSuperAdmin && (
+                            <td className="py-3 px-3.5 font-bold text-slate-900 dark:text-white">
+                              £{Number(r.labor_charge || r.price || 0).toFixed(2)}
+                            </td>
+                          )}
 
                           {/* Notes */}
                           <td className="py-3 px-3.5 max-w-[240px]">
@@ -988,7 +981,7 @@ function StaffDetailPage() {
         <Modal
           size="3xl"
           title={`Edit Staff Profile — ${staff.name}`}
-          description="Update employee credentials, salary, national insurance, and identity documentation."
+          description="Update employee credentials, national insurance, and identity documentation."
           onClose={() => setIsEditModalOpen(false)}
         >
           <StaffForm

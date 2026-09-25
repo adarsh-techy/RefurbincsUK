@@ -70,11 +70,15 @@ function PartsPage() {
     },
     { key: 'sku', label: 'SKU', render: (row) => row.sku || '—' },
     { key: 'quantity', label: 'Qty' },
-    {
-      key: 'service_charge',
-      label: 'Service Charge',
-      render: (row) => `£${Number(row.service_charge || 0).toFixed(2)}`,
-    },
+    ...(isSuperAdmin
+      ? [
+          {
+            key: 'service_charge',
+            label: 'Service Charge',
+            render: (row) => `£${Number(row.service_charge || 0).toFixed(2)}`,
+          },
+        ]
+      : []),
     {
       key: 'in_stock',
       label: 'Status',

@@ -2,11 +2,11 @@ const router = require('express').Router();
 const repairController = require('../controllers/repair.controller');
 const { requireAuth, requirePermission, requireRole } = require('../middlewares/auth');
 
-// Technicians log repairs from their own scan-and-repair flow (no
-// 'repairs' permission needed for that one action); everyone else needs
+// Technicians, staff and admins log repairs from their scan-and-repair flow (no
+// 'repairs' permission needed for that action); everyone else needs
 // the usual module permission.
 function requireRepairsAccess(req, res, next) {
-  if (req.user.role === 'technician') return next();
+  if (['technician', 'staff', 'admin', 'super_admin'].includes(req.user.role)) return next();
   return requirePermission('repairs')(req, res, next);
 }
 

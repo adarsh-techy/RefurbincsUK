@@ -14,6 +14,7 @@ const TruckIntakePage = lazy(() => import('../features/truck-intake/TruckIntakeP
 const TruckIntakeDetailPage = lazy(() => import('../features/truck-intake/TruckIntakeDetailPage'));
 const BatteriesPage = lazy(() => import('../features/batteries/pages/BatteriesPage'));
 const UnserviceableBatteriesPage = lazy(() => import('../features/batteries/pages/UnserviceableBatteriesPage'));
+const RecycledBatteriesPage = lazy(() => import('../features/batteries/pages/RecycledBatteriesPage'));
 const BatteryDetailPage = lazy(() => import('../features/batteries/pages/BatteryDetailPage'));
 const GenerateQrPage = lazy(() => import('../features/batteries/pages/GenerateQrPage'));
 const RepairsPage = lazy(() => import('../features/repairs/RepairsPage'));
@@ -37,6 +38,7 @@ const AdminMessagesPage = lazy(() => import('../features/support/AdminMessagesPa
 const AdminNotificationsPage = lazy(() => import('../features/notifications/AdminNotificationsPage'));
 const TechnicianDashboardPage = lazy(() => import('../features/batteries/technician/TechnicianDashboardPage'));
 const TechnicianHistoryPage = lazy(() => import('../features/batteries/technician/TechnicianHistoryPage'));
+const TechnicianProfilePage = lazy(() => import('../features/batteries/technician/TechnicianProfilePage'));
 const ReturnsPage = lazy(() => import('../features/returns/ReturnsPage'));
 const ReturnDetailPage = lazy(() => import('../features/returns/ReturnDetailPage'));
 const RecyclePage = lazy(() => import('../features/recycle/RecyclePage'));
@@ -62,6 +64,12 @@ function HistoryRouter() {
   const user = useSelector((state) => state.auth.user);
   if (user?.role === 'technician') return <TechnicianHistoryPage />;
   return <ClientHistoryPage />;
+}
+
+function ProfileRouter() {
+  const user = useSelector((state) => state.auth.user);
+  if (user?.role === 'technician') return <TechnicianProfilePage />;
+  return <ClientProfilePage />;
 }
 
 function AppRoutes() {
@@ -96,8 +104,8 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['super_admin', 'admin']} />}>
             <Route path="/batteries" element={<BatteriesPage />} />
             <Route path="/batteries/unserviceable" element={<UnserviceableBatteriesPage />} />
+            <Route path="/batteries/recycled" element={<RecycledBatteriesPage />} />
             <Route path="/batteries-qr-code" element={<GenerateQrPage />} />
-            <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/trash" element={<TrashPage />} />
             <Route path="/trash/:id" element={<TrashDetailPage />} />
           </Route>
@@ -153,7 +161,7 @@ function AppRoutes() {
             <Route path="/my/battery-sorting" element={<ClientBatterySortPage />} />
           </Route>
           <Route element={<ProtectedRoute roles={['client', 'technician', 'recycle_client']} />}>
-            <Route path="/my/profile" element={<ClientProfilePage />} />
+            <Route path="/my/profile" element={<ProfileRouter />} />
           </Route>
           <Route element={<ProtectedRoute roles={['recycle_client']} />}>
             <Route path="/my/recycle-shipments" element={<RecycleClientShipmentsPage />} />
@@ -179,6 +187,7 @@ function AppRoutes() {
           </Route>
 
           <Route element={<ProtectedRoute roles={['super_admin']} />}>
+            <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/finance" element={<FinancePage />} />
             <Route path="/finance/detail" element={<FinanceDetailPage />} />

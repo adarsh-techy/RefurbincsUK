@@ -1,5 +1,18 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { FiCheckCircle, FiPackage, FiTruck, FiUser, FiBriefcase, FiRepeat, FiAlertCircle } from 'react-icons/fi';
+import {
+  FiCheckCircle,
+  FiPackage,
+  FiTruck,
+  FiUser,
+  FiBriefcase,
+  FiRepeat,
+  FiAlertCircle,
+  FiCalendar,
+  FiClock,
+  FiUploadCloud,
+  FiFileText,
+  FiTrash2,
+} from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
 import QrScanner from '../../components/ui/primitives/QrScanner';
@@ -9,11 +22,23 @@ const inputClasses =
   'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs transition-colors';
 const labelClasses = 'mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300';
 
+function getNowLocalIso() {
+  const now = new Date();
+  const offset = now.getTimezoneOffset();
+  return new Date(now.getTime() - offset * 60000).toISOString().slice(0, 16);
+}
+
 function ReturnForm({ onCreated, onCancel }) {
   const { data: rawClients } = useFetchList('/clients');
   const clients = (rawClients || []).filter((c) => c.user_role !== 'recycle_client');
 
-  const [form, setForm] = useState({ truckNumber: '', driverName: '', clientId: '' });
+  const [form, setForm] = useState({
+    truckNumber: '',
+    driverName: '',
+    clientId: '',
+    returnedAt: getNowLocalIso(),
+  });
+  const [docFile, setDocFile] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -147,12 +172,17 @@ function ReturnForm({ onCreated, onCancel }) {
     setSubmitting(true);
     setError(null);
     try {
-      await apiClient.post('/returns', {
-        truckNumber: form.truckNumber,
-        driverName: form.driverName,
-        clientId: form.clientId,
-        batteryIds: addedBatteries.map((b) => b.id),
-      });
+      const formData = new FormData();
+      formData.append('truckNumber', form.truckNumber);
+      formData.append('driverName', form.driverName);
+      formData.append('clientId', form.clientId);
+      formData.append('returnedAt', form.returnedAt ? new Date(form.returnedAt).toISOString() : new Date().toISOString());
+      formData.append('batteryIds', JSON.stringify(addedBatteries.map((b) => b.id)));
+      if (docFile) {
+        formData.append('docFile', docFile);
+      }
+
+      await apiClient.post('/returns', formData);
       onCreated();
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -164,7 +194,7 @@ function ReturnForm({ onCreated, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0">
       {/* 1. Top Logistics Details Header Card */}
-      <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
+      <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs space-y-3.5">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
           <div className="relative">
             <label className={labelClasses}>
@@ -242,6 +272,81 @@ function ReturnForm({ onCreated, onCancel }) {
               className={inputClasses}
               required
             />
+          </div>
+        </div>
+
+        {/* Row 2: Automatic Current Date & Time + File Upload */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5 pt-3 border-t border-slate-200/60 dark:border-white/10">
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className={labelClasses.replace('mb-1.5 ', '')}>
+                <span className="flex items-center gap-1.5">
+                  <FiCalendar className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Return Date & Time</span>
+                </span>
+              </label>
+              <button
+                type="button"
+                onClick={() => updateField('returnedAt', getNowLocalIso())}
+                className="text-[10px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 flex items-center gap-1 cursor-pointer"
+                title="Refresh to current time"
+              >
+                <FiClock className="w-3 h-3" />
+                <span>Auto-Set: Current Time</span>
+              </button>
+            </div>
+            <input
+              type="datetime-local"
+              value={form.returnedAt}
+              onChange={(e) => updateField('returnedAt', e.target.value)}
+              className={inputClasses}
+              required
+            />
+          </div>
+
+          <div>
+            <label className={labelClasses}>
+              <span className="flex items-center gap-1.5">
+                <FiUploadCloud className="w-3.5 h-3.5 text-emerald-500" />
+                <span>Return Note / Document File (Optional)</span>
+              </span>
+            </label>
+            {!docFile ? (
+              <label className="group flex items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white px-3.5 py-2 text-center transition-all hover:border-emerald-500 hover:bg-emerald-50/20 dark:border-white/15 dark:bg-surface-900 dark:hover:border-emerald-400 cursor-pointer shadow-2xs">
+                <FiUploadCloud className="h-4 w-4 text-slate-400 group-hover:text-emerald-500 transition-colors" />
+                <span className="text-xs font-semibold text-slate-700 dark:text-neutral-300 group-hover:text-emerald-700 dark:group-hover:text-emerald-300">
+                  Upload Delivery Note / Photo
+                </span>
+                <span className="text-[10px] text-slate-400 dark:text-neutral-500">
+                  (PDF, PNG, JPG, WebP)
+                </span>
+                <input
+                  type="file"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp"
+                  onChange={(e) => setDocFile(e.target.files?.[0] || null)}
+                  className="hidden"
+                />
+              </label>
+            ) : (
+              <div className="flex items-center justify-between rounded-xl bg-emerald-50/80 px-3 py-1.5 text-xs font-semibold text-emerald-900 border border-emerald-200/80 dark:bg-emerald-950/40 dark:border-emerald-800/40 dark:text-emerald-300 shadow-2xs">
+                <span className="flex items-center gap-2 truncate">
+                  <FiFileText className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400" />
+                  <span className="truncate">{docFile.name}</span>
+                  <span className="text-[10px] text-emerald-700/80 dark:text-emerald-400/80">
+                    ({(docFile.size / 1024 / 1024).toFixed(2)} MB)
+                  </span>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setDocFile(null)}
+                  className="flex items-center gap-1 text-xs font-bold text-red-600 hover:text-red-700 dark:text-red-400 cursor-pointer ml-2 shrink-0"
+                  title="Remove file"
+                >
+                  <FiTrash2 className="h-3.5 w-3.5" />
+                  <span>Remove</span>
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

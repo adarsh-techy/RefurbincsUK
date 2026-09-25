@@ -89,8 +89,7 @@ function InvoicesPage() {
     ])
       .then(([invRes, clientRes]) => {
         setInvoices(invRes.data || []);
-        const fleetClients = (clientRes.data || []).filter((c) => c.user_role !== 'recycle_client');
-        setClients(fleetClients);
+        setClients(clientRes.data || []);
       })
       .catch((err) => {
         setError(err.response?.data?.message || err.message);
@@ -633,10 +632,10 @@ function InvoicesPage() {
                 required
                 className="w-full rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs font-bold text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white shadow-2xs"
               >
-                <option value="">-- Choose a Fleet Client Account --</option>
+                <option value="">-- Choose a Client Account --</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
-                    {c.name} {c.invoice_email ? `• Billing: ${c.invoice_email}` : (c.email || c.login_email) ? `• Login: ${c.email || c.login_email}` : ''}
+                    {c.name} {c.user_role === 'recycle_client' ? '(Recycling Partner)' : ''} {c.invoice_email ? `• Billing: ${c.invoice_email}` : (c.email || c.login_email) ? `• Login: ${c.email || c.login_email}` : ''}
                   </option>
                 ))}
               </select>

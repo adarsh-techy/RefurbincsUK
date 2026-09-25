@@ -124,7 +124,7 @@ function DashboardLayout() {
         <div className="dark">
           <PortalHeader />
         </div>
-        <main className="flex-1 p-3 pb-[max(1rem,env(safe-area-inset-bottom))] sm:p-6">
+        <main className="flex-1 p-3 pb-20 sm:p-6 md:pb-8">
           <Suspense fallback={<PageFallback />}>
             <Outlet />
           </Suspense>

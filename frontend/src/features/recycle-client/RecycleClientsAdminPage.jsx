@@ -164,6 +164,7 @@ function RecycleClientsAdminPage() {
       {formTarget && (
         <Modal
           title={formTarget === 'new' ? 'Add Recycle Client' : `Edit ${formTarget.name}`}
+          size="3xl"
           onClose={() => setFormTarget(null)}
         >
           <RecycleClientForm

@@ -55,6 +55,7 @@ function buildMonthlyBreakdown(usageHistory, stockHistory) {
 function PartDetailPage() {
   const { id } = useParams();
   const user = useSelector((state) => state.auth.user);
+  const isSuperAdmin = user?.role === 'super_admin';
   const canManageParts = hasPermission(user, 'parts');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -165,12 +166,16 @@ function PartDetailPage() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className={`mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 ${isSuperAdmin ? 'lg:grid-cols-3' : ''}`}>
         <StatCard label="Times Used" value={usageHistory.length} tone="good" />
         <StatCard label="Total Quantity Used" value={totalQuantityUsed} tone="info" />
         <StatCard label="Total Restocked" value={totalRestocked} tone="critical" />
-        <StatCard label="Service Charge" value={`£${Number(part.service_charge || 0).toFixed(2)}`} tone="warning" />
-        <StatCard label="Total Revenue" value={`£${totalRevenue.toFixed(2)}`} tone="good" />
+        {isSuperAdmin && (
+          <StatCard label="Service Charge" value={`£${Number(part.service_charge || 0).toFixed(2)}`} tone="warning" />
+        )}
+        {isSuperAdmin && (
+          <StatCard label="Total Revenue" value={`£${totalRevenue.toFixed(2)}`} tone="good" />
+        )}
       </div>
 
       <div className="mb-6 rounded-xl border border-blue-300 bg-white p-5 shadow-sm dark:border-blue-800/40 dark:bg-black">

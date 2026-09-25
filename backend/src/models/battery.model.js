@@ -23,6 +23,8 @@ async function findPage({
   qrGenerated,
   includeBlocked,
   activeOnly,
+  intakedOnly,
+  includeTesting,
   sortOrder = 'desc',
 }) {
   const conditions = [];
@@ -49,10 +51,14 @@ async function findPage({
       conditions.push(`${effectiveStatusExpr} = 'registered'`);
     } else if (status === 'returned') {
       conditions.push(`${effectiveStatusExpr} = 'returned'`);
-    } else if (status === 'unserviceable') {
+    } else if (status === 'unserviceable' || status === 'unserviceable_history' || status === 'unserviceable_all') {
       conditions.push(`${effectiveStatusExpr} IN ('unserviceable', 'tested_parts_removed')`);
     } else if (status.includes(',')) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
+      // Keep the single-value expansion: 'unserviceable' also covers test-failed batteries.
+      if (statuses.includes('unserviceable') && !statuses.includes('tested_parts_removed')) {
+        statuses.push('tested_parts_removed');
+      }
       params.push(statuses);
       conditions.push(`${effectiveStatusExpr} = ANY($${params.length})`);
     } else {
@@ -62,7 +68,17 @@ async function findPage({
   }
   if (date) {
     params.push(date);
-    conditions.push(`b.created_at::date = $${params.length}`);
+    if (status === 'recycled') {
+      conditions.push(`(
+        EXISTS (
+          SELECT 1 FROM recycle_batteries rbat
+          JOIN recycle_batches rb ON rb.id = rbat.recycle_id
+          WHERE rbat.battery_id = b.id AND rb.recycled_at::date = $${params.length}
+        ) OR b.created_at::date = $${params.length}
+      )`);
+    } else {
+      conditions.push(`b.created_at::date = $${params.length}`);
+    }
   }
   if (q) {
     params.push(`%${q}%`);
@@ -89,6 +105,30 @@ async function findPage({
   if (activeOnly) {
     conditions.push(`b.status NOT IN ('repaired', 'returned', 'unserviceable', 'recycled', 'tested_parts_removed')`);
   }
+  // Restrict to batteries that arrived via an arrival-verified truck intake
+  // and are currently awaiting repair (or testing if includeTesting is true for supervisors) —
+  // used by the technician scan typeahead so unverified/pending-arrival batteries are never suggested.
+  if (intakedOnly) {
+    if (includeTesting) {
+      conditions.push(`(
+        (b.truck_intake_id IS NOT NULL AND EXISTS (
+          SELECT 1 FROM truck_intakes ti 
+          WHERE ti.id = b.truck_intake_id 
+            AND (ti.status = 'verified' OR ti.verified_at IS NOT NULL)
+        ))
+        OR b.status = 'in_testing'
+      )`);
+      conditions.push(`b.status IN ('in_repair', 'in_testing', 'tested_parts_removed')`);
+    } else {
+      conditions.push(`b.truck_intake_id IS NOT NULL`);
+      conditions.push(`EXISTS (
+        SELECT 1 FROM truck_intakes ti 
+        WHERE ti.id = b.truck_intake_id 
+          AND (ti.status = 'verified' OR ti.verified_at IS NOT NULL)
+      )`);
+      conditions.push(`b.status IN ('in_repair', 'tested_parts_removed')`);
+    }
+  }
 
   const whereClause = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
   params.push(limit + 1, offset);
@@ -111,8 +151,42 @@ async function findPage({
             last_issue.reason AS issue_reason,
             last_issue.note AS issue_note,
             last_issue.reported_at AS issue_reported_at,
-            last_issue.photo_urls AS issue_photos
+            last_issue.photo_urls AS issue_photos,
+            COALESCE(pending_parts.pending_count, 0)::int AS pending_parts_count,
+            COALESCE(pass_back.is_passed_back, false) AS is_passed_back,
+            last_recycle.recycled_at AS recycled_at,
+            last_recycle.vehicle_number AS recycle_vehicle_number,
+            last_recycle.driver_name AS recycle_driver_name,
+            last_recycle.batch_id AS recycle_batch_id,
+            last_recycle.recycle_client_name AS recycle_client_name
      FROM batteries b
+     -- The current workshop cycle starts at the battery's latest visit (or its
+     -- creation for legacy rows). Parts-pending-removal and passed-back flags
+     -- must only look inside this cycle: parts fitted on an earlier, completed
+     -- visit are legitimately in the battery, and an old pass-back must not
+     -- resurface when the battery comes in again.
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(MAX(bv_c.created_at), b.created_at) AS started_at
+       FROM battery_visits bv_c
+       WHERE bv_c.battery_id = b.id
+     ) cycle ON true
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS pending_count
+       FROM repairs r_p
+       WHERE r_p.battery_id = b.id
+         AND r_p.removed_at IS NULL
+         AND b.status IN ('unserviceable', 'in_repair')
+         AND r_p.repaired_at >= cycle.started_at - INTERVAL '1 minute'
+     ) pending_parts ON true
+     LEFT JOIN LATERAL (
+       SELECT EXISTS (
+         SELECT 1 FROM battery_services bs_pb
+         WHERE bs_pb.battery_id = b.id
+           AND bs_pb.service_name = 'Passed back to Technician'
+           AND b.status IN ('in_repair', 'in_progress', 'in_testing')
+           AND bs_pb.completed_at >= cycle.started_at - INTERVAL '1 minute'
+       ) AS is_passed_back
+     ) pass_back ON true
      LEFT JOIN LATERAL (
        SELECT r.repaired_at, r.batch_id
        FROM repairs r
@@ -143,6 +217,15 @@ async function findPage({
        ORDER BY bi.reported_at DESC
        LIMIT 1
      ) last_issue ON true
+     LEFT JOIN LATERAL (
+       SELECT rb.recycled_at, rb.vehicle_number, rb.driver_name, rb.id AS batch_id, c.name AS recycle_client_name
+       FROM recycle_batteries rbat
+       JOIN recycle_batches rb ON rb.id = rbat.recycle_id
+       LEFT JOIN clients c ON c.id = rb.recycle_client_id
+       WHERE rbat.battery_id = b.id
+       ORDER BY rb.recycled_at DESC
+       LIMIT 1
+     ) last_recycle ON true
      ${whereClause}
      ORDER BY ${qrGenerated ? 'b.qr_generated_at ASC, b.id ASC' : (sortOrder === 'asc' ? 'b.created_at ASC, b.id ASC' : 'b.created_at DESC, b.id DESC')}
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
@@ -177,6 +260,8 @@ async function findByCode(batteryCode) {
             ti.truck_number AS intake_truck_number,
             ti.driver_name AS intake_driver_name,
             ti.intake_at AS intake_at,
+            ti.status AS intake_status,
+            ti.verified_at AS intake_verified_at,
             u.name AS started_by_name,
             EXISTS (SELECT 1 FROM battery_ratings br WHERE br.battery_code = b.battery_code) AS already_rated
      FROM batteries b
@@ -212,11 +297,40 @@ async function findByTruckIntakeId(truckIntakeId) {
     `SELECT b.*,
             last_repair.repaired_at AS last_repaired_at,
             last_parts.part_names AS last_repaired_parts,
+            COALESCE(pending_parts.pending_count, 0)::int AS pending_parts_count,
+            COALESCE(pass_back.is_passed_back, false) AS is_passed_back,
             COALESCE(monthly_visits.intake_count_this_month, 0)::int AS intake_count_this_month,
             COALESCE(monthly_visits.visits_this_month, '[]'::jsonb) AS visits_this_month,
             COALESCE(monthly_repairs.repair_count_this_month, 0)::int AS repair_count_this_month,
             COALESCE(monthly_repairs.repairs_this_month, '[]'::jsonb) AS repairs_this_month
      FROM batteries b
+     -- The current workshop cycle starts at the battery's latest visit (or its
+     -- creation for legacy rows). Parts-pending-removal and passed-back flags
+     -- must only look inside this cycle: parts fitted on an earlier, completed
+     -- visit are legitimately in the battery, and an old pass-back must not
+     -- resurface when the battery comes in again.
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(MAX(bv_c.created_at), b.created_at) AS started_at
+       FROM battery_visits bv_c
+       WHERE bv_c.battery_id = b.id
+     ) cycle ON true
+     LEFT JOIN LATERAL (
+       SELECT COUNT(*)::int AS pending_count
+       FROM repairs r_p
+       WHERE r_p.battery_id = b.id
+         AND r_p.removed_at IS NULL
+         AND b.status IN ('unserviceable', 'in_repair')
+         AND r_p.repaired_at >= cycle.started_at - INTERVAL '1 minute'
+     ) pending_parts ON true
+     LEFT JOIN LATERAL (
+       SELECT EXISTS (
+         SELECT 1 FROM battery_services bs_pb
+         WHERE bs_pb.battery_id = b.id
+           AND bs_pb.service_name = 'Passed back to Technician'
+           AND b.status IN ('in_repair', 'in_progress', 'in_testing')
+           AND bs_pb.completed_at >= cycle.started_at - INTERVAL '1 minute'
+       ) AS is_passed_back
+     ) pass_back ON true
      LEFT JOIN LATERAL (
        SELECT r.repaired_at, r.batch_id
        FROM repairs r
@@ -231,26 +345,55 @@ async function findByTruckIntakeId(truckIntakeId) {
        WHERE r2.batch_id = last_repair.batch_id
      ) last_parts ON true
      LEFT JOIN LATERAL (
+       WITH all_intakes_this_month AS (
+         SELECT
+           bv2.id AS visit_id,
+           ti2.id AS truck_intake_id,
+           ti2.truck_number,
+           ti2.driver_name,
+           COALESCE(ti2.intake_at, bv2.created_at) AS intake_at,
+           bv2.created_at,
+           (ti2.id = $1::int) AS is_current_intake
+         FROM battery_visits bv2
+         JOIN truck_intakes ti2 ON ti2.id = bv2.truck_intake_id
+         WHERE bv2.battery_id = b.id
+           AND date_trunc('month', COALESCE(ti2.intake_at, bv2.created_at)) = date_trunc('month', now())
+
+         UNION ALL
+
+         SELECT
+           NULL::int AS visit_id,
+           cur_ti.id AS truck_intake_id,
+           cur_ti.truck_number,
+           cur_ti.driver_name,
+           COALESCE(cur_ti.intake_at, cur_ti.created_at) AS intake_at,
+           cur_ti.created_at,
+           true AS is_current_intake
+         FROM truck_intakes cur_ti
+         WHERE cur_ti.id = $1::int
+           AND date_trunc('month', COALESCE(cur_ti.intake_at, cur_ti.created_at)) = date_trunc('month', now())
+           AND NOT EXISTS (
+             SELECT 1 FROM battery_visits bv3
+             WHERE bv3.battery_id = b.id AND bv3.truck_intake_id = $1::int
+           )
+       )
        SELECT
-         COUNT(bv2.id)::int AS intake_count_this_month,
+         COUNT(*)::int AS intake_count_this_month,
          COALESCE(
            jsonb_agg(
              jsonb_build_object(
-               'visit_id', bv2.id,
-               'truck_intake_id', ti2.id,
-               'truck_number', ti2.truck_number,
-               'driver_name', ti2.driver_name,
-               'intake_at', ti2.intake_at,
-               'created_at', bv2.created_at,
-               'is_current_intake', (ti2.id = $1::int)
-             ) ORDER BY ti2.intake_at ASC
+               'visit_id', aitm.visit_id,
+               'truck_intake_id', aitm.truck_intake_id,
+               'truck_number', aitm.truck_number,
+               'driver_name', aitm.driver_name,
+               'intake_at', aitm.intake_at,
+               'created_at', aitm.created_at,
+               'is_current_intake', aitm.is_current_intake
+             ) ORDER BY aitm.intake_at ASC
            ),
            '[]'::jsonb
          ) AS visits_this_month
-       FROM battery_visits bv2
-       JOIN truck_intakes ti2 ON ti2.id = bv2.truck_intake_id
-       WHERE bv2.battery_id = b.id
-         AND date_trunc('month', ti2.intake_at) = date_trunc('month', now())
+       FROM all_intakes_this_month aitm
      ) monthly_visits ON true
      LEFT JOIN LATERAL (
        SELECT
@@ -520,7 +663,7 @@ async function startWork(id, userId) {
     await client.query('BEGIN');
     const { rows } = await client.query(
       `UPDATE batteries SET status = 'in_progress', work_started_at = now(), started_by_user_id = $2
-       WHERE id = $1 AND status = 'in_repair'
+       WHERE id = $1 AND status IN ('in_repair', 'tested_parts_removed')
        RETURNING *`,
       [id, userId]
     );
@@ -551,6 +694,19 @@ async function startWork(id, userId) {
   }
 }
 
+// Sets testing_started_at to now() when a supervisor scans/starts testing.
+// Preserves existing testing_started_at if already running.
+async function startTesting(id) {
+  const { rows } = await db.query(
+    `UPDATE batteries
+     SET testing_started_at = COALESCE(testing_started_at, now())
+     WHERE id = $1 AND status = 'in_testing'
+     RETURNING *`,
+    [id]
+  );
+  return rows[0];
+}
+
 // A technician verifying a battery works after its parts were replaced —
 // only succeeds from 'in_testing' (reached automatically once repairs are
 // logged, see repair.model.js create). Stamps how long testing took, same
@@ -563,7 +719,7 @@ async function completeTesting(id, { serviceIds = [], staffId = null, notes = nu
     const { rows } = await client.query(
       `UPDATE batteries
        SET status = 'repaired',
-           testing_duration_seconds = EXTRACT(EPOCH FROM (now() - testing_started_at))::int,
+           testing_duration_seconds = EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int,
            testing_started_at = NULL
        WHERE id = $1 AND status = 'in_testing'
        RETURNING *`,
@@ -598,8 +754,7 @@ async function completeTesting(id, { serviceIds = [], staffId = null, notes = nu
   }
 }
 
-// A technician (or, once testing has started, a tester — supervisor/
-// manager) reporting that a battery can't be serviced. Succeeds from either
+// A technician (or, once testing has started, a supervisor) reporting that a battery can't be serviced. Succeeds from either
 // 'in_progress' (nothing fitted yet) or 'in_testing' (parts already fitted
 // during repair — see findPendingPartsRemoval/removeParts for reclaiming
 // them before the battery moves on to recycling). Logs the reason + note to
@@ -635,7 +790,7 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
   }
 }
 
-// A supervisor / manager / tester passing a battery back to the technician
+// A supervisor passing a battery back to the technician
 // pool from 'in_testing' — resets testing timestamps and reverts status to
 // 'in_repair' so it can be re-worked, logging an optional note.
 async function passToTech(id, { staffId = null, note = null } = {}) {
@@ -873,6 +1028,7 @@ module.exports = {
   findIssueHistory,
   findReturnHistory,
   startWork,
+  startTesting,
   completeTesting,
   reportIssue,
   passToTech,

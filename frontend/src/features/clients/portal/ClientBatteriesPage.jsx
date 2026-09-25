@@ -6,12 +6,12 @@ import DataTable from '../../../components/ui/table/DataTable';
 import TableState from '../../../components/ui/table/TableState';
 import InfiniteScrollTrigger from '../../../components/ui/table/InfiniteScrollTrigger';
 import { ClientStatusBadge } from '../../../components/ui/primitives/Badge';
-import { loadSortGroups } from '../../../utils/sort-groups';
+import { fetchSortGroups } from '../../../utils/sort-groups';
 import Modal from '../../../components/ui/overlays/Modal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 import { useTheme } from '../../../context/ThemeContext';
-import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter } from 'react-icons/fi';
+import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter, FiRefreshCw } from 'react-icons/fi';
 import { hasClientPermission } from '../../../utils/permissions';
 import ClientReturnVerifyModal from '../components/ClientReturnVerifyModal';
 import RatingModal from '../../../components/feedback/RatingModal';
@@ -178,6 +178,7 @@ function ClientBatteriesPage() {
   const [sortGroups, setSortGroups] = useState([]);
   const [pickSortGroup, setPickSortGroup] = useState(null);
   const [pickSortSelected, setPickSortSelected] = useState(new Set());
+  const [pickedSortGroupIds, setPickedSortGroupIds] = useState(new Set());
 
   // Return shipment verification modal state
   const [verifyTargetReturn, setVerifyTargetReturn] = useState(null);
@@ -537,7 +538,7 @@ function ClientBatteriesPage() {
         `/clients/me/truck-intakes/${editBatchTarget.intakeId}/batteries/${battery.id}`
       );
       setEditBatchBatteries((prev) => prev.filter((b) => b.id !== battery.id));
-      setEditBatchSuccess(`✓ Removed battery ${battery.battery_code} from intake.`);
+      setEditBatchSuccess(`✓ Removed battery ${battery.battery_code || battery.code || ''} from intake.`);
       loadData();
     } catch (err) {
       setEditBatchError(err.response?.data?.message || err.message || 'Failed to remove battery.');
@@ -804,7 +805,10 @@ function ClientBatteriesPage() {
   }
 
   function openPickFromSort() {
-    setSortGroups(loadSortGroups(user?.id));
+    setSortGroups([]);
+    fetchSortGroups()
+      .then((data) => setSortGroups(data || []))
+      .catch(() => setSortGroups([]));
     setPickSortStep('groups');
     setPickSortGroup(null);
     setPickSortOpen(true);
@@ -819,6 +823,19 @@ function ClientBatteriesPage() {
     const match = allRegisteredBatteries.find((b) => b.battery_code.toUpperCase() === code.toUpperCase());
     return match ? NOT_RETURNABLE_STATUSES.has(match.status) : false;
   }
+
+  // Filter out sort groups that have already been selected into this intake or where
+  // all batteries are already packed / already in the intake list.
+  const availableSortGroups = useMemo(() => {
+    return sortGroups.filter((group) => {
+      if (pickedSortGroupIds.has(group.id)) return false;
+      const groupBatteries = group.batteries || [];
+      if (groupBatteries.length === 0) return false;
+      const remaining = groupBatteries.filter((code) => !isAlreadyPacked(code));
+      return remaining.length > 0;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sortGroups, pickedSortGroupIds, scannedCodes, allRegisteredBatteries]);
 
   const pickSortAvailableCodes = useMemo(() => {
     if (!pickSortGroup) return [];
@@ -844,6 +861,9 @@ function ClientBatteriesPage() {
 
   function confirmPickSortSelection() {
     pickSortSelected.forEach((code) => handleAddBattery(code));
+    if (pickSortGroup?.id) {
+      setPickedSortGroupIds((prev) => new Set([...prev, pickSortGroup.id]));
+    }
     setPickSortOpen(false);
     setPickSortGroup(null);
   }
@@ -887,6 +907,7 @@ function ClientBatteriesPage() {
       setDriverName('');
       setScanInput('');
       setScannedBatteries([]);
+      setPickedSortGroupIds(new Set());
       setPackModalOpen(false);
       setShowIntakeSuccessModal(true);
       loadData();
@@ -897,42 +918,60 @@ function ClientBatteriesPage() {
     }
   }
 
-  // Metrics breakdown for selected batch (Total, In Service & Testing, Serviced/Received, Unserviceable)
+  // Metrics breakdown for selected batch (Total, Waiting for Service, In Service, Service Completed, Unserviceable, Returned, Recycled)
   const batchMetrics = useMemo(() => {
     if (!selectedBatch?.batteries) {
-      return { total: 0, inService: 0, serviced: 0, unserviceable: 0 };
+      return { total: 0, reachedWorkshop: 0, inService: 0, serviced: 0, unserviceable: 0, returned: 0, recycled: 0 };
     }
     const bats = selectedBatch.batteries;
     const total = bats.length;
+    const isBatchVerified = selectedBatch.intakeStatus === 'verified' || Boolean(selectedBatch.verifiedAt);
+
     const inService = bats.filter((b) =>
-      ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'registered', 'new', 'with_client'].includes(b.status)
+      ['in_progress', 'in_testing', 'testing', 'repair_testing'].includes(b.status)
     ).length;
-    const serviced = bats.filter((b) =>
-      ['repaired', 'returned'].includes(b.status)
-    ).length;
+    const serviced = bats.filter((b) => b.status === 'repaired').length;
     const unserviceable = bats.filter((b) =>
-      ['unserviceable', 'recycled'].includes(b.status)
+      ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(b.status)
     ).length;
-    return { total, inService, serviced, unserviceable };
+    const returned = bats.filter((b) => b.status === 'returned').length;
+    const recycled = bats.filter((b) => b.status === 'recycled').length;
+
+    const reachedWorkshop = bats.filter((b) => {
+      const isVerified = isBatchVerified || Boolean(b.verified_at);
+      if (!isVerified) return false;
+      const isHandled =
+        ['in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired', 'unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'returned', 'recycled'].includes(b.status);
+      return !isHandled;
+    }).length;
+
+    return { total, reachedWorkshop, inService, serviced, unserviceable, returned, recycled };
   }, [selectedBatch]);
 
   // Filtered batteries in detail page
   const detailBatteries = useMemo(() => {
     if (!selectedBatch) return [];
     let list = selectedBatch.batteries || [];
+    const isBatchVerified = selectedBatch.intakeStatus === 'verified' || Boolean(selectedBatch.verifiedAt);
 
-    if (batchStatusFilter === 'in_service') {
-      list = list.filter((b) =>
-        ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'registered', 'new', 'with_client'].includes(b.status)
-      );
+    if (batchStatusFilter === 'reached_workshop') {
+      list = list.filter((b) => {
+        const isVerified = isBatchVerified || Boolean(b.verified_at);
+        if (!isVerified) return false;
+        const isHandled =
+          ['in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired', 'unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'returned', 'recycled'].includes(b.status);
+        return !isHandled;
+      });
+    } else if (batchStatusFilter === 'in_service') {
+      list = list.filter((b) => ['in_progress', 'in_testing', 'testing', 'repair_testing'].includes(b.status));
     } else if (batchStatusFilter === 'serviced') {
-      list = list.filter((b) =>
-        ['repaired', 'returned'].includes(b.status)
-      );
+      list = list.filter((b) => b.status === 'repaired');
     } else if (batchStatusFilter === 'unserviceable') {
-      list = list.filter((b) =>
-        ['unserviceable', 'recycled'].includes(b.status)
-      );
+      list = list.filter((b) => ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(b.status));
+    } else if (batchStatusFilter === 'returned') {
+      list = list.filter((b) => b.status === 'returned');
+    } else if (batchStatusFilter === 'recycled') {
+      list = list.filter((b) => b.status === 'recycled');
     }
 
     if (!batchSearch.trim()) return list;
@@ -983,7 +1022,103 @@ function ClientBatteriesPage() {
         );
       },
     },
-    { key: 'status', label: 'Status', render: (row) => <ClientStatusBadge status={row.status} /> },
+    {
+      key: 'status',
+      label: 'Status',
+      render: (row) => {
+        if (effectiveBucket === 'packed') {
+          const isVerified =
+            selectedBatch?.intakeStatus === 'verified' ||
+            Boolean(selectedBatch?.verifiedAt) ||
+            Boolean(row.verified_at);
+          if (!isVerified) {
+            return (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-semibold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+                <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                Waiting for Verify
+              </span>
+            );
+          }
+
+          if (row.status === 'unserviceable' || row.status === 'tested_parts_removed' || row.status === 'unserviceable_parts_removed') {
+            const isTestFailed = row.status === 'tested_parts_removed' || row.status === 'unserviceable_parts_removed';
+            return (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200/90 bg-red-50/90 px-2.5 py-0.5 text-xs font-semibold text-red-700 shadow-2xs dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500 ring-2 ring-red-400/30" />
+                <span>Unserviceable</span>
+                {isTestFailed && (
+                  <>
+                    <span className="font-normal text-red-300 dark:text-red-600">·</span>
+                    <span className="text-[11px] font-bold text-red-600 dark:text-red-400">Test Failed</span>
+                  </>
+                )}
+              </span>
+            );
+          }
+
+          if (row.status === 'in_progress' || row.status === 'in_testing' || row.status === 'testing' || row.status === 'repair_testing') {
+            return (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-blue-200/90 bg-blue-50/90 px-2.5 py-0.5 text-xs font-semibold text-blue-700 shadow-2xs dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-300">
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-500 animate-pulse" />
+                <span>In Service</span>
+              </span>
+            );
+          }
+
+          if (row.status === 'repaired') {
+            return (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-emerald-200/90 bg-emerald-50/90 px-2.5 py-0.5 text-xs font-semibold text-emerald-800 shadow-2xs dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-emerald-600 dark:text-emerald-400">
+                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                </svg>
+                <span>Service Completed</span>
+              </span>
+            );
+          }
+
+          if (row.status === 'returned') {
+            return (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-sky-200/90 bg-sky-50/90 px-2.5 py-0.5 text-xs font-semibold text-sky-800 shadow-2xs dark:border-sky-900/40 dark:bg-sky-950/40 dark:text-sky-300">
+                <FiTruck className="h-3 w-3 text-sky-600 dark:text-sky-400" />
+                <span>Returned</span>
+              </span>
+            );
+          }
+
+          if (row.status === 'recycled') {
+            return (
+              <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-black bg-black px-2.5 py-0.5 text-xs font-semibold text-white shadow-2xs dark:border-neutral-800 dark:bg-black dark:text-white">
+                <span>Recycled</span>
+              </span>
+            );
+          }
+
+          return (
+            <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-yellow-300 bg-yellow-50 px-2.5 py-0.5 text-xs font-bold text-yellow-800 shadow-2xs dark:border-yellow-700/60 dark:bg-yellow-950/40 dark:text-yellow-300">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 text-yellow-600 dark:text-yellow-400">
+                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+              </svg>
+              <span>Waiting for Service</span>
+            </span>
+          );
+        }
+
+        const isVerified =
+          effectiveBucket === 'received'
+            ? selectedBatch?.intakeStatus === 'verified' ||
+              Boolean(selectedBatch?.verifiedAt) ||
+              row.return_status === 'verified' ||
+              Boolean(row.return_verified_at)
+            : row.return_status === 'verified' || Boolean(row.return_verified_at);
+        return (
+          <ClientStatusBadge
+            status={row.status}
+            isVerified={isVerified}
+            returnStatus={row.return_status || (selectedBatch?.intakeStatus === 'verified' ? 'verified' : selectedBatch?.intakeStatus)}
+          />
+        );
+      },
+    },
     {
       key: 'notes',
       label: 'Defect Notes',
@@ -1055,7 +1190,7 @@ function ClientBatteriesPage() {
         </div>
       ),
     },
-  ];
+  ].filter((col) => !(effectiveBucket === 'packed' && col.key === 'actions'));
 
   // Admin-Matched Global Fleet Table Columns for "All Batteries" Page
   const globalFleetTableColumns = [
@@ -1101,20 +1236,14 @@ function ClientBatteriesPage() {
       key: 'status',
       label: 'Status',
       width: '160px',
-      sortValue: (row) => (hasBeenServiced(row) ? row.status || 'registered' : ''),
-      render: (row) =>
-        hasBeenServiced(row) ? (
-          <ClientStatusBadge status={row.status} />
-        ) : (
-          <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
-        ),
-    },
-    {
-      key: 'created_at',
-      label: 'Registered Time',
-      width: '190px',
-      sortValue: (row) => (row.created_at ? new Date(row.created_at).getTime() : 0),
-      render: (row) => new Date(row.created_at).toLocaleString(),
+      sortValue: (row) => row.status || 'registered',
+      render: (row) => (
+        <ClientStatusBadge
+          status={row.status || 'registered'}
+          isVerified={row.return_status === 'verified' || Boolean(row.return_verified_at)}
+          returnStatus={row.return_status}
+        />
+      ),
     },
     {
       key: 'last_repaired_at',
@@ -1167,7 +1296,13 @@ function ClientBatteriesPage() {
       label: 'Status',
       width: '160px',
       sortValue: (row) => row.status || '',
-      render: (row) => <ClientStatusBadge status={row.status} />,
+      render: (row) => (
+        <ClientStatusBadge
+          status={row.status}
+          isVerified={row.return_status === 'verified' || Boolean(row.return_verified_at)}
+          returnStatus={row.return_status}
+        />
+      ),
     },
     {
       key: 'truck_number',
@@ -1208,7 +1343,9 @@ function ClientBatteriesPage() {
       const matchesStatus =
         !statusFilter ||
         (statusFilter === 'in_service'
-          ? ['in_progress', 'in_testing', 'testing', 'repair_testing'].includes(item.status)
+          ? ['in_progress', 'in_testing', 'testing', 'repair_testing', 'in_repair', 'repaired'].includes(item.status)
+          : statusFilter === 'unserviceable'
+          ? ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(item.status)
           : item.status === statusFilter);
       const matchesDate = !date || toLocalDateValue(getRelevantDate(item)) === date;
       return matchesSearch && matchesStatus && matchesDate;
@@ -1321,16 +1458,16 @@ function ClientBatteriesPage() {
           return (
             <span className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
               <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              On the Way to Workshop
+              Waiting for Verify
             </span>
           );
         }
         return (
-          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+          <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-600 bg-emerald-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs dark:border-emerald-500 dark:bg-emerald-600 dark:text-white">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 text-white">
               <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
             </svg>
-            Received at Workshop
+            Verified
           </span>
         );
       },
@@ -1521,7 +1658,7 @@ function ClientBatteriesPage() {
               <>
                 <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
                   <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
-                  On the Way to Workshop
+                  Waiting for Verify
                 </span>
 
                 {effectiveBucket === 'packed' && (
@@ -1565,11 +1702,11 @@ function ClientBatteriesPage() {
                 )}
               </>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+              <span className="inline-flex items-center gap-1.5 rounded-xl border border-yellow-300 bg-yellow-50 px-3.5 py-1.5 text-xs font-bold text-yellow-800 shadow-2xs dark:border-yellow-700/60 dark:bg-yellow-950/40 dark:text-yellow-300">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-yellow-600 dark:text-yellow-400">
                   <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
                 </svg>
-                Received at Workshop
+                Waiting for Service
               </span>
             )}
             <span className="rounded-xl bg-emerald-100 px-3.5 py-1.5 text-xs font-black text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-200">
@@ -1579,197 +1716,202 @@ function ClientBatteriesPage() {
         </div>
 
         {/* ── Top Status & Volume Breakdown Cards for this Truck Intake ────────────── */}
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4 lg:grid-cols-7 sm:gap-4">
           {/* Card 1: Total in Batch */}
           <button
             type="button"
             onClick={() => setBatchStatusFilter('all')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
               batchStatusFilter === 'all'
-                ? 'border-blue-500 bg-blue-50/70 shadow-sm dark:border-blue-500/80 dark:bg-blue-950/40 ring-2 ring-blue-500/20'
-                : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs dark:border-white/10 dark:bg-surface-850 dark:hover:border-white/20'
+                ? 'border-blue-500 bg-blue-100/90 shadow-xs dark:border-blue-400 dark:bg-blue-950/60 ring-2 ring-blue-500/30'
+                : 'border-blue-200/80 bg-blue-50/70 hover:border-blue-300 hover:bg-blue-100/60 dark:border-blue-900/40 dark:bg-blue-950/20 dark:hover:border-blue-800'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold tracking-wider text-slate-500 uppercase dark:text-neutral-400">
-                Total in Truck
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-blue-900/80 uppercase dark:text-blue-300">
+                Total Units
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                <FiTruck className="h-4 w-4" />
-              </div>
             </div>
-            <div className="mt-3">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white">
-                  {batchMetrics.total}
-                </span>
-                <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">batteries</span>
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-                All units in this intake
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+                {batchMetrics.total}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-slate-500 dark:text-neutral-400">
+                All in truck
               </p>
             </div>
           </button>
 
-          {/* Card 2: In Service & Testing */}
+          {/* Card 2: Waiting for Service */}
+          <button
+            type="button"
+            onClick={() => setBatchStatusFilter('reached_workshop')}
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+              batchStatusFilter === 'reached_workshop'
+                ? 'border-amber-500 bg-amber-100/90 shadow-xs dark:border-amber-400 dark:bg-amber-950/60 ring-2 ring-amber-500/30'
+                : 'border-amber-200/80 bg-amber-50/70 hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/40 dark:bg-amber-950/20 dark:hover:border-amber-800'
+            }`}
+          >
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-amber-800 uppercase dark:text-amber-400">
+                Waiting for Service
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
+                {batchMetrics.reachedWorkshop}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-amber-700/70 dark:text-amber-400/70">
+                At workshop
+              </p>
+            </div>
+          </button>
+
+          {/* Card 3: In Service */}
           <button
             type="button"
             onClick={() => setBatchStatusFilter('in_service')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
               batchStatusFilter === 'in_service'
-                ? 'border-amber-500 bg-amber-50/70 shadow-sm dark:border-amber-500/80 dark:bg-amber-950/40 ring-2 ring-amber-500/20'
-                : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs dark:border-white/10 dark:bg-surface-850 dark:hover:border-white/20'
+                ? 'border-indigo-500 bg-indigo-100/90 shadow-xs dark:border-indigo-400 dark:bg-indigo-950/60 ring-2 ring-indigo-500/30'
+                : 'border-indigo-200/80 bg-indigo-50/70 hover:border-indigo-300 hover:bg-indigo-100/60 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:hover:border-indigo-800'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold tracking-wider text-amber-800 uppercase dark:text-amber-400">
-                In Service & Testing
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-indigo-800 uppercase dark:text-indigo-400">
+                In Service
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300">
-                <FiActivity className="h-4 w-4" />
-              </div>
             </div>
-            <div className="mt-3">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-amber-600 dark:text-amber-400">
-                  {batchMetrics.inService}
-                </span>
-                <span className="text-xs font-semibold text-amber-700/60 dark:text-amber-400/60">in shop</span>
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-                Under repair, cells or QA
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">
+                {batchMetrics.inService}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-indigo-700/70 dark:text-indigo-400/70">
+                Repairing / Testing
               </p>
             </div>
           </button>
 
-          {/* Card 3: Repaired & Ready / Received */}
+          {/* Card 4: Service Completed */}
           <button
             type="button"
             onClick={() => setBatchStatusFilter('serviced')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
               batchStatusFilter === 'serviced'
-                ? 'border-emerald-500 bg-emerald-50/70 shadow-sm dark:border-emerald-500/80 dark:bg-emerald-950/40 ring-2 ring-emerald-500/20'
-                : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs dark:border-white/10 dark:bg-surface-850 dark:hover:border-white/20'
+                ? 'border-teal-500 bg-teal-100/90 shadow-xs dark:border-teal-400 dark:bg-teal-950/60 ring-2 ring-teal-500/30'
+                : 'border-emerald-200/80 bg-emerald-50/70 hover:border-emerald-300 hover:bg-emerald-100/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:hover:border-emerald-800'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold tracking-wider text-emerald-800 uppercase dark:text-emerald-400">
-                Repaired & Ready
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-teal-800 uppercase dark:text-teal-400">
+                Completed
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300">
-                <FiCheckCircle className="h-4 w-4" />
-              </div>
             </div>
-            <div className="mt-3">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-emerald-600 dark:text-emerald-400">
-                  {batchMetrics.serviced}
-                </span>
-                <span className="text-xs font-semibold text-emerald-700/60 dark:text-emerald-400/60">ready</span>
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-                Repairs done & received
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-teal-600 dark:text-teal-400">
+                {batchMetrics.serviced}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-teal-700/70 dark:text-teal-400/70">
+                Repaired & ready
               </p>
             </div>
           </button>
 
-          {/* Card 4: Unserviceable */}
+          {/* Card 5: Unserviceable */}
           <button
             type="button"
             onClick={() => setBatchStatusFilter('unserviceable')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
               batchStatusFilter === 'unserviceable'
-                ? 'border-rose-500 bg-rose-50/70 shadow-sm dark:border-rose-500/80 dark:bg-rose-950/40 ring-2 ring-rose-500/20'
-                : 'border-slate-200/80 bg-white hover:border-slate-300 hover:shadow-2xs dark:border-white/10 dark:bg-surface-850 dark:hover:border-white/20'
+                ? 'border-rose-500 bg-rose-100/90 shadow-xs dark:border-rose-400 dark:bg-rose-950/60 ring-2 ring-rose-500/30'
+                : 'border-rose-200/80 bg-rose-50/70 hover:border-rose-300 hover:bg-rose-100/60 dark:border-rose-900/40 dark:bg-rose-950/20 dark:hover:border-rose-800'
             }`}
           >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold tracking-wider text-rose-800 uppercase dark:text-rose-400">
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-rose-800 uppercase dark:text-rose-400">
                 Unserviceable
               </span>
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300">
-                <FiXCircle className="h-4 w-4" />
-              </div>
             </div>
-            <div className="mt-3">
-              <div className="flex items-baseline gap-1.5">
-                <span className="text-2xl sm:text-3xl font-black text-rose-600 dark:text-rose-400">
-                  {batchMetrics.unserviceable}
-                </span>
-                <span className="text-xs font-semibold text-rose-700/60 dark:text-rose-400/60">unrepairable</span>
-              </div>
-              <p className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-                Not repairable / recycled
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">
+                {batchMetrics.unserviceable}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-rose-700/70 dark:text-rose-400/70">
+                Cannot service
+              </p>
+            </div>
+          </button>
+
+          {/* Card 6: Returned */}
+          <button
+            type="button"
+            onClick={() => setBatchStatusFilter('returned')}
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+              batchStatusFilter === 'returned'
+                ? 'border-sky-500 bg-sky-100/90 shadow-xs dark:border-sky-400 dark:bg-sky-950/60 ring-2 ring-sky-500/30'
+                : 'border-sky-200/80 bg-sky-50/70 hover:border-sky-300 hover:bg-sky-100/60 dark:border-sky-900/40 dark:bg-sky-950/20 dark:hover:border-sky-800'
+            }`}
+          >
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-sky-800 uppercase dark:text-sky-400">
+                Returned
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-sky-600 dark:text-sky-400">
+                {batchMetrics.returned}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-sky-700/70 dark:text-sky-400/70">
+                Delivered back
+              </p>
+            </div>
+          </button>
+
+          {/* Card 7: Recycled */}
+          <button
+            type="button"
+            onClick={() => setBatchStatusFilter('recycled')}
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+              batchStatusFilter === 'recycled'
+                ? 'border-neutral-800 bg-neutral-200/90 shadow-xs dark:border-neutral-300 dark:bg-neutral-800 ring-2 ring-neutral-500/30'
+                : 'border-neutral-200/80 bg-neutral-100/80 hover:border-neutral-300 hover:bg-neutral-200/60 dark:border-neutral-700/60 dark:bg-neutral-800/40 dark:hover:border-neutral-600'
+            }`}
+          >
+            <div>
+              <span className="text-[10.5px] font-bold tracking-wider text-neutral-800 uppercase dark:text-neutral-300">
+                Recycled
+              </span>
+            </div>
+            <div className="mt-2.5">
+              <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white">
+                {batchMetrics.recycled}
+              </span>
+              <p className="mt-0.5 text-[10.5px] font-medium text-neutral-600 dark:text-neutral-400">
+                Decommissioned
               </p>
             </div>
           </button>
         </div>
 
-        {/* ── Search & Filter Pill Buttons in this Batch ────────────────────── */}
-        <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
-          {/* Filter Pills */}
-          <div className="flex items-center gap-1.5 flex-wrap overflow-x-auto pb-1 md:pb-0">
-            <button
-              type="button"
-              onClick={() => setBatchStatusFilter('all')}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-                batchStatusFilter === 'all'
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700'
-              }`}
-            >
-              <span>All</span>
-              <span className="rounded-full bg-black/10 dark:bg-white/20 px-1.5 py-0.2 text-[10px]">
-                {batchMetrics.total}
+        {/* ── Search in this Batch ────────────────────── */}
+        <div className="flex items-center justify-between gap-3">
+          {batchStatusFilter !== 'all' ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-slate-500 dark:text-neutral-400">
+                Filtered by:{' '}
+                <span className="font-semibold text-slate-700 dark:text-neutral-200 capitalize">
+                  {batchStatusFilter === 'reached_workshop' ? 'Waiting for Service' : batchStatusFilter.replace('_', ' ')}
+                </span>
               </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setBatchStatusFilter('in_service')}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-                batchStatusFilter === 'in_service'
-                  ? 'bg-amber-600 text-white shadow-2xs'
-                  : 'bg-amber-50 text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-950/70 border border-amber-200 dark:border-amber-800/40'
-              }`}
-            >
-              <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-              <span>In Service & Testing</span>
-              <span className="rounded-full bg-black/10 dark:bg-white/20 px-1.5 py-0.2 text-[10px]">
-                {batchMetrics.inService}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setBatchStatusFilter('serviced')}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-                batchStatusFilter === 'serviced'
-                  ? 'bg-emerald-600 text-white shadow-2xs'
-                  : 'bg-emerald-50 text-emerald-800 hover:bg-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-950/70 border border-emerald-200 dark:border-emerald-800/40'
-              }`}
-            >
-              <span>Repaired & Ready</span>
-              <span className="rounded-full bg-black/10 dark:bg-white/20 px-1.5 py-0.2 text-[10px]">
-                {batchMetrics.serviced}
-              </span>
-            </button>
-
-            <button
-              type="button"
-              onClick={() => setBatchStatusFilter('unserviceable')}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-bold transition-colors cursor-pointer ${
-                batchStatusFilter === 'unserviceable'
-                  ? 'bg-rose-600 text-white shadow-2xs'
-                  : 'bg-rose-50 text-rose-800 hover:bg-rose-100 dark:bg-rose-950/40 dark:text-rose-300 dark:hover:bg-rose-950/70 border border-rose-200 dark:border-rose-800/40'
-              }`}
-            >
-              <span>Unserviceable</span>
-              <span className="rounded-full bg-black/10 dark:bg-white/20 px-1.5 py-0.2 text-[10px]">
-                {batchMetrics.unserviceable}
-              </span>
-            </button>
-          </div>
+              <button
+                type="button"
+                onClick={() => setBatchStatusFilter('all')}
+                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+              >
+                Clear filter
+              </button>
+            </div>
+          ) : <div />}
 
           {/* Search Input */}
           <div className="relative w-full md:w-72 shrink-0">
@@ -1927,6 +2069,7 @@ function ClientBatteriesPage() {
                 type="button"
                 onClick={() => {
                   setPackModalOpen(true);
+                  setPickedSortGroupIds(new Set());
                   setCameraOpen(false);
                   setPackError(null);
                   setPackSuccess(null);
@@ -1946,37 +2089,114 @@ function ClientBatteriesPage() {
 
       {/* ── Stat Summary Cards for All Batteries ────────────────────── */}
       {effectiveBucket === 'all' && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-              Total Fleet
-            </span>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {/* Card 1: Total Fleet */}
+          <div
+            onClick={() => setStatusFilter('')}
+            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+              statusFilter === ''
+                ? 'border-slate-400 bg-slate-50/70 dark:border-white/30 dark:bg-surface-800 ring-2 ring-slate-400/20'
+                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                Total Fleet
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-300">
+                <FiLayers className="w-3.5 h-3.5" />
+              </span>
+            </div>
             <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
               {data.length}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-              Active in Fleet
-            </span>
+
+          {/* Card 2: Active in Fleet */}
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'returned' ? '' : 'returned')}
+            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+              statusFilter === 'returned'
+                ? 'border-emerald-500 bg-emerald-50/40 dark:border-emerald-600 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
+                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-emerald-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                Active in Fleet
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <FiCheckCircle className="w-3.5 h-3.5" />
+              </span>
+            </div>
             <p className="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-400">
               {data.filter((b) => b.status === 'returned').length}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-              In Workshop Repair
-            </span>
+
+          {/* Card 3: In Workshop Repair */}
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'in_service' ? '' : 'in_service')}
+            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+              statusFilter === 'in_service' || statusFilter === 'in_repair' || statusFilter === 'repaired'
+                ? 'border-amber-500 bg-amber-50/40 dark:border-amber-600 dark:bg-amber-950/30 ring-2 ring-amber-500/20'
+                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-amber-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                In Workshop Repair
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300">
+                <FiActivity className="w-3.5 h-3.5" />
+              </span>
+            </div>
             <p className="mt-1 text-2xl font-black text-amber-700 dark:text-amber-400">
-              {data.filter((b) => b.status !== 'returned' && b.status !== 'unserviceable').length}
+              {data.filter((b) => ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)).length}
             </p>
           </div>
-          <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-              Unserviceable
-            </span>
+
+          {/* Card 4: Unserviceable */}
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'unserviceable' ? '' : 'unserviceable')}
+            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+              statusFilter === 'unserviceable'
+                ? 'border-rose-500 bg-rose-50/40 dark:border-rose-600 dark:bg-rose-950/30 ring-2 ring-rose-500/20'
+                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-rose-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                Unserviceable
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300">
+                <FiXCircle className="w-3.5 h-3.5" />
+              </span>
+            </div>
             <p className="mt-1 text-2xl font-black text-rose-700 dark:text-rose-400">
-              {data.filter((b) => b.status === 'unserviceable').length}
+              {data.filter((b) => ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(b.status)).length}
+            </p>
+          </div>
+
+          {/* Card 5: Recycled */}
+          <div
+            onClick={() => setStatusFilter(statusFilter === 'recycled' ? '' : 'recycled')}
+            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+              statusFilter === 'recycled'
+                ? 'border-purple-500 bg-purple-50/40 dark:border-purple-600 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
+                : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-purple-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+                Recycled
+              </span>
+              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300">
+                <FiRefreshCw className="w-3.5 h-3.5" />
+              </span>
+            </div>
+            <p className="mt-1 text-2xl font-black text-purple-700 dark:text-purple-400">
+              {data.filter((b) => b.status === 'recycled').length}
             </p>
           </div>
         </div>
@@ -2008,11 +2228,12 @@ function ClientBatteriesPage() {
               className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
             >
               <option value="">All Statuses</option>
+              <option value="returned">Active in Fleet</option>
+              <option value="in_service">In Workshop Repair</option>
               <option value="in_repair">Packed for Repair</option>
-              <option value="in_service">In Service</option>
               <option value="repaired">Repair Complete</option>
-              <option value="returned">Back in Your Fleet</option>
-              <option value="unserviceable">Not Repairable</option>
+              <option value="unserviceable">Unserviceable</option>
+              <option value="recycled">Recycled</option>
             </select>
           </div>
         )}
@@ -2227,11 +2448,11 @@ function ClientBatteriesPage() {
                                 ) : batch.intakeStatus === 'pending_arrival' ? (
                                   <span className="font-bold text-amber-700 dark:text-amber-300 flex items-center gap-1">
                                     <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
-                                    On the Way to Workshop
+                                    Waiting for Verify
                                   </span>
                                 ) : (
                                   <span className="font-bold text-emerald-700 dark:text-emerald-300">
-                                    ✓ Received at Workshop
+                                    ✓ Verified
                                   </span>
                                 )}
                               </div>
@@ -2618,38 +2839,49 @@ function ClientBatteriesPage() {
           onClose={() => setPickSortOpen(false)}
         >
           {pickSortStep === 'groups' ? (
-            sortGroups.length === 0 ? (
+            availableSortGroups.length === 0 ? (
               <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-white/10 dark:bg-surface-900">
                 <p className="text-sm font-semibold text-slate-700 dark:text-neutral-300">
-                  No sort groups yet.
+                  {sortGroups.length === 0
+                    ? 'No sort groups yet.'
+                    : 'All sort groups are already selected or packed.'}
                 </p>
                 <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">
-                  Build one on the Battery Sorting page, then pick it from here next time.
+                  {sortGroups.length === 0
+                    ? 'Build one on the Battery Sorting page, then pick it from here next time.'
+                    : 'There are no remaining unpacked batteries in your sort groups.'}
                 </p>
               </div>
             ) : (
               <div className="flex flex-col gap-2.5 max-h-96 overflow-y-auto">
-                {sortGroups.map((group) => (
-                  <button
-                    key={group.id}
-                    type="button"
-                    onClick={() => reviewSortGroup(group)}
-                    disabled={group.batteries.length === 0}
-                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-2xs transition-all hover:border-emerald-500/80 hover:bg-emerald-50/50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-white/10 dark:bg-surface-900 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-950/20"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-bold text-slate-900 dark:text-white">
-                        {group.name}
+                {availableSortGroups.map((group) => {
+                  const remaining = (group.batteries || []).filter((code) => !isAlreadyPacked(code));
+                  return (
+                    <button
+                      key={group.id}
+                      type="button"
+                      onClick={() => reviewSortGroup(group)}
+                      className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 text-left shadow-2xs transition-all hover:border-emerald-500/80 hover:bg-emerald-50/50 dark:border-white/10 dark:bg-surface-900 dark:hover:border-emerald-400/60 dark:hover:bg-emerald-950/20"
+                    >
+                      <span className="min-w-0">
+                        <span className="block truncate text-sm font-bold text-slate-900 dark:text-white">
+                          {group.name}
+                        </span>
+                        <span className="text-xs text-slate-400 dark:text-neutral-500">
+                          {remaining.length} {remaining.length === 1 ? 'battery' : 'batteries'} available
+                          {remaining.length < (group.batteries || []).length && (
+                            <span className="ml-1 text-[11px] text-amber-600 dark:text-amber-400">
+                              ({(group.batteries || []).length - remaining.length} already packed)
+                            </span>
+                          )}
+                        </span>
                       </span>
-                      <span className="text-xs text-slate-400 dark:text-neutral-500">
-                        {group.batteries.length} {group.batteries.length === 1 ? 'battery' : 'batteries'}
+                      <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
+                        Review →
                       </span>
-                    </span>
-                    <span className="shrink-0 rounded-lg bg-emerald-100 px-2.5 py-1 text-xs font-bold text-emerald-800 dark:bg-emerald-950/50 dark:text-emerald-300">
-                      Review →
-                    </span>
-                  </button>
-                ))}
+                    </button>
+                  );
+                })}
               </div>
             )
           ) : (

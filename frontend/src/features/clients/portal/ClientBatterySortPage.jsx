@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import * as XLSX from 'xlsx';
@@ -11,6 +11,11 @@ import QrScanner from '../../../components/ui/primitives/QrScanner';
 import { ClientStatusBadge } from '../../../components/ui/primitives/Badge';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 import { useTheme } from '../../../context/ThemeContext';
+import {
+  clearLegacySortGroups,
+  fetchSortGroups,
+  saveSortGroups,
+} from '../../../utils/sort-groups';
 
 const formInputClasses =
   'w-full rounded-md border border-blue-300 bg-blue-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30';
@@ -38,26 +43,7 @@ function getBatteryPackedDate(battery) {
   return battery.intake_at || battery.created_at;
 }
 
-function storageKey(userId) {
-  return `battery-sort-groups-${userId || 'guest'}`;
-}
 
-function loadGroups(userId) {
-  try {
-    const raw = localStorage.getItem(storageKey(userId));
-    return raw ? JSON.parse(raw) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveGroups(userId, groups) {
-  try {
-    localStorage.setItem(storageKey(userId), JSON.stringify(groups));
-  } catch {
-    // non-blocking — sorting is a local convenience tool
-  }
-}
 
 function formatDate(val) {
   if (!val) return '—';
@@ -74,7 +60,12 @@ function ClientBatterySortPage() {
   const { user } = useSelector((state) => state.auth);
 
   const [registeredBatteries, setRegisteredBatteries] = useState([]);
-  const [groups, setGroups] = useState(() => loadGroups(user?.id));
+  const [groups, setGroups] = useState([]);
+  const [loadingGroups, setLoadingGroups] = useState(true);
+  const [groupsLoadError, setGroupsLoadError] = useState(null);
+  const [groupsSaveError, setGroupsSaveError] = useState(null);
+  const [batteriesLoaded, setBatteriesLoaded] = useState(false);
+  const [batteriesLoadError, setBatteriesLoadError] = useState(null);
 
   // Create / rename group modal
   const [nameModalOpen, setNameModalOpen] = useState(false);
@@ -96,15 +87,35 @@ function ClientBatterySortPage() {
   const [savedGroupBatteries, setSavedGroupBatteries] = useState(null);
   const [showUnsavedModal, setShowUnsavedModal] = useState(false);
   const [saveSuccessModal, setSaveSuccessModal] = useState(false);
+  const [savedSuccessInfo, setSavedSuccessInfo] = useState(null);
 
   useEffect(() => {
+    // Clean up any legacy localStorage data so old database data is never retained
+    clearLegacySortGroups(user?.id);
+
+    setLoadingGroups(true);
+    setGroupsLoadError(null);
+    fetchSortGroups()
+      .then((data) => setGroups(data || []))
+      .catch((err) => {
+        // Do NOT fall back to [] — persisting on top of a failed load would
+        // wipe every group stored server-side. Block saves instead.
+        console.error('Failed to load sort groups:', err);
+        setGroupsLoadError('Could not load your sort groups. Please refresh the page before making changes.');
+      })
+      .finally(() => setLoadingGroups(false));
+
+    setBatteriesLoaded(false);
+    setBatteriesLoadError(null);
     apiClient
       .get('/clients/me/batteries')
       .then(({ data: result }) => setRegisteredBatteries(result.data || []))
-      .catch(() => {
-        // non-blocking — used only for suggestions/status lookup
-      });
-  }, []);
+      .catch((err) => {
+        console.error('Failed to load registered batteries:', err);
+        setBatteriesLoadError('Could not load your fleet list, so batteries cannot be verified. Please refresh the page.');
+      })
+      .finally(() => setBatteriesLoaded(true));
+  }, [user?.id]);
 
   const activeGroup = useMemo(
     () => groups.find((g) => g.id === activeGroupId) || null,
@@ -122,14 +133,41 @@ function ClientBatterySortPage() {
     setSavedGroupBatteries([...(group.batteries || [])]);
   }
 
-  function handleSaveGroup() {
-    saveGroups(user?.id, groups);
-    if (activeGroup) {
-      setSavedGroupBatteries([...(activeGroup.batteries || [])]);
+  // Optimistic setGroups() has already run by the time this is called, so a
+  // failed PUT must be surfaced and the local state re-synced from the
+  // server — otherwise a deleted/renamed group silently reappears on refresh.
+  async function persistGroups(nextGroups) {
+    if (groupsLoadError) return;
+    try {
+      await saveSortGroups(nextGroups);
+      setGroupsSaveError(null);
+    } catch (err) {
+      console.error('Failed to persist sort groups:', err);
+      setGroupsSaveError(
+        err?.response?.data?.message || 'Could not save your sort groups. Your last change was not saved.'
+      );
+      try {
+        setGroups((await fetchSortGroups()) || []);
+      } catch {
+        // keep the optimistic state; the banner already says it isn't saved
+      }
     }
-    setSaveFeedback(true);
-    setSaveSuccessModal(true);
-    setTimeout(() => setSaveFeedback(false), 2500);
+  }
+
+  async function handleSaveGroup() {
+    if (groupsLoadError) return;
+    try {
+      await saveSortGroups(groups);
+      const name = activeGroup?.name || 'Group';
+      const count = activeGroup?.batteries?.length || 0;
+      setSavedSuccessInfo({ name, count });
+      setActiveGroupId(null);
+      setSavedGroupBatteries(null);
+      setSaveSuccessModal(true);
+    } catch (err) {
+      console.error('Failed to save group:', err);
+      setGroupsSaveError(err?.response?.data?.message || 'Could not save this group. Please try again.');
+    }
   }
 
   function handleBackClick() {
@@ -141,11 +179,22 @@ function ClientBatterySortPage() {
     }
   }
 
-  function handleSaveAndLeave() {
-    saveGroups(user?.id, groups);
-    setShowUnsavedModal(false);
-    setActiveGroupId(null);
-    setSavedGroupBatteries(null);
+  async function handleSaveAndLeave() {
+    if (groupsLoadError) return;
+    try {
+      await saveSortGroups(groups);
+      const name = activeGroup?.name || 'Group';
+      const count = activeGroup?.batteries?.length || 0;
+      setSavedSuccessInfo({ name, count });
+      setShowUnsavedModal(false);
+      setActiveGroupId(null);
+      setSavedGroupBatteries(null);
+      setSaveSuccessModal(true);
+    } catch (err) {
+      console.error('Failed to save and leave:', err);
+      setGroupsSaveError(err?.response?.data?.message || 'Could not save this group. Please try again.');
+      setShowUnsavedModal(false);
+    }
   }
 
   function handleDiscardAndLeave() {
@@ -193,6 +242,18 @@ function ClientBatterySortPage() {
     XLSX.writeFile(workbook, `${safeName}.xlsx`);
   }
 
+
+  const removeBatteryFromActiveGroup = useCallback((code) => {
+    if (!activeGroup) return;
+    setGroups((prev) =>
+      prev.map((g) =>
+        g.id === activeGroup.id
+          ? { ...g, batteries: g.batteries.filter((c) => c !== code) }
+          : g
+      )
+    );
+  }, [activeGroup]);
+
   const sortedTableColumns = useMemo(() => [
     {
       key: 'battery_code',
@@ -233,38 +294,16 @@ function ClientBatterySortPage() {
         const isPackedForRepair = isBatteryPackedForRepair(row.match);
         const packedDate = getBatteryPackedDate(row.match);
 
-        return (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {row.match && hasBeenServiced(row.match) ? (
-              <ClientStatusBadge status={row.match.status} />
-            ) : row.match ? (
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                Not yet serviced
-              </span>
-            ) : (
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
-                Not in your fleet
-              </span>
-            )}
-
-            {isPackedForRepair && (
-              <span className="rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-red-800 dark:border dark:border-red-500/30 dark:bg-red-950/60 dark:text-red-300">
-                Packed to Service{packedDate ? ` (${formatDate(packedDate)})` : ''}
-              </span>
-            )}
-          </div>
+        return isPackedForRepair ? (
+          <span className="rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-red-800 dark:border dark:border-red-500/30 dark:bg-red-950/60 dark:text-red-300">
+            Packed to Service{packedDate ? ` (${formatDate(packedDate)})` : ''}
+          </span>
+        ) : (
+          <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
         );
       },
     },
-    {
-      key: 'notes',
-      label: 'Defect Notes',
-      render: (row) => (
-        <span className="text-xs text-slate-600 dark:text-neutral-300">
-          {row.match?.notes || '—'}
-        </span>
-      ),
-    },
+
     {
       key: 'actions',
       label: '',
@@ -290,7 +329,7 @@ function ClientBatterySortPage() {
         </div>
       ),
     },
-  ], []);
+  ], [removeBatteryFromActiveGroup]);
 
   // Only suggest batteries actually in the client's hands right now — not
   // ones away at the workshop for repair/testing, or unserviceable.
@@ -374,13 +413,13 @@ function ClientBatterySortPage() {
       };
       const next = [newGroup, ...groups];
       setGroups(next);
-      saveGroups(user?.id, next);
+      persistGroups(next);
       setActiveGroupId(newGroup.id);
       setSavedGroupBatteries([]);
     } else {
       const next = groups.map((g) => (g.id === nameTargetId ? { ...g, name: trimmed } : g));
       setGroups(next);
-      saveGroups(user?.id, next);
+      persistGroups(next);
     }
 
     setNameModalOpen(false);
@@ -396,7 +435,7 @@ function ClientBatterySortPage() {
     if (!deleteTarget) return;
     const next = groups.filter((g) => g.id !== deleteTarget.id);
     setGroups(next);
-    saveGroups(user?.id, next);
+    persistGroups(next);
     if (activeGroupId === deleteTarget.id) {
       setActiveGroupId(null);
       setSavedGroupBatteries(null);
@@ -412,6 +451,20 @@ function ClientBatterySortPage() {
       return;
     }
     const code = extracted.toUpperCase();
+
+    // ── Validate: only accept batteries registered to this client ──────────
+    if (!batteriesLoaded) {
+      setAddError('Your fleet list is still loading. Please try again in a moment.');
+      return;
+    }
+    if (batteriesLoadError) {
+      setAddError(batteriesLoadError);
+      return;
+    }
+    if (!codeToBattery.has(code)) {
+      setAddError(`Battery "${code}" is not registered in your fleet. Only registered batteries can be sorted.`);
+      return;
+    }
 
     const existingGroupName = allSortedBatteryMap.get(code);
     if (existingGroupName) {
@@ -430,17 +483,6 @@ function ClientBatterySortPage() {
     );
     setScanInput('');
     setAddError(null);
-  }
-
-  function removeBatteryFromActiveGroup(code) {
-    if (!activeGroup) return;
-    setGroups((prev) =>
-      prev.map((g) =>
-        g.id === activeGroup.id
-          ? { ...g, batteries: g.batteries.filter((c) => c !== code) }
-          : g
-      )
-    );
   }
 
   function handleScanKeyDown(e) {
@@ -491,19 +533,21 @@ function ClientBatterySortPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {hasUnsavedChanges && (
-              <button
-                type="button"
-                onClick={handleSaveGroup}
-                style={{ backgroundColor: accent }}
-                className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs transition-all hover:opacity-90 active:scale-98 ring-2 ring-emerald-400/50 animate-pulse"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-                </svg>
-                <span>Save Group</span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={handleSaveGroup}
+              style={hasUnsavedChanges ? { backgroundColor: accent } : undefined}
+              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-xs transition-all hover:opacity-90 active:scale-98 ${
+                hasUnsavedChanges
+                  ? 'text-white ring-2 ring-emerald-400/50 animate-pulse'
+                  : 'border border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
+              }`}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+              </svg>
+              <span>{hasUnsavedChanges ? 'Save Group ●' : 'Save Group'}</span>
+            </button>
             <button
               type="button"
               onClick={() => openRenameModal(activeGroup)}
@@ -570,7 +614,11 @@ function ClientBatterySortPage() {
                         )}
                       </div>
                       {hasBeenServiced(b) ? (
-                        <ClientStatusBadge status={b.status} />
+                        <ClientStatusBadge
+                          status={b.status}
+                          isVerified={b.return_status === 'verified' || Boolean(b.return_verified_at)}
+                          returnStatus={b.return_status}
+                        />
                       ) : (
                         <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
                       )}
@@ -731,7 +779,11 @@ function ClientBatterySortPage() {
                   <div className="space-y-1.5 pt-2 border-t border-slate-200/50 dark:border-white/5">
                     <div className="flex items-center justify-between gap-2">
                       {match && hasBeenServiced(match) ? (
-                        <ClientStatusBadge status={match.status} />
+                        <ClientStatusBadge
+                          status={match.status}
+                          isVerified={match.return_status === 'verified' || Boolean(match.return_verified_at)}
+                          returnStatus={match.return_status}
+                        />
                       ) : match ? (
                         <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                           Not yet serviced
@@ -871,51 +923,6 @@ function ClientBatterySortPage() {
           </Modal>
         )}
 
-        {saveSuccessModal && (
-          <Modal
-            title="Group Saved Successfully"
-            onClose={() => setSaveSuccessModal(false)}
-          >
-            <div className="flex flex-col gap-5">
-              <div className="flex items-start gap-3.5">
-                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    viewBox="0 0 24 24"
-                    fill="currentColor"
-                    className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
-                  >
-                    <path
-                      fillRule="evenodd"
-                      d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.74-5.25Z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                </span>
-                <div className="text-sm">
-                  <h4 className="font-bold text-slate-900 dark:text-neutral-100 text-base">
-                    "{activeGroup?.name || 'Group'}" Saved!
-                  </h4>
-                  <p className="mt-1 text-xs text-slate-600 dark:text-neutral-300 leading-relaxed">
-                    All sorted batteries ({activeGroup?.batteries?.length || 0}{' '}
-                    {activeGroup?.batteries?.length === 1 ? 'battery' : 'batteries'}) in this group have been updated and saved successfully.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-surface-700">
-                <button
-                  type="button"
-                  onClick={() => setSaveSuccessModal(false)}
-                  style={{ backgroundColor: accent }}
-                  className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 active:scale-98 transition-all"
-                >
-                  OK
-                </button>
-              </div>
-            </div>
-          </Modal>
-        )}
       </div>
     );
   }
@@ -947,6 +954,24 @@ function ClientBatterySortPage() {
         </button>
       </div>
 
+      {savedSuccessInfo && (
+        <div className="flex items-center justify-between rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-900 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100 font-bold">✓</span>
+            <span>
+              Group <span className="font-bold">&quot;{savedSuccessInfo.name}&quot;</span> saved successfully ({savedSuccessInfo.count} {savedSuccessInfo.count === 1 ? 'battery' : 'batteries'}).
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSavedSuccessInfo(null)}
+            className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {groups.length > 0 && (
         <div className="relative w-full sm:w-80">
           <svg
@@ -971,7 +996,24 @@ function ClientBatterySortPage() {
         </div>
       )}
 
-      {groups.length === 0 ? (
+      {groupsSaveError && (
+        <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
+          <span>{groupsSaveError}</span>
+          <button type="button" onClick={() => setGroupsSaveError(null)} className="shrink-0 font-bold underline-offset-2 hover:underline">
+            Dismiss
+          </button>
+        </div>
+      )}
+
+      {loadingGroups ? (
+        <div className="flex h-48 items-center justify-center">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-emerald-500 border-t-transparent" />
+        </div>
+      ) : groupsLoadError ? (
+        <div className="rounded-3xl border border-rose-200 bg-rose-50/60 p-8 text-center dark:border-rose-500/30 dark:bg-rose-500/10">
+          <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{groupsLoadError}</p>
+        </div>
+      ) : groups.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-white/10 dark:bg-surface-900">
           <p className="text-sm font-semibold text-slate-700 dark:text-neutral-300">
             No sort groups yet.
@@ -1184,6 +1226,58 @@ function ClientBatterySortPage() {
           message={duplicateNameAlert}
           onClose={() => setDuplicateNameAlert(null)}
         />
+      )}
+
+      {saveSuccessModal && (
+        <Modal
+          title="Group Saved Successfully"
+          onClose={() => {
+            setSaveSuccessModal(false);
+            setSavedSuccessInfo(null);
+          }}
+        >
+          <div className="flex flex-col gap-5">
+            <div className="flex items-start gap-3.5">
+              <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800/50">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="currentColor"
+                  className="h-6 w-6 text-emerald-600 dark:text-emerald-400"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.74-5.25Z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </span>
+              <div className="text-sm">
+                <h4 className="font-bold text-slate-900 dark:text-neutral-100 text-base">
+                  &quot;{savedSuccessInfo?.name || 'Group'}&quot; Saved!
+                </h4>
+                <p className="mt-1 text-xs text-slate-600 dark:text-neutral-300 leading-relaxed">
+                  All sorted batteries ({savedSuccessInfo?.count || 0}{' '}
+                  {savedSuccessInfo?.count === 1 ? 'battery' : 'batteries'}) in this group have been updated and saved successfully.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 pt-4 dark:border-surface-700">
+              <button
+                type="button"
+                onClick={() => {
+                  setSaveSuccessModal(false);
+                  setSavedSuccessInfo(null);
+                }}
+                style={{ backgroundColor: accent }}
+                className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 active:scale-98 transition-all"
+              >
+                OK
+              </button>
+            </div>
+          </div>
+        </Modal>
       )}
     </div>
   );

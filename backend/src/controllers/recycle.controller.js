@@ -40,7 +40,7 @@ async function getById(req, res, next) {
 
 async function create(req, res, next) {
   try {
-    const { vehicleNumber, driverName, batteryIds, recycleClientId } = req.body;
+    const { vehicleNumber, driverName, batteryIds, recycleClientId, totalWeightKg, pricePerKg } = req.body;
     const cleanBatteryIds = Array.isArray(batteryIds)
       ? [...new Set(batteryIds.map(Number).filter(Boolean))]
       : [];
@@ -52,6 +52,8 @@ async function create(req, res, next) {
       driverName,
       batteryIds: cleanBatteryIds,
       recycleClientId: recycleClientId ? Number(recycleClientId) : null,
+      totalWeightKg: totalWeightKg != null ? Number(totalWeightKg) : null,
+      pricePerKg: pricePerKg != null ? Number(pricePerKg) : 3.40,
     });
 
     await auditLogModel.record({
@@ -59,7 +61,7 @@ async function create(req, res, next) {
       action: 'create',
       entity: 'recycle_batch',
       entityId: batch.id,
-      details: { vehicleNumber, driverName, batteryIds: cleanBatteryIds },
+      details: { vehicleNumber, driverName, batteryIds: cleanBatteryIds, totalWeightKg, pricePerKg },
     });
 
     // These batteries just left 'unserviceable' — keep the popup alert and

@@ -46,6 +46,37 @@ const CLIENT_BATTERY_IDS_CTE = `
     SELECT b.id, b.battery_code, b.serial_number, b.status, b.created_at, b.qr_generated_at, b.truck_intake_id, b.notes
     FROM batteries b
     WHERE lower(b.client_name) = lower($2)
+    UNION
+    SELECT rb.battery_id AS id, b.battery_code, b.serial_number, b.status, b.created_at, b.qr_generated_at, b.truck_intake_id, b.notes
+    FROM returns ret
+    JOIN return_batteries rb ON rb.return_id = ret.id
+    JOIN batteries b ON b.id = rb.battery_id
+    WHERE ret.client_id = $1
+  )
+`;
+
+// A battery is billable from the moment the workshop first verified it on
+// ANY visit (battery_visits, plus its original intake for legacy rows), not
+// just its current truck_intake_id — that column is overwritten on every
+// re-pack, which would silently drop earlier visits' charges. A battery with
+// no verified visit at all (QR-registered, legacy data) falls back to billing
+// every charge, matching the original behaviour.
+const BILLABLE_BATTERIES_CTE = `
+  billable AS (
+    SELECT cb.id, fv.first_verified_at
+    FROM client_battery_ids cb
+    LEFT JOIN LATERAL (
+      SELECT MIN(COALESCE(ti.verified_at, v.visited_at)) AS first_verified_at
+      FROM (
+        SELECT bv.truck_intake_id, bv.created_at AS visited_at
+        FROM battery_visits bv WHERE bv.battery_id = cb.id
+        UNION
+        SELECT b0.truck_intake_id, b0.created_at
+        FROM batteries b0 WHERE b0.id = cb.id AND b0.truck_intake_id IS NOT NULL
+      ) v
+      JOIN truck_intakes ti ON ti.id = v.truck_intake_id
+      WHERE ti.status = 'verified' OR ti.verified_at IS NOT NULL
+    ) fv ON true
   )
 `;
 
@@ -55,16 +86,34 @@ const CLIENT_BATTERY_IDS_CTE = `
 // battery belonging to this client (see CLIENT_BATTERY_IDS_CTE above).
 async function getDashboardStats(clientId, clientName) {
   const { rows } = await db.query(
-    `WITH ${CLIENT_BATTERY_IDS_CTE}
+    `WITH ${CLIENT_BATTERY_IDS_CTE},
+     ${BILLABLE_BATTERIES_CTE}
      SELECT
        COUNT(DISTINCT b.id) AS battery_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_repair') AS in_repair_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_progress') AS in_progress_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_testing') AS in_testing_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'repaired') AS repaired_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'unserviceable') AS unserviceable_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'returned' AND EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)) AS returned_count,
        COUNT(DISTINCT r.batch_id) AS repair_visit_count,
-       COALESCE(SUM(r.price + r.labor_charge), 0) AS balance
+       (
+         COALESCE((
+           SELECT SUM(r.price + r.labor_charge)
+           FROM billable bb
+           JOIN repairs r ON r.battery_id = bb.id
+           WHERE bb.first_verified_at IS NULL
+              OR r.repaired_at >= bb.first_verified_at - INTERVAL '1 minute'
+         ), 0)
+         +
+         COALESCE((
+           SELECT SUM(bs.rate)
+           FROM billable bb
+           JOIN battery_services bs ON bs.battery_id = bb.id
+           WHERE bb.first_verified_at IS NULL
+              OR bs.completed_at >= bb.first_verified_at - INTERVAL '1 minute'
+         ), 0)
+       ) AS balance
      FROM client_battery_ids cb
      JOIN batteries b ON b.id = cb.id
      LEFT JOIN repairs r ON r.battery_id = b.id`,
@@ -222,8 +271,33 @@ async function findMyBatteries(clientId, clientName, bucket) {
   const params = [clientId, clientName];
 
   if (bucket === 'received') {
-    conditions.push(`b.status = 'returned'`);
-    conditions.push(`EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)`);
+    // Preserve full history of every received truck / return dispatch for this client all time,
+    // even if a battery in it is subsequently re-packed or sent back to service.
+    const { rows } = await db.query(
+      `WITH ${CLIENT_BATTERY_IDS_CTE}
+       SELECT b.id, b.battery_code, b.serial_number, b.serial_number_added_by_role, b.serial_number_added_at,
+              b.status, b.notes, b.created_at, b.truck_intake_id,
+              ti.id AS intake_id, ti.truck_number, ti.driver_name, ti.intake_at, ti.status AS intake_status, ti.verified_at,
+              last_repair.repaired_at AS last_repaired_at,
+              ret.id AS return_id, ret.truck_number AS return_truck, ret.driver_name AS return_driver, ret.returned_at AS return_date,
+              ret.status AS return_status, ret.verified_at AS return_verified_at
+       FROM returns ret
+       JOIN return_batteries rb ON rb.return_id = ret.id
+       JOIN client_battery_ids cb ON cb.id = rb.battery_id
+       JOIN batteries b ON b.id = cb.id
+       LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
+       LEFT JOIN LATERAL (
+         SELECT r.repaired_at
+         FROM repairs r
+         WHERE r.battery_id = b.id
+         ORDER BY r.repaired_at DESC
+         LIMIT 1
+       ) last_repair ON true
+       WHERE (ret.client_id = $1 OR lower(b.client_name) = lower($2))
+       ORDER BY ret.returned_at DESC, b.battery_code ASC`,
+      [clientId, clientName]
+    );
+    return rows;
   } else if (bucket === 'packed') {
     // Every truck ever packed for repair, whether it's still pending arrival
     // at the workshop or has already arrived and is awaiting technician
@@ -273,27 +347,86 @@ async function findMyBatteries(clientId, clientName, bucket) {
   return rows;
 }
 
-// Every repair charge across every battery belonging to this client, one row
-// per repair visit (batch_id — the same grouping the Repairs page uses) so a
-// multi-part visit reads as one billing line, not several.
+// Every repair and service charge across every battery belonging to this client,
+// strictly calculated ONLY after the battery has been received and verified at the workshop.
 async function findMyTransactions(clientId, clientName) {
   const { rows } = await db.query(
-    `WITH ${CLIENT_BATTERY_IDS_CTE}
-     SELECT
-       MIN(r.id) AS id,
-       r.batch_id,
-       MAX(b.battery_code) AS battery_code,
-       string_agg(p.name, ', ' ORDER BY p.name) AS part_name,
-       MAX(s.name) AS staff_name,
-       SUM(r.price + r.labor_charge) AS amount,
-       MIN(r.repaired_at) AS repaired_at
-     FROM client_battery_ids cb
-     JOIN batteries b ON b.id = cb.id
-     JOIN repairs r ON r.battery_id = b.id
-     JOIN parts p ON p.id = r.part_id
-     JOIN staff s ON s.id = r.staff_id
-     GROUP BY r.batch_id
-     ORDER BY MIN(r.repaired_at) DESC`,
+    `WITH ${CLIENT_BATTERY_IDS_CTE},
+     ${BILLABLE_BATTERIES_CTE},
+     verified_batteries AS (
+       SELECT
+         cb.id,
+         cb.battery_code,
+         cb.status,
+         li.intake_id,
+         li.truck_number,
+         li.driver_name,
+         li.intake_status,
+         bb.first_verified_at AS verified_at
+       FROM client_battery_ids cb
+       JOIN billable bb ON bb.id = cb.id
+       LEFT JOIN LATERAL (
+         SELECT ti.id AS intake_id, ti.truck_number, ti.driver_name, ti.status AS intake_status
+         FROM battery_visits bv
+         JOIN truck_intakes ti ON ti.id = bv.truck_intake_id
+         WHERE bv.battery_id = cb.id
+         ORDER BY bv.created_at DESC
+         LIMIT 1
+       ) li ON true
+     ),
+     repair_lines AS (
+       SELECT
+         'rep_' || r.batch_id::text AS id,
+         r.batch_id,
+         vb.id AS battery_id,
+         vb.battery_code,
+         vb.status AS battery_status,
+         vb.truck_number,
+         vb.verified_at,
+         'repair' AS charge_type,
+         string_agg(p.name, ', ' ORDER BY p.name) AS part_name,
+         string_agg(p.name, ', ' ORDER BY p.name) AS description,
+         MAX(s.name) AS staff_name,
+         SUM(r.price + r.labor_charge) AS amount,
+         MIN(r.repaired_at) AS repaired_at,
+         MAX(r.notes) AS notes
+       FROM verified_batteries vb
+       JOIN repairs r ON r.battery_id = vb.id
+       LEFT JOIN parts p ON p.id = r.part_id
+       LEFT JOIN staff s ON s.id = r.staff_id
+       WHERE vb.verified_at IS NULL
+          OR r.repaired_at >= vb.verified_at - INTERVAL '1 minute'
+       GROUP BY r.batch_id, vb.id, vb.battery_code, vb.status, vb.truck_number, vb.verified_at
+     ),
+     service_lines AS (
+       SELECT
+         'srv_' || bs.id::text AS id,
+         bs.batch_id,
+         vb.id AS battery_id,
+         vb.battery_code,
+         vb.status AS battery_status,
+         vb.truck_number,
+         vb.verified_at,
+         'service' AS charge_type,
+         bs.service_name AS part_name,
+         bs.service_name AS description,
+         COALESCE(s.name, 'Workshop') AS staff_name,
+         bs.rate AS amount,
+         bs.completed_at AS repaired_at,
+         bs.notes AS notes
+       FROM verified_batteries vb
+       JOIN battery_services bs ON bs.battery_id = vb.id
+       LEFT JOIN staff s ON s.id = bs.staff_id
+       WHERE vb.verified_at IS NULL
+          OR bs.completed_at >= vb.verified_at - INTERVAL '1 minute'
+     ),
+     all_lines AS (
+       SELECT * FROM repair_lines
+       UNION ALL
+       SELECT * FROM service_lines
+     )
+     SELECT * FROM all_lines
+     ORDER BY repaired_at DESC NULLS LAST`,
     [clientId, clientName]
   );
   return rows;
@@ -680,10 +813,18 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
 }
 
 // Update client's unverified truck intake info (truck number, driver name)
-async function updateClientTruckIntake(clientId, intakeId, { truckNumber, driverName }) {
+async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNumber, driverName }) {
   const { rows: existing } = await db.query(
-    `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
-    [intakeId, clientId]
+    `SELECT ti.* FROM truck_intakes ti
+     WHERE ti.id = $1 AND (
+       ti.client_id = $2
+       OR (ti.client_id IS NULL AND EXISTS (
+         SELECT 1 FROM batteries b
+         WHERE b.truck_intake_id = ti.id
+           AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
+       ))
+     )`,
+    [intakeId, clientId, clientName || '']
   );
   if (existing.length === 0) {
     const err = new Error('Truck intake not found or does not belong to your company.');
@@ -699,8 +840,9 @@ async function updateClientTruckIntake(clientId, intakeId, { truckNumber, driver
   const { rows } = await db.query(
     `UPDATE truck_intakes
      SET truck_number = COALESCE(NULLIF(trim($1), ''), truck_number),
-         driver_name = COALESCE(NULLIF(trim($2), ''), driver_name)
-     WHERE id = $3 AND client_id = $4
+         driver_name = COALESCE(NULLIF(trim($2), ''), driver_name),
+         client_id = COALESCE(client_id, $4)
+     WHERE id = $3
      RETURNING *`,
     [truckNumber, driverName, intakeId, clientId]
   );
@@ -710,8 +852,16 @@ async function updateClientTruckIntake(clientId, intakeId, { truckNumber, driver
 // Add more batteries to an existing unverified truck intake
 async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, { batteries = [] }) {
   const { rows: existing } = await db.query(
-    `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
-    [intakeId, clientId]
+    `SELECT ti.* FROM truck_intakes ti
+     WHERE ti.id = $1 AND (
+       ti.client_id = $2
+       OR (ti.client_id IS NULL AND EXISTS (
+         SELECT 1 FROM batteries b
+         WHERE b.truck_intake_id = ti.id
+           AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
+       ))
+     )`,
+    [intakeId, clientId, clientName || '']
   );
   if (existing.length === 0) {
     const err = new Error('Truck intake not found or does not belong to your company.');
@@ -776,8 +926,8 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
       [intakeId]
     );
     await client.query(
-      `UPDATE truck_intakes SET battery_count = $1 WHERE id = $2`,
-      [countRows[0].count, intakeId]
+      `UPDATE truck_intakes SET battery_count = $1, client_id = COALESCE(client_id, $3) WHERE id = $2`,
+      [countRows[0].count, intakeId, clientId]
     );
 
     await client.query('COMMIT');
@@ -813,8 +963,16 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
     if (hasIntake) {
       const validIntakeId = Number(intakeId);
       const { rows: intakeRows } = await client.query(
-        `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
-        [validIntakeId, clientId]
+        `SELECT ti.* FROM truck_intakes ti
+         WHERE ti.id = $1 AND (
+           ti.client_id = $2
+           OR (ti.client_id IS NULL AND EXISTS (
+             SELECT 1 FROM batteries b
+             WHERE b.truck_intake_id = ti.id
+               AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
+           ))
+         )`,
+        [validIntakeId, clientId, clientName || '']
       );
       if (intakeRows.length === 0) {
         const err = new Error('Truck intake not found.');
@@ -867,8 +1025,16 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
 // Delete / cancel an entire unverified truck intake and reset all its batteries
 async function deleteClientTruckIntake(clientId, clientName, intakeId) {
   const { rows: intakeRows } = await db.query(
-    `SELECT * FROM truck_intakes WHERE id = $1 AND client_id = $2`,
-    [intakeId, clientId]
+    `SELECT ti.* FROM truck_intakes ti
+     WHERE ti.id = $1 AND (
+       ti.client_id = $2
+       OR (ti.client_id IS NULL AND EXISTS (
+         SELECT 1 FROM batteries b
+         WHERE b.truck_intake_id = ti.id
+           AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
+       ))
+     )`,
+    [intakeId, clientId, clientName || '']
   );
   if (intakeRows.length === 0) {
     const err = new Error('Truck intake not found or does not belong to your company.');
@@ -902,8 +1068,8 @@ async function deleteClientTruckIntake(clientId, clientName, intakeId) {
 
     // Delete the intake
     await client.query(
-      `DELETE FROM truck_intakes WHERE id = $1 AND client_id = $2`,
-      [intakeId, clientId]
+      `DELETE FROM truck_intakes WHERE id = $1`,
+      [intakeId]
     );
 
     await client.query('COMMIT');
@@ -959,6 +1125,83 @@ async function updateClientBattery(clientId, clientName, batteryId, { serialNumb
   return rows[0];
 }
 
+async function findSortGroups(clientId, userId) {
+  let query;
+  let params;
+  if (clientId && userId) {
+    query = `SELECT id, name, batteries, created_at AS "createdAt", updated_at AS "updatedAt"
+             FROM client_sort_groups
+             WHERE client_id = $1 OR user_id = $2
+             ORDER BY created_at DESC`;
+    params = [clientId, userId];
+  } else if (clientId) {
+    query = `SELECT id, name, batteries, created_at AS "createdAt", updated_at AS "updatedAt"
+             FROM client_sort_groups
+             WHERE client_id = $1
+             ORDER BY created_at DESC`;
+    params = [clientId];
+  } else if (userId) {
+    query = `SELECT id, name, batteries, created_at AS "createdAt", updated_at AS "updatedAt"
+             FROM client_sort_groups
+             WHERE user_id = $1
+             ORDER BY created_at DESC`;
+    params = [userId];
+  } else {
+    return [];
+  }
+
+  const { rows } = await db.query(query, params);
+  return rows.map((r) => ({
+    id: r.id,
+    name: r.name,
+    createdAt: r.createdAt ? new Date(r.createdAt).toISOString() : new Date().toISOString(),
+    updatedAt: r.updatedAt ? new Date(r.updatedAt).toISOString() : new Date().toISOString(),
+    batteries: Array.isArray(r.batteries) ? r.batteries : [],
+  }));
+}
+
+async function replaceSortGroups(clientId, userId, groups) {
+  const client = await db.pool.connect();
+  try {
+    await client.query('BEGIN');
+
+    if (clientId && userId) {
+      await client.query('DELETE FROM client_sort_groups WHERE client_id = $1 OR user_id = $2', [clientId, userId]);
+    } else if (clientId) {
+      await client.query('DELETE FROM client_sort_groups WHERE client_id = $1', [clientId]);
+    } else if (userId) {
+      await client.query('DELETE FROM client_sort_groups WHERE user_id = $1', [userId]);
+    }
+
+    if (Array.isArray(groups) && groups.length > 0) {
+      for (const g of groups) {
+        if (!g || !g.id || !g.name) continue;
+        const groupBatteries = Array.isArray(g.batteries) ? g.batteries : [];
+        await client.query(
+          `INSERT INTO client_sort_groups (id, client_id, user_id, name, batteries, created_at, updated_at)
+           VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, now()), now())`,
+          [
+            String(g.id),
+            clientId || null,
+            userId || null,
+            String(g.name).trim(),
+            JSON.stringify(groupBatteries),
+            g.createdAt || null,
+          ]
+        );
+      }
+    }
+
+    await client.query('COMMIT');
+    return findSortGroups(clientId, userId);
+  } catch (err) {
+    await client.query('ROLLBACK');
+    throw err;
+  } finally {
+    client.release();
+  }
+}
+
 module.exports = {
   findAll,
   findById,
@@ -976,6 +1219,8 @@ module.exports = {
   removeBatteryFromClientTruckIntake,
   deleteClientTruckIntake,
   updateClientBattery,
+  findSortGroups,
+  replaceSortGroups,
   create,
   update,
   remove,

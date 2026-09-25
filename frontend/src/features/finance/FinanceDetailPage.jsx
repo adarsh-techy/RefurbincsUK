@@ -87,6 +87,7 @@ function FinanceDetailPage() {
     clientBreakdown = [],
     staffBreakdown = [],
     partBreakdown = [],
+    serviceBreakdown = [],
     repairs = [],
   } = data || {};
 
@@ -107,7 +108,7 @@ function FinanceDetailPage() {
     return 'Period Financial Statement';
   }, [type, period, from, to]);
 
-  // Search filtered repairs
+  // Search filtered repairs & battery fee charges
   const filteredRepairs = useMemo(() => {
     if (!searchQuery.trim()) return repairs;
     const q = searchQuery.toLowerCase();
@@ -115,14 +116,16 @@ function FinanceDetailPage() {
       const code = (r.batteryCode || '').toLowerCase();
       const client = (r.clientName || '').toLowerCase();
       const staff = (r.staffName || '').toLowerCase();
-      const part = (r.partName || '').toLowerCase();
+      const part = (r.partName || r.itemDescription || '').toLowerCase();
       const note = (r.notes || '').toLowerCase();
+      const chargeType = (r.chargeType || '').toLowerCase();
       return (
         code.includes(q) ||
         client.includes(q) ||
         staff.includes(q) ||
         part.includes(q) ||
-        note.includes(q)
+        note.includes(q) ||
+        chargeType.includes(q)
       );
     });
   }, [repairs, searchQuery]);
@@ -188,7 +191,7 @@ function FinanceDetailPage() {
             <div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded-md">
-                  {type === 'month' ? 'Monthly Report' : 'Daily Report'}
+                  {type === 'month' ? 'Monthly Statement' : 'Daily Statement'}
                 </span>
                 <span className="text-xs text-slate-400 dark:text-neutral-500">
                   {data?.period?.startDate} {data?.period?.endDate !== data?.period?.startDate ? `to ${data?.period?.endDate}` : ''}
@@ -201,12 +204,12 @@ function FinanceDetailPage() {
           </div>
 
           <div className="flex items-center gap-3">
-            <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/40">
+            <div className="p-3 rounded-xl bg-emerald-50/80 border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/40 text-right">
               <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400 block">
-                Total Billed Revenue
+                Total Revenue
               </span>
-              <span className="text-xl font-black text-emerald-700 dark:text-emerald-300">
-                {formatMoney(totals.repairRevenue)}
+              <span className="text-xl md:text-2xl font-black text-emerald-700 dark:text-emerald-300">
+                {formatMoney(totals.totalRevenue)}
               </span>
             </div>
           </div>
@@ -217,37 +220,37 @@ function FinanceDetailPage() {
       <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
         <StatCard
           label="Total Revenue"
+          value={formatMoney(totals.totalRevenue)}
+          tone="good"
+          sub="Repairs, Fees & Recycling"
+        />
+        <StatCard
+          label="Repair Cost"
           value={formatMoney(totals.repairRevenue)}
-          tone="good"
-          sub="Parts + Labor combined"
+          tone="neutral"
+          sub={`Parts: ${formatMoney(totals.partsRevenue)} · Labor: ${formatMoney(totals.laborRevenue)}`}
         />
         <StatCard
-          label="Labor Revenue"
-          value={formatMoney(totals.laborRevenue)}
+          label="Service & Intake Fees"
+          value={formatMoney(totals.servicesRevenue)}
           tone="info"
-          sub="Service charges earned"
+          sub={`${totals.servicesCount || 0} service / intake fee items`}
         />
         <StatCard
-          label="Parts Revenue"
-          value={formatMoney(totals.partsRevenue)}
-          tone="neutral"
-          sub="Stock components billed"
+          label="Recycle Revenue"
+          value={formatMoney(totals.recycleRevenue)}
+          tone="warning"
+          sub="Scrap & battery recycling payout"
         />
         <StatCard
-          label="Repairs Count"
-          value={totals.repairsCount || 0}
+          label="Batteries Serviced"
+          value={`${totals.batteriesCount || 0} units`}
           tone="good"
-          sub={`${totals.batteriesCount || 0} distinct batteries`}
-        />
-        <StatCard
-          label="Avg Job Value"
-          value={formatMoney(totals.avgRevenuePerRepair)}
-          tone="neutral"
-          sub="Average revenue per repair"
+          sub={`${(totals.repairsCount || 0) + (totals.servicesCount || 0)} total logged actions`}
         />
       </div>
 
-      {/* Summary Distribution Grids: Clients, Staff & Parts */}
+      {/* Summary Distribution Grids: Clients, Staff, Services & Parts */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         {/* 1. Client Breakdown */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-850 space-y-3.5 flex flex-col">
@@ -262,16 +265,17 @@ function FinanceDetailPage() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[280px] pr-1">
+          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[300px] pr-1">
             {clientBreakdown.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
                 No client activity in this period.
               </p>
             ) : (
               clientBreakdown.map((c, idx) => {
+                const totalBilled = totals.totalRevenue || totals.repairRevenue || 1;
                 const sharePercent =
-                  totals.repairRevenue > 0
-                    ? Math.round((c.totalRevenue / totals.repairRevenue) * 100)
+                  totalBilled > 0
+                    ? Math.round((c.totalRevenue / totalBilled) * 100)
                     : 0;
                 return (
                   <div
@@ -287,13 +291,13 @@ function FinanceDetailPage() {
                       </span>
                     </div>
                     <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-400">
-                      <span>{c.repairsCount} repairs ({c.batteriesCount} batteries)</span>
+                      <span>{c.repairsCount} repairs · {c.servicesCount || 0} fees ({c.batteriesCount} batteries)</span>
                       <span>{sharePercent}% share</span>
                     </div>
                     <div className="w-full bg-slate-200 dark:bg-surface-800 h-1 rounded-full overflow-hidden">
                       <div
                         className="bg-emerald-500 h-full rounded-full transition-all"
-                        style={{ width: `${sharePercent}%` }}
+                        style={{ width: `${Math.min(100, Math.max(2, sharePercent))}%` }}
                       />
                     </div>
                   </div>
@@ -316,10 +320,10 @@ function FinanceDetailPage() {
             </div>
           </div>
 
-          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[280px] pr-1">
+          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[300px] pr-1">
             {staffBreakdown.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
-                No technician logged repairs in this period.
+                No technician logged work in this period.
               </p>
             ) : (
               staffBreakdown.map((s, idx) => (
@@ -339,11 +343,15 @@ function FinanceDetailPage() {
                     </span>
                   </div>
                   <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400">
-                    <span>{s.repairsCount} jobs · Labor: {formatMoney(s.laborRevenue)}</span>
-                    <span className="inline-flex items-center gap-1 font-mono">
-                      <FiClock className="w-3 h-3 text-slate-400" />
-                      {formatDuration(s.avgDurationSeconds)}
-                    </span>
+                    <span>{s.repairsCount} repairs · {s.servicesCount || 0} services</span>
+                    {s.avgDurationSeconds ? (
+                      <span className="inline-flex items-center gap-1 font-mono">
+                        <FiClock className="w-3 h-3 text-slate-400" />
+                        {formatDuration(s.avgDurationSeconds)}
+                      </span>
+                    ) : (
+                      <span className="font-mono text-slate-400">Fee/Test</span>
+                    )}
                   </div>
                 </div>
               ))
@@ -351,7 +359,7 @@ function FinanceDetailPage() {
           </div>
         </div>
 
-        {/* 3. Top Replacement Parts */}
+        {/* 3. Services & Intake Fees & Parts Breakdown */}
         <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-850 space-y-3.5 flex flex-col">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/5">
             <div className="flex items-center gap-2">
@@ -359,57 +367,78 @@ function FinanceDetailPage() {
                 <FiLayers className="w-4 h-4" />
               </div>
               <h3 className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
-                Parts & Services Utilized ({partBreakdown.length})
+                Services & Intake Fees ({serviceBreakdown.length})
               </h3>
             </div>
           </div>
 
-          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[280px] pr-1">
-            {partBreakdown.length === 0 ? (
+          <div className="flex-1 space-y-2.5 overflow-y-auto max-h-[300px] pr-1">
+            {serviceBreakdown.length === 0 && partBreakdown.length === 0 ? (
               <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
-                No parts logged in this period.
+                No service fees or parts logged in this period.
               </p>
             ) : (
-              partBreakdown.map((p, idx) => (
-                <div
-                  key={p.id || idx}
-                  className="p-3 rounded-xl bg-slate-50/80 border border-slate-100 dark:bg-surface-900/60 dark:border-white/5 flex items-center justify-between"
-                >
-                  <div className="min-w-0 pr-2">
-                    <span className="font-bold text-xs text-slate-900 dark:text-white block truncate">
-                      {p.name}
-                    </span>
-                    <span className="text-[11px] text-slate-400 dark:text-neutral-400">
-                      {p.quantityUsed} unit{p.quantityUsed === 1 ? '' : 's'} replaced
+              <>
+                {serviceBreakdown.map((s, idx) => (
+                  <div
+                    key={`srv-${s.service_id || idx}`}
+                    className="p-2.5 rounded-xl bg-purple-50/70 border border-purple-100 dark:bg-purple-950/30 dark:border-purple-900/40 flex items-center justify-between"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-bold text-xs text-purple-900 dark:text-purple-200 block truncate">
+                        {s.name}
+                      </span>
+                      <span className="text-[11px] text-purple-700/80 dark:text-purple-400">
+                        {s.timesApplied} applied ({s.batteriesCount} batteries) · {formatMoney(s.avgRate)}/unit
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-xs text-purple-700 dark:text-purple-300 shrink-0">
+                      {formatMoney(s.totalRevenue)}
                     </span>
                   </div>
-                  <span className="font-mono font-bold text-xs text-slate-900 dark:text-white shrink-0">
-                    {formatMoney(p.totalRevenue)}
-                  </span>
-                </div>
-              ))
+                ))}
+
+                {partBreakdown.slice(0, 4).map((p, idx) => (
+                  <div
+                    key={`prt-${p.id || idx}`}
+                    className="p-2.5 rounded-xl bg-slate-50/80 border border-slate-100 dark:bg-surface-900/60 dark:border-white/5 flex items-center justify-between"
+                  >
+                    <div className="min-w-0 pr-2">
+                      <span className="font-bold text-xs text-slate-900 dark:text-white block truncate">
+                        {p.name}
+                      </span>
+                      <span className="text-[11px] text-slate-400 dark:text-neutral-400">
+                        {p.quantityUsed} unit{p.quantityUsed === 1 ? '' : 's'} replaced
+                      </span>
+                    </div>
+                    <span className="font-mono font-bold text-xs text-slate-900 dark:text-white shrink-0">
+                      {formatMoney(p.totalRevenue)}
+                    </span>
+                  </div>
+                ))}
+              </>
             )}
           </div>
         </div>
       </div>
 
-      {/* Itemized Transaction Log (Repairs Table) */}
+      {/* Itemized Battery Fee & Service Transaction Log */}
       <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-850 space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-white/5">
           <div>
             <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Itemized Repair Log ({filteredRepairs.length})
+              Itemized Battery Charges & Fee Ledger ({filteredRepairs.length})
             </h2>
             <p className="text-xs text-slate-500 dark:text-neutral-400">
-              Complete breakdown of every billable repair logged during this statement period.
+              Complete itemized breakdown of every billable repair, mandatory intake fee, and diagnostic service across all batteries.
             </p>
           </div>
 
-          <div className="relative min-w-[220px]">
+          <div className="relative min-w-[240px]">
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
             <input
               type="text"
-              placeholder="Search battery, client, part…"
+              placeholder="Search battery, client, service, fee…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-800"
@@ -436,31 +465,35 @@ function FinanceDetailPage() {
                   <th className="py-3 px-3.5 min-w-[130px]">Date & Time</th>
                   <th className="py-3 px-3.5 min-w-[130px]">Battery Code</th>
                   <th className="py-3 px-3.5 min-w-[140px]">Client</th>
-                  <th className="py-3 px-3.5 min-w-[130px]">Technician</th>
-                  <th className="py-3 px-3.5 min-w-[160px]">Parts Changed</th>
+                  <th className="py-3 px-3.5 min-w-[120px]">Type</th>
+                  <th className="py-3 px-3.5 min-w-[130px]">Staff / System</th>
+                  <th className="py-3 px-3.5 min-w-[170px]">Service / Parts</th>
                   <th className="py-3 px-3.5 min-w-[90px]">Labor</th>
                   <th className="py-3 px-3.5 min-w-[90px]">Parts</th>
-                  <th className="py-3 px-3.5 min-w-[100px]">Total</th>
+                  <th className="py-3 px-3.5 min-w-[90px]">Fee</th>
+                  <th className="py-3 px-3.5 min-w-[100px]">Total Charge</th>
                   <th className="py-3 px-3.5 min-w-[100px]">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-surface-850">
                 {filteredRepairs.length === 0 ? (
                   <tr>
-                    <td colSpan={10} className="py-12 text-center text-slate-400 dark:text-neutral-500">
+                    <td colSpan={12} className="py-12 text-center text-slate-400 dark:text-neutral-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <FiTool className="w-8 h-8 text-slate-300 dark:text-neutral-600" />
                         <p className="font-semibold">
                           {searchQuery
-                            ? 'No repairs match your search.'
-                            : 'No repair transactions found for this period.'}
+                            ? 'No charges match your search query.'
+                            : 'No battery fees or repair charges found for this period.'}
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   filteredRepairs.map((r, index) => {
-                    const parts = (r.partName || '').split(',').map((p) => p.trim()).filter(Boolean);
+                    const isServiceFee = r.chargeType === 'service_fee' || (r.serviceFee > 0 && !r.partsCharge && !r.laborCharge);
+                    const parts = (r.partName || r.itemDescription || '').split(',').map((p) => p.trim()).filter(Boolean);
+
                     return (
                       <tr
                         key={r.batchId || r.id || index}
@@ -472,29 +505,44 @@ function FinanceDetailPage() {
                         <td className="py-3 px-3.5">
                           <div className="flex flex-col">
                             <span className="font-bold text-slate-800 dark:text-neutral-200">
-                              {new Date(r.repairedAt).toLocaleDateString([], {
+                              {r.repairedAt ? new Date(r.repairedAt).toLocaleDateString([], {
                                 day: '2-digit',
                                 month: 'short',
-                              })}
+                              }) : '—'}
                             </span>
                             <span className="text-[10px] text-slate-400 dark:text-neutral-500">
-                              {new Date(r.repairedAt).toLocaleTimeString([], {
+                              {r.repairedAt ? new Date(r.repairedAt).toLocaleTimeString([], {
                                 hour: '2-digit',
                                 minute: '2-digit',
-                              })}
+                              }) : ''}
                             </span>
                           </div>
                         </td>
                         <td className="py-3 px-3.5 font-medium">
-                          <Link
-                            to={`/batteries/${r.batteryCode}`}
-                            className="inline-flex items-center gap-1 font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md hover:underline dark:bg-blue-950/60 dark:text-blue-300"
-                          >
-                            {r.batteryCode}
-                          </Link>
+                          {r.batteryCode ? (
+                            <Link
+                              to={`/batteries/${r.batteryCode}`}
+                              className="inline-flex items-center gap-1 font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md hover:underline dark:bg-blue-950/60 dark:text-blue-300"
+                            >
+                              {r.batteryCode}
+                            </Link>
+                          ) : (
+                            <span className="text-slate-400">—</span>
+                          )}
                         </td>
                         <td className="py-3 px-3.5 font-semibold text-slate-800 dark:text-neutral-200">
                           {r.clientName}
+                        </td>
+                        <td className="py-3 px-3.5">
+                          {isServiceFee ? (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                              Service Fee
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                              Repair Job
+                            </span>
+                          )}
                         </td>
                         <td className="py-3 px-3.5">
                           {r.staffId ? (
@@ -505,36 +553,45 @@ function FinanceDetailPage() {
                               {r.staffName}
                             </Link>
                           ) : (
-                            <span className="text-slate-500 dark:text-neutral-400">{r.staffName}</span>
+                            <span className="text-slate-500 dark:text-neutral-400">{r.staffName || 'System Auto'}</span>
                           )}
                         </td>
                         <td className="py-3 px-3.5">
-                          <div className="flex flex-wrap gap-1">
-                            {parts.length > 0 ? (
-                              parts.map((p, pIdx) => (
-                                <span
-                                  key={pIdx}
-                                  className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                                >
-                                  {p}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-slate-400 dark:text-neutral-500">—</span>
-                            )}
-                          </div>
+                          {isServiceFee ? (
+                            <span className="font-semibold text-slate-800 dark:text-neutral-200">
+                              {r.itemDescription || r.partName || 'Service Fee'}
+                            </span>
+                          ) : (
+                            <div className="flex flex-wrap gap-1">
+                              {parts.length > 0 ? (
+                                parts.map((p, pIdx) => (
+                                  <span
+                                    key={pIdx}
+                                    className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                  >
+                                    {p}
+                                  </span>
+                                ))
+                              ) : (
+                                <span className="text-slate-400 dark:text-neutral-500">—</span>
+                              )}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
-                          {formatMoney(r.laborCharge)}
+                          {r.laborCharge > 0 ? formatMoney(r.laborCharge) : '—'}
                         </td>
                         <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
-                          {formatMoney(r.partsCharge)}
+                          {r.partsCharge > 0 ? formatMoney(r.partsCharge) : '—'}
+                        </td>
+                        <td className="py-3 px-3.5 font-mono text-purple-600 dark:text-purple-400 font-bold">
+                          {r.serviceFee > 0 ? formatMoney(r.serviceFee) : '—'}
                         </td>
                         <td className="py-3 px-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
                           {formatMoney(r.totalCharge)}
                         </td>
                         <td className="py-3 px-3.5">
-                          <StatusBadge status={r.batteryStatus} />
+                          {r.batteryStatus ? <StatusBadge status={r.batteryStatus} /> : '—'}
                         </td>
                       </tr>
                     );

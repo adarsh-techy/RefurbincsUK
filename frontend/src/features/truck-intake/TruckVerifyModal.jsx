@@ -165,13 +165,13 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
   // Check if a scanned battery is arriving for 2nd (or N-th) time this month and trigger popup
   async function triggerRepeatIntakeAlertIfApplicable(matchedBattery, code) {
     const currentIntakeId = Number(intakeId || data?.intake?.id);
-    let count = matchedBattery?.intake_count_this_month || 0;
-    let visits = matchedBattery?.visits_this_month || [];
-    let repairs = matchedBattery?.repairs_this_month || [];
+    let count = Number(matchedBattery?.intake_count_this_month) || 0;
+    let visits = Array.isArray(matchedBattery?.visits_this_month) ? [...matchedBattery.visits_this_month] : [];
+    let repairs = Array.isArray(matchedBattery?.repairs_this_month) ? [...matchedBattery.repairs_this_month] : [];
     let lastParts = matchedBattery?.last_repaired_parts || '';
 
-    // If repeat data wasn't already attached to matchedBattery, fetch from battery details endpoint
-    if (count === 0 && (!visits || visits.length === 0)) {
+    // If repeat data wasn't already attached to matchedBattery, or count is <= 1, verify via details endpoint
+    if (count <= 1 || visits.length <= 1) {
       try {
         const res = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
         const allVisits = res.data?.visits || [];
@@ -180,10 +180,28 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
           const d = new Date(v.intake_at || v.created_at);
           return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth();
         });
-        if (thisMonthVisits.length > 1) {
-          count = thisMonthVisits.length;
-          visits = thisMonthVisits;
-          repairs = res.data?.history || [];
+
+        // Check if current truck is already in thisMonthVisits
+        const alreadyHasCurrent = thisMonthVisits.some(
+          (v) => Number(v.truck_intake_id) === currentIntakeId
+        );
+
+        // Past visits in current month + current intake arrival
+        const totalThisMonth = thisMonthVisits.length + (alreadyHasCurrent ? 0 : 1);
+        if (totalThisMonth > 1) {
+          count = totalThisMonth;
+          const currentEntry = alreadyHasCurrent
+            ? null
+            : {
+                truck_intake_id: currentIntakeId,
+                truck_number: data?.intake?.truck_number,
+                driver_name: data?.intake?.driver_name,
+                intake_at: data?.intake?.intake_at || new Date().toISOString(),
+                is_current_intake: true,
+              };
+          visits = currentEntry ? [...thisMonthVisits, currentEntry] : thisMonthVisits;
+          repairs = res.data?.history || repairs;
+          lastParts = res.data?.last_repaired_parts || lastParts;
         }
       } catch {
         // Safe fallback
@@ -290,14 +308,14 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
         }
         onClose={onClose}
         size="6xl"
-        className="max-h-[94vh] flex flex-col"
+        className="h-[88vh] md:h-[92vh] max-h-[92vh] flex flex-col"
       >
         {loading ? (
           <TableState>Loading truck shipment details…</TableState>
         ) : error ? (
           <TableState tone="error">{error}</TableState>
         ) : (
-          <div className="flex flex-col min-h-[580px] max-h-[75vh]">
+          <div className="flex flex-col flex-1 min-h-0 h-full">
             {/* 1. Top Metadata & Progress Banner */}
             <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
               <div className="flex flex-wrap items-center justify-between gap-3">

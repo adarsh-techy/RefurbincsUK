@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
+import { FiFileText } from 'react-icons/fi';
 import useFetchList from '../../utils/use-fetch-list';
 import DataTable from '../../components/ui/table/DataTable';
 import TableState from '../../components/ui/table/TableState';
@@ -12,6 +13,7 @@ import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
 import ReturnForm from './ReturnForm';
 import ReturnEditForm from './ReturnEditForm';
+import { resolveImageUrl } from '../../utils/image-url';
 
 // Converts to a YYYY-MM-DD string in the browser's local timezone, so a date
 // picked in the filter matches returns recorded that same calendar day —
@@ -83,6 +85,26 @@ function ReturnsPage() {
       key: 'returned_at',
       label: 'Date/Time',
       render: (row) => new Date(row.returned_at).toLocaleString(),
+    },
+    {
+      key: 'document',
+      label: 'Document',
+      render: (row) =>
+        row.document_url ? (
+          <a
+            href={resolveImageUrl(row.document_url)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40 transition-colors"
+          >
+            <FiFileText className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+            <span className="truncate max-w-[120px]">
+              {row.document_name ? row.document_name : 'View Note'}
+            </span>
+          </a>
+        ) : (
+          <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
+        ),
     },
     ...(isSuperAdmin
       ? [

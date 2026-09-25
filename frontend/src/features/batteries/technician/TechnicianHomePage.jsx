@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
+import { canTestBatteries } from '../../../utils/permissions';
 
 const SUGGESTION_LIMIT = 8;
 const DEBOUNCE_MS = 250;
@@ -14,6 +16,9 @@ const DEBOUNCE_MS = 250;
 // code itself and shows its own error if nothing matches.
 function TechnicianHomePage() {
   const navigate = useNavigate();
+  const user = useSelector((state) => state.auth.user);
+  const canTest = canTestBatteries(user);
+
   const [cameraOpen, setCameraOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
   const [suggestions, setSuggestions] = useState([]);
@@ -31,9 +36,15 @@ function TechnicianHomePage() {
 
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await apiClient.get('/batteries', {
-          params: { q: manualCode.trim(), limit: SUGGESTION_LIMIT },
-        });
+        const params = {
+          q: manualCode.trim(),
+          limit: SUGGESTION_LIMIT,
+          intakedOnly: 'true',
+        };
+        if (canTest) {
+          params.includeTesting = 'true';
+        }
+        const { data } = await apiClient.get('/batteries', { params });
         setSuggestions(data.data);
       } catch {
         setSuggestions([]);
@@ -41,7 +52,7 @@ function TechnicianHomePage() {
     }, DEBOUNCE_MS);
 
     return () => clearTimeout(debounceRef.current);
-  }, [manualCode]);
+  }, [manualCode, canTest]);
 
   function goToBattery(raw) {
     const code = extractBatteryCode(raw);
@@ -49,7 +60,7 @@ function TechnicianHomePage() {
     setCameraOpen(false);
     setSuggestions([]);
     setShowSuggestions(false);
-    navigate(`/batteries/${encodeURIComponent(code)}`);
+    navigate(`/batteries/${encodeURIComponent(code)}?fromScan=true`);
   }
 
   function handleManualKeyDown(e) {
@@ -60,46 +71,47 @@ function TechnicianHomePage() {
   }
 
   return (
-    <div className="flex min-h-[70vh] flex-col items-center justify-center text-center">
-      <span className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/30">
+    <div className="flex min-h-[75vh] flex-col items-center justify-center px-4 py-8 text-center">
+      <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
           fill="none"
-          stroke="currentColor"
-          strokeWidth="1.5"
-          className="h-10 w-10 text-emerald-400"
+          stroke="#059669"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="h-8 w-8"
         >
-          <path
-            strokeLinecap="round"
-            strokeLinejoin="round"
-            d="M3.75 4.5h4.5v4.5h-4.5v-4.5Zm0 10.5h4.5v4.5h-4.5v-4.5Zm10.5-10.5h4.5v4.5h-4.5v-4.5Zm0 6.75h1.5v1.5h-1.5v-1.5Zm3 0h1.5v1.5h-1.5v-1.5Zm-3 3h1.5v1.5h-1.5v-1.5Zm3 0h1.5v1.5h-1.5v-1.5Zm-3 3h1.5v1.5h-1.5v-1.5Zm3 0h1.5v1.5h-1.5v-1.5Z"
-          />
+          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
+          <circle cx="12" cy="13" r="3" />
         </svg>
-      </span>
-      <h1 className="text-lg font-semibold text-slate-900">Scan a Battery to Begin</h1>
-      <p className="mt-2 max-w-xs text-sm text-slate-500">
-        Scan the QR code on a battery to start work, log the parts you changed, and mark it
-        complete.
+      </div>
+
+      <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Scan a Battery to Begin</h1>
+      <p className="mt-2 max-w-xs text-center text-sm text-slate-500 dark:text-neutral-400">
+        Scan the QR code on a battery to start work, log the parts you changed, and mark it complete.
       </p>
 
       <div className="mt-6 flex w-full max-w-xs flex-col items-center gap-3">
         {cameraOpen ? (
-          <QrScanner onScan={goToBattery} onClose={() => setCameraOpen(false)} />
+          <div className="w-full">
+            <QrScanner onScan={goToBattery} onClose={() => setCameraOpen(false)} />
+          </div>
         ) : (
           <button
             type="button"
             onClick={() => setCameraOpen(true)}
-            className="w-full rounded-md bg-blue-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-blue-700"
+            className="w-full rounded-md bg-blue-600 px-4 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 transition-colors"
           >
             Scan with Camera
           </button>
         )}
 
         <div className="flex w-full items-center gap-2 text-xs text-slate-400">
-          <div className="h-px flex-1 bg-slate-200" />
-          or use a handheld scanner
-          <div className="h-px flex-1 bg-slate-200" />
+          <div className="h-px flex-1 bg-slate-200 dark:bg-neutral-800" />
+          or search by code
+          <div className="h-px flex-1 bg-slate-200 dark:bg-neutral-800" />
         </div>
 
         <div className="relative w-full">
@@ -107,31 +119,36 @@ function TechnicianHomePage() {
             ref={inputRef}
             type="text"
             value={manualCode}
-            onChange={(e) => setManualCode(e.target.value)}
+            onChange={(e) => {
+              setManualCode(e.target.value);
+              setShowSuggestions(true);
+            }}
             onKeyDown={handleManualKeyDown}
             onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-            placeholder="Scan or type battery code, then Enter"
+            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+            placeholder="Type battery code"
+            autoCapitalize="characters"
             autoComplete="off"
-            className="w-full rounded-md border border-blue-200 bg-blue-50 px-3.5 py-2.5 text-center text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-400/30 dark:border-blue-800/40 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
+            className="w-full rounded-md border border-blue-200 bg-blue-50 px-3.5 py-3 text-center text-base font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-900/40 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
           />
 
           {showSuggestions && suggestions.length > 0 && (
-            <ul className="absolute z-10 mt-1 max-h-56 w-full overflow-y-auto rounded-md border border-blue-200 bg-white py-1 text-left shadow-lg dark:border-surface-700 dark:bg-surface-900">
-              {suggestions.map((b) => (
-                <li key={b.id}>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => goToBattery(b.battery_code)}
-                    className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-blue-50 dark:hover:bg-surface-800"
-                  >
-                    <span className="font-medium text-slate-900 dark:text-white">{b.battery_code}</span>
-                    <StatusBadge status={b.status} />
-                  </button>
-                </li>
+            <div className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-blue-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900 divide-y divide-slate-100 dark:divide-white/5">
+              {suggestions.map((item) => (
+                <button
+                  key={item.id}
+                  type="button"
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => goToBattery(item.battery_code)}
+                  className="flex w-full items-center justify-between px-3.5 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-surface-800"
+                >
+                  <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                    {item.battery_code}
+                  </span>
+                  <StatusBadge status={item.status} />
+                </button>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </div>

@@ -91,32 +91,34 @@ function ClientForm({ client, onSaved, onCancel }) {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5 max-h-[80vh] overflow-y-auto pr-1">
-      <div>
-        <label className={labelClasses}>Client Name</label>
-        <input
-          type="text"
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Apex Fleet Logistics UK"
-          className={inputClasses}
-          required
-        />
-      </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className={labelClasses}>Client Name <span className="text-rose-500">*</span></label>
+          <input
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Apex Fleet Logistics UK"
+            className={inputClasses}
+            required
+          />
+        </div>
 
-      <div>
-        <label className={labelClasses}>
-          Invoice / Billing Email (optional)
-        </label>
-        <input
-          type="email"
-          value={invoiceEmail}
-          onChange={(e) => setInvoiceEmail(e.target.value)}
-          placeholder="e.g. accounts@clientfleet.co.uk or billing@company.com"
-          className={inputClasses}
-        />
-        <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">
-          Invoices & billing statements will automatically be sent to this email address.
-        </p>
+        <div>
+          <label className={labelClasses}>
+            Invoice / Billing Email (optional)
+          </label>
+          <input
+            type="email"
+            value={invoiceEmail}
+            onChange={(e) => setInvoiceEmail(e.target.value)}
+            placeholder="e.g. accounts@clientfleet.co.uk"
+            className={inputClasses}
+          />
+          <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">
+            Invoices & statements will be sent to this email.
+          </p>
+        </div>
       </div>
 
       <div>
@@ -238,7 +240,7 @@ function ClientForm({ client, onSaved, onCancel }) {
                     <p className="mb-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
                       {groupName}
                     </p>
-                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
                       {perms.map((p) => {
                         const isChecked = permissions.includes(p.key);
                         return (

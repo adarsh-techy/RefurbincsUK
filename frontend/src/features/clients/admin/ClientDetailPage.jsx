@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useSelector } from 'react-redux';
 import { Link, useParams } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
@@ -17,6 +18,8 @@ const STATUS_BREAKDOWN = [
 // sent in via a tagged truck intake, plus their full billing history.
 function ClientDetailPage() {
   const { id } = useParams();
+  const user = useSelector((state) => state.auth.user);
+  const isSuperAdmin = user?.role === 'super_admin';
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -103,16 +106,19 @@ function ClientDetailPage() {
         </Link>
       </div>
 
-      <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className={`mb-6 grid grid-cols-1 gap-4 ${isSuperAdmin ? 'sm:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <StatCard label="Total Batteries" value={stats.battery_count} tone="good" />
         <StatCard label="Repair Visits" value={stats.repair_visit_count} tone="info" />
-        <StatCard label="Balance" value={`£${Number(stats.balance).toFixed(2)}`} tone="warning" />
+        {isSuperAdmin && (
+          <StatCard label="Balance" value={`£${Number(stats.balance).toFixed(2)}`} tone="warning" />
+        )}
       </div>
 
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm dark:border-white/10 dark:bg-surface-900">
-        <h2 className="mb-4 border-b border-slate-100 pb-4 text-sm font-bold text-slate-900 dark:border-white/5 dark:text-white">
-          Billing History
-        </h2>
+      {isSuperAdmin && (
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-sm dark:border-white/10 dark:bg-surface-900">
+          <h2 className="mb-4 border-b border-slate-100 pb-4 text-sm font-bold text-slate-900 dark:border-white/5 dark:text-white">
+            Billing History
+          </h2>
 
         {transactions.length === 0 ? (
           <p className="py-6 text-center text-sm text-slate-500 dark:text-neutral-400">
@@ -121,7 +127,7 @@ function ClientDetailPage() {
         ) : (
           <ul className="divide-y divide-slate-100 dark:divide-surface-800">
             {transactions.map((t) => (
-              <li key={t.batch_id} className="flex gap-4 py-5 text-sm first:pt-0 last:pb-0">
+              <li key={t.id || t.batch_id} className="flex gap-4 py-5 text-sm first:pt-0 last:pb-0">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-brand-100 text-brand-700 dark:bg-emerald-500/15 dark:text-emerald-300">
                   <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
                     <path d="M4 4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V6a2 2 0 0 0-2-2H4Zm0 3h12v1H4V7Zm0 3h5v3H4v-3Z" />
@@ -129,25 +135,34 @@ function ClientDetailPage() {
                 </span>
                 <div className="flex min-w-0 flex-1 flex-col gap-2">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <Link
-                      to={`/batteries/${t.battery_code}`}
-                      className="font-medium text-blue-700 hover:underline dark:text-blue-400"
-                    >
-                      {t.battery_code}
-                    </Link>
+                    <div className="flex items-center gap-2">
+                      <Link
+                        to={`/batteries/${t.battery_code}`}
+                        className="font-medium text-blue-700 hover:underline dark:text-blue-400 font-mono"
+                      >
+                        {t.battery_code}
+                      </Link>
+                      {t.battery_status === 'unserviceable' && (
+                        <span className="rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 border border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/50">
+                          Unserviceable
+                        </span>
+                      )}
+                    </div>
                     <span className="text-xs text-slate-400 dark:text-neutral-500">
                       {new Date(t.repaired_at).toLocaleString()}
                     </span>
                   </div>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-slate-500 dark:text-neutral-400">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-slate-500 dark:text-neutral-400 text-xs">
                     <span>
-                      {t.part_name.includes(',') ? 'Parts:' : 'Part:'}{' '}
-                      <span className="text-xs font-semibold text-brand-700 dark:text-emerald-300">{t.part_name}</span>
+                      {t.charge_type === 'service' ? 'Service / Fee:' : (t.part_name || '').includes(',') ? 'Parts:' : 'Part:'}{' '}
+                      <span className="font-semibold text-brand-700 dark:text-emerald-300">
+                        {t.part_name || t.description || 'Service Fee'}
+                      </span>
                     </span>
                     <span>
                       By <span className="font-semibold text-slate-700 dark:text-neutral-200">{t.staff_name}</span>
                     </span>
-                    <span className="ml-auto text-sm font-semibold text-pink-800 dark:text-pink-400">
+                    <span className="ml-auto text-sm font-bold text-pink-800 dark:text-pink-400">
                       £{Number(t.amount).toFixed(2)}
                     </span>
                   </div>
@@ -157,6 +172,7 @@ function ClientDetailPage() {
           </ul>
         )}
       </div>
+      )}
     </div>
   );
 }

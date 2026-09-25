@@ -3,15 +3,22 @@ const db = require('../config/db');
 // Same batch-shipment pattern as return.model.js's create: record the
 // shipment, link every battery to it, then flip those batteries to their
 // terminal 'recycled' status — all inside one transaction.
-async function create({ vehicleNumber, driverName, batteryIds, recycleClientId }) {
+async function create({ vehicleNumber, driverName, batteryIds, recycleClientId, totalWeightKg, pricePerKg }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
     const { rows } = await client.query(
-      `INSERT INTO recycle_batches (vehicle_number, driver_name, battery_count, recycle_client_id)
-       VALUES ($1, $2, $3, $4) RETURNING *`,
-      [vehicleNumber, driverName, batteryIds.length, recycleClientId || null]
+      `INSERT INTO recycle_batches (vehicle_number, driver_name, battery_count, recycle_client_id, total_weight_kg, price_per_kg)
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        vehicleNumber,
+        driverName,
+        batteryIds.length,
+        recycleClientId || null,
+        totalWeightKg != null ? Number(totalWeightKg) : null,
+        pricePerKg != null ? Number(pricePerKg) : 3.40,
+      ]
     );
     const batch = rows[0];
 

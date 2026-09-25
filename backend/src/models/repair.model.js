@@ -61,7 +61,7 @@ async function create({ batteryId, staffId, partId, quantityUsed, notes, laborCh
     // in the same visit find the battery already in_testing.
     if (isFirstInBatch) {
       await client.query(
-        "UPDATE batteries SET status = 'in_testing', work_started_at = NULL, testing_started_at = now() WHERE id = $1",
+        "UPDATE batteries SET status = 'in_testing', work_started_at = NULL, testing_started_at = NULL WHERE id = $1",
         [batteryId]
       );
     }
@@ -86,6 +86,8 @@ async function create({ batteryId, staffId, partId, quantityUsed, notes, laborCh
 async function findPage({ limit, offset, date, q }) {
   const conditions = [];
   const params = [];
+
+  // Retain all repair history all time — do not exclude unserviceable or recycled batteries.
 
   if (date) {
     params.push(date);

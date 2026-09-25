@@ -170,6 +170,7 @@ function getTimeGreeting() {
 
 function DashboardPage() {
   const user = useSelector((state) => state.auth.user);
+  const isSuperAdmin = user?.role === 'super_admin';
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const isToday = toLocalDateValue(selectedDate) === toLocalDateValue(new Date());
 
@@ -663,67 +664,69 @@ function DashboardPage() {
       </div>
 
       {/* ── Workshop Performance Matrix: Average Times ──────────────── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        {/* Average Time by Service / Part */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-                <FiClock className="h-4 w-4" />
-              </span>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">
-                Average Duration by Service / Part
-              </h2>
+      {isSuperAdmin && (
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+          {/* Average Time by Service / Part */}
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                  <FiClock className="h-4 w-4" />
+                </span>
+                <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                  Average Duration by Service / Part
+                </h2>
+              </div>
+              {serviceTimes?.byPart?.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
+                  {serviceTimes.byPart.length} monitored
+                </span>
+              )}
             </div>
-            {serviceTimes?.byPart?.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
-                {serviceTimes.byPart.length} monitored
-              </span>
+            {!serviceTimes?.byPart?.length ? (
+              <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+                Not enough completed service sessions recorded to benchmark times.
+              </p>
+            ) : (
+              <DurationList
+                items={serviceTimes.byPart}
+                getLabel={(i) => i.partName}
+                getTo={(i) => (i.partId ? `/parts/${i.partId}` : null)}
+              />
             )}
           </div>
-          {!serviceTimes?.byPart?.length ? (
-            <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
-              Not enough completed service sessions recorded to benchmark times.
-            </p>
-          ) : (
-            <DurationList
-              items={serviceTimes.byPart}
-              getLabel={(i) => i.partName}
-              getTo={(i) => (i.partId ? `/parts/${i.partId}` : null)}
-            />
-          )}
-        </div>
 
-        {/* Average Time by Technician */}
-        <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-          <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
-            <div className="flex items-center gap-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
-                <FiUser className="h-4 w-4" />
-              </span>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white">
-                Average Duration by Technician
-              </h2>
+          {/* Average Time by Technician */}
+          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+              <div className="flex items-center gap-2">
+                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+                  <FiUser className="h-4 w-4" />
+                </span>
+                <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                  Average Duration by Technician
+                </h2>
+              </div>
+              {serviceTimes?.byStaff?.length > 0 && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
+                  {serviceTimes.byStaff.length} technicians
+                </span>
+              )}
             </div>
-            {serviceTimes?.byStaff?.length > 0 && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
-                {serviceTimes.byStaff.length} technicians
-              </span>
+            {!serviceTimes?.byStaff?.length ? (
+              <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+                Not enough completed technician sessions recorded to benchmark times.
+              </p>
+            ) : (
+              <DurationList
+                items={serviceTimes.byStaff}
+                getLabel={(i) => i.staffName}
+                getTo={(i) => (i.staffId ? `/staff/${i.staffId}` : null)}
+              />
             )}
           </div>
-          {!serviceTimes?.byStaff?.length ? (
-            <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
-              Not enough completed technician sessions recorded to benchmark times.
-            </p>
-          ) : (
-            <DurationList
-              items={serviceTimes.byStaff}
-              getLabel={(i) => i.staffName}
-              getTo={(i) => (i.staffId ? `/staff/${i.staffId}` : null)}
-            />
-          )}
         </div>
-      </div>
+      )}
     </div>
   );
 }

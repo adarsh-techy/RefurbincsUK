@@ -6,6 +6,7 @@ const clientModel = require('../models/client.model');
 const recycleModel = require('../models/recycle.model');
 const serviceModel = require('../models/service.model');
 const trashModel = require('../models/trash.model');
+const truckIntakeModel = require('../models/truck-intake.model');
 const realtime = require('../realtime');
 
 const ISSUE_PHOTOS_DIR = path.join(__dirname, '..', '..', 'uploads', 'issue-photos');
@@ -75,6 +76,21 @@ async function list(req, res, next) {
       req.query.qrGenerated === 'true' ? true : req.query.qrGenerated === 'false' ? false : undefined;
     const includeBlocked = req.query.includeBlocked === 'true';
     const activeOnly = req.query.activeOnly === 'true';
+    // intakedOnly: restrict to batteries that arrived via a truck intake and
+    // are currently awaiting repair — used by technician scan typeaheads.
+    const intakedOnly = req.query.intakedOnly === 'true';
+    let includeTesting = req.query.includeTesting === 'true';
+    if (!includeTesting && req.user && intakedOnly) {
+      if (req.user.role === 'admin' || req.user.role === 'super_admin') {
+        includeTesting = true;
+      } else {
+        const staff = await staffModel.findByUserId(req.user.id);
+        const staffRole = (staff?.role || req.user.staff_role || req.user.role || '').toLowerCase();
+        if (staffRole === 'supervisor') {
+          includeTesting = true;
+        }
+      }
+    }
     const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
 
     const { rows, hasMore, total } = await batteryModel.findPage({
@@ -88,6 +104,8 @@ async function list(req, res, next) {
       qrGenerated,
       includeBlocked,
       activeOnly,
+      intakedOnly,
+      includeTesting,
       sortOrder,
     });
     res.json({ data: rows, hasMore, total });
@@ -382,6 +400,18 @@ async function unserviceableCount(req, res, next) {
 // A technician claiming a battery to start work on, before logging any part.
 async function startWork(req, res, next) {
   try {
+    const batteryRecord = await batteryModel.findById(req.params.id);
+    if (!batteryRecord) {
+      return res.status(404).json({ message: 'Battery not found.' });
+    }
+    if (batteryRecord.truck_intake_id) {
+      const intake = await truckIntakeModel.findById(batteryRecord.truck_intake_id);
+      if (intake && intake.status === 'pending_arrival' && !intake.verified_at) {
+        return res.status(400).json({
+          message: `Cannot start work: Truck #${intake.truck_number} arrival has not been verified by the workshop yet.`,
+        });
+      }
+    }
     const battery = await batteryModel.startWork(req.params.id, req.user.id);
     if (!battery) {
       return res.status(409).json({
@@ -395,8 +425,36 @@ async function startWork(req, res, next) {
   }
 }
 
+// Sets testing_started_at = now() when a Supervisor or Admin scans/opens the battery for testing.
+async function startTesting(req, res, next) {
+  try {
+    let canTest = req.user.role === 'admin' || req.user.role === 'super_admin';
+    if (!canTest && (req.user.role === 'technician' || req.user.role === 'staff')) {
+      const staff = await staffModel.findByUserId(req.user.id);
+      const staffRole = (staff?.role || '').toLowerCase();
+      if (staffRole === 'supervisor') {
+        canTest = true;
+      }
+    }
+    if (!canTest) {
+      return res.status(403).json({
+        message: 'Technicians do not have access to testing. Only Supervisors can test batteries.',
+      });
+    }
+
+    const battery = await batteryModel.startTesting(req.params.id);
+    if (!battery) {
+      return res.status(404).json({ message: 'Battery not found or not in testing status.' });
+    }
+    realtime.broadcastBatteryUpdated(battery);
+    res.json(battery);
+  } catch (err) {
+    next(err);
+  }
+}
+
 // Confirms a battery works after its parts were replaced — restricted to
-// Supervisors, Managers, and Admins (Technicians do not have testing permission).
+// Supervisors and Admins (Technicians do not have testing permission).
 async function completeTesting(req, res, next) {
   try {
     let staffId = null;
@@ -410,7 +468,7 @@ async function completeTesting(req, res, next) {
       if (staffRole === 'technician') {
         return res.status(403).json({
           message:
-            'Technicians do not have permission to perform testing. Only Supervisors and Managers can complete testing.',
+            'Technicians do not have permission to perform testing. Only Supervisors can complete testing.',
         });
       }
     } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
@@ -450,12 +508,13 @@ async function reportIssue(req, res, next) {
     const reasonId = req.body.reasonId ? Number(req.body.reasonId) || null : null;
     const note = typeof req.body.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
 
-    // Route is technician-only (see battery.routes.js), so this always
-    // resolves — same pattern as repair.controller.js's staffId lookup.
+    // Every allowed role must resolve to a staff row: battery_issues.staff_id
+    // is NOT NULL, and removed_by_staff_id is the audit trail of who did it.
     const staff = await staffModel.findByUserId(req.user.id);
     if (!staff) {
       return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
     }
+    const staffId = staff.id;
 
     // Process uploaded photos (up to 3) via multipart/form-data or JSON base64
     const photoUrls = [];
@@ -500,7 +559,7 @@ async function reportIssue(req, res, next) {
     }
 
     const battery = await batteryModel.reportIssue(req.params.id, {
-      staffId: staff.id,
+      staffId: staffId,
       reasonId,
       note,
       photoUrls,
@@ -526,18 +585,21 @@ async function reportIssue(req, res, next) {
 // was declared unserviceable there (rather than caught earlier in
 // in_progress, before anything was fitted) — restocks each selected part
 // and stamps its repair row so it drops off the pending list. Open to any
-// workshop login (technician/supervisor/manager all share the 'technician'
+// workshop login (technician/supervisor both share the 'technician'
 // role — see battery.routes.js), matching who can report the issue itself.
 async function removeParts(req, res, next) {
   try {
     const repairIds = Array.isArray(req.body.repairIds)
       ? req.body.repairIds.map(Number).filter(Boolean)
       : [];
+    // Every allowed role must resolve to a staff row: battery_issues.staff_id
+    // is NOT NULL, and removed_by_staff_id is the audit trail of who did it.
     const staff = await staffModel.findByUserId(req.user.id);
     if (!staff) {
       return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
     }
-    const result = await batteryModel.removeParts(req.params.id, repairIds, staff.id);
+    const staffId = staff.id;
+    const result = await batteryModel.removeParts(req.params.id, repairIds, staffId);
     if (result.removedCount === 0) {
       return res.status(409).json({ message: 'These parts were already removed or do not belong to this battery.' });
     }
@@ -553,7 +615,7 @@ async function removeParts(req, res, next) {
 
 // Passes a battery back from 'in_testing' to 'in_repair' so technicians
 // can re-work on it after failing testing. Restricted to Supervisors,
-// Managers, and Admins.
+// and Admins.
 async function passToTech(req, res, next) {
   try {
     let staffId = null;
@@ -567,7 +629,7 @@ async function passToTech(req, res, next) {
       if (staffRole === 'technician') {
         return res.status(403).json({
           message:
-            'Technicians cannot pass batteries back. Only Supervisors and Managers can perform testing and QA decisions.',
+            'Technicians cannot pass batteries back. Only Supervisors can perform testing and QA decisions.',
         });
       }
     } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
@@ -623,6 +685,7 @@ module.exports = {
   repeatIntakesThisMonth,
   unserviceableCount,
   startWork,
+  startTesting,
   completeTesting,
   reportIssue,
   removeParts,

@@ -1,6 +1,16 @@
+const fs = require('fs');
+const path = require('path');
 const returnModel = require('../models/return.model');
 const clientModel = require('../models/client.model');
 const auditLogModel = require('../models/audit-log.model');
+
+const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'return-docs');
+
+function ensureUploadsDir() {
+  if (!fs.existsSync(UPLOADS_DIR)) {
+    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+  }
+}
 
 // GET /:id and PATCH /:id/verify-receipt are reachable by any authenticated
 // role (not just requirePermission('returns') staff) so a client can view
@@ -50,20 +60,79 @@ async function getById(req, res, next) {
   }
 }
 
+// Writes an uploaded delivery note/receipt to uploads/return-docs and returns
+// the public path + original name. Shared by create() and update(); async so
+// a 15MB PDF doesn't stall the event loop for every other request.
+async function persistReturnDoc(file) {
+  ensureUploadsDir();
+  const cleanOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+  const filename = `return-${Date.now()}-${cleanOriginal}`;
+  await fs.promises.writeFile(path.join(UPLOADS_DIR, filename), file.buffer);
+  return { documentUrl: `/uploads/return-docs/${filename}`, documentName: file.originalname };
+}
+
+// Removes a previously stored return document (best effort — a missing file
+// is not an error). Only ever touches files inside UPLOADS_DIR.
+async function removeReturnDoc(documentUrl) {
+  if (!documentUrl) return;
+  const filename = path.basename(documentUrl);
+  try {
+    await fs.promises.unlink(path.join(UPLOADS_DIR, filename));
+  } catch (_) {}
+}
+
+// returned_at comes from a date picker; anything unparseable must be a 400,
+// not a 500 from `new Date(garbage)` inside the model.
+function parseReturnedAt(value) {
+  if (value === undefined || value === null || value === '') return undefined;
+  const ts = Date.parse(value);
+  if (Number.isNaN(ts)) {
+    const err = new Error('Invalid return date.');
+    err.status = 400;
+    throw err;
+  }
+  return new Date(ts).toISOString();
+}
+
 async function create(req, res, next) {
   try {
-    const { truckNumber, driverName, clientId, batteryIds } = req.body;
+    let { truckNumber, driverName, clientId, batteryIds, returnedAt } = req.body;
     if (!clientId) {
       return res.status(400).json({ message: 'Client is required.' });
     }
-    const returnRecord = await returnModel.create({ truckNumber, driverName, clientId, batteryIds });
+
+    if (typeof batteryIds === 'string') {
+      try {
+        batteryIds = JSON.parse(batteryIds);
+      } catch (e) {
+        batteryIds = batteryIds.split(',').map((s) => s.trim()).filter(Boolean);
+      }
+    }
+
+    returnedAt = parseReturnedAt(returnedAt);
+
+    let documentUrl = undefined;
+    let documentName = undefined;
+    if (req.file) {
+      ({ documentUrl, documentName } = await persistReturnDoc(req.file));
+    }
+
+    const returnRecord = await returnModel.create({
+      truckNumber,
+      driverName,
+      clientId,
+      batteryIds: Array.isArray(batteryIds) ? batteryIds : [],
+      returnedAt,
+      documentUrl,
+      documentName,
+    });
 
     await auditLogModel.record({
       userId: req.user.id,
       action: 'create',
       entity: 'return',
       entityId: returnRecord.id,
-      details: { truckNumber, driverName, clientId, batteryIds },
+      details: { truckNumber, driverName, clientId, batteryIds, returnedAt, documentUrl },
     });
 
     res.status(201).json(returnRecord);
@@ -104,9 +173,34 @@ async function update(req, res, next) {
     if (!clientId) {
       return res.status(400).json({ message: 'Client is required.' });
     }
-    const returnRecord = await returnModel.update(req.params.id, { truckNumber, driverName, clientId });
+    const returnedAt = parseReturnedAt(req.body.returnedAt);
+
+    const existing = await returnModel.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: 'Return not found' });
+    }
+
+    let documentUrl = undefined;
+    let documentName = undefined;
+    if (req.file) {
+      ({ documentUrl, documentName } = await persistReturnDoc(req.file));
+    }
+
+    const returnRecord = await returnModel.update(req.params.id, {
+      truckNumber,
+      driverName,
+      clientId,
+      returnedAt,
+      documentUrl,
+      documentName,
+    });
     if (!returnRecord) {
       return res.status(404).json({ message: 'Return not found' });
+    }
+    // The old file is orphaned once a replacement is stored — drop it so the
+    // uploads directory doesn't grow with every edit.
+    if (documentUrl && existing.document_url && existing.document_url !== documentUrl) {
+      await removeReturnDoc(existing.document_url);
     }
     res.json(returnRecord);
   } catch (err) {

@@ -27,6 +27,17 @@ export const CLIENT_PERMISSIONS = [
   { key: 'client_notifications', label: 'Notifications', group: 'Support', desc: 'Client system alerts and activity log' },
 ];
 
+// Who may run the testing / QA stage on a battery (start-testing,
+// complete-testing, pass-to-tech, remove-parts). Mirrors the backend check in
+// battery.controller.js: admins always, workshop logins only when their staff
+// record is a supervisor. `staff_role` is attached to the user by /auth/login
+// and /auth/me, so no extra /staff/me round-trip is needed.
+export function canTestBatteries(user) {
+  if (!user) return false;
+  if (user.role === 'super_admin' || user.role === 'admin') return true;
+  return (user.staff_role || '').toLowerCase() === 'supervisor';
+}
+
 // super_admin implicitly has every permission; an admin only has what's in
 // user.permissions.
 export function hasPermission(user, permission) {

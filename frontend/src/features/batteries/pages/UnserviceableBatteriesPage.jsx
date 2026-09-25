@@ -5,7 +5,7 @@ import DataTable from '../../../components/ui/table/DataTable';
 import TableState from '../../../components/ui/table/TableState';
 import InfiniteScrollTrigger from '../../../components/ui/table/InfiniteScrollTrigger';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
-import Badge from '../../../components/ui/primitives/Badge';
+import Badge, { StatusBadge } from '../../../components/ui/primitives/Badge';
 import ImageLightboxModal from '../../../components/ui/overlays/ImageLightboxModal';
 import { resolveImageUrl } from '../../../utils/image-url';
 import { socket } from '../../../services/socket-client';
@@ -56,7 +56,7 @@ function UnserviceableBatteriesPage() {
     {
       key: 'status',
       label: 'Status',
-      render: (row) => <Badge status={row.status} />,
+      render: (row) => <StatusBadge status={row.status} />,
     },
     { key: 'client_name', label: 'Client', render: (row) => row.client_name || '—' },
     { key: 'issue_reason', label: 'Reason', render: (row) => row.issue_reason || '—' },
@@ -108,7 +108,7 @@ function UnserviceableBatteriesPage() {
     <div>
       <PageHeader
         title="Unserviceable Batteries"
-        description="Batteries a technician reported as unable to be serviced — terminal, not returned to the active queue."
+        description="Batteries reported as unserviceable or test-failed (parts removed) — quarantined in workshop."
       />
 
       <div className="mb-4 sm:mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-3 shadow-xs dark:border-blue-800/40">
@@ -136,7 +136,7 @@ function UnserviceableBatteriesPage() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs text-slate-700 focus:border-blue-500 focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200"
           >
-            <option value="unserviceable,tested_parts_removed">All Unserviceable</option>
+            <option value="unserviceable,tested_parts_removed">All Unserviceable & Test Failed</option>
             <option value="unserviceable">Unserviceable Only</option>
             <option value="tested_parts_removed">Test Failed (Parts Removed)</option>
           </select>

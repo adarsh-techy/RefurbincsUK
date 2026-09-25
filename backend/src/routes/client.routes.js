@@ -30,6 +30,8 @@ router.delete('/me/truck-intakes/:id', requireRole('client'), clientController.d
 router.post('/me/truck-intakes/:id/batteries', requireRole('client'), clientController.addBatteriesToMyTruckIntake);
 router.delete('/me/truck-intakes/:intakeId/batteries/:batteryId', requireRole('client'), clientController.removeBatteryFromMyTruckIntake);
 router.patch('/me/batteries/:id', requireRole('client'), clientController.updateMyBattery);
+router.get('/me/sort-groups', requireRole('client'), clientController.mySortGroups);
+router.put('/me/sort-groups', requireRole('client'), clientController.updateMySortGroups);
 router.get('/me/transactions', requireRole('client'), clientController.myTransactions);
 router.get('/me/history', requireRole('client'), clientController.myHistory);
 router.get('/me/invoices', requireRole('client'), clientController.myInvoices);

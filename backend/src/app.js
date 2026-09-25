@@ -30,6 +30,7 @@ app.use('/uploads/client-logos', express.static(path.join(__dirname, '..', 'uplo
 // the latter needed since <img>/<a href> can't set headers.
 app.use('/uploads/staff-docs', requireAuth, express.static(path.join(__dirname, '..', 'uploads', 'staff-docs')));
 app.use('/uploads/issue-photos', requireAuth, express.static(path.join(__dirname, '..', 'uploads', 'issue-photos')));
+app.use('/uploads/return-docs', requireAuth, express.static(path.join(__dirname, '..', 'uploads', 'return-docs')));
 app.use('/uploads', express.static(path.join(__dirname, '..', 'uploads')));
 
 app.use('/api', routes);

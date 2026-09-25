@@ -324,7 +324,8 @@ const NAV_GROUPS = [
     heading: 'Recycling',
     links: [
       { to: '/batteries/unserviceable', label: 'Unserviceable Batteries', icon: Icons.unserviceable },
-      { to: '/recycle', label: 'Recycle Shipments', icon: Icons.recycle, permission: 'recycle' },
+      { to: '/batteries/recycled', label: 'Recycled Batteries', icon: Icons.recycle },
+      { to: '/recycle', label: 'Recycle Shipments', icon: Icons.intake, permission: 'recycle' },
     ],
   },
   {
@@ -338,7 +339,7 @@ const NAV_GROUPS = [
   {
     heading: 'Administration',
     links: [
-      { to: '/invoices', label: 'Invoices', icon: Icons.invoice },
+      { to: '/invoices', label: 'Invoices', icon: Icons.invoice, superAdminOnly: true },
       { to: '/finance', label: 'Finance', icon: Icons.finance, superAdminOnly: true },
       { to: '/ratings', label: 'Ratings & Reviews', icon: Icons.ratings },
       { to: '/certificates', label: 'Certificates & Impact', icon: Icons.certificates },

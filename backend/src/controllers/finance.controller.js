@@ -59,13 +59,8 @@ async function summary(req, res, next) {
       financeModel.getBreakdown({ from, to, breakdownType: breakdown, limit: 60 }),
     ]);
 
-    const netProfit = totals.repairRevenue - totals.staffSalaryTotal;
-
     res.json({
-      totals: {
-        ...totals,
-        netProfit,
-      },
+      totals,
       // Keep backward compatibility if old code expected `monthly`
       monthly: breakdown === 'month' ? breakdownList : [],
       breakdown: breakdownList,
