@@ -726,6 +726,7 @@ export default function BatteryDetailScreen() {
       setShowTestingUnserviceableForm(false);
       setSelectedReasonId(null);
       setSelectedPartIds([]);
+      setSelectedServiceIds([]);
       setIssueNote('');
       setIssuePhotos([]);
       await load();
@@ -746,6 +747,7 @@ export default function BatteryDetailScreen() {
       });
       setShowTestingDecisionModal(false);
       setShowTestingUnserviceableForm(false);
+      setSelectedServiceIds([]);
       setIssueNote('');
       setIssuePhotos([]);
       await load();
@@ -1024,11 +1026,12 @@ export default function BatteryDetailScreen() {
   // no dependency on any pre-seeded/admin-managed reason existing.
   function renderTestingUnserviceableSection() {
     return (
-      <View className="mt-4 border-t border-slate-200 pt-3">
+      <View className={showTestingUnserviceableForm ? 'pt-0' : 'mt-4 border-t border-slate-200 pt-3'}>
         {!showTestingUnserviceableForm ? (
           <TouchableOpacity
             onPress={() => {
               setSelectedReasonId(null);
+              setSelectedServiceIds([]);
               setShowTestingUnserviceableForm(true);
             }}
             className="items-center rounded-xl border border-red-200 bg-red-50 py-3 active:bg-red-100"
@@ -1636,95 +1639,99 @@ export default function BatteryDetailScreen() {
                           {formatDuration(testingElapsedSeconds)}
                         </Text>
                       </View>
-                      {availableServices.length > 0 && (
-                        <View className="mb-3">
-                          <View className="flex-row items-center justify-between mb-2">
-                            <Text className="text-xs font-bold text-slate-900">
-                              Services Performed ({selectedServiceIds.length})
-                            </Text>
-                            {availableServices
-                              .filter((s) => selectedServiceIds.includes(s.id))
-                              .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0 && (
-                              <Text className="text-xs font-extrabold text-emerald-600">
-                                +£
+                      {!showTestingUnserviceableForm && (
+                        <>
+                          {availableServices.length > 0 && (
+                            <View className="mb-3">
+                              <View className="flex-row items-center justify-between mb-2">
+                                <Text className="text-xs font-bold text-slate-900">
+                                  Services Performed ({selectedServiceIds.length})
+                                </Text>
                                 {availableServices
                                   .filter((s) => selectedServiceIds.includes(s.id))
-                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                                  .toFixed(2)}
-                              </Text>
-                            )}
-                          </View>
-                          <View className="gap-2">
-                            {availableServices.map((s) => {
-                              const isChecked = selectedServiceIds.includes(s.id);
-                              return (
-                                <TouchableOpacity
-                                  key={s.id}
-                                  onPress={() => toggleService(s.id)}
-                                  className={`flex-row items-center justify-between rounded-xl border p-3 ${
-                                    isChecked
-                                      ? 'border-blue-500 bg-blue-100/70'
-                                      : 'border-slate-200 bg-white'
-                                  }`}
-                                >
-                                  <View className="flex-row items-center gap-2.5 flex-1 pr-2">
-                                    <View
-                                      className={`h-5 w-5 rounded-md border items-center justify-center ${
+                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0 && (
+                                  <Text className="text-xs font-extrabold text-emerald-600">
+                                    +£
+                                    {availableServices
+                                      .filter((s) => selectedServiceIds.includes(s.id))
+                                      .reduce((sum, s) => sum + Number(s.rate || 0), 0)
+                                      .toFixed(2)}
+                                  </Text>
+                                )}
+                              </View>
+                              <View className="gap-2">
+                                {availableServices.map((s) => {
+                                  const isChecked = selectedServiceIds.includes(s.id);
+                                  return (
+                                    <TouchableOpacity
+                                      key={s.id}
+                                      onPress={() => toggleService(s.id)}
+                                      className={`flex-row items-center justify-between rounded-xl border p-3 ${
                                         isChecked
-                                          ? 'border-blue-600 bg-blue-600'
-                                          : 'border-slate-300 bg-white'
+                                          ? 'border-blue-500 bg-blue-100/70'
+                                          : 'border-slate-200 bg-white'
                                       }`}
                                     >
-                                      {isChecked && <Icon name="check" color="#ffffff" size={12} strokeWidth={3} />}
-                                    </View>
-                                    <View className="flex-1">
-                                      <Text className="text-xs font-bold text-slate-900">{s.name}</Text>
-                                      {s.description ? (
-                                        <Text className="text-[10px] text-slate-500" numberOfLines={1}>
-                                          {s.description}
-                                        </Text>
-                                      ) : null}
-                                    </View>
-                                  </View>
-                                  <Text className="text-xs font-bold text-emerald-600">
-                                    +£{Number(s.rate || 0).toFixed(2)}
-                                  </Text>
-                                </TouchableOpacity>
-                              );
-                            })}
-                          </View>
-                        </View>
-                      )}
+                                      <View className="flex-row items-center gap-2.5 flex-1 pr-2">
+                                        <View
+                                          className={`h-5 w-5 rounded-md border items-center justify-center ${
+                                            isChecked
+                                              ? 'border-blue-600 bg-blue-600'
+                                              : 'border-slate-300 bg-white'
+                                          }`}
+                                        >
+                                          {isChecked && <Icon name="check" color="#ffffff" size={12} strokeWidth={3} />}
+                                        </View>
+                                        <View className="flex-1">
+                                          <Text className="text-xs font-bold text-slate-900">{s.name}</Text>
+                                          {s.description ? (
+                                            <Text className="text-[10px] text-slate-500" numberOfLines={1}>
+                                              {s.description}
+                                            </Text>
+                                          ) : null}
+                                        </View>
+                                      </View>
+                                      <Text className="text-xs font-bold text-emerald-600">
+                                        +£{Number(s.rate || 0).toFixed(2)}
+                                      </Text>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          )}
 
-                      <TextInput
-                        value={testingNotes}
-                        onChangeText={setTestingNotes}
-                        placeholder="Testing notes (optional)"
-                        placeholderTextColor="#94a3b8"
-                        className="mb-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900"
-                      />
+                          <TextInput
+                            value={testingNotes}
+                            onChangeText={setTestingNotes}
+                            placeholder="Testing notes (optional)"
+                            placeholderTextColor="#94a3b8"
+                            className="mb-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900"
+                          />
 
-                      <TouchableOpacity
-                        onPress={handleCompleteTesting}
-                        disabled={submitting}
-                        className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
-                      >
-                        {submitting ? (
-                          <ActivityIndicator color="#fff" />
-                        ) : (
-                          <Text className="text-sm font-bold text-white">
-                            Complete Testing{' '}
-                            {availableServices
-                              .filter((s) => selectedServiceIds.includes(s.id))
-                              .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0
-                              ? `(+£${availableServices
+                          <TouchableOpacity
+                            onPress={handleCompleteTesting}
+                            disabled={submitting}
+                            className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
+                          >
+                            {submitting ? (
+                              <ActivityIndicator color="#fff" />
+                            ) : (
+                              <Text className="text-sm font-bold text-white">
+                                Complete Testing{' '}
+                                {availableServices
                                   .filter((s) => selectedServiceIds.includes(s.id))
-                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                                  .toFixed(2)})`
-                              : ''}
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0
+                                  ? `(+£${availableServices
+                                      .filter((s) => selectedServiceIds.includes(s.id))
+                                      .reduce((sum, s) => sum + Number(s.rate || 0), 0)
+                                      .toFixed(2)})`
+                                  : ''}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        </>
+                      )}
 
                       {renderTestingUnserviceableSection()}
                     </>
