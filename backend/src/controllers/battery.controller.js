@@ -628,13 +628,6 @@ async function passToTech(req, res, next) {
         return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
       }
       staffId = staff.id;
-      const staffRole = (staff.role || '').toLowerCase();
-      if (staffRole === 'technician') {
-        return res.status(403).json({
-          message:
-            'Technicians cannot pass batteries back. Only Supervisors can perform testing and QA decisions.',
-        });
-      }
     } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
       const staff = await staffModel.findByUserId(req.user.id);
       if (staff) {

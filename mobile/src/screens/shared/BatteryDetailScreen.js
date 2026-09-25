@@ -2418,6 +2418,12 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
 
+            {actionError && (
+              <View className="mb-3 rounded-xl bg-red-50 p-2.5 border border-red-200">
+                <Text className="text-xs text-red-700 font-semibold text-center">{actionError}</Text>
+              </View>
+            )}
+
             <View className="gap-2.5">
               <TouchableOpacity
                 onPress={handleConfirmTestingUnserviceable}
@@ -2439,12 +2445,15 @@ export default function BatteryDetailScreen() {
                 {passToTechSubmitting ? (
                   <ActivityIndicator color="#fff" />
                 ) : (
-                  <Text className="text-xs font-bold text-white">Pass Back to Technician</Text>
+                  <Text className="text-xs font-bold text-white">Continue to Pass to Tech</Text>
                 )}
               </TouchableOpacity>
 
               <TouchableOpacity
-                onPress={() => setShowTestingDecisionModal(false)}
+                onPress={() => {
+                  setActionError(null);
+                  setShowTestingDecisionModal(false);
+                }}
                 className="items-center rounded-2xl py-2.5 mt-1"
               >
                 <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Cancel</Text>
@@ -2462,13 +2471,13 @@ export default function BatteryDetailScreen() {
         onRequestClose={() => setShowPassToTechSuccessModal(false)}
       >
         <View className="flex-1 items-center justify-center bg-black/60 px-6">
-          <View className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200">
+          <View className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 dark:bg-blue-950/40 border border-blue-200 dark:border-blue-800">
               <Icon name="checkCircle" color="#2563eb" size={22} />
             </View>
-            <Text className="mb-1.5 text-lg font-bold text-slate-900">Passed to Technician</Text>
-            <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
-              <Text className="font-bold text-slate-800">{battery?.battery_code}</Text> has been returned to the repair queue for technician rework.
+            <Text className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Passed to Technician</Text>
+            <Text className="mb-5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <Text className="font-bold text-slate-800 dark:text-slate-200">{battery?.battery_code || code}</Text> has been returned to the repair queue for technician rework.
             </Text>
             <View className="gap-2.5">
               <TouchableOpacity
@@ -2480,16 +2489,16 @@ export default function BatteryDetailScreen() {
                     params: { autoScan: Date.now() },
                   });
                 }}
-                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md"
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
               >
                 <Icon name="camera" color="#ffffff" size={16} />
                 <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowPassToTechSuccessModal(false)}
-                className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
+                className="items-center rounded-xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
               >
-                <Text className="text-xs font-semibold text-slate-700">View Battery Details</Text>
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">View Battery Details</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2504,13 +2513,13 @@ export default function BatteryDetailScreen() {
         onRequestClose={() => setShowUnserviceableSuccessModal(false)}
       >
         <View className="flex-1 items-center justify-center bg-black/60 px-6">
-          <View className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-red-50 border border-red-200">
+          <View className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-800">
               <Icon name="alertTriangle" color="#dc2626" size={22} />
             </View>
-            <Text className="mb-1.5 text-lg font-bold text-slate-900">Marked Unserviceable</Text>
-            <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
-              <Text className="font-bold text-slate-800">{battery?.battery_code}</Text> has been declared unserviceable with attached photos and moved to the recycling queue.
+            <Text className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Marked Unserviceable</Text>
+            <Text className="mb-5 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <Text className="font-bold text-slate-800 dark:text-slate-200">{battery?.battery_code || code}</Text> has been declared unserviceable with attached photos and moved to the recycling queue.
             </Text>
             <View className="gap-2.5">
               <TouchableOpacity
@@ -2522,16 +2531,16 @@ export default function BatteryDetailScreen() {
                     params: { autoScan: Date.now() },
                   });
                 }}
-                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md"
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-red-600 py-3.5 shadow-md active:bg-red-700"
               >
                 <Icon name="camera" color="#ffffff" size={16} />
                 <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => setShowUnserviceableSuccessModal(false)}
-                className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
+                className="items-center rounded-xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
               >
-                <Text className="text-xs font-semibold text-slate-700">View Battery Details</Text>
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">View Battery Details</Text>
               </TouchableOpacity>
             </View>
           </View>
