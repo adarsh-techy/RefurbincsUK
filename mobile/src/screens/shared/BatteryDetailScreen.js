@@ -4,6 +4,7 @@ import {
   Alert,
   Image,
   Modal,
+  SafeAreaView,
   ScrollView,
   Text,
   TextInput,
@@ -253,6 +254,8 @@ export default function BatteryDetailScreen() {
   const [showTestChoiceModal, setShowTestChoiceModal] = useState(false);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [showSubmittedModal, setShowSubmittedModal] = useState(false);
+  const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
+  const [submittedBatteryCode, setSubmittedBatteryCode] = useState(null);
   const [showUnserviceableSuccessModal, setShowUnserviceableSuccessModal] = useState(false);
   const [showTestingDecisionModal, setShowTestingDecisionModal] = useState(false);
   const [showPassToTechSuccessModal, setShowPassToTechSuccessModal] = useState(false);
@@ -538,7 +541,7 @@ export default function BatteryDetailScreen() {
             isTestedByMe,
           });
           setShowUnserviceableAlertModal(true);
-        } else if (fromScan && isTestingStatus) {
+        } else if (fromScan && isTestingStatus && !isSubmittedSuccess) {
           const activeHistory = (data.history || []).filter((h) => !h.removed_at);
           const latestBatchId = activeHistory[0]?.batch_id;
           const latestRepairs = latestBatchId
@@ -897,14 +900,15 @@ export default function BatteryDetailScreen() {
       }
       setSelectedPartIds([]);
       setNotes('');
-      await load();
       // A technician who can't test just gets a done confirmation. A
       // supervisor doing their own repair gets a choice: test this
       // battery right now, or step away and leave it queued for testing.
       if (canTest) {
+        await load();
         setShowTestChoiceModal(true);
       } else {
-        setShowSubmittedModal(true);
+        setSubmittedBatteryCode(result?.battery?.battery_code || code);
+        setIsSubmittedSuccess(true);
       }
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
@@ -1303,6 +1307,72 @@ export default function BatteryDetailScreen() {
           </View>
         </View>
       </Modal>
+    );
+  }
+
+  if (isSubmittedSuccess || showSubmittedModal) {
+    const displayCode = submittedBatteryCode || result?.battery?.battery_code || code;
+    return (
+      <SafeAreaView className="flex-1 bg-slate-50 dark:bg-slate-950">
+        <View className="flex-1 items-center justify-center px-6">
+          <View className="w-full max-w-sm rounded-3xl border border-emerald-200 dark:border-emerald-800/60 bg-white dark:bg-slate-900 p-6 shadow-2xl items-center">
+            {/* Success Icon */}
+            <View className="mb-4 h-16 w-16 items-center justify-center rounded-3xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800">
+              <Icon name="zap" color="#059669" size={30} />
+            </View>
+
+            {/* Title */}
+            <Text className="text-xl font-black text-slate-900 dark:text-white text-center">
+              Work Submitted!
+            </Text>
+
+            {/* Battery Code Badge */}
+            <View className="my-3 rounded-full bg-emerald-100/70 dark:bg-emerald-950 px-3.5 py-1 border border-emerald-200 dark:border-emerald-800">
+              <Text className="text-xs font-mono font-extrabold text-emerald-800 dark:text-emerald-300">
+                {displayCode}
+              </Text>
+            </View>
+
+            {/* Message */}
+            <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
+              Your repair work on this battery is done. It has been successfully submitted for testing.
+            </Text>
+
+            {/* Action Buttons */}
+            <View className="w-full gap-3">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSubmittedModal(false);
+                  setIsSubmittedSuccess(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => {
+                  setShowSubmittedModal(false);
+                  setIsSubmittedSuccess(false);
+                  allowExitRef.current = true;
+                  navigation.goBack();
+                }}
+                className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+              >
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  Back to Service List
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -2413,56 +2483,6 @@ export default function BatteryDetailScreen() {
                 className="items-center rounded-2xl py-2.5"
               >
                 <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Exit to Service List</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
-
-      {/* ── Submitted for Testing Modal (For Technician) ─────────────────── */}
-      <Modal
-        visible={showSubmittedModal}
-        transparent
-        animationType="fade"
-        onRequestClose={() => {
-          setShowSubmittedModal(false);
-          allowExitRef.current = true;
-          navigation.goBack();
-        }}
-      >
-        <View className="flex-1 items-center justify-center bg-black/60 px-6">
-          <View className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
-            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200">
-              <Icon name="zap" color="#059669" size={22} />
-            </View>
-            <Text className="mb-1.5 text-lg font-bold text-slate-900">Work Submitted!</Text>
-            <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
-              <Text className="font-bold text-slate-800">{battery?.battery_code}</Text> has been submitted for testing. Your repair work on this battery is done.
-            </Text>
-            <View className="gap-2.5">
-              <TouchableOpacity
-                onPress={() => {
-                  setShowSubmittedModal(false);
-                  allowExitRef.current = true;
-                  navigation.navigate('Main', {
-                    screen: 'Service',
-                    params: { autoScan: Date.now() },
-                  });
-                }}
-                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md"
-              >
-                <Icon name="camera" color="#ffffff" size={16} />
-                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowSubmittedModal(false);
-                  allowExitRef.current = true;
-                  navigation.goBack();
-                }}
-                className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
-              >
-                <Text className="text-xs font-semibold text-slate-700">Back to Service List</Text>
               </TouchableOpacity>
             </View>
           </View>
