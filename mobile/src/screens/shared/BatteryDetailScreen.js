@@ -256,6 +256,8 @@ export default function BatteryDetailScreen() {
   const [showRemovePartsSuccessModal, setShowRemovePartsSuccessModal] = useState(false);
   const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
   const [unverifiedIntakeData, setUnverifiedIntakeData] = useState(null);
+  const [showUnserviceableAlertModal, setShowUnserviceableAlertModal] = useState(false);
+  const [unserviceableAlertData, setUnserviceableAlertData] = useState(null);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -401,28 +403,6 @@ export default function BatteryDetailScreen() {
             intakeId: data.battery.truck_intake_id,
           });
           setShowUnverifiedIntakeModal(true);
-        } else if (fromScan && isTestedPartsRemoved) {
-          const removedParts = (data.history || []).filter((h) => h.removed_at);
-          const fittedParts = data.history || [];
-          setCantServiceAlertData({
-            mode: 'already_reclaimed',
-            batteryCode: data.battery.battery_code,
-            status: data.battery.status,
-            fittedBy: fittedParts[0]?.staff_name || 'Technician',
-            fittedAt: fittedParts[0]?.repaired_at || null,
-            fittedParts,
-            testedBy: data.issues?.[0]?.staff_name || latestPassBack?.staff_name || 'Supervisor',
-            testedAt: data.issues?.[0]?.reported_at || latestPassBack?.completed_at || null,
-            issueReason: data.issues?.[0]?.reason_label || data.issues?.[0]?.reason || (latestPassBack ? 'Failed Testing Diagnostics' : 'Unserviceable Unit'),
-            issueNote: data.issues?.[0]?.note || latestPassBack?.notes || null,
-            passBackStaff: latestPassBack?.staff_name || null,
-            passBackAt: latestPassBack?.completed_at || null,
-            passBackNote: latestPassBack?.notes || null,
-            removedBy: removedParts[0]?.removed_by_staff_name || 'Technician',
-            removedAt: removedParts[0]?.removed_at || null,
-            removedParts,
-          });
-          setShowCantServiceAlertModal(true);
         } else if (
           fromScan &&
           (isPassedBack ||
@@ -452,6 +432,39 @@ export default function BatteryDetailScreen() {
             fittedAt: (data.history || [])[0]?.repaired_at || null,
           });
           setShowCantServiceAlertModal(true);
+        } else if (
+          fromScan &&
+          (data.battery?.status === 'unserviceable' ||
+            data.battery?.status === 'tested_parts_removed' ||
+            data.battery?.status === 'recycled')
+        ) {
+          const latestIssue = (data.issues || [])[0];
+          const latestReturn = (data.returns || [])[0];
+          const removedParts = (data.history || []).filter((h) => h.removed_at);
+          setUnserviceableAlertData({
+            batteryCode: data.battery.battery_code,
+            serialNumber: data.battery.serial_number,
+            status: data.battery.status,
+            reason:
+              latestIssue?.reason_label ||
+              latestIssue?.reason ||
+              (latestReturn?.notes ? 'Failed Testing Diagnostics' : data.battery?.status === 'recycled' ? 'Battery Recycled' : 'Unserviceable Unit'),
+            staffName:
+              latestIssue?.staff_name ||
+              latestReturn?.staff_name ||
+              data.battery?.started_by_name ||
+              'Workshop Technician',
+            reportedAt:
+              latestIssue?.reported_at ||
+              latestReturn?.completed_at ||
+              data.battery?.updated_at ||
+              null,
+            note: latestIssue?.note || latestReturn?.notes || null,
+            photos: latestIssue?.photo_urls || [],
+            hasRemovedParts: removedParts.length > 0,
+            removedPartsCount: removedParts.length,
+          });
+          setShowUnserviceableAlertModal(true);
         } else if (fromScan && isTestingStatus) {
           const activeHistory = (data.history || []).filter((h) => !h.removed_at);
           const latestBatchId = activeHistory[0]?.batch_id;
@@ -2593,6 +2606,183 @@ export default function BatteryDetailScreen() {
                   View Battery Details
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Unserviceable Battery Red Alert Modal (When scanned by technician or supervisor) ──────────── */}
+      <Modal
+        visible={showUnserviceableAlertModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUnserviceableAlertModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/70 px-5">
+          <View className="w-full max-w-sm rounded-3xl border border-red-500/50 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
+            {/* Red Alert Header Banner */}
+            <View className="bg-red-600 px-5 pt-5 pb-4">
+              <View className="flex-row items-center justify-between mb-2.5">
+                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20 border border-white/30">
+                  <Icon name="alertTriangle" color="#ffffff" size={22} strokeWidth={2.5} />
+                </View>
+                <View className="rounded-full bg-white/25 px-3 py-1 border border-white/30">
+                  <Text className="text-[10px] font-black text-white uppercase tracking-wider">
+                    {unserviceableAlertData?.status === 'recycled' ? 'Recycled' : 'Unserviceable'}
+                  </Text>
+                </View>
+              </View>
+
+              <Text className="text-lg font-black text-white tracking-tight">
+                This Battery is Unserviceable
+              </Text>
+              <Text className="mt-0.5 text-xs text-red-100 font-medium leading-relaxed">
+                This unit was marked unserviceable and cannot undergo repair or testing.
+              </Text>
+            </View>
+
+            {/* Modal Content Body */}
+            <View className="p-5">
+              {/* Battery Code Badge Box */}
+              <View className="mb-3.5 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/30 p-3 flex-row items-center justify-between">
+                <View>
+                  <Text className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase tracking-wider">
+                    Battery Code
+                  </Text>
+                  <Text className="text-base font-extrabold font-mono text-red-900 dark:text-red-200">
+                    {unserviceableAlertData?.batteryCode || code || '—'}
+                  </Text>
+                </View>
+                {unserviceableAlertData?.serialNumber ? (
+                  <View className="items-end">
+                    <Text className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+                      Serial #
+                    </Text>
+                    <Text className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {unserviceableAlertData.serialNumber}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Information Rows */}
+              <View className="space-y-2 mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3.5">
+                {/* Reason */}
+                <View className="pb-2 border-b border-slate-200/80 dark:border-slate-800">
+                  <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Reason
+                  </Text>
+                  <View className="self-start rounded-lg bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 px-2.5 py-1">
+                    <Text className="text-xs font-bold text-red-800 dark:text-red-300">
+                      {unserviceableAlertData?.reason || 'Unserviceable Battery'}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Marked By */}
+                <View className="flex-row items-center justify-between py-1.5 border-b border-slate-200/80 dark:border-slate-800">
+                  <View className="flex-row items-center gap-1.5">
+                    <Icon name="user" color="#64748b" size={13} />
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Marked By</Text>
+                  </View>
+                  <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {unserviceableAlertData?.staffName || 'Technician'}
+                  </Text>
+                </View>
+
+                {/* Date & Time */}
+                <View className="flex-row items-center justify-between pt-1">
+                  <View className="flex-row items-center gap-1.5">
+                    <Icon name="clock" color="#64748b" size={13} />
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Date &amp; Time</Text>
+                  </View>
+                  <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {unserviceableAlertData?.reportedAt
+                      ? `${new Date(unserviceableAlertData.reportedAt).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })} · ${new Date(unserviceableAlertData.reportedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}`
+                      : '—'}
+                  </Text>
+                </View>
+
+                {/* Notes (if any) */}
+                {unserviceableAlertData?.note ? (
+                  <View className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                      Notes
+                    </Text>
+                    <Text className="text-xs text-slate-700 dark:text-slate-300 italic">
+                      "{unserviceableAlertData.note}"
+                    </Text>
+                  </View>
+                ) : null}
+
+                {/* Photos (if any) */}
+                {unserviceableAlertData?.photos && unserviceableAlertData.photos.length > 0 && (
+                  <View className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                      Attached Photos ({unserviceableAlertData.photos.length})
+                    </Text>
+                    <View className="flex-row gap-2">
+                      {unserviceableAlertData.photos.slice(0, 3).map((photoUrl, pIdx) => {
+                        const resolved = resolveImageUrl(photoUrl);
+                        return (
+                          <TouchableOpacity
+                            key={pIdx}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                              openPhotoViewer(
+                                unserviceableAlertData.photos.map((u) => resolveImageUrl(u)),
+                                pIdx,
+                                `${unserviceableAlertData.batteryCode} · Unserviceable Photo ${pIdx + 1}`
+                              )
+                            }
+                            className="h-12 w-12 rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+                          >
+                            <Image
+                              source={{ uri: resolved }}
+                              className="h-full w-full"
+                              resizeMode="cover"
+                            />
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Action Buttons */}
+              <View className="gap-2">
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowUnserviceableAlertModal(false);
+                    allowExitRef.current = true;
+                    navigation.navigate('Main', {
+                      screen: 'Service',
+                      params: { autoScan: Date.now() },
+                    });
+                  }}
+                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-red-600 py-3.5 shadow-md active:bg-red-700"
+                >
+                  <Icon name="camera" color="#ffffff" size={16} />
+                  <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => setShowUnserviceableAlertModal(false)}
+                  className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+                >
+                  <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    View Battery History
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
