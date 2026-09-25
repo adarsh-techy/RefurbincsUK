@@ -712,6 +712,7 @@ export default function BatteryDetailScreen() {
       setShowIssueForm(false);
       setShowTestingUnserviceableForm(false);
       setSelectedReasonId(null);
+      setSelectedPartIds([]);
       setIssueNote('');
       setIssuePhotos([]);
       await load();
@@ -846,7 +847,7 @@ export default function BatteryDetailScreen() {
         {!showIssueForm ? (
           <TouchableOpacity
             onPress={() => setShowIssueForm(true)}
-            className="items-center rounded-xl border border-red-200 bg-red-50 py-3"
+            className="items-center rounded-xl border border-red-200 bg-red-50 py-3 active:bg-red-100"
           >
             <Text className="text-xs font-bold text-red-600">
               Can't service this battery?
@@ -854,21 +855,64 @@ export default function BatteryDetailScreen() {
           </TouchableOpacity>
         ) : (
           <View>
-            <Text className="text-xs font-bold text-slate-900">Report Issue</Text>
-            <View className="mt-2 gap-1.5">
-              {issueReasons.map((reason) => (
-                <TouchableOpacity
-                  key={reason.id}
-                  onPress={() => setSelectedReasonId(reason.id)}
-                  className={`rounded-xl border p-2.5 ${
-                    selectedReasonId === reason.id
-                      ? 'border-red-500 bg-red-50'
-                      : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <Text className="text-xs font-medium text-slate-900">{reason.label}</Text>
-                </TouchableOpacity>
-              ))}
+            <View className="flex-row items-center justify-between mb-2">
+              <View className="flex-row items-center gap-2">
+                <Text className="text-xs font-bold text-slate-900">Report Issue</Text>
+                {selectedReasonId != null && (
+                  <TouchableOpacity
+                    onPress={() => setSelectedReasonId(null)}
+                    className="rounded-full bg-red-100 px-2 py-0.5"
+                  >
+                    <Text className="text-[10px] font-semibold text-red-700">Clear</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowIssueForm(false);
+                  setSelectedReasonId(null);
+                  setIssuePhotos([]);
+                  setIssueNote('');
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="flex-row items-center gap-1 rounded-lg bg-slate-100 px-2 py-1"
+              >
+                <Icon name="close" color="#64748b" size={12} strokeWidth={2.5} />
+                <Text className="text-[11px] font-semibold text-slate-600">Close</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View className="mt-1 gap-1.5">
+              {issueReasons.map((reason) => {
+                const isSelected = selectedReasonId === reason.id;
+                return (
+                  <TouchableOpacity
+                    key={reason.id}
+                    onPress={() =>
+                      setSelectedReasonId((prev) => (prev === reason.id ? null : reason.id))
+                    }
+                    className={`flex-row items-center justify-between rounded-xl border p-2.5 ${
+                      isSelected
+                        ? 'border-red-500 bg-red-50'
+                        : 'border-slate-200 bg-white'
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs ${
+                        isSelected ? 'font-bold text-red-950' : 'font-medium text-slate-900'
+                      }`}
+                    >
+                      {reason.label}
+                    </Text>
+                    {isSelected && (
+                      <View className="flex-row items-center gap-1">
+                        <Text className="text-[10px] font-semibold text-red-600">Selected</Text>
+                        <Icon name="check" color="#dc2626" size={13} strokeWidth={2.5} />
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
             </View>
             <TextInput
               value={issueNote}
@@ -974,7 +1018,7 @@ export default function BatteryDetailScreen() {
               setSelectedReasonId(null);
               setShowTestingUnserviceableForm(true);
             }}
-            className="items-center rounded-xl border border-red-200 bg-red-50 py-3"
+            className="items-center rounded-xl border border-red-200 bg-red-50 py-3 active:bg-red-100"
           >
             <Text className="text-xs font-bold text-red-600">
               Can't service this battery?
@@ -982,7 +1026,21 @@ export default function BatteryDetailScreen() {
           </TouchableOpacity>
         ) : (
           <View>
-            <Text className="text-xs font-bold text-slate-900">Mark Unserviceable</Text>
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xs font-bold text-slate-900">Mark Unserviceable</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowTestingUnserviceableForm(false);
+                  setIssuePhotos([]);
+                  setIssueNote('');
+                }}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                className="flex-row items-center gap-1 rounded-lg bg-slate-100 px-2 py-1"
+              >
+                <Icon name="close" color="#64748b" size={12} strokeWidth={2.5} />
+                <Text className="text-[11px] font-semibold text-slate-600">Close</Text>
+              </TouchableOpacity>
+            </View>
             <TextInput
               value={issueNote}
               onChangeText={setIssueNote}
