@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, Fragment } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import {
   FiArrowLeft,
@@ -12,6 +12,8 @@ import {
   FiX,
   FiChevronLeft,
   FiChevronRight,
+  FiChevronDown,
+  FiChevronUp,
   FiClock,
   FiDownload,
 } from 'react-icons/fi';
@@ -108,27 +110,153 @@ function FinanceDetailPage() {
     return 'Period Financial Statement';
   }, [type, period, from, to]);
 
-  // Search filtered repairs & battery fee charges
-  const filteredRepairs = useMemo(() => {
-    if (!searchQuery.trim()) return repairs;
+  const [expandedBatteries, setExpandedBatteries] = useState(new Set());
+
+  const toggleExpand = (key) => {
+    setExpandedBatteries((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
+  };
+
+  // Group all repairs and service fee entries by battery so each battery is consolidated in one row
+  const groupedBatteries = useMemo(() => {
+    if (!repairs || repairs.length === 0) return [];
+
+    const map = new Map();
+
+    repairs.forEach((r, idx) => {
+      const key = r.batteryId
+        ? `battery_${r.batteryId}`
+        : r.batteryCode
+        ? `code_${r.batteryCode}`
+        : `item_${r.id || idx}`;
+
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          batteryId: r.batteryId,
+          batteryCode: r.batteryCode,
+          batteryStatus: r.batteryStatus,
+          clientId: r.clientId,
+          clientName: r.clientName || 'Direct / Unassigned',
+          staffList: [],
+          services: new Set(),
+          parts: new Set(),
+          chargeTypes: new Set(),
+          laborCharge: 0,
+          partsCharge: 0,
+          serviceFee: 0,
+          totalCharge: 0,
+          items: [],
+          latestDate: r.repairedAt,
+          notes: [],
+        });
+      }
+
+      const group = map.get(key);
+
+      group.laborCharge += Number(r.laborCharge || 0);
+      group.partsCharge += Number(r.partsCharge || 0);
+      group.serviceFee += Number(r.serviceFee || 0);
+      group.totalCharge += Number(r.totalCharge || 0);
+
+      const isServiceFee =
+        r.chargeType === 'service_fee' || (r.serviceFee > 0 && !r.partsCharge && !r.laborCharge);
+      if (isServiceFee) {
+        group.chargeTypes.add('service_fee');
+        const desc = r.itemDescription || r.partName || 'Service Fee';
+        if (desc) group.services.add(desc);
+      } else {
+        group.chargeTypes.add('repair');
+        const partsArr = (r.partName || r.itemDescription || '')
+          .split(',')
+          .map((p) => p.trim())
+          .filter(Boolean);
+        partsArr.forEach((p) => group.parts.add(p));
+      }
+
+      // Track staff members
+      const sName = r.staffName || (r.staffId ? `Staff #${r.staffId}` : 'System Auto');
+      if (sName && !group.staffList.some((s) => s.id === r.staffId && s.name === sName)) {
+        group.staffList.push({ id: r.staffId, name: sName });
+      }
+
+      if (r.batteryStatus) {
+        group.batteryStatus = r.batteryStatus;
+      }
+      if (r.batteryCode && !group.batteryCode) {
+        group.batteryCode = r.batteryCode;
+      }
+      if (r.clientName && r.clientName !== 'Direct / Unassigned') {
+        group.clientName = r.clientName;
+      }
+      if (r.clientId && !group.clientId) {
+        group.clientId = r.clientId;
+      }
+
+      if (r.repairedAt) {
+        if (!group.latestDate || new Date(r.repairedAt) > new Date(group.latestDate)) {
+          group.latestDate = r.repairedAt;
+        }
+      }
+
+      if (r.notes && r.notes.trim()) {
+        group.notes.push(r.notes.trim());
+      }
+
+      group.items.push(r);
+    });
+
+    const list = Array.from(map.values()).map((g) => ({
+      ...g,
+      services: Array.from(g.services),
+      parts: Array.from(g.parts),
+      chargeTypes: Array.from(g.chargeTypes),
+      items: g.items.sort((a, b) => new Date(b.repairedAt || 0) - new Date(a.repairedAt || 0)),
+    }));
+
+    list.sort((a, b) => new Date(b.latestDate || 0) - new Date(a.latestDate || 0));
+
+    return list;
+  }, [repairs]);
+
+  // Search filtered grouped batteries
+  const filteredBatteries = useMemo(() => {
+    if (!searchQuery.trim()) return groupedBatteries;
     const q = searchQuery.toLowerCase();
-    return repairs.filter((r) => {
-      const code = (r.batteryCode || '').toLowerCase();
-      const client = (r.clientName || '').toLowerCase();
-      const staff = (r.staffName || '').toLowerCase();
-      const part = (r.partName || r.itemDescription || '').toLowerCase();
-      const note = (r.notes || '').toLowerCase();
-      const chargeType = (r.chargeType || '').toLowerCase();
+
+    return groupedBatteries.filter((b) => {
+      const code = (b.batteryCode || '').toLowerCase();
+      const client = (b.clientName || '').toLowerCase();
+      const staffMatches = b.staffList.some((s) => (s.name || '').toLowerCase().includes(q));
+      const serviceMatches = b.services.some((s) => s.toLowerCase().includes(q));
+      const partMatches = b.parts.some((p) => p.toLowerCase().includes(q));
+      const noteMatches = b.notes.some((n) => n.toLowerCase().includes(q));
+      const typeMatches = b.chargeTypes.some((t) => t.toLowerCase().includes(q));
+      const statusMatches = (b.batteryStatus || '').toLowerCase().includes(q);
+
       return (
         code.includes(q) ||
         client.includes(q) ||
-        staff.includes(q) ||
-        part.includes(q) ||
-        note.includes(q) ||
-        chargeType.includes(q)
+        staffMatches ||
+        serviceMatches ||
+        partMatches ||
+        noteMatches ||
+        typeMatches ||
+        statusMatches
       );
     });
-  }, [repairs, searchQuery]);
+  }, [groupedBatteries, searchQuery]);
+
+  const totalItemizedChargesCount = useMemo(() => {
+    return filteredBatteries.reduce((sum, b) => sum + (b.items?.length || 0), 0);
+  }, [filteredBatteries]);
 
   if (loading) return <TableState>Loading detailed period financial report…</TableState>;
 
@@ -427,10 +555,10 @@ function FinanceDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-white/5">
           <div>
             <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Itemized Battery Charges & Fee Ledger ({filteredRepairs.length})
+              Itemized Battery Charges & Fee Ledger ({filteredBatteries.length} {filteredBatteries.length === 1 ? 'battery' : 'batteries'}{totalItemizedChargesCount > filteredBatteries.length ? ` · ${totalItemizedChargesCount} charges` : ''})
             </h2>
             <p className="text-xs text-slate-500 dark:text-neutral-400">
-              Complete itemized breakdown of every billable repair, mandatory intake fee, and diagnostic service across all batteries.
+              Consolidated battery charges showing combined repairs, mandatory intake fees, and diagnostic services in a single row per battery.
             </p>
           </div>
 
@@ -438,7 +566,7 @@ function FinanceDetailPage() {
             <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
             <input
               type="text"
-              placeholder="Search battery, client, service, fee…"
+              placeholder="Search battery, client, service, part, fee…"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-800"
@@ -457,143 +585,269 @@ function FinanceDetailPage() {
 
         {/* Scrollable Data Table */}
         <div className="rounded-xl border border-slate-200/80 dark:border-white/10 overflow-hidden shadow-2xs">
-          <div className="max-h-[520px] overflow-y-auto overflow-x-auto">
+          <div className="max-h-[560px] overflow-y-auto overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
               <thead className="sticky top-0 z-10 bg-slate-100/95 dark:bg-surface-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-white/10">
                 <tr className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">
                   <th className="py-3 px-3.5 w-12 text-center">#</th>
                   <th className="py-3 px-3.5 min-w-[130px]">Date & Time</th>
-                  <th className="py-3 px-3.5 min-w-[130px]">Battery Code</th>
-                  <th className="py-3 px-3.5 min-w-[140px]">Client</th>
+                  <th className="py-3 px-3.5 min-w-[140px]">Battery Code</th>
+                  <th className="py-3 px-3.5 min-w-[130px]">Client</th>
                   <th className="py-3 px-3.5 min-w-[120px]">Type</th>
                   <th className="py-3 px-3.5 min-w-[130px]">Staff / System</th>
-                  <th className="py-3 px-3.5 min-w-[170px]">Service / Parts</th>
+                  <th className="py-3 px-3.5 min-w-[180px]">Service / Parts</th>
                   <th className="py-3 px-3.5 min-w-[90px]">Labor</th>
                   <th className="py-3 px-3.5 min-w-[90px]">Parts</th>
                   <th className="py-3 px-3.5 min-w-[90px]">Fee</th>
                   <th className="py-3 px-3.5 min-w-[100px]">Total Charge</th>
                   <th className="py-3 px-3.5 min-w-[100px]">Status</th>
+                  <th className="py-3 px-2 w-10 text-center"></th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-surface-850">
-                {filteredRepairs.length === 0 ? (
+                {filteredBatteries.length === 0 ? (
                   <tr>
-                    <td colSpan={12} className="py-12 text-center text-slate-400 dark:text-neutral-500">
+                    <td colSpan={13} className="py-12 text-center text-slate-400 dark:text-neutral-500">
                       <div className="flex flex-col items-center justify-center gap-2">
                         <FiTool className="w-8 h-8 text-slate-300 dark:text-neutral-600" />
                         <p className="font-semibold">
                           {searchQuery
-                            ? 'No charges match your search query.'
+                            ? 'No batteries match your search query.'
                             : 'No battery fees or repair charges found for this period.'}
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
-                  filteredRepairs.map((r, index) => {
-                    const isServiceFee = r.chargeType === 'service_fee' || (r.serviceFee > 0 && !r.partsCharge && !r.laborCharge);
-                    const parts = (r.partName || r.itemDescription || '').split(',').map((p) => p.trim()).filter(Boolean);
+                  filteredBatteries.map((b, index) => {
+                    const hasRepair = b.chargeTypes.includes('repair') || b.partsCharge > 0 || b.laborCharge > 0;
+                    const hasServiceFee = b.chargeTypes.includes('service_fee') || b.serviceFee > 0;
+                    const isExpanded = expandedBatteries.has(b.key);
 
                     return (
-                      <tr
-                        key={r.batchId || r.id || index}
-                        className="hover:bg-slate-50/80 dark:hover:bg-surface-800/60 transition-colors"
-                      >
-                        <td className="py-3 px-3.5 text-center font-mono text-slate-400 dark:text-neutral-500">
-                          {index + 1}
-                        </td>
-                        <td className="py-3 px-3.5">
-                          <div className="flex flex-col">
-                            <span className="font-bold text-slate-800 dark:text-neutral-200">
-                              {r.repairedAt ? new Date(r.repairedAt).toLocaleDateString([], {
-                                day: '2-digit',
-                                month: 'short',
-                              }) : '—'}
-                            </span>
-                            <span className="text-[10px] text-slate-400 dark:text-neutral-500">
-                              {r.repairedAt ? new Date(r.repairedAt).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              }) : ''}
-                            </span>
-                          </div>
-                        </td>
-                        <td className="py-3 px-3.5 font-medium">
-                          {r.batteryCode ? (
-                            <Link
-                              to={`/batteries/${r.batteryCode}`}
-                              className="inline-flex items-center gap-1 font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md hover:underline dark:bg-blue-950/60 dark:text-blue-300"
-                            >
-                              {r.batteryCode}
-                            </Link>
-                          ) : (
-                            <span className="text-slate-400">—</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5 font-semibold text-slate-800 dark:text-neutral-200">
-                          {r.clientName}
-                        </td>
-                        <td className="py-3 px-3.5">
-                          {isServiceFee ? (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-                              Service Fee
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                              Repair Job
-                            </span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5">
-                          {r.staffId ? (
-                            <Link
-                              to={`/staff/${r.staffId}`}
-                              className="font-medium text-blue-600 hover:underline dark:text-blue-400"
-                            >
-                              {r.staffName}
-                            </Link>
-                          ) : (
-                            <span className="text-slate-500 dark:text-neutral-400">{r.staffName || 'System Auto'}</span>
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5">
-                          {isServiceFee ? (
-                            <span className="font-semibold text-slate-800 dark:text-neutral-200">
-                              {r.itemDescription || r.partName || 'Service Fee'}
-                            </span>
-                          ) : (
-                            <div className="flex flex-wrap gap-1">
-                              {parts.length > 0 ? (
-                                parts.map((p, pIdx) => (
-                                  <span
-                                    key={pIdx}
-                                    className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                                  >
-                                    {p}
-                                  </span>
-                                ))
+                      <Fragment key={b.key}>
+                        <tr className="hover:bg-slate-50/80 dark:hover:bg-surface-800/60 transition-colors">
+                          <td className="py-3 px-3.5 text-center font-mono text-slate-400 dark:text-neutral-500">
+                            {index + 1}
+                          </td>
+                          <td className="py-3 px-3.5">
+                            <div className="flex flex-col">
+                              <span className="font-bold text-slate-800 dark:text-neutral-200">
+                                {b.latestDate ? new Date(b.latestDate).toLocaleDateString([], {
+                                  day: '2-digit',
+                                  month: 'short',
+                                }) : '—'}
+                              </span>
+                              <span className="text-[10px] text-slate-400 dark:text-neutral-500">
+                                {b.latestDate ? new Date(b.latestDate).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                }) : ''}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 font-medium">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {b.batteryCode ? (
+                                <Link
+                                  to={`/batteries/${b.batteryCode}`}
+                                  className="inline-flex items-center gap-1 font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md hover:underline dark:bg-blue-950/60 dark:text-blue-300"
+                                >
+                                  {b.batteryCode}
+                                </Link>
                               ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                              {b.items.length > 1 && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleExpand(b.key)}
+                                  className="inline-flex items-center text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 px-1.5 py-0.5 rounded-full transition-colors cursor-pointer"
+                                  title="Toggle charge breakdown"
+                                >
+                                  {b.items.length} charges
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5 font-semibold text-slate-800 dark:text-neutral-200">
+                            {b.clientName}
+                          </td>
+                          <td className="py-3 px-3.5">
+                            <div className="flex flex-wrap gap-1">
+                              {hasRepair && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                  Repair
+                                </span>
+                              )}
+                              {hasServiceFee && (
+                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                                  Service Fee
+                                </span>
+                              )}
+                              {!hasRepair && !hasServiceFee && (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3.5">
+                            {b.staffList.length > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                {b.staffList.map((st, sIdx) =>
+                                  st.id ? (
+                                    <Link
+                                      key={sIdx}
+                                      to={`/staff/${st.id}`}
+                                      className="font-medium text-blue-600 hover:underline dark:text-blue-400 block truncate max-w-[130px]"
+                                      title={st.name}
+                                    >
+                                      {st.name}
+                                    </Link>
+                                  ) : (
+                                    <span
+                                      key={sIdx}
+                                      className="text-slate-500 dark:text-neutral-400 block truncate max-w-[130px]"
+                                      title={st.name}
+                                    >
+                                      {st.name}
+                                    </span>
+                                  )
+                                )}
+                              </div>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3.5">
+                            <div className="flex flex-wrap gap-1 max-w-[280px]">
+                              {b.services.map((s, sIdx) => (
+                                <span
+                                  key={`srv-${sIdx}`}
+                                  className="inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                                >
+                                  {s}
+                                </span>
+                              ))}
+                              {b.parts.map((p, pIdx) => (
+                                <span
+                                  key={`prt-${pIdx}`}
+                                  className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
+                                >
+                                  {p}
+                                </span>
+                              ))}
+                              {b.services.length === 0 && b.parts.length === 0 && (
                                 <span className="text-slate-400 dark:text-neutral-500">—</span>
                               )}
                             </div>
-                          )}
-                        </td>
-                        <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
-                          {r.laborCharge > 0 ? formatMoney(r.laborCharge) : '—'}
-                        </td>
-                        <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
-                          {r.partsCharge > 0 ? formatMoney(r.partsCharge) : '—'}
-                        </td>
-                        <td className="py-3 px-3.5 font-mono text-purple-600 dark:text-purple-400 font-bold">
-                          {r.serviceFee > 0 ? formatMoney(r.serviceFee) : '—'}
-                        </td>
-                        <td className="py-3 px-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                          {formatMoney(r.totalCharge)}
-                        </td>
-                        <td className="py-3 px-3.5">
-                          {r.batteryStatus ? <StatusBadge status={r.batteryStatus} /> : '—'}
-                        </td>
-                      </tr>
+                          </td>
+                          <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
+                            {b.laborCharge > 0 ? formatMoney(b.laborCharge) : '—'}
+                          </td>
+                          <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
+                            {b.partsCharge > 0 ? formatMoney(b.partsCharge) : '—'}
+                          </td>
+                          <td className="py-3 px-3.5 font-mono text-purple-600 dark:text-purple-400 font-bold">
+                            {b.serviceFee > 0 ? formatMoney(b.serviceFee) : '—'}
+                          </td>
+                          <td className="py-3 px-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
+                            {formatMoney(b.totalCharge)}
+                          </td>
+                          <td className="py-3 px-3.5">
+                            {b.batteryStatus ? <StatusBadge status={b.batteryStatus} /> : '—'}
+                          </td>
+                          <td className="py-3 px-2 text-center">
+                            {b.items.length > 1 ? (
+                              <button
+                                type="button"
+                                onClick={() => toggleExpand(b.key)}
+                                title={isExpanded ? 'Collapse charge details' : 'Expand charge details'}
+                                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-surface-800 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                              >
+                                {isExpanded ? (
+                                  <FiChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                ) : (
+                                  <FiChevronDown className="w-4 h-4" />
+                                )}
+                              </button>
+                            ) : null}
+                          </td>
+                        </tr>
+
+                        {/* Expandable itemized sub-row */}
+                        {isExpanded && (
+                          <tr className="bg-slate-50/80 dark:bg-surface-900/60 border-y border-slate-200/70 dark:border-white/5">
+                            <td colSpan={13} className="py-3 px-4 pl-10 pr-6">
+                              <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-surface-850 shadow-2xs space-y-2">
+                                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-neutral-200 border-b border-slate-100 dark:border-white/5 pb-2">
+                                  <span>Itemized Individual Charges ({b.items.length})</span>
+                                  <span className="text-[11px] font-normal text-slate-400">
+                                    Battery: <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{b.batteryCode || '—'}</span>
+                                  </span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  {b.items.map((item, itemIdx) => {
+                                    const isItemSrv =
+                                      item.chargeType === 'service_fee' ||
+                                      (item.serviceFee > 0 && !item.partsCharge && !item.laborCharge);
+                                    return (
+                                      <div
+                                        key={item.id || itemIdx}
+                                        className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 dark:bg-surface-900/80 text-xs border border-slate-100 dark:border-white/5"
+                                      >
+                                        <div className="flex items-center gap-2 min-w-0">
+                                          <span className="font-mono text-[11px] text-slate-400 w-5">#{itemIdx + 1}</span>
+                                          <span
+                                            className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                              isItemSrv
+                                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                            }`}
+                                          >
+                                            {isItemSrv ? 'Service Fee' : 'Repair Job'}
+                                          </span>
+                                          <span className="font-semibold text-slate-800 dark:text-neutral-200">
+                                            {item.itemDescription || item.partName || (isItemSrv ? 'Service Fee' : 'Repair')}
+                                          </span>
+                                          {item.notes && (
+                                            <span className="text-[11px] text-slate-500 italic truncate max-w-xs">
+                                              — "{item.notes}"
+                                            </span>
+                                          )}
+                                        </div>
+
+                                        <div className="flex items-center gap-4 text-right shrink-0">
+                                          <span className="text-[11px] text-slate-400">
+                                            {item.repairedAt
+                                              ? new Date(item.repairedAt).toLocaleString([], {
+                                                  day: '2-digit',
+                                                  month: 'short',
+                                                  hour: '2-digit',
+                                                  minute: '2-digit',
+                                                })
+                                              : '—'}
+                                          </span>
+                                          <span className="text-[11px] text-slate-500">
+                                            by {item.staffName || 'System'}
+                                          </span>
+                                          <div className="text-[11px] text-slate-500 flex items-center gap-2">
+                                            {item.laborCharge > 0 && <span>Labor: {formatMoney(item.laborCharge)}</span>}
+                                            {item.partsCharge > 0 && <span>Parts: {formatMoney(item.partsCharge)}</span>}
+                                            {item.serviceFee > 0 && <span>Fee: {formatMoney(item.serviceFee)}</span>}
+                                          </div>
+                                          <div className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 min-w-[70px]">
+                                            {formatMoney(item.totalCharge)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
                     );
                   })
                 )}
