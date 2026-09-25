@@ -254,6 +254,8 @@ export default function BatteryDetailScreen() {
   const [passToTechSubmitting, setPassToTechSubmitting] = useState(false);
   const [showCantServiceAlertModal, setShowCantServiceAlertModal] = useState(false);
   const [cantServiceAlertData, setCantServiceAlertData] = useState(null);
+  const [showConfirmRemovePartsModal, setShowConfirmRemovePartsModal] = useState(false);
+  const [confirmRemoveMode, setConfirmRemoveMode] = useState('scan_alert');
   const [showRemovePartsSuccessModal, setShowRemovePartsSuccessModal] = useState(false);
   const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
   const [unverifiedIntakeData, setUnverifiedIntakeData] = useState(null);
@@ -785,38 +787,15 @@ export default function BatteryDetailScreen() {
   }
 
   async function handleConfirmTestingUnserviceable() {
-    Alert.alert(
-      'Continue to Remove Fitted Parts?',
-      'Are you sure you want to mark this battery unserviceable and continue to remove all fitted parts?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue to Remove',
-          style: 'destructive',
-          onPress: async () => {
-            setShowTestingDecisionModal(false);
-            await handleReportIssue();
-          },
-        },
-      ]
-    );
+    setShowTestingDecisionModal(false);
+    setConfirmRemoveMode('testing_decision');
+    setShowConfirmRemovePartsModal(true);
   }
 
   function handleConfirmRemoveFittedPartsFromAlert() {
-    Alert.alert(
-      'Continue to Remove Fitted Parts?',
-      'Are you sure you want to continue and remove all fitted parts from this battery?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Continue to Remove',
-          style: 'destructive',
-          onPress: () => {
-            setShowCantServiceAlertModal(false);
-          },
-        },
-      ]
-    );
+    setShowCantServiceAlertModal(false);
+    setConfirmRemoveMode('scan_alert');
+    setShowConfirmRemovePartsModal(true);
   }
 
   function toggleRemovalId(repairId) {
@@ -3116,6 +3095,142 @@ export default function BatteryDetailScreen() {
                   View Battery Details
                 </Text>
               </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Confirm Continue to Remove Fitted Parts Modal ────────────────── */}
+      <Modal
+        visible={showConfirmRemovePartsModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          setShowConfirmRemovePartsModal(false);
+          if (confirmRemoveMode === 'scan_alert') {
+            setShowCantServiceAlertModal(true);
+          } else if (confirmRemoveMode === 'testing_decision') {
+            setShowTestingDecisionModal(true);
+          }
+        }}
+      >
+        <View className="flex-1 items-center justify-center bg-black/75 px-5">
+          <View className="w-full max-w-sm rounded-3xl border border-amber-300/80 dark:border-amber-700/80 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
+            {/* Header Accent Bar */}
+            <View className="bg-amber-600 px-5 pt-5 pb-4">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20 border border-white/30">
+                  <Icon name="wrench" color="#ffffff" size={20} strokeWidth={2.5} />
+                </View>
+                <View className="rounded-full bg-white/20 px-3 py-1 border border-white/30">
+                  <Text className="text-[10px] font-black tracking-wider text-white uppercase">
+                    Removal Confirmation
+                  </Text>
+                </View>
+              </View>
+
+              <Text className="text-lg font-black text-white tracking-tight">
+                Continue to Remove Fitted Parts?
+              </Text>
+              <Text className="mt-0.5 text-xs text-amber-100 font-medium leading-relaxed">
+                Are you sure you want to proceed and physically remove all fitted parts from this battery?
+              </Text>
+            </View>
+
+            <View className="p-5">
+              {/* Battery & Parts Summary Card */}
+              <View className="mb-4 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/40 p-3.5 space-y-2">
+                <View className="flex-row items-center justify-between pb-2 border-b border-amber-200/60 dark:border-amber-900/60">
+                  <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Battery Code</Text>
+                  <Text className="text-xs font-mono font-bold text-amber-950 dark:text-amber-200">
+                    {cantServiceAlertData?.batteryCode || battery?.battery_code || code || '—'}
+                  </Text>
+                </View>
+
+                {/* Parts Preview */}
+                {((cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0) || (pendingPartsRemoval && pendingPartsRemoval.length > 0)) && (
+                  <View className="pt-0.5">
+                    <View className="flex-row items-center justify-between mb-1.5">
+                      <Text className="text-[10px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
+                        Parts to be Restocked
+                      </Text>
+                      <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                        {(cantServiceAlertData?.parts || pendingPartsRemoval || []).length} {(cantServiceAlertData?.parts || pendingPartsRemoval || []).length === 1 ? 'item' : 'items'}
+                      </Text>
+                    </View>
+                    <View className="space-y-1">
+                      {(cantServiceAlertData?.parts || pendingPartsRemoval || []).slice(0, 3).map((p, pIdx) => (
+                        <View
+                          key={p.id || pIdx}
+                          className="flex-row items-center justify-between rounded-lg border border-amber-200/80 dark:border-amber-800/80 bg-white/90 dark:bg-slate-900 px-2.5 py-1.5"
+                        >
+                          <View className="flex-row items-center gap-1.5 flex-1 mr-2">
+                            <View className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                            <Text className="text-xs font-semibold text-slate-800 dark:text-slate-200" numberOfLines={1}>
+                              {p.part_name}
+                            </Text>
+                          </View>
+                          <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-400">
+                            Qty {p.quantity_used || 1}
+                          </Text>
+                        </View>
+                      ))}
+                      {(cantServiceAlertData?.parts || pendingPartsRemoval || []).length > 3 && (
+                        <Text className="text-[10px] font-medium text-amber-800 dark:text-amber-300 italic text-center pt-0.5">
+                          + {(cantServiceAlertData?.parts || pendingPartsRemoval || []).length - 3} additional parts
+                        </Text>
+                      )}
+                    </View>
+                  </View>
+                )}
+
+                {/* Restock Warning */}
+                <View className="flex-row items-center gap-1.5 pt-1">
+                  <Icon name="alertCircle" color="#b45309" size={13} />
+                  <Text className="text-[10px] font-medium text-amber-800 dark:text-amber-300">
+                    Parts will be physically removed &amp; restocked into inventory.
+                  </Text>
+                </View>
+              </View>
+
+              {/* Action Buttons */}
+              <View className="gap-2.5">
+                <TouchableOpacity
+                  onPress={async () => {
+                    setShowConfirmRemovePartsModal(false);
+                    if (confirmRemoveMode === 'testing_decision') {
+                      await handleReportIssue();
+                    }
+                  }}
+                  disabled={submitting}
+                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700 disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#ffffff" />
+                  ) : (
+                    <>
+                      <Icon name="check" color="#ffffff" size={16} strokeWidth={2.5} />
+                      <Text className="text-sm font-bold text-white">Yes, Continue to Remove</Text>
+                    </>
+                  )}
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowConfirmRemovePartsModal(false);
+                    if (confirmRemoveMode === 'scan_alert') {
+                      setShowCantServiceAlertModal(true);
+                    } else if (confirmRemoveMode === 'testing_decision') {
+                      setShowTestingDecisionModal(true);
+                    }
+                  }}
+                  className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+                >
+                  <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                    Cancel
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
