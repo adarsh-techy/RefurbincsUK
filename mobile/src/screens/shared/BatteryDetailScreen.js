@@ -369,9 +369,10 @@ export default function BatteryDetailScreen() {
         const isOwnInProgress =
           data.battery?.status === 'in_progress' &&
           data.battery?.started_by_user_id === currentUserId;
-        const canTestInTesting =
-          canTest &&
-          ['in_testing', 'testing', 'repair_testing'].includes(data.battery?.status);
+        const isTestingStatus = ['in_testing', 'testing', 'repair_testing'].includes(
+          data.battery?.status
+        );
+        const canTestInTesting = canTest && isTestingStatus;
         const hasPendingPartsRemoval = (data.pendingPartsRemoval?.length || 0) > 0;
         const latestPassBack = (data.services || []).find(
           (s) => s.service_name === 'Passed back to Technician'
@@ -451,19 +452,52 @@ export default function BatteryDetailScreen() {
             fittedAt: (data.history || [])[0]?.repaired_at || null,
           });
           setShowCantServiceAlertModal(true);
+        } else if (fromScan && isTestingStatus) {
+          const activeHistory = (data.history || []).filter((h) => !h.removed_at);
+          const latestBatchId = activeHistory[0]?.batch_id;
+          const latestRepairs = latestBatchId
+            ? activeHistory.filter((h) => h.batch_id === latestBatchId)
+            : activeHistory;
+
+          const repStaffName =
+            latestRepairs[0]?.staff_name ||
+            data.battery?.started_by_name ||
+            'Workshop Technician';
+          const repUserId = latestRepairs[0]?.user_id || data.battery?.started_by_user_id;
+          const isRepByMe = Boolean(
+            (repUserId && repUserId === currentUserId) ||
+            (repStaffName &&
+              currentUser?.name &&
+              repStaffName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+            (data.battery?.started_by_user_id && data.battery.started_by_user_id === currentUserId)
+          );
+
+          setRepairedByInfo({
+            batteryCode: data.battery.battery_code,
+            serialNumber: data.battery.serial_number,
+            status: data.battery.status,
+            staffName: repStaffName,
+            userId: repUserId,
+            repairedAt: latestRepairs[0]?.repaired_at || null,
+            notes: latestRepairs.find((r) => r.notes)?.notes || null,
+            durationSeconds: latestRepairs[0]?.duration_seconds || null,
+            parts: latestRepairs.map((r) => ({
+              id: r.id,
+              partName: r.part_name,
+              quantity: r.quantity_used || 1,
+            })),
+            isRepairedByMe: isRepByMe,
+          });
+          setShowRepairedByModal(true);
         } else if (
           fromScan &&
           data.battery?.status !== 'in_repair' &&
           data.battery?.status !== 'tested_parts_removed' &&
           !isOwnInProgress &&
-          !canTestInTesting &&
           !hasPendingPartsRemoval
         ) {
           setBlockedStatus(data.battery.status);
           return;
-        } else if (fromScan && canTestInTesting) {
-          setRepairedByInfo(data.history?.[0] || null);
-          setShowRepairedByModal(true);
         }
       }
       setResult(data);
@@ -1877,13 +1911,14 @@ export default function BatteryDetailScreen() {
         </Modal>
       )}
 
-      {/* ── Repaired-By Modal (For a tester scanning a battery that's ready) ── */}
+      {/* ── Repaired-By Modal (Already Repaired & Passed to Test) ── */}
       {(() => {
         const isRepairedByMe = Boolean(
-          (repairedByInfo?.user_id && repairedByInfo.user_id === currentUserId) ||
-          (repairedByInfo?.staff_name &&
+          repairedByInfo?.isRepairedByMe ||
+          (repairedByInfo?.userId && repairedByInfo.userId === currentUserId) ||
+          (repairedByInfo?.staffName &&
             currentUser?.name &&
-            repairedByInfo.staff_name.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+            repairedByInfo.staffName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
           (result?.battery?.started_by_user_id && result.battery.started_by_user_id === currentUserId)
         );
 
@@ -1895,122 +1930,204 @@ export default function BatteryDetailScreen() {
             onRequestClose={() => setShowRepairedByModal(false)}
           >
             <View className="flex-1 items-center justify-center bg-black/60 px-5">
-              <View className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+              <View className={`w-full max-w-sm rounded-3xl border p-6 shadow-2xl ${
+                isRepairedByMe
+                  ? 'border-emerald-300 dark:border-emerald-700 bg-white dark:bg-slate-900'
+                  : 'border-purple-300 dark:border-purple-700 bg-white dark:bg-slate-900'
+              }`}>
                 {/* Header with Icon & Status Badge */}
-                <View className="flex-row items-center justify-between mb-4">
+                <View className="flex-row items-center justify-between mb-3.5">
                   <View className={`h-12 w-12 items-center justify-center rounded-2xl border ${
                     isRepairedByMe
                       ? 'bg-emerald-500/10 border-emerald-500/20'
-                      : 'bg-blue-500/10 border-blue-500/20'
+                      : 'bg-purple-500/10 border-purple-500/20'
                   }`}>
-                    <Icon name={isRepairedByMe ? 'checkCircle' : 'flask'} color={isRepairedByMe ? '#059669' : '#2563eb'} size={22} />
+                    <Icon
+                      name={isRepairedByMe ? 'checkCircle' : 'flask'}
+                      color={isRepairedByMe ? '#059669' : '#9333ea'}
+                      size={24}
+                    />
                   </View>
                   <View className={`rounded-full border px-3 py-1 ${
                     isRepairedByMe
                       ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800/60'
-                      : 'bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800/60'
+                      : 'bg-purple-50 dark:bg-purple-950/40 border-purple-200 dark:border-purple-800/60'
                   }`}>
                     <Text className={`text-[11px] font-bold ${
                       isRepairedByMe
-                        ? 'text-emerald-600 dark:text-emerald-400'
-                        : 'text-blue-600 dark:text-blue-400'
+                        ? 'text-emerald-700 dark:text-emerald-400'
+                        : 'text-purple-700 dark:text-purple-400'
                     }`}>
-                      {isRepairedByMe ? 'Repaired by You' : 'Ready for Testing'}
+                      {isRepairedByMe ? 'Repaired by You' : 'Passed to Testing'}
                     </Text>
                   </View>
                 </View>
 
                 <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  Battery Inspection &amp; QA
+                  Battery Already Repaired
                 </Text>
-                <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400">
+                <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
                   {isRepairedByMe
-                    ? 'You repaired this battery. Review details before proceeding with testing sign-off:'
-                    : 'Repair work is completed. Review details before starting sign-off:'}
+                    ? 'You already completed repair work on this battery. It has been passed for testing diagnostics.'
+                    : 'This battery has already been repaired and is waiting for testing & QA sign-off.'}
                 </Text>
 
                 {/* Structured Details Card */}
-                <View className="mb-5 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 bg-slate-50 dark:bg-slate-950/60 p-3.5 space-y-2.5">
+                <View className="mb-4 rounded-2xl border border-slate-200/90 dark:border-slate-800/90 bg-slate-50 dark:bg-slate-950/60 p-3.5 space-y-2">
                   {/* Battery Code */}
-                  <View className="flex-row items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
+                  <View className="flex-row items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-slate-800">
                     <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Battery ID</Text>
                     <Text className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">
-                      {battery?.battery_code || '—'}
+                      {repairedByInfo?.batteryCode || battery?.battery_code || code}
                     </Text>
                   </View>
 
-                  {/* Repaired By */}
-                  <View className="flex-row items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
+                  {/* Who Repaired It */}
+                  <View className="flex-row items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-slate-800">
                     <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Repaired By</Text>
-                    <View className="flex-row items-center gap-1.5">
-                      <Icon name="user" color="#64748b" size={12} />
-                      {isRepairedByMe ? (
-                        <View className="flex-row items-center gap-1">
-                          <Text className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    {isRepairedByMe ? (
+                      <View className="flex-row items-center gap-1.5">
+                        <View className="rounded-md bg-emerald-500/15 border border-emerald-500/30 px-2 py-0.5">
+                          <Text className="text-xs font-extrabold text-emerald-700 dark:text-emerald-300">
                             You
                           </Text>
-                          <Text className="text-xs text-slate-500 dark:text-slate-400">
-                            ({repairedByInfo?.staff_name || currentUser?.name || 'Technician'})
-                          </Text>
                         </View>
-                      ) : (
-                        <Text className="text-xs font-bold text-slate-900 dark:text-white">
-                          {repairedByInfo?.staff_name || 'Workshop Technician'}
+                        <Text className="text-xs font-medium text-slate-600 dark:text-slate-300">
+                          ({repairedByInfo?.staffName || currentUser?.name || 'Technician'})
                         </Text>
-                      )}
-                    </View>
+                      </View>
+                    ) : (
+                      <View className="flex-row items-center gap-1.5">
+                        <Icon name="user" color="#64748b" size={13} />
+                        <Text className="text-xs font-bold text-slate-900 dark:text-white">
+                          {repairedByInfo?.staffName || 'Workshop Technician'}
+                        </Text>
+                      </View>
+                    )}
                   </View>
 
                   {/* Repair Date & Time */}
-                  <View className="flex-row items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
-                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Repair Date &amp; Time</Text>
-                    <Text className="text-xs font-medium text-slate-700 dark:text-slate-300">
-                      {repairedByInfo?.repaired_at
-                        ? new Date(repairedByInfo.repaired_at).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          }) +
-                          ' · ' +
-                          new Date(repairedByInfo.repaired_at).toLocaleTimeString([], {
-                            hour: '2-digit',
-                            minute: '2-digit',
-                          })
-                        : '—'}
-                    </Text>
-                  </View>
-
-                  {/* Parts Changed (if available) */}
-                  {repairedByInfo?.part_name && (
-                    <View className="flex-row items-center justify-between py-1 border-b border-slate-200/60 dark:border-slate-800">
-                      <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Part Serviced</Text>
-                      <View className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5">
-                        <Text className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
-                          {repairedByInfo.part_name}
-                        </Text>
-                      </View>
+                  {repairedByInfo?.repairedAt && (
+                    <View className="flex-row items-center justify-between pb-1.5 border-b border-slate-200/60 dark:border-slate-800">
+                      <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Repaired On</Text>
+                      <Text className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                        {new Date(repairedByInfo.repairedAt).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })} · {new Date(repairedByInfo.repairedAt).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}
+                      </Text>
                     </View>
                   )}
 
-                  {/* Notes (if available) */}
+                  {/* Changed Parts List */}
+                  <View className="pt-0.5">
+                    <View className="flex-row items-center justify-between mb-1.5">
+                      <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+                        Parts Changed
+                      </Text>
+                      <View className="rounded-full bg-slate-200/70 dark:bg-slate-800 px-2 py-0.5">
+                        <Text className="text-[10px] font-bold text-slate-700 dark:text-slate-300">
+                          {repairedByInfo?.parts?.length || 0} {repairedByInfo?.parts?.length === 1 ? 'part' : 'parts'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {repairedByInfo?.parts && repairedByInfo.parts.length > 0 ? (
+                      <ScrollView nestedScrollEnabled className="max-h-28 space-y-1.5">
+                        {repairedByInfo.parts.map((p, idx) => (
+                          <View
+                            key={p.id || idx}
+                            className="flex-row items-center justify-between rounded-xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 px-2.5 py-1.5"
+                          >
+                            <View className="flex-row items-center gap-1.5 flex-1 pr-2">
+                              <Icon name="check" color="#059669" size={12} />
+                              <Text className="text-xs font-bold text-slate-800 dark:text-slate-100" numberOfLines={1}>
+                                {p.partName}
+                              </Text>
+                            </View>
+                            <View className="rounded-md bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.5">
+                              <Text className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                                Qty {p.quantity}
+                              </Text>
+                            </View>
+                          </View>
+                        ))}
+                      </ScrollView>
+                    ) : (
+                      <Text className="text-xs text-slate-400 italic">No parts replaced (Check / Diagnostic)</Text>
+                    )}
+                  </View>
+
+                  {/* Notes (if any) */}
                   {repairedByInfo?.notes && (
-                    <View className="pt-1">
-                      <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400 mb-1">
+                    <View className="pt-1.5 border-t border-slate-200/60 dark:border-slate-800">
+                      <Text className="text-[10px] font-semibold uppercase tracking-wider text-slate-400">
                         Repair Note:
                       </Text>
-                      <Text className="text-xs text-slate-700 dark:text-slate-300 italic">
+                      <Text className="text-xs text-slate-700 dark:text-slate-300 italic mt-0.5">
                         "{repairedByInfo.notes}"
                       </Text>
                     </View>
                   )}
                 </View>
 
-                <TouchableOpacity
-                  onPress={() => setShowRepairedByModal(false)}
-                  className="items-center rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
-                >
-                  <Text className="text-sm font-bold text-white">Start Testing</Text>
-                </TouchableOpacity>
+                {/* Action Buttons */}
+                <View className="gap-2.5">
+                  {canTest ? (
+                    <>
+                      <TouchableOpacity
+                        onPress={() => setShowRepairedByModal(false)}
+                        className="items-center rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+                      >
+                        <Text className="text-sm font-bold text-white">Start Testing &amp; QA</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowRepairedByModal(false);
+                          navigation.navigate('Main', {
+                            screen: 'Service',
+                            params: { autoScan: Date.now() },
+                          });
+                        }}
+                        className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
+                      >
+                        <Icon name="camera" color="#64748b" size={15} />
+                        <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
+                      </TouchableOpacity>
+                    </>
+                  ) : (
+                    <>
+                      <View className="rounded-xl bg-purple-50 dark:bg-purple-950/40 p-2.5 border border-purple-200 dark:border-purple-800/60">
+                        <Text className="text-[11px] text-purple-800 dark:text-purple-300 leading-relaxed text-center font-medium">
+                          This battery is awaiting testing sign-off by a supervisor or tester.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => {
+                          setShowRepairedByModal(false);
+                          navigation.navigate('Main', {
+                            screen: 'Service',
+                            params: { autoScan: Date.now() },
+                          });
+                        }}
+                        className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+                      >
+                        <Icon name="camera" color="#ffffff" size={16} />
+                        <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        onPress={() => setShowRepairedByModal(false)}
+                        className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-2.5 border border-slate-200 dark:border-slate-700"
+                      >
+                        <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">View Battery Details</Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
+                </View>
               </View>
             </View>
           </Modal>
