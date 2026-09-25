@@ -79,8 +79,11 @@ async function list(req, res, next) {
     // intakedOnly: restrict to batteries that arrived via a truck intake and
     // are currently awaiting repair — used by technician scan typeaheads.
     const intakedOnly = req.query.intakedOnly === 'true';
-    let includeTesting = req.query.includeTesting === 'true';
-    if (!includeTesting && req.user && intakedOnly) {
+    // Whether in_testing batteries may be suggested is decided by the
+    // caller's role only — never by a query flag, which any technician could
+    // set from devtools. (Clients may still send includeTesting; it's ignored.)
+    let includeTesting = false;
+    if (req.user && intakedOnly) {
       if (req.user.role === 'admin' || req.user.role === 'super_admin') {
         includeTesting = true;
       } else {

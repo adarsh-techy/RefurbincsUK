@@ -52,6 +52,10 @@ const CLIENT_BATTERY_IDS_CTE = `
     JOIN return_batteries rb ON rb.return_id = ret.id
     JOIN batteries b ON b.id = rb.battery_id
     WHERE ret.client_id = $1
+      -- A return recorded against this client must never pull in a battery
+      -- that is explicitly tagged to a different client (mis-picked on the
+      -- dispatch form) — that would bill the same charges to two companies.
+      AND (b.client_name IS NULL OR lower(b.client_name) = lower($2))
   )
 `;
 
@@ -808,20 +812,41 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
   }
 }
 
-// Update client's unverified truck intake info (truck number, driver name)
-async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNumber, driverName }) {
-  const { rows: existing } = await db.query(
+// The one rule for "may this client touch this truck intake": the intake is
+// tagged with their client_id, OR it is an untagged (client_id IS NULL)
+// intake whose batteries ALL belong to them — at least one carries their
+// name and none carries another client's. Requiring only one matching
+// battery would let a client claim or delete a mixed workshop-created
+// intake and wipe another company's shipment. `runner` is db or an open
+// transaction client so callers inside BEGIN/COMMIT see their own writes.
+async function findOwnedIntake(runner, intakeId, clientId, clientName) {
+  const { rows } = await runner.query(
     `SELECT ti.* FROM truck_intakes ti
      WHERE ti.id = $1 AND (
        ti.client_id = $2
-       OR (ti.client_id IS NULL AND EXISTS (
-         SELECT 1 FROM batteries b
-         WHERE b.truck_intake_id = ti.id
-           AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
-       ))
+       OR (
+         ti.client_id IS NULL
+         AND $3 <> ''
+         AND EXISTS (
+           SELECT 1 FROM batteries b
+           WHERE b.truck_intake_id = ti.id AND lower(b.client_name) = lower($3)
+         )
+         AND NOT EXISTS (
+           SELECT 1 FROM batteries b
+           WHERE b.truck_intake_id = ti.id
+             AND b.client_name IS NOT NULL AND lower(b.client_name) <> lower($3)
+         )
+       )
      )`,
     [intakeId, clientId, clientName || '']
   );
+  return rows;
+}
+
+// Update client's unverified truck intake info (truck number, driver name)
+async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNumber, driverName }) {
+  const existing = await findOwnedIntake(db, intakeId, clientId, clientName);
+
   if (existing.length === 0) {
     const err = new Error('Truck intake not found or does not belong to your company.');
     err.status = 404;
@@ -847,18 +872,8 @@ async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNu
 
 // Add more batteries to an existing unverified truck intake
 async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, { batteries = [] }) {
-  const { rows: existing } = await db.query(
-    `SELECT ti.* FROM truck_intakes ti
-     WHERE ti.id = $1 AND (
-       ti.client_id = $2
-       OR (ti.client_id IS NULL AND EXISTS (
-         SELECT 1 FROM batteries b
-         WHERE b.truck_intake_id = ti.id
-           AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
-       ))
-     )`,
-    [intakeId, clientId, clientName || '']
-  );
+  const existing = await findOwnedIntake(db, intakeId, clientId, clientName);
+
   if (existing.length === 0) {
     const err = new Error('Truck intake not found or does not belong to your company.');
     err.status = 404;
@@ -958,18 +973,8 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
 
     if (hasIntake) {
       const validIntakeId = Number(intakeId);
-      const { rows: intakeRows } = await client.query(
-        `SELECT ti.* FROM truck_intakes ti
-         WHERE ti.id = $1 AND (
-           ti.client_id = $2
-           OR (ti.client_id IS NULL AND EXISTS (
-             SELECT 1 FROM batteries b
-             WHERE b.truck_intake_id = ti.id
-               AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
-           ))
-         )`,
-        [validIntakeId, clientId, clientName || '']
-      );
+      const intakeRows = await findOwnedIntake(client, validIntakeId, clientId, clientName);
+
       if (intakeRows.length === 0) {
         const err = new Error('Truck intake not found.');
         err.status = 404;
@@ -1020,18 +1025,8 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
 
 // Delete / cancel an entire unverified truck intake and reset all its batteries
 async function deleteClientTruckIntake(clientId, clientName, intakeId) {
-  const { rows: intakeRows } = await db.query(
-    `SELECT ti.* FROM truck_intakes ti
-     WHERE ti.id = $1 AND (
-       ti.client_id = $2
-       OR (ti.client_id IS NULL AND EXISTS (
-         SELECT 1 FROM batteries b
-         WHERE b.truck_intake_id = ti.id
-           AND ($3 <> '' AND b.client_name IS NOT NULL AND lower(b.client_name) = lower($3))
-       ))
-     )`,
-    [intakeId, clientId, clientName || '']
-  );
+  const intakeRows = await findOwnedIntake(db, intakeId, clientId, clientName);
+
   if (intakeRows.length === 0) {
     const err = new Error('Truck intake not found or does not belong to your company.');
     err.status = 404;

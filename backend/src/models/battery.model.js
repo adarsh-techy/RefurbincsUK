@@ -51,7 +51,7 @@ async function findPage({
       conditions.push(`${effectiveStatusExpr} = 'registered'`);
     } else if (status === 'returned') {
       conditions.push(`${effectiveStatusExpr} = 'returned'`);
-    } else if (status === 'unserviceable' || status === 'unserviceable_history' || status === 'unserviceable_all') {
+    } else if (status === 'unserviceable') {
       conditions.push(`${effectiveStatusExpr} IN ('unserviceable', 'tested_parts_removed')`);
     } else if (status.includes(',')) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean);
@@ -74,7 +74,7 @@ async function findPage({
           SELECT 1 FROM recycle_batteries rbat
           JOIN recycle_batches rb ON rb.id = rbat.recycle_id
           WHERE rbat.battery_id = b.id AND rb.recycled_at::date = $${params.length}
-        ) OR b.created_at::date = $${params.length}
+        )
       )`);
     } else {
       conditions.push(`b.created_at::date = $${params.length}`);
@@ -118,7 +118,9 @@ async function findPage({
         ))
         OR b.status = 'in_testing'
       )`);
-      conditions.push(`b.status IN ('in_repair', 'in_testing', 'tested_parts_removed')`);
+      // in_progress included so a technician can get back to the battery they
+      // already started (the typeahead replaced the old activeOnly filter).
+      conditions.push(`b.status IN ('in_repair', 'in_progress', 'in_testing', 'tested_parts_removed')`);
     } else {
       conditions.push(`b.truck_intake_id IS NOT NULL`);
       conditions.push(`EXISTS (
@@ -126,7 +128,7 @@ async function findPage({
         WHERE ti.id = b.truck_intake_id 
           AND (ti.status = 'verified' OR ti.verified_at IS NOT NULL)
       )`);
-      conditions.push(`b.status IN ('in_repair', 'tested_parts_removed')`);
+      conditions.push(`b.status IN ('in_repair', 'in_progress', 'tested_parts_removed')`);
     }
   }
 

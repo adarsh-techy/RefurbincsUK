@@ -214,7 +214,13 @@ Babel CLI via `babel.config.js` fails standalone (expo preset needs Metro env) �
 15. **`Math.max` across revenue sources** discarded whichever was smaller; per-period reconciliation (`recycleRevenueByPeriod`: invoice if present else weight estimate) is the rule.
 16. **Guard added to one save path but not its siblings** (`handleSaveAndLeave` bypassed `groupsLoadError`). Grep every caller of the persist function.
 17. **Optimistic update + swallowed PUT error** → UI lies. Surface the error and re-fetch.
-18. **Moved JSX SVG path lost tokens** (`… 9.75-9.75 9.75S…`). Diff icon paths against an intact copy.
+18. **"Any one battery is mine" ownership on untagged intakes** let a client claim/delete a mixed workshop intake. Rule now lives in ONE place — `findOwnedIntake()` in `client.model.js`: `client_id = me`, or `client_id IS NULL` **and all** batteries carry my name.
+19. **Feature flag read from the query string instead of the role** (`includeTesting=true`) let technicians bypass the supervisor guard. Derive privilege flags from `req.user`, never from `req.query`.
+20. **Return-batch union pulled in other clients' batteries** (`CLIENT_BATTERY_IDS_CTE`): a mis-picked battery on a dispatch form billed two clients. The returns branch now excludes batteries tagged to a different `client_name`.
+21. **`LEFT JOIN clients … OR …` fan-out** duplicated fee rows in finance when intake client ≠ battery client_name. Use a `LATERAL … LIMIT 1` to pick exactly one client.
+22. **Typeahead status list dropped `in_progress`** so technicians couldn't find batteries they'd already started. When replacing a filter (`activeOnly` → `intakedOnly`), diff the status sets.
+23. **File written before the DB row** — orphaned uploads on INSERT failure. Validate input first, write file, wrap the DB call and unlink on throw (`return.controller.js`).
+24. **Moved JSX SVG path lost tokens** (`… 9.75-9.75 9.75S…`). Diff icon paths against an intact copy.
 
 Meta-rules: prefer 409/400 with a message over silently writing NULL; anything that *replaces* a set server-side must never run from a default/empty client state; every `requireRole` widening needs a matching DB-constraint check.
 
@@ -236,5 +242,6 @@ Meta-rules: prefer 409/400 with a message over silently writing NULL; anything t
 ## 9. Fix log
 
 - **2026-09-25** — Review of the uncommitted "sort groups / return docs / recycle weight" batch (47 files): fixed the 14 items in §7 across `battery.controller.js`, `battery.model.js`, `client.model.js`, `return.routes.js`, `app.js`, `image-url.js`, `imageUrl.js`, `TechnicianRepairPanel.jsx`, `BatteryDetailPage.jsx`, `ClientBatterySortPage.jsx`, `sort-groups.js`, `ClientSortingScreen.js`. Verified with `vite build` + backend module load.
+- **2026-09-26 (later)** — Third pass over `3e22db8..HEAD` (10 findings): `findOwnedIntake()` helper with all-batteries rule, returns-branch guard in `CLIENT_BATTERY_IDS_CTE`, `includeTesting` derived from role only, `LATERAL` single-client join + `buildDateRangeWhere()` in `finance.model.js`, `in_progress` back in the technician typeahead, recycled-date filter no longer matches registration date, dead `unserviceable_*` aliases removed, `parseBatteryIds()` + orphan-file cleanup in `return.controller.js`. SQL smoke-tested against local DB.
 - **2026-09-26** — Second review pass (10 findings + 3 lows): cycle-scoped `pending_parts_count`/`is_passed_back` (`battery.model.js`), intake ownership tightened + billing from first verified visit (`client.model.js` `BILLABLE_BATTERIES_CTE`), reconciled recycle revenue with proper period labels (`finance.model.js` `recycleRevenueByPeriod`), async return-doc writes + old-file unlink + `returnedAt` validation (`return.controller.js`), sort-page save guards/error banner, shared `canTestBatteries()` in `utils/permissions.js` (dropped `/staff/me` fetches), `TruckIntakeDetailPage` testing count, mobile no-op re-save skip. All rewritten SQL executed against local DB.
 - **2026-09-25** — Workshop roles reduced to `technician` + `supervisor` (manager/tester/qa removed) in backend guards, web + mobile UI, `StaffForm` dropdown; `staff.controller` validates; migration `052_staff_two_roles.sql` converts old rows and adds a CHECK.

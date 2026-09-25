@@ -94,6 +94,33 @@ function parseReturnedAt(value) {
   return new Date(ts).toISOString();
 }
 
+// batteryIds arrives as a JSON array, a comma-separated string (multipart
+// form) or an actual array. Anything that isn't a list of positive integers
+// is a 400 here rather than a 500 from unnest($2::int[]) in the model.
+function parseBatteryIds(raw) {
+  let list = raw;
+  if (typeof list === 'string') {
+    try {
+      list = JSON.parse(list);
+    } catch (e) {
+      list = list.split(',').map((s) => s.trim()).filter(Boolean);
+    }
+  }
+  if (list === undefined || list === null || list === '') return [];
+  if (!Array.isArray(list)) {
+    const err = new Error('batteryIds must be a list of battery ids.');
+    err.status = 400;
+    throw err;
+  }
+  const ids = list.map((v) => Number(v));
+  if (ids.some((n) => !Number.isInteger(n) || n <= 0)) {
+    const err = new Error('batteryIds must contain only valid battery ids.');
+    err.status = 400;
+    throw err;
+  }
+  return ids;
+}
+
 async function create(req, res, next) {
   try {
     let { truckNumber, driverName, clientId, batteryIds, returnedAt } = req.body;
@@ -101,15 +128,8 @@ async function create(req, res, next) {
       return res.status(400).json({ message: 'Client is required.' });
     }
 
-    if (typeof batteryIds === 'string') {
-      try {
-        batteryIds = JSON.parse(batteryIds);
-      } catch (e) {
-        batteryIds = batteryIds.split(',').map((s) => s.trim()).filter(Boolean);
-      }
-    }
-
     returnedAt = parseReturnedAt(returnedAt);
+    batteryIds = parseBatteryIds(batteryIds);
 
     let documentUrl = undefined;
     let documentName = undefined;
@@ -117,15 +137,24 @@ async function create(req, res, next) {
       ({ documentUrl, documentName } = await persistReturnDoc(req.file));
     }
 
-    const returnRecord = await returnModel.create({
-      truckNumber,
-      driverName,
-      clientId,
-      batteryIds: Array.isArray(batteryIds) ? batteryIds : [],
-      returnedAt,
-      documentUrl,
-      documentName,
-    });
+    let returnRecord;
+    try {
+      returnRecord = await returnModel.create({
+        truckNumber,
+        driverName,
+        clientId,
+        batteryIds,
+        returnedAt,
+        documentUrl,
+        documentName,
+      });
+    } catch (err) {
+      // Nothing references the file if the row never landed — don't leave it
+      // orphaned on disk (a retried failing request would otherwise fill the
+      // volume with dead uploads).
+      await removeReturnDoc(documentUrl);
+      throw err;
+    }
 
     await auditLogModel.record({
       userId: req.user.id,
@@ -186,14 +215,20 @@ async function update(req, res, next) {
       ({ documentUrl, documentName } = await persistReturnDoc(req.file));
     }
 
-    const returnRecord = await returnModel.update(req.params.id, {
-      truckNumber,
-      driverName,
-      clientId,
-      returnedAt,
-      documentUrl,
-      documentName,
-    });
+    let returnRecord;
+    try {
+      returnRecord = await returnModel.update(req.params.id, {
+        truckNumber,
+        driverName,
+        clientId,
+        returnedAt,
+        documentUrl,
+        documentName,
+      });
+    } catch (err) {
+      await removeReturnDoc(documentUrl);
+      throw err;
+    }
     if (!returnRecord) {
       return res.status(404).json({ message: 'Return not found' });
     }
