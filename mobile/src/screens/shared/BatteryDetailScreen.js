@@ -467,7 +467,49 @@ export default function BatteryDetailScreen() {
         ) {
           const latestIssue = (data.issues || [])[0];
           const latestReturn = (data.returns || [])[0];
+          const latestPassBack = (data.services || []).find(
+            (s) =>
+              s.service_name === 'Passed back to Technician' ||
+              s.service_name?.toLowerCase()?.includes('passed back')
+          );
           const removedParts = (data.history || []).filter((h) => h.removed_at);
+          const allRepairs = data.history || [];
+          const firstRepair = allRepairs[0];
+          const firstRemoved = removedParts[0];
+
+          // 1. Who Serviced
+          const servicedBy = firstRepair?.staff_name || data.battery?.started_by_name || 'Workshop Technician';
+          const servicedAt = firstRepair?.repaired_at || data.battery?.work_started_at || null;
+          const fittedParts = allRepairs.map((r) => ({
+            id: r.id,
+            part_name: r.part_name,
+            quantity_used: r.quantity_used || 1,
+            repaired_at: r.repaired_at,
+            isRemoved: Boolean(r.removed_at),
+          }));
+
+          // 2. Who Tested
+          const testedBy =
+            latestIssue?.staff_name ||
+            latestPassBack?.staff_name ||
+            latestReturn?.staff_name ||
+            data.battery?.started_by_name ||
+            'Supervisor / Tester';
+          const testedAt =
+            latestIssue?.reported_at ||
+            latestPassBack?.completed_at ||
+            latestReturn?.completed_at ||
+            data.battery?.updated_at ||
+            null;
+          const isTestedByMe = Boolean(
+            currentUser?.name &&
+              testedBy.trim().toLowerCase() === currentUser.name.trim().toLowerCase()
+          );
+
+          // 3. Who Removed Parts
+          const removedBy = firstRemoved?.removed_by_staff_name || 'Workshop Staff';
+          const removedAt = firstRemoved?.removed_at || null;
+
           setUnserviceableAlertData({
             batteryCode: data.battery.battery_code,
             serialNumber: data.battery.serial_number,
@@ -476,20 +518,19 @@ export default function BatteryDetailScreen() {
               latestIssue?.reason_label ||
               latestIssue?.reason ||
               (latestReturn?.notes ? 'Failed Testing Diagnostics' : data.battery?.status === 'recycled' ? 'Battery Recycled' : 'Unserviceable Unit'),
-            staffName:
-              latestIssue?.staff_name ||
-              latestReturn?.staff_name ||
-              data.battery?.started_by_name ||
-              'Workshop Technician',
-            reportedAt:
-              latestIssue?.reported_at ||
-              latestReturn?.completed_at ||
-              data.battery?.updated_at ||
-              null,
-            note: latestIssue?.note || latestReturn?.notes || null,
+            staffName: testedBy,
+            reportedAt: testedAt,
+            note: latestIssue?.note || latestReturn?.notes || latestPassBack?.notes || null,
             photos: latestIssue?.photo_urls || [],
             hasRemovedParts: removedParts.length > 0,
             removedPartsCount: removedParts.length,
+            removedParts,
+            removedBy,
+            removedAt,
+            servicedBy,
+            servicedAt,
+            fittedParts,
+            isTestedByMe,
           });
           setShowUnserviceableAlertModal(true);
         } else if (fromScan && isTestingStatus) {
@@ -2710,10 +2751,14 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
 
-            {/* Modal Content Body */}
-            <View className="p-5">
+            {/* Scrollable Modal Content Body */}
+            <ScrollView
+              className="p-4"
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 380 }}
+            >
               {/* Battery Code Badge Box */}
-              <View className="mb-3.5 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/30 p-3 flex-row items-center justify-between">
+              <View className="mb-3 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/30 p-3 flex-row items-center justify-between">
                 <View>
                   <Text className="text-[10px] font-bold text-red-700 dark:text-red-400 uppercase tracking-wider">
                     Battery Code
@@ -2734,12 +2779,72 @@ export default function BatteryDetailScreen() {
                 ) : null}
               </View>
 
-              {/* Information Rows */}
-              <View className="space-y-2 mb-4 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3.5">
+              {/* ── 1. Serviced & Repaired (Who Serviced) ── */}
+              <View className="mb-3 rounded-2xl border border-blue-200 dark:border-blue-900/60 bg-blue-50/50 dark:bg-blue-950/20 p-3 space-y-2">
+                <View className="flex-row items-center gap-1.5 pb-1 border-b border-blue-200/60 dark:border-blue-900/40">
+                  <Icon name="wrench" color="#2563eb" size={13} />
+                  <Text className="text-[11px] font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider">
+                    1. Serviced &amp; Repaired
+                  </Text>
+                </View>
+                <View className="flex-row items-center justify-between py-0.5">
+                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Serviced By</Text>
+                  <Text className="text-xs font-bold text-slate-900 dark:text-white">
+                    {unserviceableAlertData?.servicedBy || 'Workshop Technician'}
+                  </Text>
+                </View>
+                {unserviceableAlertData?.servicedAt ? (
+                  <View className="flex-row items-center justify-between py-0.5">
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Service Date</Text>
+                    <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                      {new Date(unserviceableAlertData.servicedAt).toLocaleDateString('en-GB', {
+                        day: '2-digit',
+                        month: 'short',
+                        year: 'numeric',
+                      })} · {new Date(unserviceableAlertData.servicedAt).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                      })}
+                    </Text>
+                  </View>
+                ) : null}
+                {unserviceableAlertData?.fittedParts && unserviceableAlertData.fittedParts.length > 0 && (
+                  <View className="pt-1 border-t border-blue-200/50 dark:border-blue-900/30">
+                    <Text className="text-[10px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider mb-1">
+                      Fitted Parts ({unserviceableAlertData.fittedParts.length})
+                    </Text>
+                    <View className="flex-row flex-wrap gap-1">
+                      {unserviceableAlertData.fittedParts.map((p, pIdx) => (
+                        <View
+                          key={p.id || pIdx}
+                          className="rounded-lg border border-blue-200/70 dark:border-blue-800/70 bg-white/90 dark:bg-slate-900 px-2 py-1 flex-row items-center gap-1"
+                        >
+                          <Text className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">
+                            {p.part_name}
+                          </Text>
+                          <Text className="text-[9px] font-bold text-blue-700 dark:text-blue-300">
+                            x{p.quantity_used || 1}
+                          </Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* ── 2. Tested & Marked Unserviceable (Who Tested) ── */}
+              <View className="mb-3 rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/60 dark:bg-red-950/20 p-3 space-y-2">
+                <View className="flex-row items-center gap-1.5 pb-1 border-b border-red-200/60 dark:border-red-900/40">
+                  <Icon name="alertCircle" color="#dc2626" size={13} />
+                  <Text className="text-[11px] font-bold text-red-900 dark:text-red-300 uppercase tracking-wider">
+                    2. Tested &amp; Marked Unserviceable
+                  </Text>
+                </View>
+
                 {/* Reason */}
-                <View className="pb-2 border-b border-slate-200/80 dark:border-slate-800">
+                <View className="pb-1">
                   <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Reason
+                    Testing Diagnosis
                   </Text>
                   <View className="self-start rounded-lg bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 px-2.5 py-1">
                     <Text className="text-xs font-bold text-red-800 dark:text-red-300">
@@ -2748,24 +2853,25 @@ export default function BatteryDetailScreen() {
                   </View>
                 </View>
 
-                {/* Marked By */}
-                <View className="flex-row items-center justify-between py-1.5 border-b border-slate-200/80 dark:border-slate-800">
-                  <View className="flex-row items-center gap-1.5">
-                    <Icon name="user" color="#64748b" size={13} />
-                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Marked By</Text>
+                {/* Tested By */}
+                <View className="flex-row items-center justify-between py-0.5 border-t border-red-200/50 dark:border-red-900/30">
+                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tested By</Text>
+                  <View className="flex-row items-center gap-1">
+                    <Text className="text-xs font-bold text-slate-900 dark:text-white">
+                      {unserviceableAlertData?.staffName || 'Supervisor / Tester'}
+                    </Text>
+                    {unserviceableAlertData?.isTestedByMe && (
+                      <View className="rounded bg-red-100 dark:bg-red-950/60 px-1.5 py-0.5 border border-red-200 dark:border-red-800">
+                        <Text className="text-[9px] font-bold text-red-700 dark:text-red-300">You</Text>
+                      </View>
+                    )}
                   </View>
-                  <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                    {unserviceableAlertData?.staffName || 'Technician'}
-                  </Text>
                 </View>
 
-                {/* Date & Time */}
-                <View className="flex-row items-center justify-between pt-1">
-                  <View className="flex-row items-center gap-1.5">
-                    <Icon name="clock" color="#64748b" size={13} />
-                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Date &amp; Time</Text>
-                  </View>
-                  <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                {/* Tested Date */}
+                <View className="flex-row items-center justify-between py-0.5">
+                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tested Date</Text>
+                  <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     {unserviceableAlertData?.reportedAt
                       ? `${new Date(unserviceableAlertData.reportedAt).toLocaleDateString('en-GB', {
                           day: '2-digit',
@@ -2781,11 +2887,11 @@ export default function BatteryDetailScreen() {
 
                 {/* Notes (if any) */}
                 {unserviceableAlertData?.note ? (
-                  <View className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                  <View className="pt-1 border-t border-red-200/50 dark:border-red-900/30">
                     <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                      Notes
+                      Tester Notes
                     </Text>
-                    <Text className="text-xs text-slate-700 dark:text-slate-300 italic">
+                    <Text className="text-xs text-red-950 dark:text-red-200 italic">
                       "{unserviceableAlertData.note}"
                     </Text>
                   </View>
@@ -2793,8 +2899,8 @@ export default function BatteryDetailScreen() {
 
                 {/* Photos (if any) */}
                 {unserviceableAlertData?.photos && unserviceableAlertData.photos.length > 0 && (
-                  <View className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
-                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                  <View className="pt-1 border-t border-red-200/50 dark:border-red-900/30">
+                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
                       Attached Photos ({unserviceableAlertData.photos.length})
                     </Text>
                     <View className="flex-row gap-2">
@@ -2826,32 +2932,98 @@ export default function BatteryDetailScreen() {
                 )}
               </View>
 
-              {/* Action Buttons */}
-              <View className="gap-2">
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowUnserviceableAlertModal(false);
-                    allowExitRef.current = true;
-                    navigation.navigate('Main', {
-                      screen: 'Service',
-                      params: { autoScan: Date.now() },
-                    });
-                  }}
-                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-red-600 py-3.5 shadow-md active:bg-red-700"
-                >
-                  <Icon name="camera" color="#ffffff" size={16} />
-                  <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setShowUnserviceableAlertModal(false)}
-                  className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
-                >
-                  <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
-                    View Battery History
+              {/* ── 3. Parts Removed (Who Removed) ── */}
+              <View className="mb-2 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 space-y-1.5">
+                <View className="flex-row items-center gap-1.5 pb-1 border-b border-emerald-200/60 dark:border-emerald-900/40">
+                  <Icon name="checkCircle" color="#059669" size={13} />
+                  <Text className="text-[11px] font-bold text-emerald-900 dark:text-emerald-300 uppercase tracking-wider">
+                    3. Parts Removed &amp; Restocked
                   </Text>
-                </TouchableOpacity>
+                </View>
+
+                {unserviceableAlertData?.hasRemovedParts ? (
+                  <>
+                    <View className="flex-row items-center justify-between py-0.5">
+                      <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Removed By</Text>
+                      <Text className="text-xs font-bold text-emerald-950 dark:text-emerald-200">
+                        {unserviceableAlertData.removedBy || 'Technician'}
+                      </Text>
+                    </View>
+                    {unserviceableAlertData.removedAt ? (
+                      <View className="flex-row items-center justify-between py-0.5">
+                        <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Removed Date</Text>
+                        <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          {new Date(unserviceableAlertData.removedAt).toLocaleDateString('en-GB', {
+                            day: '2-digit',
+                            month: 'short',
+                            year: 'numeric',
+                          })} · {new Date(unserviceableAlertData.removedAt).toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    {unserviceableAlertData.removedParts && unserviceableAlertData.removedParts.length > 0 && (
+                      <View className="pt-1 border-t border-emerald-200/50 dark:border-emerald-900/30">
+                        <Text className="text-[10px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider mb-1">
+                          Reclaimed Parts ({unserviceableAlertData.removedParts.length})
+                        </Text>
+                        <View className="space-y-1">
+                          {unserviceableAlertData.removedParts.map((p, pIdx) => (
+                            <View
+                              key={p.id || pIdx}
+                              className="flex-row items-center justify-between rounded-lg border border-emerald-200/70 dark:border-emerald-800/70 bg-white/90 dark:bg-slate-900 px-2.5 py-1.5"
+                            >
+                              <Text className="text-xs font-semibold text-slate-800 dark:text-slate-200" numberOfLines={1}>
+                                {p.part_name}
+                              </Text>
+                              <View className="rounded bg-emerald-100 dark:bg-emerald-950 px-1.5 py-0.5">
+                                <Text className="text-[9px] font-bold text-emerald-700 dark:text-emerald-300">
+                                  Restocked · Qty {p.quantity_used || 1}
+                                </Text>
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+                  </>
+                ) : (
+                  <Text className="text-xs text-slate-600 dark:text-slate-400 italic py-1">
+                    No fitted parts required removal for this unit.
+                  </Text>
+                )}
               </View>
+            </ScrollView>
+
+            {/* Action Buttons */}
+            <View className="p-4 pt-2 gap-2 border-t border-slate-100 dark:border-slate-800">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowUnserviceableAlertModal(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-2xl bg-red-600 py-3.5 shadow-md active:bg-red-700"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setShowUnserviceableAlertModal(false)}
+                className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+              >
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  View Battery Details
+                </Text>
+              </TouchableOpacity>
+            </View>
             </View>
           </View>
         </View>
