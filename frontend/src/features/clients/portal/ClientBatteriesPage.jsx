@@ -550,21 +550,22 @@ function ClientBatteriesPage() {
   async function handleEditBatchSave(e) {
     if (e) e.preventDefault();
     if (!editBatchTarget) return;
-    if (!editBatchTruck.trim()) {
-      setEditBatchError('Truck number cannot be empty.');
-      return;
-    }
     setEditBatchSaving(true);
     setEditBatchError(null);
     try {
+      const finalTruck = editBatchTruck.trim() || 'N/A';
+      const finalDriver = editBatchDriver.trim() || 'Fleet Driver';
       if (editBatchTarget.intakeId) {
         await apiClient.patch(`/clients/me/truck-intakes/${editBatchTarget.intakeId}`, {
-          truckNumber: editBatchTruck.trim(),
-          driverName: editBatchDriver.trim() || undefined,
+          truckNumber: finalTruck,
+          driverName: finalDriver,
         });
       }
-      setEditBatchTarget(null);
-      loadData();
+      setEditBatchSuccess('✓ Truck batch details saved successfully.');
+      setTimeout(() => {
+        setEditBatchTarget(null);
+        loadData();
+      }, 400);
     } catch (err) {
       setEditBatchError(err.response?.data?.message || err.message);
     } finally {
@@ -3144,27 +3145,47 @@ function ClientBatteriesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClasses}>
-                    Truck / Vehicle Plate Number <span className="text-rose-500">*</span>
+                    Truck Number (optional)
                   </label>
                   <input
                     type="text"
                     value={editBatchTruck}
                     onChange={(e) => setEditBatchTruck(e.target.value)}
-                    placeholder="e.g. GB21 XYZ or LD68 FGH"
+                    placeholder="e.g. GB21 XYZ or LD68 FGH (optional)"
                     autoComplete="off"
                     className={formInputClasses}
-                    required
                   />
                 </div>
                 <div>
-                  <label className={labelClasses}>Driver Name / Contact</label>
+                  <label className={labelClasses}>Driver Name (optional)</label>
                   <input
                     type="text"
                     value={editBatchDriver}
                     onChange={(e) => setEditBatchDriver(e.target.value)}
-                    placeholder="e.g. George Davies"
+                    placeholder="e.g. George Davies (optional)"
                     className={formInputClasses}
                   />
+                </div>
+                <div className="sm:col-span-2 flex justify-end pt-1">
+                  <button
+                    type="button"
+                    onClick={handleEditBatchSave}
+                    disabled={editBatchSaving}
+                    style={{ backgroundColor: accent }}
+                    className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
+                  >
+                    {editBatchSaving ? (
+                      <>
+                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                        <span>Saving…</span>
+                      </>
+                    ) : (
+                      <>
+                        <FiCheckCircle className="w-3.5 h-3.5" />
+                        <span>Save Truck &amp; Driver Info</span>
+                      </>
+                    )}
+                  </button>
                 </div>
               </div>
             </div>
@@ -3375,7 +3396,7 @@ function ClientBatteriesPage() {
               <button
                 type="button"
                 onClick={handleEditBatchSave}
-                disabled={editBatchSaving || !editBatchTruck.trim()}
+                disabled={editBatchSaving}
                 style={{ backgroundColor: accent }}
                 className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
               >

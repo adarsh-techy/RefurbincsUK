@@ -306,13 +306,12 @@ async function recordTruckIntake(req, res, next) {
       return res.status(409).json({ message: 'Your account is not linked to a client record.' });
     }
     const { truckNumber, driverName, batteryCount, batteryCodes, issueDescription } = req.body;
-    if (!truckNumber || !String(truckNumber).trim()) {
-      return res.status(400).json({ message: 'Truck number is required.' });
-    }
+    const finalTruckNumber = (truckNumber && String(truckNumber).trim()) || 'N/A';
+    const finalDriverName = (driverName && String(driverName).trim()) || 'Fleet Driver';
 
     const result = await clientModel.recordClientTruckIntake(client.id, client.name, {
-      truckNumber,
-      driverName,
+      truckNumber: finalTruckNumber,
+      driverName: finalDriverName,
       batteryCount,
       batteryCodes,
       issueDescription,

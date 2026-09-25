@@ -739,8 +739,8 @@ async function getHistorySummary(clientId, clientName) {
 
 // Record client truck intake (dispatch from client fleet to Refurbnics workshop)
 async function recordClientTruckIntake(clientId, clientName, { truckNumber, driverName, batteryCount, batteryCodes = [], issueDescription }) {
-  const truck = (truckNumber || '').trim();
-  const driver = (driverName || '').trim();
+  const truck = (truckNumber || '').trim() || 'N/A';
+  const driver = (driverName || '').trim() || 'Fleet Driver';
   const rawCount = Number(batteryCount);
   const items = Array.isArray(batteryCodes)
     ? batteryCodes
@@ -749,10 +749,6 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
     : [];
 
   const count = rawCount > 0 ? rawCount : items.length > 0 ? items.length : 1;
-
-  if (!truck) {
-    throw new Error('Truck number is required.');
-  }
 
   const client = await db.pool.connect();
   try {

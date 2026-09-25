@@ -181,10 +181,6 @@ function ClientDashboardPage() {
 
   async function handleRecordTruckIntake(e) {
     e?.preventDefault();
-    if (!truckForm.truckNumber.trim()) {
-      setTruckError('Truck Number is required.');
-      return;
-    }
     setSubmittingTruck(true);
     setTruckError(null);
     try {
@@ -194,8 +190,8 @@ function ClientDashboardPage() {
         .filter(Boolean);
 
       const payload = {
-        truckNumber: truckForm.truckNumber.trim(),
-        driverName: truckForm.driverName.trim(),
+        truckNumber: truckForm.truckNumber.trim() || 'N/A',
+        driverName: truckForm.driverName.trim() || 'Fleet Driver',
         batteryCount: Number(truckForm.batteryCount) || (codesArray.length > 0 ? codesArray.length : 1),
         batteryCodes: codesArray,
         issueDescription: truckForm.issueDescription.trim(),
@@ -1773,27 +1769,26 @@ function ClientDashboardPage() {
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-neutral-200 mb-1">
-                  Truck / License Plate Number <span className="text-rose-500">*</span>
+                  Truck Number <span className="text-[11px] font-normal text-slate-400 dark:text-neutral-400">(Optional)</span>
                 </label>
                 <input
                   type="text"
-                  required
                   value={truckForm.truckNumber}
                   onChange={(e) => setTruckForm((prev) => ({ ...prev, truckNumber: e.target.value }))}
-                  placeholder="e.g. TR-8042 or KL18ABCD1234"
+                  placeholder="e.g. TR-8042 or GB21 XYZ (Optional)"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-neutral-200 mb-1">
-                  Driver Name / Contact
+                  Driver Name <span className="text-[11px] font-normal text-slate-400 dark:text-neutral-400">(Optional)</span>
                 </label>
                 <input
                   type="text"
                   value={truckForm.driverName}
                   onChange={(e) => setTruckForm((prev) => ({ ...prev, driverName: e.target.value }))}
-                  placeholder="e.g. John Smith"
+                  placeholder="e.g. John Smith (Optional)"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
                 />
               </div>
