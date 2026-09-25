@@ -181,6 +181,14 @@ function ClientDashboardPage() {
 
   async function handleRecordTruckIntake(e) {
     e?.preventDefault();
+    if (!truckForm.truckNumber?.trim()) {
+      setTruckError('Truck Number is required.');
+      return;
+    }
+    if (!truckForm.driverName?.trim()) {
+      setTruckError('Driver Name is required.');
+      return;
+    }
     setSubmittingTruck(true);
     setTruckError(null);
     try {
@@ -190,8 +198,8 @@ function ClientDashboardPage() {
         .filter(Boolean);
 
       const payload = {
-        truckNumber: truckForm.truckNumber.trim() || 'N/A',
-        driverName: truckForm.driverName.trim() || 'Fleet Driver',
+        truckNumber: truckForm.truckNumber.trim(),
+        driverName: truckForm.driverName.trim(),
         batteryCount: Number(truckForm.batteryCount) || (codesArray.length > 0 ? codesArray.length : 1),
         batteryCodes: codesArray,
         issueDescription: truckForm.issueDescription.trim(),
@@ -1769,26 +1777,31 @@ function ClientDashboardPage() {
             <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-neutral-200 mb-1">
-                  Truck Number <span className="text-[11px] font-normal text-slate-400 dark:text-neutral-400">(Optional)</span>
+                  Truck Number <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={truckForm.truckNumber}
-                  onChange={(e) => setTruckForm((prev) => ({ ...prev, truckNumber: e.target.value }))}
-                  placeholder="e.g. TR-8042 or GB21 XYZ (Optional)"
+                  onChange={(e) => setTruckForm((prev) => ({ ...prev, truckNumber: e.target.value.toUpperCase() }))}
+                  placeholder="e.g. TR-8042 or GB21 XYZ"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
                 />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 dark:text-neutral-200 mb-1">
-                  Driver Name <span className="text-[11px] font-normal text-slate-400 dark:text-neutral-400">(Optional)</span>
+                  Driver Name <span className="text-rose-500 font-bold">*</span>
                 </label>
                 <input
                   type="text"
+                  required
                   value={truckForm.driverName}
-                  onChange={(e) => setTruckForm((prev) => ({ ...prev, driverName: e.target.value }))}
-                  placeholder="e.g. John Smith (Optional)"
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    setTruckForm((prev) => ({ ...prev, driverName: val.charAt(0).toUpperCase() + val.slice(1) }));
+                  }}
+                  placeholder="e.g. George Davies"
                   className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-semibold text-slate-800 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
                 />
               </div>

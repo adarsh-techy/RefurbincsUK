@@ -278,14 +278,20 @@ async function packBatteryForRepair(req, res, next) {
       return res.status(409).json({ message: 'Your account is not linked to a client record.' });
     }
     const { batteryCode, serialNumber, truckNumber, driverName, issueDescription, batteries } = req.body;
+    if (!truckNumber || !String(truckNumber).trim()) {
+      return res.status(400).json({ message: 'Truck Number is required.' });
+    }
+    if (!driverName || !String(driverName).trim()) {
+      return res.status(400).json({ message: 'Driver Name is required.' });
+    }
     if (!batteryCode && (!batteries || batteries.length === 0)) {
       return res.status(400).json({ message: 'At least one battery code is required.' });
     }
     const result = await clientModel.packBatteryForRepair(client.id, client.name, {
       batteryCode,
       serialNumber,
-      truckNumber,
-      driverName,
+      truckNumber: String(truckNumber).trim(),
+      driverName: String(driverName).trim(),
       issueDescription,
       batteries,
     });
@@ -306,8 +312,14 @@ async function recordTruckIntake(req, res, next) {
       return res.status(409).json({ message: 'Your account is not linked to a client record.' });
     }
     const { truckNumber, driverName, batteryCount, batteryCodes, issueDescription } = req.body;
-    const finalTruckNumber = (truckNumber && String(truckNumber).trim()) || 'N/A';
-    const finalDriverName = (driverName && String(driverName).trim()) || 'Fleet Driver';
+    if (!truckNumber || !String(truckNumber).trim()) {
+      return res.status(400).json({ message: 'Truck Number is required.' });
+    }
+    if (!driverName || !String(driverName).trim()) {
+      return res.status(400).json({ message: 'Driver Name is required.' });
+    }
+    const finalTruckNumber = String(truckNumber).trim();
+    const finalDriverName = String(driverName).trim();
 
     const result = await clientModel.recordClientTruckIntake(client.id, client.name, {
       truckNumber: finalTruckNumber,

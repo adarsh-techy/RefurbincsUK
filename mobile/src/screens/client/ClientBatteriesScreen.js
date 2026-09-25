@@ -148,6 +148,10 @@ export default function ClientBatteriesScreen() {
   }
 
   function addScanned(rawCode) {
+    if (!truckNumber.trim() || !driverName.trim()) {
+      setPackError('Please enter Truck Number and Driver Name first.');
+      return;
+    }
     const code = (extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
     if (!code) return;
     if (scannedBatteries.some((b) => b.code === code)) {
@@ -181,6 +185,14 @@ export default function ClientBatteriesScreen() {
         finalBatteries.push({ id: Date.now(), code });
       }
     }
+    if (!truckNumber.trim()) {
+      setPackError('Truck Number is required.');
+      return;
+    }
+    if (!driverName.trim()) {
+      setPackError('Driver Name is required.');
+      return;
+    }
     if (finalBatteries.length === 0) {
       setPackError('Please scan or add at least one battery to intake.');
       return;
@@ -190,8 +202,8 @@ export default function ClientBatteriesScreen() {
     setPackError(null);
     try {
       const res = await apiClient.post('/clients/me/batteries/pack-to-repair', {
-        truckNumber: truckNumber.trim() || undefined,
-        driverName: driverName.trim() || undefined,
+        truckNumber: truckNumber.trim(),
+        driverName: driverName.trim(),
         batteries: finalBatteries.map((b) => ({ batteryCode: b.code })),
       });
       setPackSuccess(res.data?.message || `${finalBatteries.length} batteries recorded for repair intake!`);
@@ -486,16 +498,20 @@ export default function ClientBatteriesScreen() {
               </View>
             )}
 
-            <Text className="mb-1.5 mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">Truck Number (optional)</Text>
+            <Text className="mb-1.5 mt-4 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Truck Number <Text className="text-red-500 font-bold">*</Text>
+            </Text>
             <TextInput
               value={truckNumber}
-              onChangeText={setTruckNumber}
+              onChangeText={(v) => setTruckNumber(v.toUpperCase())}
               placeholder="e.g. GB21 XYZ"
               placeholderTextColor="#64748b"
               className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white"
             />
 
-            <Text className="mb-1.5 mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Driver Name (optional)</Text>
+            <Text className="mb-1.5 mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
+              Driver Name <Text className="text-red-500 font-bold">*</Text>
+            </Text>
             <TextInput
               value={driverName}
               onChangeText={setDriverName}

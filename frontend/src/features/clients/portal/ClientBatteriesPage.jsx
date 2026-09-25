@@ -159,6 +159,7 @@ function ClientBatteriesPage() {
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [truckNumber, setTruckNumber] = useState('');
   const [driverName, setDriverName] = useState('');
+  const isLogisticsReady = Boolean(truckNumber.trim() && driverName.trim());
   const [scanInput, setScanInput] = useState('');
   const [scannedBatteries, setScannedBatteries] = useState([]);
   const [showScanSuggestions, setShowScanSuggestions] = useState(false);
@@ -550,11 +551,19 @@ function ClientBatteriesPage() {
   async function handleEditBatchSave(e) {
     if (e) e.preventDefault();
     if (!editBatchTarget) return;
+    if (!editBatchTruck.trim()) {
+      setEditBatchError('Truck Number is required.');
+      return;
+    }
+    if (!editBatchDriver.trim()) {
+      setEditBatchError('Driver Name is required.');
+      return;
+    }
     setEditBatchSaving(true);
     setEditBatchError(null);
     try {
-      const finalTruck = editBatchTruck.trim() || 'N/A';
-      const finalDriver = editBatchDriver.trim() || 'Fleet Driver';
+      const finalTruck = editBatchTruck.trim();
+      const finalDriver = editBatchDriver.trim();
       if (editBatchTarget.intakeId) {
         await apiClient.patch(`/clients/me/truck-intakes/${editBatchTarget.intakeId}`, {
           truckNumber: finalTruck,
@@ -739,6 +748,10 @@ function ClientBatteriesPage() {
 
   // Handle adding scanned/typed battery to form list
   function handleAddBattery(rawCode, initialSerial = '') {
+    if (!truckNumber.trim() || !driverName.trim()) {
+      setPackError('Please enter Truck Number and Driver Name first.');
+      return;
+    }
     const code = (extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
     if (!code) return;
 
@@ -791,6 +804,10 @@ function ClientBatteriesPage() {
   function handleScanKeyDown(e) {
     if (e.key === 'Enter') {
       e.preventDefault();
+      if (!truckNumber.trim() || !driverName.trim()) {
+        setPackError('Please enter Truck Number and Driver Name first.');
+        return;
+      }
       handleAddBattery(scanInput);
     }
   }
@@ -806,6 +823,10 @@ function ClientBatteriesPage() {
   }
 
   function openPickFromSort() {
+    if (!truckNumber.trim() || !driverName.trim()) {
+      setPackError('Please enter Truck Number and Driver Name first.');
+      return;
+    }
     setSortGroups([]);
     fetchSortGroups()
       .then((data) => setSortGroups(data || []))
@@ -872,6 +893,14 @@ function ClientBatteriesPage() {
   // Handle Submission of Admin-style Intake Form
   async function handlePackSubmit(e) {
     e.preventDefault();
+    if (!truckNumber.trim()) {
+      setPackError('Truck Number is required.');
+      return;
+    }
+    if (!driverName.trim()) {
+      setPackError('Driver Name is required.');
+      return;
+    }
     if (scannedBatteries.length === 0 && !scanInput.trim()) {
       setPackError('Please scan or add at least one battery to intake.');
       return;
@@ -2569,11 +2598,14 @@ function ClientBatteriesPage() {
               {/* Left: truck details + scan controls */}
               <div className="flex min-h-0 flex-col gap-4 lg:col-span-7">
               <div className="shrink-0">
-                <label className={labelClasses}>Truck Number (optional)</label>
+                <label className={labelClasses}>
+                  Truck Number <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input
                   type="text"
+                  required
                   value={truckNumber}
-                  onChange={(e) => setTruckNumber(e.target.value)}
+                  onChange={(e) => setTruckNumber(e.target.value.toUpperCase())}
                   placeholder="e.g. GB21 XYZ or LD68 FGH"
                   autoComplete="off"
                   className={formInputClasses}
@@ -2581,9 +2613,12 @@ function ClientBatteriesPage() {
               </div>
 
               <div className="shrink-0">
-                <label className={labelClasses}>Driver Name (optional)</label>
+                <label className={labelClasses}>
+                  Driver Name <span className="text-rose-500 font-bold">*</span>
+                </label>
                 <input
                   type="text"
+                  required
                   value={driverName}
                   onChange={(e) => {
                     const val = e.target.value;
@@ -2608,32 +2643,51 @@ function ClientBatteriesPage() {
                   For batteries being packed or intaked for repair. A handheld scanner types straight into the box below — or select from your registered battery list.
                 </p>
 
+                {!isLogisticsReady && (
+                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-300/80 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300">
+                    <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-200 text-[11px] font-black text-amber-900 dark:bg-amber-900 dark:text-amber-200">
+                      !
+                    </span>
+                    <span>Please enter Truck Number &amp; Driver Name above first to type battery number, scan, or pick from sort.</span>
+                  </div>
+                )}
+
                 <div className="flex shrink-0 gap-2">
                   <div className="relative flex-1">
                     <input
                       type="text"
+                      disabled={!isLogisticsReady}
                       value={scanInput}
                       onChange={(e) => {
                         setScanInput(e.target.value.toUpperCase());
                         setShowScanSuggestions(true);
                       }}
                       onKeyDown={handleScanKeyDown}
-                      onFocus={() => setShowScanSuggestions(true)}
-                      placeholder="Scan, type code or pick from suggestions…"
+                      onFocus={() => {
+                        if (isLogisticsReady) setShowScanSuggestions(true);
+                      }}
+                      placeholder={
+                        isLogisticsReady
+                          ? 'Scan, type code or pick from suggestions…'
+                          : 'Enter Truck Number & Driver Name above first…'
+                      }
                       autoComplete="off"
-                      className={formInputClasses}
+                      className={`${formInputClasses} ${
+                        !isLogisticsReady ? 'cursor-not-allowed opacity-60 bg-slate-100 dark:bg-surface-900' : ''
+                      }`}
                     />
                   </div>
                   <button
                     type="button"
                     onClick={() => handleAddBattery(scanInput)}
-                    disabled={!scanInput.trim()}
+                    disabled={!isLogisticsReady || !scanInput.trim()}
                     className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   >
                     Add
                   </button>
                   <button
                     type="button"
+                    disabled={!isLogisticsReady}
                     onClick={() => setCameraOpen((prev) => !prev)}
                     className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
                   >
@@ -2641,9 +2695,14 @@ function ClientBatteriesPage() {
                   </button>
                   <button
                     type="button"
+                    disabled={!isLogisticsReady}
                     onClick={openPickFromSort}
-                    className="shrink-0 rounded-md border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
-                    title="Import batteries from a pre-built Battery Sorting group"
+                    className="shrink-0 rounded-md border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                    title={
+                      isLogisticsReady
+                        ? 'Import batteries from a pre-built Battery Sorting group'
+                        : 'Enter Truck Number & Driver Name first'
+                    }
                   >
                     Pick from Sort
                   </button>
@@ -3145,24 +3204,31 @@ function ClientBatteriesPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className={labelClasses}>
-                    Truck Number (optional)
+                    Truck Number <span className="text-rose-500 font-bold">*</span>
                   </label>
                   <input
                     type="text"
+                    required
                     value={editBatchTruck}
-                    onChange={(e) => setEditBatchTruck(e.target.value)}
-                    placeholder="e.g. GB21 XYZ or LD68 FGH (optional)"
+                    onChange={(e) => setEditBatchTruck(e.target.value.toUpperCase())}
+                    placeholder="e.g. GB21 XYZ or LD68 FGH"
                     autoComplete="off"
                     className={formInputClasses}
                   />
                 </div>
                 <div>
-                  <label className={labelClasses}>Driver Name (optional)</label>
+                  <label className={labelClasses}>
+                    Driver Name <span className="text-rose-500 font-bold">*</span>
+                  </label>
                   <input
                     type="text"
+                    required
                     value={editBatchDriver}
-                    onChange={(e) => setEditBatchDriver(e.target.value)}
-                    placeholder="e.g. George Davies (optional)"
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setEditBatchDriver(val.charAt(0).toUpperCase() + val.slice(1));
+                    }}
+                    placeholder="e.g. George Davies"
                     className={formInputClasses}
                   />
                 </div>
