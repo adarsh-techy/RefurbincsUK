@@ -3065,7 +3065,6 @@ export default function BatteryDetailScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
-            </View>
           </View>
         </View>
       </Modal>
