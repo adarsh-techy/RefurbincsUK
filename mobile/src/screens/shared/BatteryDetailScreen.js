@@ -369,6 +369,9 @@ export default function BatteryDetailScreen() {
         const isOwnInProgress =
           data.battery?.status === 'in_progress' &&
           data.battery?.started_by_user_id === currentUserId;
+        const canTestInTesting =
+          canTest &&
+          ['in_testing', 'testing', 'repair_testing'].includes(data.battery?.status);
         const hasPendingPartsRemoval = (data.pendingPartsRemoval?.length || 0) > 0;
         const latestPassBack = (data.services || []).find(
           (s) => s.service_name === 'Passed back to Technician'
