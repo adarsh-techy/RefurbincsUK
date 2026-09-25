@@ -846,13 +846,20 @@ async function findOwnedIntake(runner, intakeId, clientId, clientName) {
 // Update client's unverified truck intake info (truck number, driver name)
 async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNumber, driverName }) {
   const existing = await findOwnedIntake(db, intakeId, clientId, clientName);
-
-  if (existing.length === 0) {
-    const err = new Error('Truck intake not found or does not belong to your company.');
-    err.status = 404;
-    throw err;
+  let intakeRecord = existing[0];
+  if (!intakeRecord) {
+    const { rows: tiFallback } = await db.query(
+      `SELECT ti.* FROM truck_intakes ti WHERE ti.id = $1 AND (ti.client_id = $2 OR ti.client_id IS NULL)`,
+      [intakeId, clientId]
+    );
+    if (tiFallback.length === 0) {
+      const err = new Error('Truck intake not found or does not belong to your company.');
+      err.status = 404;
+      throw err;
+    }
+    intakeRecord = tiFallback[0];
   }
-  if (existing[0].status === 'verified' || existing[0].verified_at) {
+  if (intakeRecord.status === 'verified' || intakeRecord.verified_at) {
     const err = new Error('Cannot edit an intake batch that has already been verified by the workshop.');
     err.status = 400;
     throw err;
@@ -873,13 +880,20 @@ async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNu
 // Add more batteries to an existing unverified truck intake
 async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, { batteries = [] }) {
   const existing = await findOwnedIntake(db, intakeId, clientId, clientName);
-
-  if (existing.length === 0) {
-    const err = new Error('Truck intake not found or does not belong to your company.');
-    err.status = 404;
-    throw err;
+  let intakeRecord = existing[0];
+  if (!intakeRecord) {
+    const { rows: tiFallback } = await db.query(
+      `SELECT ti.* FROM truck_intakes ti WHERE ti.id = $1 AND (ti.client_id = $2 OR ti.client_id IS NULL)`,
+      [intakeId, clientId]
+    );
+    if (tiFallback.length === 0) {
+      const err = new Error('Truck intake not found or does not belong to your company.');
+      err.status = 404;
+      throw err;
+    }
+    intakeRecord = tiFallback[0];
   }
-  if (existing[0].status === 'verified' || existing[0].verified_at) {
+  if (intakeRecord.status === 'verified' || intakeRecord.verified_at) {
     const err = new Error('Cannot add batteries to a batch that has already been verified by the workshop.');
     err.status = 400;
     throw err;
@@ -957,30 +971,54 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
   try {
     await client.query('BEGIN');
 
-    // Verify battery belongs to client
-    const { rows: bRows } = await client.query(
+    // Verify battery belongs to client (supports both numeric ID and battery_code)
+    let { rows: bRows } = await client.query(
       `WITH ${CLIENT_BATTERY_IDS_CTE}
-       SELECT b.* FROM client_battery_ids cb JOIN batteries b ON b.id = cb.id WHERE b.id = $3`,
-      [clientId, clientName, batteryId]
+       SELECT b.* FROM client_battery_ids cb JOIN batteries b ON b.id = cb.id
+       WHERE b.id::text = $3::text OR upper(b.battery_code) = upper($3::text)`,
+      [clientId, clientName, String(batteryId)]
     );
     if (bRows.length === 0) {
-      const err = new Error('Battery not found or does not belong to your fleet.');
-      err.status = 404;
-      throw err;
-    }
-
-    const hasIntake = intakeId && intakeId !== 'null' && intakeId !== 'awaiting_pickup' && !isNaN(Number(intakeId));
-
-    if (hasIntake) {
-      const validIntakeId = Number(intakeId);
-      const intakeRows = await findOwnedIntake(client, validIntakeId, clientId, clientName);
-
-      if (intakeRows.length === 0) {
-        const err = new Error('Truck intake not found.');
+      const { rows: directRows } = await client.query(
+        `SELECT b.* FROM batteries b
+         WHERE (b.id::text = $1::text OR upper(b.battery_code) = upper($1::text))
+           AND (lower(b.client_name) = lower($2) OR EXISTS (
+             SELECT 1 FROM truck_intakes ti WHERE ti.id = b.truck_intake_id AND ti.client_id = $3
+           ))`,
+        [String(batteryId), clientName || '', clientId]
+      );
+      if (directRows.length === 0) {
+        const err = new Error('Battery not found or does not belong to your fleet.');
         err.status = 404;
         throw err;
       }
-      if (intakeRows[0].status === 'verified' || intakeRows[0].verified_at) {
+      bRows = directRows;
+    }
+
+    const targetBattery = bRows[0];
+    const actualBatteryId = targetBattery.id;
+
+    const effectiveIntakeId = (intakeId && intakeId !== 'null' && intakeId !== 'awaiting_pickup' && !isNaN(Number(intakeId)))
+      ? Number(intakeId)
+      : targetBattery.truck_intake_id;
+
+    if (effectiveIntakeId) {
+      const intakeRows = await findOwnedIntake(client, effectiveIntakeId, clientId, clientName);
+      let intakeRecord = intakeRows[0];
+      if (!intakeRecord) {
+        const { rows: tiFallback } = await client.query(
+          `SELECT ti.* FROM truck_intakes ti WHERE ti.id = $1`,
+          [effectiveIntakeId]
+        );
+        if (tiFallback.length > 0 && tiFallback[0].client_id && tiFallback[0].client_id !== clientId) {
+          const err = new Error('Truck intake not found.');
+          err.status = 404;
+          throw err;
+        }
+        intakeRecord = tiFallback[0];
+      }
+
+      if (intakeRecord && (intakeRecord.status === 'verified' || intakeRecord.verified_at)) {
         const err = new Error('Cannot remove batteries from an intake batch that has already been verified by the workshop.');
         err.status = 400;
         throw err;
@@ -989,17 +1027,17 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
       // Remove visit for this intake
       await client.query(
         `DELETE FROM battery_visits WHERE battery_id = $1 AND truck_intake_id = $2`,
-        [batteryId, validIntakeId]
+        [actualBatteryId, effectiveIntakeId]
       );
 
       // Recalculate count
       const { rows: countRows } = await client.query(
         `SELECT COUNT(*)::int AS count FROM batteries WHERE truck_intake_id = $1 AND id != $2`,
-        [validIntakeId, batteryId]
+        [effectiveIntakeId, actualBatteryId]
       );
       await client.query(
         `UPDATE truck_intakes SET battery_count = $1 WHERE id = $2`,
-        [countRows[0].count, validIntakeId]
+        [countRows[0].count, effectiveIntakeId]
       );
     }
 
@@ -1010,7 +1048,7 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
            status = 'returned'
        WHERE id = $1
        RETURNING *`,
-      [batteryId]
+      [actualBatteryId]
     );
 
     await client.query('COMMIT');

@@ -300,14 +300,14 @@ function ClientBatteriesPage() {
         groupMap.set(key, {
           id: key,
           key,
-          intakeId: isReceived ? item.return_id : item.intake_id,
+          intakeId: isReceived ? item.return_id : (item.intake_id || item.truck_intake_id || null),
           returnId: item.return_id || null,
           truckNumber: isReceived ? (item.return_truck || 'Return Dispatch') : (item.truck_number || null),
           driverName: isReceived ? (item.return_driver || 'Workshop Driver') : (item.driver_name || null),
           intakeAt: isReceived ? (item.return_date || item.last_repaired_at || item.created_at) : (item.intake_at || item.created_at),
           intakeStatus: isReceived ? (item.return_status || 'verified') : (item.intake_status || 'pending_arrival'),
           verifiedAt: isReceived ? (item.return_verified_at || null) : (item.verified_at || null),
-          isAwaitingPickup: !isReceived && !item.truck_number && !item.intake_id,
+          isAwaitingPickup: !isReceived && !item.truck_number && !item.intake_id && !item.truck_intake_id,
           isReturnDispatch: isReceived,
           batteries: [],
         });
@@ -454,7 +454,26 @@ function ClientBatteriesPage() {
 
   // ── Edit Batch Handlers ──────────────────────────────────────────────
   function openEditBatch(batch) {
-    setEditBatchTarget(batch);
+    const isVerified = Boolean(
+      batch.intakeStatus === 'verified' ||
+      batch.verifiedAt ||
+      batch.return_verified_at ||
+      batch.status === 'verified'
+    );
+    if (isVerified) {
+      alert('This batch has already been verified by the workshop and cannot be edited.');
+      return;
+    }
+
+    const resolvedIntakeId =
+      batch.intakeId ||
+      batch.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.truck_intake_id ||
+      batch.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.intake_id ||
+      (typeof batch.key === 'string' && batch.key.startsWith('truck_') && !isNaN(Number(batch.key.replace('truck_', '')))
+        ? Number(batch.key.replace('truck_', ''))
+        : null);
+
+    setEditBatchTarget({ ...batch, intakeId: resolvedIntakeId });
     setEditBatchTruck(batch.truckNumber || '');
     setEditBatchDriver(batch.driverName || '');
     setEditBatchBatteries(batch.batteries || []);
@@ -470,8 +489,16 @@ function ClientBatteriesPage() {
   }
 
   async function handleEditModalAddBattery(customCode, customSerial, customNotes) {
-    if (!editBatchTarget?.intakeId) {
-      setEditBatchError('This batch cannot be modified directly.');
+    const resolvedIntakeId =
+      editBatchTarget?.intakeId ||
+      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.truck_intake_id ||
+      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.intake_id ||
+      (typeof editBatchTarget?.key === 'string' && editBatchTarget.key.startsWith('truck_') && !isNaN(Number(editBatchTarget.key.replace('truck_', '')))
+        ? Number(editBatchTarget.key.replace('truck_', ''))
+        : null);
+
+    if (!resolvedIntakeId) {
+      setEditBatchError('This batch cannot be modified directly (missing intake ID).');
       return;
     }
     const raw = customCode !== undefined ? customCode : editBatchAddInput;
@@ -495,7 +522,7 @@ function ClientBatteriesPage() {
 
     try {
       const res = await apiClient.post(
-        `/clients/me/truck-intakes/${editBatchTarget.intakeId}/batteries`,
+        `/clients/me/truck-intakes/${resolvedIntakeId}/batteries`,
         {
           batteries: [{ code, serialNumber: serial || undefined, issueDescription: notes || undefined }],
         }
@@ -508,6 +535,7 @@ function ClientBatteriesPage() {
         serial_number: serial || null,
         notes: notes || null,
         status: 'in_repair',
+        truck_intake_id: resolvedIntakeId,
       };
 
       setEditBatchBatteries((prev) => [...prev, newAddedItem]);
@@ -526,19 +554,30 @@ function ClientBatteriesPage() {
   }
 
   async function handleEditModalRemoveBattery(battery) {
-    if (!editBatchTarget?.intakeId) {
-      setEditBatchError('This batch cannot be modified directly.');
-      return;
-    }
-    setEditBatchRemovingId(battery.id);
+    const resolvedIntakeId =
+      editBatchTarget?.intakeId ||
+      battery.truck_intake_id ||
+      battery.intake_id ||
+      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.truck_intake_id ||
+      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.intake_id ||
+      (typeof editBatchTarget?.key === 'string' && editBatchTarget.key.startsWith('truck_') && !isNaN(Number(editBatchTarget.key.replace('truck_', '')))
+        ? Number(editBatchTarget.key.replace('truck_', ''))
+        : 'awaiting_pickup');
+
+    const batteryIdentifier = battery.id || battery.battery_code || battery.code;
+    setEditBatchRemovingId(batteryIdentifier);
     setEditBatchError(null);
     setEditBatchSuccess(null);
 
     try {
       await apiClient.delete(
-        `/clients/me/truck-intakes/${editBatchTarget.intakeId}/batteries/${battery.id}`
+        `/clients/me/truck-intakes/${resolvedIntakeId}/batteries/${batteryIdentifier}`
       );
-      setEditBatchBatteries((prev) => prev.filter((b) => b.id !== battery.id));
+      setEditBatchBatteries((prev) =>
+        prev.filter((b) =>
+          battery.id ? b.id !== battery.id : (b.battery_code || b.code) !== (battery.battery_code || battery.code)
+        )
+      );
       setEditBatchSuccess(`✓ Removed battery ${battery.battery_code || battery.code || ''} from intake.`);
       loadData();
     } catch (err) {
@@ -615,8 +654,14 @@ function ClientBatteriesPage() {
     setRemoveBatteryLoading(true);
     setRemoveBatteryError(null);
     try {
+      const resolvedIntakeId =
+        removeBatteryTarget.intakeId ||
+        removeBatteryTarget.battery?.truck_intake_id ||
+        removeBatteryTarget.battery?.intake_id ||
+        'awaiting_pickup';
+      const batteryIdentifier = removeBatteryTarget.battery?.id || removeBatteryTarget.battery?.battery_code;
       await apiClient.delete(
-        `/clients/me/truck-intakes/${removeBatteryTarget.intakeId}/batteries/${removeBatteryTarget.battery.id}`
+        `/clients/me/truck-intakes/${resolvedIntakeId}/batteries/${batteryIdentifier}`
       );
       setRemoveBatteryTarget(null);
       loadData();
@@ -1163,7 +1208,7 @@ function ClientBatteriesPage() {
       label: 'Actions',
       render: (row) => (
         <div className="flex items-center gap-1.5 justify-end">
-          {effectiveBucket === 'packed' && (selectedBatch?.intakeStatus === 'pending_arrival' || selectedBatch?.isAwaitingPickup) && (
+          {effectiveBucket === 'packed' && selectedBatch?.intakeStatus !== 'verified' && !selectedBatch?.verifiedAt && (
             <>
               <button
                 type="button"
@@ -1512,7 +1557,7 @@ function ClientBatteriesPage() {
       label: '',
       render: (batch) => (
         <div className="flex items-center justify-end gap-2">
-          {effectiveBucket === 'packed' && batch.intakeStatus === 'pending_arrival' && (
+          {effectiveBucket === 'packed' && batch.intakeStatus !== 'verified' && !batch.verifiedAt && (
             <button
               type="button"
               onClick={(e) => {
@@ -1691,7 +1736,7 @@ function ClientBatteriesPage() {
                   Waiting for Verify
                 </span>
 
-                {effectiveBucket === 'packed' && (
+                {effectiveBucket === 'packed' && selectedBatch.intakeStatus !== 'verified' && !selectedBatch.verifiedAt && (
                   <>
                     <button
                       type="button"
@@ -1703,31 +1748,29 @@ function ClientBatteriesPage() {
                     </button>
 
                     {selectedBatch.intakeId && (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setAddMoreToBatchOpen(true);
-                            setAddMoreCameraOpen(false);
-                            setAddMoreError(null);
-                            setAddMoreSuccess(null);
-                          }}
-                          className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
-                        >
-                          <FiPlus className="w-3.5 h-3.5" />
-                          <span>+ Add Batteries</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={() => setDeleteBatchTarget(selectedBatch)}
-                          className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-50 dark:border-red-800/40 dark:bg-surface-800 dark:text-red-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
-                        >
-                          <FiTrash2 className="w-3.5 h-3.5" />
-                          <span>Cancel Batch</span>
-                        </button>
-                      </>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAddMoreToBatchOpen(true);
+                          setAddMoreCameraOpen(false);
+                          setAddMoreError(null);
+                          setAddMoreSuccess(null);
+                        }}
+                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
+                      >
+                        <FiPlus className="w-3.5 h-3.5" />
+                        <span>+ Add Batteries</span>
+                      </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={() => setDeleteBatchTarget(selectedBatch)}
+                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-50 dark:border-red-800/40 dark:bg-surface-800 dark:text-red-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
+                    >
+                      <FiTrash2 className="w-3.5 h-3.5" />
+                      <span>Cancel Batch</span>
+                    </button>
                   </>
                 )}
               </>
@@ -2492,7 +2535,7 @@ function ClientBatteriesPage() {
                           {/* Card Bottom Links */}
                           <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/5">
                             <div className="flex items-center gap-2">
-                              {effectiveBucket === 'packed' && batch.intakeStatus === 'pending_arrival' && (
+                              {effectiveBucket === 'packed' && batch.intakeStatus !== 'verified' && !batch.verifiedAt && (
                                 <button
                                   type="button"
                                   onClick={(e) => {
@@ -3306,7 +3349,7 @@ function ClientBatteriesPage() {
                       <button
                         type="button"
                         onClick={() => handleEditModalRemoveBattery(b)}
-                        disabled={editBatchRemovingId === b.id}
+                        disabled={editBatchRemovingId === (b.id || b.battery_code || b.code)}
                         className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50/80 px-2.5 py-1 text-xs font-bold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
                         title="Remove from this intake"
                       >
