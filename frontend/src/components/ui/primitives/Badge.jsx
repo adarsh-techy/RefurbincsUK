@@ -1,32 +1,32 @@
 const TONES = {
-  info: 'border border-blue-400 bg-blue-50 text-blue-700 dark:border-blue-500/40 dark:bg-blue-500/15 dark:text-blue-300',
-  warning: 'bg-warning-50 text-warning-700 dark:bg-amber-500/15 dark:text-amber-300',
-  good: 'bg-brand-50 text-brand-800 dark:bg-emerald-500/15 dark:text-emerald-300',
-  critical: 'bg-critical-50 text-critical-700 dark:bg-red-500/15 dark:text-red-300',
-  testing: 'border border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-500/40 dark:bg-purple-500/15 dark:text-purple-300',
-  neutral: 'bg-slate-100 text-slate-700 dark:bg-surface-700 dark:text-neutral-300',
-  black: 'bg-black text-white dark:bg-black dark:text-white border border-neutral-900 shadow-2xs',
+  info: 'border border-blue-200/90 bg-blue-50/80 text-blue-800 shadow-2xs dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300',
+  warning: 'border border-amber-200/90 bg-amber-50/80 text-amber-800 shadow-2xs dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300',
+  good: 'border border-emerald-200/90 bg-emerald-50/80 text-emerald-800 shadow-2xs dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300',
+  critical: 'border border-rose-200/90 bg-rose-50/80 text-rose-800 shadow-2xs dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-300',
+  testing: 'border border-purple-200/90 bg-purple-50/80 text-purple-800 shadow-2xs dark:border-purple-800/50 dark:bg-purple-950/40 dark:text-purple-300',
+  neutral: 'border border-slate-200/90 bg-slate-50/80 text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-700 dark:text-neutral-300',
+  black: 'border border-slate-800 bg-slate-900 text-white shadow-2xs dark:border-neutral-700 dark:bg-black dark:text-neutral-200',
 };
 
 // battery/status strings from the API (snake_case) mapped to a tone +
-// professional display label.
+// professional display label and status dot indicator.
 const STATUS_MAP = {
-  registered: { tone: 'neutral', label: 'Registered' },
-  with_client: { tone: 'info', label: 'With Client' },
-  new: { tone: 'neutral', label: 'Registered' },
-  in_repair: { tone: 'warning', label: 'Awaiting Repair' },
-  in_progress: { tone: 'critical', label: 'Repair In Progress' },
-  in_testing: { tone: 'testing', label: 'In Testing' },
-  testing: { tone: 'testing', label: 'In Testing' },
-  repair_testing: { tone: 'testing', label: 'Repair Testing' },
-  repaired: { tone: 'good', label: 'Repair Completed' },
-  returned: { tone: 'info', label: 'Returned to Client' },
-  unserviceable: { tone: 'critical', label: 'Unserviceable' },
-  tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
-  unserviceable_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
-  passed_to_remove: { tone: 'warning', label: 'Passed to Remove Parts' },
-  passed_for_part_removal: { tone: 'warning', label: 'Passed to Remove Parts' },
-  recycled: { tone: 'black', label: 'Recycled' },
+  registered: { tone: 'neutral', label: 'Registered', dot: 'bg-slate-400' },
+  with_client: { tone: 'info', label: 'With Client', dot: 'bg-blue-500 shadow-xs' },
+  new: { tone: 'neutral', label: 'Registered', dot: 'bg-slate-400' },
+  in_repair: { tone: 'warning', label: 'Awaiting Repair', dot: 'bg-amber-500 ring-2 ring-amber-400/30' },
+  in_progress: { tone: 'critical', label: 'Repair In Progress', dot: 'bg-rose-500 animate-pulse ring-2 ring-rose-400/30' },
+  in_testing: { tone: 'testing', label: 'In Testing', dot: 'bg-purple-500 animate-pulse ring-2 ring-purple-400/30' },
+  testing: { tone: 'testing', label: 'In Testing', dot: 'bg-purple-500 animate-pulse ring-2 ring-purple-400/30' },
+  repair_testing: { tone: 'testing', label: 'Repair Testing', dot: 'bg-purple-500 animate-pulse ring-2 ring-purple-400/30' },
+  repaired: { tone: 'good', label: 'Repair Completed', dot: 'bg-emerald-500 ring-2 ring-emerald-400/30 shadow-xs' },
+  returned: { tone: 'info', label: 'Returned to Client', dot: 'bg-blue-500 shadow-xs' },
+  unserviceable: { tone: 'critical', label: 'Unserviceable', dot: 'bg-rose-500 ring-2 ring-rose-400/30' },
+  tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed', dot: 'bg-rose-500' },
+  unserviceable_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed', dot: 'bg-rose-500' },
+  passed_to_remove: { tone: 'warning', label: 'Passed to Remove Parts', dot: 'bg-amber-500 ring-2 ring-amber-400/30' },
+  passed_for_part_removal: { tone: 'warning', label: 'Passed to Remove Parts', dot: 'bg-amber-500 ring-2 ring-amber-400/30' },
+  recycled: { tone: 'black', label: 'Recycled', dot: 'bg-emerald-400 shadow-xs' },
 };
 
 function Badge({ tone = 'neutral', status, children }) {
@@ -54,23 +54,33 @@ export function StatusBadge({ status, hasPendingParts, isPassedBack }) {
     );
   }
   if (!status || status === 'null' || status === 'undefined') {
-    return <Badge tone="neutral">Registered</Badge>;
+    return (
+      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${TONES.neutral}`}>
+        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400"></span>
+        <span>Registered</span>
+      </span>
+    );
   }
   const meta = STATUS_MAP[status] || {
     tone: 'neutral',
     label: status.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()),
+    dot: 'bg-slate-400',
   };
-  if (meta.subLabel) {
-    return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200/90 bg-red-50/90 px-2.5 py-0.5 text-xs font-semibold text-red-700 shadow-2xs dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500 ring-2 ring-red-400/30"></span>
-        <span>{meta.label}</span>
-        <span className="font-normal text-red-300 dark:text-red-600">·</span>
-        <span className="text-[11px] font-bold text-red-600 dark:text-red-400">{meta.subLabel}</span>
-      </span>
-    );
-  }
-  return <Badge tone={meta.tone}>{meta.label}</Badge>;
+
+  const toneClass = TONES[meta.tone] || TONES.neutral;
+
+  return (
+    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${toneClass}`}>
+      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot || 'bg-slate-400'}`}></span>
+      <span>{meta.label}</span>
+      {meta.subLabel && (
+        <>
+          <span className="opacity-40">·</span>
+          <span className="text-[10px] font-bold opacity-90">{meta.subLabel}</span>
+        </>
+      )}
+    </span>
+  );
 }
 
 // Same statuses as StatusBadge, but worded for the client portal instead of

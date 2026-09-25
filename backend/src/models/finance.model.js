@@ -1,6 +1,31 @@
 const db = require('../config/db');
 
 // Get high-level totals, optionally filtered by date range [from, to]
+// The repair (r.repaired_at) and service (bs.completed_at) WHERE clauses
+// share ONE params array — $1/$2 are the same from/to for both — so the
+// UNION queries that mix the two never bind the wrong placeholder. Services
+// always exclude the internal "passed back" marker row, which carries no fee.
+function buildDateRangeWhere(from, to) {
+  const params = [];
+  const repairConditions = [];
+  const serviceConditions = ["LOWER(bs.service_name) != 'passed back to technician'"];
+  if (from) {
+    params.push(from);
+    repairConditions.push(`r.repaired_at::date >= $${params.length}`);
+    serviceConditions.push(`bs.completed_at::date >= $${params.length}`);
+  }
+  if (to) {
+    params.push(to);
+    repairConditions.push(`r.repaired_at::date <= $${params.length}`);
+    serviceConditions.push(`bs.completed_at::date <= $${params.length}`);
+  }
+  return {
+    repairWhere: repairConditions.length ? `WHERE ${repairConditions.join(' AND ')}` : '',
+    serviceWhere: `WHERE ${serviceConditions.join(' AND ')}`,
+    params,
+  };
+}
+
 // Recycle revenue per period, reconciled from the two sources we hold:
 // invoices raised to recycle clients (actual billing) and recycle batches
 // priced by weight (the partner's quoted rate). For any one period the
@@ -59,29 +84,7 @@ async function recycleRevenueByPeriod({ from, to, timeFormat = 'YYYY-MM', labelF
 }
 
 async function getTotals({ from, to } = {}) {
-  const repairConditions = [];
-  const repairParams = [];
-  if (from) {
-    repairParams.push(from);
-    repairConditions.push(`r.repaired_at::date >= $${repairParams.length}`);
-  }
-  if (to) {
-    repairParams.push(to);
-    repairConditions.push(`r.repaired_at::date <= $${repairParams.length}`);
-  }
-  const repairWhere = repairConditions.length ? `WHERE ${repairConditions.join(' AND ')}` : '';
-
-  const serviceConditions = [];
-  const serviceParams = [];
-  if (from) {
-    serviceParams.push(from);
-    serviceConditions.push(`bs.completed_at::date >= $${serviceParams.length}`);
-  }
-  if (to) {
-    serviceParams.push(to);
-    serviceConditions.push(`bs.completed_at::date <= $${serviceParams.length}`);
-  }
-  const serviceWhere = serviceConditions.length ? `WHERE ${serviceConditions.join(' AND ')}` : '';
+  const { repairWhere, serviceWhere, params: rangeParams } = buildDateRangeWhere(from, to);
 
   const [
     { rows: repairRows },
@@ -99,7 +102,7 @@ async function getTotals({ from, to } = {}) {
          COUNT(DISTINCT r.battery_id) AS repair_batteries_count
        FROM repairs r
        ${repairWhere}`,
-      repairParams
+      rangeParams
     ),
 
     // 2. Battery services & intake / diagnostic fees revenue
@@ -110,7 +113,7 @@ async function getTotals({ from, to } = {}) {
          COUNT(DISTINCT bs.battery_id) AS service_batteries_count
        FROM battery_services bs
        ${serviceWhere}`,
-      serviceParams
+      rangeParams
     ),
 
     // 3. Recycle revenue (invoices reconciled with weight-priced batches, per period)
@@ -124,7 +127,7 @@ async function getTotals({ from, to } = {}) {
          UNION
          SELECT bs.battery_id FROM battery_services bs ${serviceWhere}
        ) combined`,
-      repairParams.length >= serviceParams.length ? repairParams : serviceParams
+      rangeParams
     ),
   ]);
 
@@ -163,29 +166,7 @@ async function getBreakdown({ from, to, breakdownType = 'month', limit = 60 } = 
   const labelFormat = isDay ? 'DD Mon YYYY' : 'Mon YYYY';
   const dateTrunc = isDay ? 'day' : 'month';
 
-  const repairConditions = [];
-  const repairParams = [];
-  if (from) {
-    repairParams.push(from);
-    repairConditions.push(`r.repaired_at::date >= $${repairParams.length}`);
-  }
-  if (to) {
-    repairParams.push(to);
-    repairConditions.push(`r.repaired_at::date <= $${repairParams.length}`);
-  }
-  const repairWhere = repairConditions.length ? `WHERE ${repairConditions.join(' AND ')}` : '';
-
-  const serviceConditions = [];
-  const serviceParams = [];
-  if (from) {
-    serviceParams.push(from);
-    serviceConditions.push(`bs.completed_at::date >= $${serviceParams.length}`);
-  }
-  if (to) {
-    serviceParams.push(to);
-    serviceConditions.push(`bs.completed_at::date <= $${serviceParams.length}`);
-  }
-  const serviceWhere = serviceConditions.length ? `WHERE ${serviceConditions.join(' AND ')}` : '';
+  const { repairWhere, serviceWhere, params: rangeParams } = buildDateRangeWhere(from, to);
 
   const [
     { rows: repairBreakdown },
@@ -208,7 +189,7 @@ async function getBreakdown({ from, to, breakdownType = 'month', limit = 60 } = 
        ${repairWhere}
        GROUP BY period_key, period_date, label
        ORDER BY period_date DESC`,
-      repairParams
+      rangeParams
     ),
 
     // 2. Services breakdown
@@ -224,7 +205,7 @@ async function getBreakdown({ from, to, breakdownType = 'month', limit = 60 } = 
        ${serviceWhere}
        GROUP BY period_key, period_date, label
        ORDER BY period_date DESC`,
-      serviceParams
+      rangeParams
     ),
 
     // 3. Recycle breakdown (invoices reconciled with weight-priced batches)
@@ -241,7 +222,7 @@ async function getBreakdown({ from, to, breakdownType = 'month', limit = 60 } = 
          SELECT to_char(bs.completed_at, '${timeFormat}') AS period_key, bs.battery_id FROM battery_services bs ${serviceWhere}
        ) combined
        GROUP BY period_key`,
-      repairParams.length >= serviceParams.length ? repairParams : serviceParams
+      rangeParams
     ),
   ]);
 
@@ -319,29 +300,7 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
     endDate = lastDay.toISOString().slice(0, 10);
   }
 
-  const repairConditions = [];
-  const repairParams = [];
-  if (startDate) {
-    repairParams.push(startDate);
-    repairConditions.push(`r.repaired_at::date >= $${repairParams.length}`);
-  }
-  if (endDate) {
-    repairParams.push(endDate);
-    repairConditions.push(`r.repaired_at::date <= $${repairParams.length}`);
-  }
-  const repairWhere = repairConditions.length ? `WHERE ${repairConditions.join(' AND ')}` : '';
-
-  const serviceConditions = [];
-  const serviceParams = [];
-  if (startDate) {
-    serviceParams.push(startDate);
-    serviceConditions.push(`bs.completed_at::date >= $${serviceParams.length}`);
-  }
-  if (endDate) {
-    serviceParams.push(endDate);
-    serviceConditions.push(`bs.completed_at::date <= $${serviceParams.length}`);
-  }
-  const serviceWhere = serviceConditions.length ? `WHERE ${serviceConditions.join(' AND ')}` : '';
+  const { repairWhere, serviceWhere, params: rangeParams } = buildDateRangeWhere(startDate, endDate);
 
   const [
     totalsRes,
@@ -370,7 +329,14 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
          FROM repairs r
          JOIN batteries b ON b.id = r.battery_id
          LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
-         LEFT JOIN clients c ON c.id = ti.client_id OR lower(c.name) = lower(b.client_name)
+         LEFT JOIN LATERAL (
+           -- exactly one client per battery: its own client_name wins over the
+           -- intake's client_id, so a re-tagged battery never yields two rows
+           SELECT c0.id, c0.name FROM clients c0
+           WHERE c0.id = ti.client_id OR lower(c0.name) = lower(b.client_name)
+           ORDER BY (lower(c0.name) = lower(b.client_name)) DESC, c0.id
+           LIMIT 1
+         ) c ON true
          ${repairWhere}
 
          UNION ALL
@@ -388,7 +354,14 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
          FROM battery_services bs
          JOIN batteries b ON b.id = bs.battery_id
          LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
-         LEFT JOIN clients c ON c.id = ti.client_id OR lower(c.name) = lower(b.client_name)
+         LEFT JOIN LATERAL (
+           -- exactly one client per battery: its own client_name wins over the
+           -- intake's client_id, so a re-tagged battery never yields two rows
+           SELECT c0.id, c0.name FROM clients c0
+           WHERE c0.id = ti.client_id OR lower(c0.name) = lower(b.client_name)
+           ORDER BY (lower(c0.name) = lower(b.client_name)) DESC, c0.id
+           LIMIT 1
+         ) c ON true
          ${serviceWhere}
        )
        SELECT
@@ -405,7 +378,7 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
        FROM client_charges
        GROUP BY client_id, client_name
        ORDER BY total_revenue DESC`,
-      repairParams.length >= serviceParams.length ? repairParams : serviceParams
+      rangeParams
     ),
 
     // 3. Staff Breakdown (Repairs + Services performed)
@@ -454,7 +427,7 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
        FROM staff_work
        GROUP BY staff_id, staff_name, staff_role
        ORDER BY total_revenue DESC`,
-      repairParams.length >= serviceParams.length ? repairParams : serviceParams
+      rangeParams
     ),
 
     // 4. Parts Breakdown
@@ -471,7 +444,7 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
        GROUP BY p.id, p.name, p.sku
        ORDER BY total_revenue DESC
        LIMIT 15`,
-      repairParams
+      rangeParams
     ),
 
     // 5. Services & Intake Fees Breakdown
@@ -487,7 +460,7 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
        ${serviceWhere}
        GROUP BY bs.service_id, bs.service_name
        ORDER BY total_revenue DESC`,
-      serviceParams
+      rangeParams
     ),
 
     // 6. Complete Itemized Battery Charge / Fee Ledger
@@ -515,7 +488,14 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
          FROM repairs r
          JOIN batteries b ON b.id = r.battery_id
          LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
-         LEFT JOIN clients c ON c.id = ti.client_id OR lower(c.name) = lower(b.client_name)
+         LEFT JOIN LATERAL (
+           -- exactly one client per battery: its own client_name wins over the
+           -- intake's client_id, so a re-tagged battery never yields two rows
+           SELECT c0.id, c0.name FROM clients c0
+           WHERE c0.id = ti.client_id OR lower(c0.name) = lower(b.client_name)
+           ORDER BY (lower(c0.name) = lower(b.client_name)) DESC, c0.id
+           LIMIT 1
+         ) c ON true
          JOIN staff s ON s.id = r.staff_id
          JOIN parts p ON p.id = r.part_id
          ${repairWhere}
@@ -545,12 +525,19 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
          FROM battery_services bs
          JOIN batteries b ON b.id = bs.battery_id
          LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
-         LEFT JOIN clients c ON c.id = ti.client_id OR lower(c.name) = lower(b.client_name)
+         LEFT JOIN LATERAL (
+           -- exactly one client per battery: its own client_name wins over the
+           -- intake's client_id, so a re-tagged battery never yields two rows
+           SELECT c0.id, c0.name FROM clients c0
+           WHERE c0.id = ti.client_id OR lower(c0.name) = lower(b.client_name)
+           ORDER BY (lower(c0.name) = lower(b.client_name)) DESC, c0.id
+           LIMIT 1
+         ) c ON true
          LEFT JOIN staff s ON s.id = bs.staff_id
          ${serviceWhere}
        ) unified
        ORDER BY charge_date DESC`,
-      repairParams.length >= serviceParams.length ? repairParams : serviceParams
+      rangeParams
     ),
   ]);
 
@@ -656,7 +643,9 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
         }
 
         if (r.charge_type === 'service_fee') {
-          if (r.item_description) group.serviceNames.add(r.item_description.trim());
+          if (r.item_description && r.item_description.trim().toLowerCase() !== 'passed back to technician') {
+            group.serviceNames.add(r.item_description.trim());
+          }
         } else {
           const parts = (r.item_description || '').split(',').map((p) => p.trim()).filter(Boolean);
           parts.forEach((p) => group.partNames.add(p));
@@ -679,22 +668,24 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
           group.clientName = r.client_name;
         }
 
-        group.items.push({
-          id: r.item_key,
-          chargeType: r.charge_type,
-          batteryId: r.battery_id,
-          batteryCode: r.battery_code,
-          staffId: r.staff_id,
-          staffName: r.staff_name || 'System / Auto',
-          itemDescription: r.item_description,
-          partName: r.item_description,
-          partsCharge: Number(r.parts_charge || 0),
-          laborCharge: Number(r.labor_charge || 0),
-          serviceFee: Number(r.service_fee || 0),
-          totalCharge: Number(r.total_charge || 0),
-          notes: r.notes,
-          repairedAt: r.charge_date,
-        });
+        if ((r.item_description || '').trim().toLowerCase() !== 'passed back to technician') {
+          group.items.push({
+            id: r.item_key,
+            chargeType: r.charge_type,
+            batteryId: r.battery_id,
+            batteryCode: r.battery_code,
+            staffId: r.staff_id,
+            staffName: r.staff_name || 'System / Auto',
+            itemDescription: r.item_description,
+            partName: r.item_description,
+            partsCharge: Number(r.parts_charge || 0),
+            laborCharge: Number(r.labor_charge || 0),
+            serviceFee: Number(r.service_fee || 0),
+            totalCharge: Number(r.total_charge || 0),
+            notes: r.notes,
+            repairedAt: r.charge_date,
+          });
+        }
       });
 
       const consolidated = Array.from(batteryMap.values()).map((e) => {

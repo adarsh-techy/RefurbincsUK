@@ -164,9 +164,13 @@ function FinanceDetailPage() {
       group.serviceFee += Number(r.serviceFee || r.service_fee || 0);
       group.totalCharge += Number(r.totalCharge || r.total_charge || 0);
 
-      // Merge services if array
+      // Merge services if array (excluding 'Passed back to Technician')
       if (Array.isArray(r.services)) {
-        r.services.forEach((s) => group.services.add(s));
+        r.services.forEach((s) => {
+          if (s && s.toLowerCase() !== 'passed back to technician') {
+            group.services.add(s);
+          }
+        });
       }
       // Merge parts if array
       if (Array.isArray(r.parts)) {
@@ -176,9 +180,11 @@ function FinanceDetailPage() {
       const isServiceFee =
         r.chargeType === 'service_fee' || (r.serviceFee > 0 && !r.partsCharge && !r.laborCharge);
       if (isServiceFee) {
-        group.chargeTypes.add('service_fee');
         const desc = r.itemDescription || r.partName || 'Service Fee';
-        if (desc && !Array.isArray(r.services)) group.services.add(desc);
+        if (desc && desc.toLowerCase() !== 'passed back to technician') {
+          group.chargeTypes.add('service_fee');
+          if (!Array.isArray(r.services)) group.services.add(desc);
+        }
       } else {
         group.chargeTypes.add('repair');
         if (!Array.isArray(r.parts)) {
@@ -233,9 +239,17 @@ function FinanceDetailPage() {
       }
 
       if (Array.isArray(r.items) && r.items.length > 0) {
-        r.items.forEach((it) => group.items.push(it));
+        r.items.forEach((it) => {
+          const desc = (it.itemDescription || it.partName || '').toLowerCase();
+          if (desc !== 'passed back to technician') {
+            group.items.push(it);
+          }
+        });
       } else {
-        group.items.push(r);
+        const desc = (r.itemDescription || r.partName || '').toLowerCase();
+        if (desc !== 'passed back to technician') {
+          group.items.push(r);
+        }
       }
     });
 
@@ -646,8 +660,44 @@ function FinanceDetailPage() {
                   </tr>
                 ) : (
                   filteredBatteries.map((b, index) => {
-                    const hasRepair = b.chargeTypes.includes('repair') || b.partsCharge > 0 || b.laborCharge > 0;
-                    const hasServiceFee = b.chargeTypes.includes('service_fee') || b.serviceFee > 0;
+                    const hasRepair =
+                      b.chargeTypes.includes('repair') || b.partsCharge > 0 || b.laborCharge > 0 || (b.parts && b.parts.length > 0);
+                    const testingServices = (b.services || []).filter(
+                      (s) => s && s.toLowerCase() !== 'passed back to technician'
+                    );
+                    const hasTesting =
+                      b.chargeTypes.includes('service_fee') || b.serviceFee > 0 || testingServices.length > 0;
+                    const hasBoth = hasRepair && hasTesting;
+
+                    // Separate repair staff and testing staff
+                    const repairItems = (b.items || []).filter(
+                      (it) => it.chargeType === 'repair' || (it.partsCharge > 0 || it.laborCharge > 0)
+                    );
+                    const testingItems = (b.items || []).filter(
+                      (it) =>
+                        (it.chargeType === 'service_fee' || it.serviceFee > 0) &&
+                        (it.itemDescription || it.partName || '').toLowerCase() !== 'passed back to technician'
+                    );
+
+                    const repairStaff = Array.from(
+                      new Set(
+                        repairItems
+                          .map((it) => it.staffName)
+                          .filter((n) => n && !n.toLowerCase().includes('system') && !n.toLowerCase().includes('auto'))
+                      )
+                    );
+                    const testingStaff = Array.from(
+                      new Set(
+                        testingItems
+                          .map((it) => it.staffName)
+                          .filter((n) => n && !n.toLowerCase().includes('system') && !n.toLowerCase().includes('auto'))
+                      )
+                    );
+
+                    const allRealStaff = b.staffList.filter(
+                      (s) => s.name && !s.name.toLowerCase().includes('system') && !s.name.toLowerCase().includes('auto')
+                    );
+
                     const isExpanded = expandedBatteries.has(b.key);
 
                     return (
@@ -699,78 +749,117 @@ function FinanceDetailPage() {
                           <td className="py-3 px-3.5 font-semibold text-slate-800 dark:text-neutral-200">
                             {b.clientName}
                           </td>
+
+                          {/* Type Column with Light Gray Divider if both Repair & Testing */}
                           <td className="py-3 px-3.5">
-                            <div className="flex flex-wrap gap-1">
+                            <div className="flex flex-col gap-1.5 justify-center">
                               {hasRepair && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                  Repair
-                                </span>
+                                <div>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                                    Repair Job
+                                  </span>
+                                </div>
                               )}
-                              {hasServiceFee && (
-                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-                                  Service Fee
-                                </span>
+                              {hasBoth && (
+                                <div className="border-t border-slate-200 dark:border-white/10 w-full" />
                               )}
-                              {!hasRepair && !hasServiceFee && (
-                                <span className="text-slate-400">—</span>
+                              {hasTesting && (
+                                <div>
+                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
+                                    Testing & Fee
+                                  </span>
+                                </div>
+                              )}
+                              {!hasRepair && !hasTesting && <span className="text-slate-400">—</span>}
+                            </div>
+                          </td>
+
+                          {/* Staff / System Column with Light Gray Divider */}
+                          <td className="py-3 px-3.5">
+                            <div className="flex flex-col gap-1.5 justify-center">
+                              {hasRepair && (
+                                <div className="text-xs">
+                                  {repairStaff.length > 0 ? (
+                                    repairStaff.map((st, i) => (
+                                      <span key={i} className="font-semibold text-slate-800 dark:text-neutral-200 block truncate max-w-[130px]" title={st}>
+                                        {st}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-400 text-xs">—</span>
+                                  )}
+                                </div>
+                              )}
+                              {hasBoth && (
+                                <div className="border-t border-slate-200 dark:border-white/10 w-full" />
+                              )}
+                              {hasTesting && (
+                                <div className="text-xs">
+                                  {testingStaff.length > 0 ? (
+                                    testingStaff.map((st, i) => (
+                                      <span key={i} className="font-semibold text-slate-800 dark:text-neutral-200 block truncate max-w-[130px]" title={st}>
+                                        {st}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-400 text-xs">
+                                      {allRealStaff.length > 0 ? allRealStaff[0].name : 'System Auto'}
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                              {!hasRepair && !hasTesting && (
+                                <span className="text-slate-400">{allRealStaff[0]?.name || '—'}</span>
                               )}
                             </div>
                           </td>
-                          <td className="py-3 px-3.5">
-                            {(() => {
-                              const realStaff = b.staffList.filter(
-                                (s) => s.name && !s.name.toLowerCase().includes('system') && !s.name.toLowerCase().includes('auto')
-                              );
-                              const staffToRender = realStaff.length > 0 ? realStaff : b.staffList;
 
-                              return staffToRender.length > 0 ? (
-                                <div className="flex flex-col gap-0.5">
-                                  {staffToRender.map((st, sIdx) =>
-                                    st.id ? (
-                                      <Link
-                                        key={sIdx}
-                                        to={`/staff/${st.id}`}
-                                        className="font-medium text-blue-600 hover:underline dark:text-blue-400 block truncate max-w-[130px]"
-                                        title={st.name}
-                                      >
-                                        {st.name}
-                                      </Link>
-                                    ) : (
+                          {/* Service / Parts Column with Light Gray Divider */}
+                          <td className="py-3 px-3.5">
+                            <div className="flex flex-col gap-1.5 max-w-[340px] justify-center">
+                              {hasRepair && (
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80 dark:text-emerald-400 mr-1 shrink-0">
+                                    Parts:
+                                  </span>
+                                  {b.parts.length > 0 ? (
+                                    b.parts.map((p, pIdx) => (
                                       <span
-                                        key={sIdx}
-                                        className="text-slate-500 dark:text-neutral-400 block truncate max-w-[130px]"
-                                        title={st.name}
+                                        key={`prt-${pIdx}`}
+                                        className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
                                       >
-                                        {st.name}
+                                        {p}
                                       </span>
-                                    )
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-400 text-[11px]">No parts replaced</span>
                                   )}
                                 </div>
-                              ) : (
+                              )}
+                              {hasBoth && (
+                                <div className="border-t border-slate-200 dark:border-white/10 w-full" />
+                              )}
+                              {hasTesting && (
+                                <div className="flex flex-wrap gap-1 items-center">
+                                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/80 dark:text-purple-400 mr-1 shrink-0">
+                                    Testing:
+                                  </span>
+                                  {testingServices.length > 0 ? (
+                                    testingServices.map((s, sIdx) => (
+                                      <span
+                                        key={`srv-${sIdx}`}
+                                        className="inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
+                                      >
+                                        {s}
+                                      </span>
+                                    ))
+                                  ) : (
+                                    <span className="text-slate-400 text-[11px]">Diagnostic / Intake Fee</span>
+                                  )}
+                                </div>
+                              )}
+                              {!hasRepair && !hasTesting && (
                                 <span className="text-slate-400">—</span>
-                              );
-                            })()}
-                          </td>
-                          <td className="py-3 px-3.5">
-                            <div className="flex flex-wrap gap-1 max-w-[280px]">
-                              {b.services.map((s, sIdx) => (
-                                <span
-                                  key={`srv-${sIdx}`}
-                                  className="inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
-                                >
-                                  {s}
-                                </span>
-                              ))}
-                              {b.parts.map((p, pIdx) => (
-                                <span
-                                  key={`prt-${pIdx}`}
-                                  className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                                >
-                                  {p}
-                                </span>
-                              ))}
-                              {b.services.length === 0 && b.parts.length === 0 && (
-                                <span className="text-slate-400 dark:text-neutral-500">—</span>
                               )}
                             </div>
                           </td>
