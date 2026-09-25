@@ -622,8 +622,10 @@ async function removeParts(req, res, next) {
 }
 
 // Passes a battery back from 'in_testing' to 'in_repair' so technicians
-// can re-work on it after failing testing. Restricted to Supervisors,
-// and Admins.
+// can re-work on it after failing testing. A testing/QA decision, so it is
+// restricted to Supervisors and Admins exactly like completeTesting — a
+// plain technician must not be able to pull their own battery out of the
+// QA queue.
 async function passToTech(req, res, next) {
   try {
     let staffId = null;
@@ -633,6 +635,11 @@ async function passToTech(req, res, next) {
         return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
       }
       staffId = staff.id;
+      if ((staff.role || '').toLowerCase() !== 'supervisor') {
+        return res.status(403).json({
+          message: 'Technicians cannot pass batteries back. Only Supervisors can perform testing and QA decisions.',
+        });
+      }
     } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
       const staff = await staffModel.findByUserId(req.user.id);
       if (staff) {

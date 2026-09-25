@@ -16,6 +16,22 @@ import { hasClientPermission } from '../../../utils/permissions';
 import ClientReturnVerifyModal from '../components/ClientReturnVerifyModal';
 import RatingModal from '../../../components/feedback/RatingModal';
 
+// One place that turns a grouped batch (see groupMap) — optionally with a
+// specific battery row — into the truck_intake id its API calls need.
+// Returns null for awaiting-pickup groups, which have no intake row.
+function resolveBatchIntakeId(batch, battery = null) {
+  if (!batch) return null;
+  if (batch.intakeId) return batch.intakeId;
+  if (battery?.truck_intake_id || battery?.intake_id) return battery.truck_intake_id || battery.intake_id;
+  const tagged = batch.batteries?.find((b) => b.truck_intake_id || b.intake_id);
+  if (tagged) return tagged.truck_intake_id || tagged.intake_id;
+  if (typeof batch.key === 'string' && batch.key.startsWith('truck_')) {
+    const n = Number(batch.key.replace('truck_', ''));
+    if (!Number.isNaN(n)) return n;
+  }
+  return null;
+}
+
 const formInputClasses =
   'w-full rounded-md border border-blue-300 bg-blue-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30';
 const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
@@ -211,6 +227,9 @@ function ClientBatteriesPage() {
   const [removeBatteryTarget, setRemoveBatteryTarget] = useState(null);
   const [removeBatteryLoading, setRemoveBatteryLoading] = useState(false);
   const [removeBatteryError, setRemoveBatteryError] = useState(null);
+
+  // Non-blocking notice (replaces window.alert) — e.g. trying to edit a verified batch.
+  const [infoNotice, setInfoNotice] = useState(null);
 
   // ── Delete / Cancel Batch State ──────────────────────────────────────
   const [deleteBatchTarget, setDeleteBatchTarget] = useState(null);
@@ -454,26 +473,14 @@ function ClientBatteriesPage() {
 
   // ── Edit Batch Handlers ──────────────────────────────────────────────
   function openEditBatch(batch) {
-    const isVerified = Boolean(
-      batch.intakeStatus === 'verified' ||
-      batch.verifiedAt ||
-      batch.return_verified_at ||
-      batch.status === 'verified'
-    );
-    if (isVerified) {
-      alert('This batch has already been verified by the workshop and cannot be edited.');
+    // groupMap only ever sets intakeStatus / verifiedAt (see above) — those
+    // are the whole "already verified" signal.
+    if (batch.intakeStatus === 'verified' || batch.verifiedAt) {
+      setInfoNotice('This batch has already been verified by the workshop and cannot be edited.');
       return;
     }
 
-    const resolvedIntakeId =
-      batch.intakeId ||
-      batch.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.truck_intake_id ||
-      batch.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.intake_id ||
-      (typeof batch.key === 'string' && batch.key.startsWith('truck_') && !isNaN(Number(batch.key.replace('truck_', '')))
-        ? Number(batch.key.replace('truck_', ''))
-        : null);
-
-    setEditBatchTarget({ ...batch, intakeId: resolvedIntakeId });
+    setEditBatchTarget({ ...batch, intakeId: resolveBatchIntakeId(batch) });
     setEditBatchTruck(batch.truckNumber || '');
     setEditBatchDriver(batch.driverName || '');
     setEditBatchBatteries(batch.batteries || []);
@@ -489,13 +496,7 @@ function ClientBatteriesPage() {
   }
 
   async function handleEditModalAddBattery(customCode, customSerial, customNotes) {
-    const resolvedIntakeId =
-      editBatchTarget?.intakeId ||
-      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.truck_intake_id ||
-      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.intake_id ||
-      (typeof editBatchTarget?.key === 'string' && editBatchTarget.key.startsWith('truck_') && !isNaN(Number(editBatchTarget.key.replace('truck_', '')))
-        ? Number(editBatchTarget.key.replace('truck_', ''))
-        : null);
+    const resolvedIntakeId = resolveBatchIntakeId(editBatchTarget);
 
     if (!resolvedIntakeId) {
       setEditBatchError('This batch cannot be modified directly (missing intake ID).');
@@ -554,15 +555,7 @@ function ClientBatteriesPage() {
   }
 
   async function handleEditModalRemoveBattery(battery) {
-    const resolvedIntakeId =
-      editBatchTarget?.intakeId ||
-      battery.truck_intake_id ||
-      battery.intake_id ||
-      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.truck_intake_id ||
-      editBatchTarget?.batteries?.find((b) => b.truck_intake_id || b.intake_id)?.intake_id ||
-      (typeof editBatchTarget?.key === 'string' && editBatchTarget.key.startsWith('truck_') && !isNaN(Number(editBatchTarget.key.replace('truck_', '')))
-        ? Number(editBatchTarget.key.replace('truck_', ''))
-        : 'awaiting_pickup');
+    const resolvedIntakeId = resolveBatchIntakeId(editBatchTarget, battery) || 'awaiting_pickup';
 
     const batteryIdentifier = battery.id || battery.battery_code || battery.code;
     setEditBatchRemovingId(batteryIdentifier);
@@ -655,10 +648,7 @@ function ClientBatteriesPage() {
     setRemoveBatteryError(null);
     try {
       const resolvedIntakeId =
-        removeBatteryTarget.intakeId ||
-        removeBatteryTarget.battery?.truck_intake_id ||
-        removeBatteryTarget.battery?.intake_id ||
-        'awaiting_pickup';
+        resolveBatchIntakeId(removeBatteryTarget, removeBatteryTarget.battery) || 'awaiting_pickup';
       const batteryIdentifier = removeBatteryTarget.battery?.id || removeBatteryTarget.battery?.battery_code;
       await apiClient.delete(
         `/clients/me/truck-intakes/${resolvedIntakeId}/batteries/${batteryIdentifier}`
@@ -1763,14 +1753,18 @@ function ClientBatteriesPage() {
                       </button>
                     )}
 
-                    <button
-                      type="button"
-                      onClick={() => setDeleteBatchTarget(selectedBatch)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-50 dark:border-red-800/40 dark:bg-surface-800 dark:text-red-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
-                    >
-                      <FiTrash2 className="w-3.5 h-3.5" />
-                      <span>Cancel Batch</span>
-                    </button>
+                    {/* Only a real truck intake can be cancelled — an
+                        awaiting-pickup group has no intake row to delete. */}
+                    {resolveBatchIntakeId(selectedBatch) && (
+                      <button
+                        type="button"
+                        onClick={() => setDeleteBatchTarget({ ...selectedBatch, intakeId: resolveBatchIntakeId(selectedBatch) })}
+                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-50 dark:border-red-800/40 dark:bg-surface-800 dark:text-red-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
+                      >
+                        <FiTrash2 className="w-3.5 h-3.5" />
+                        <span>Cancel Batch</span>
+                      </button>
+                    )}
                   </>
                 )}
               </>
@@ -3621,6 +3615,17 @@ function ClientBatteriesPage() {
             </div>
           </div>
         </Modal>
+      )}
+
+      {infoNotice && (
+        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
+          <div className="flex max-w-md items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 shadow-lg dark:border-amber-800/60 dark:bg-amber-950/80 dark:text-amber-200">
+            <span>{infoNotice}</span>
+            <button type="button" onClick={() => setInfoNotice(null)} className="shrink-0 font-bold underline-offset-2 hover:underline">
+              Dismiss
+            </button>
+          </div>
+        </div>
       )}
 
       {/* ── Delete / Cancel Batch Confirmation Modal ──────────────────── */}

@@ -38,6 +38,14 @@ export function canTestBatteries(user) {
   return (user.staff_role || '').toLowerCase() === 'supervisor';
 }
 
+// A battery that arrived on a truck intake the workshop hasn't verified yet
+// (still 'pending_arrival'). Work and testing must not start on it. One
+// definition for BatteryDetailPage, TechnicianHomePage and the repair panel.
+export function isIntakeUnverified(battery) {
+  if (!battery?.truck_intake_id) return false;
+  return battery.intake_status !== 'verified' || !battery.intake_verified_at;
+}
+
 // super_admin implicitly has every permission; an admin only has what's in
 // user.permissions.
 export function hasPermission(user, permission) {

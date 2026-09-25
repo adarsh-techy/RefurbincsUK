@@ -5,7 +5,7 @@ import apiClient from '../../../services/api-client';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
-import { canTestBatteries } from '../../../utils/permissions';
+import { canTestBatteries, isIntakeUnverified } from '../../../utils/permissions';
 
 const SUGGESTION_LIMIT = 8;
 const DEBOUNCE_MS = 250;
@@ -67,9 +67,15 @@ function TechnicianHomePage() {
     }
   }, [searchParams, setSearchParams]);
 
+  // QrScanner keeps decoding the same code frame after frame; without this
+  // lock one physical scan would fire several lookups and navigations.
+  const scanInFlightRef = useRef(false);
+
   async function goToBattery(raw) {
     const code = extractBatteryCode(raw);
     if (!code) return;
+    if (scanInFlightRef.current) return;
+    scanInFlightRef.current = true;
     setSuggestions([]);
     setShowSuggestions(false);
     setCheckingScan(true);
@@ -77,20 +83,16 @@ function TechnicianHomePage() {
     try {
       const { data } = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
       const b = data.battery;
-      const isUnverified = Boolean(
-        b?.truck_intake_id &&
-        (b?.intake_status === 'pending_arrival' || b?.intake_status !== 'verified' || !b?.intake_verified_at)
-      );
-      if (isUnverified) {
+      if (isIntakeUnverified(b)) {
         setCameraOpen(false);
         setUnverifiedModalBattery(b);
-        setCheckingScan(false);
         return;
       }
     } catch {
       // If lookup fails or battery does not exist, let detail page handle it
     } finally {
       setCheckingScan(false);
+      scanInFlightRef.current = false;
     }
 
     setCameraOpen(false);

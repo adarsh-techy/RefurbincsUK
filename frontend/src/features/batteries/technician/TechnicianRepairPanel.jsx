@@ -4,7 +4,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
 import useFetchList from '../../../utils/use-fetch-list';
 import formatDuration from '../../../utils/format-duration';
-import { canTestBatteries } from '../../../utils/permissions';
+import { canTestBatteries, isIntakeUnverified as intakeIsUnverified } from '../../../utils/permissions';
 import { resolveImageUrl } from '../../../utils/image-url';
 import { ImageLightboxModal } from '../../../components/ui/overlays/ImageLightboxModal';
 
@@ -77,15 +77,10 @@ function TechnicianRepairPanel({
 
   const [searchParams] = useSearchParams();
   const fromScan = searchParams.get('fromScan') === 'true';
-  const isIntakeUnverified = Boolean(
-    battery?.truck_intake_id &&
-    (battery?.intake_status === 'pending_arrival' ||
-      battery?.intake_status !== 'verified' ||
-      !battery?.intake_verified_at)
-  );
+  const isIntakeUnverified = intakeIsUnverified(battery);
   const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
   const [showScanStartWorkModal, setShowScanStartWorkModal] = useState(false);
-  const [scanTime, setScanTime] = useState(null);
+  const [scanTime] = useState(null);
   const [showPassedBackScanModal, setShowPassedBackScanModal] = useState(false);
   const [passedBackScanTime, setPassedBackScanTime] = useState(null);
 
@@ -198,7 +193,7 @@ function TechnicianRepairPanel({
     const status = battery.status;
     const hasPending = pendingPartsRemoval.length > 0;
     if (isIntakeUnverified) return; // handled by its own effect above
-    if (isPassedBack || (status === 'unserviceable' && hasPending)) return; // passed-back effect above
+    if (needsPartsRemovalOnScan) return; // passed-back / parts-pending effect above
     if (status === 'unserviceable' || status === 'recycled') {
       setShowUnserviceableAlertModal(true);
       return;
@@ -207,16 +202,13 @@ function TechnicianRepairPanel({
       setShowRepairedByModal(true);
       return;
     }
-    if (status === 'tested_parts_removed') {
-      // Parts already reclaimed — offer to start rework straight away.
-      setScanTime(new Date());
-      setShowScanStartWorkModal(true);
-      return;
-    }
+    // tested_parts_removed falls through to "Not Available": rework is not
+    // allowed on a unit whose parts were reclaimed (handleStartWork and the
+    // backend both reject it), so never offer a Start Work button for it.
     if (status !== 'in_repair' && !isOwnInProgress && !hasPending) {
       setBlockedStatus(status);
     }
-  }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval.length]);
+  }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, needsPartsRemovalOnScan, isOwnInProgress, pendingPartsRemoval.length]);
 
   // Exit guard (mobile intercepts `beforeRemove`): while a scanned battery
   // has an active repair/testing session or unsaved input, warn before the
@@ -278,12 +270,17 @@ function TechnicianRepairPanel({
   }, [fromScan, isIntakeUnverified]);
 
 
+  // Passed back for rework, OR failed in testing with parts still fitted —
+  // both need the "remove fitted parts" alert on scan (mobile shows the same
+  // cantServiceAlert for `isPassedBack || (unserviceable && pending)`).
+  const needsPartsRemovalOnScan =
+    isPassedBack || (battery?.status === 'unserviceable' && pendingPartsRemoval.length > 0);
   useEffect(() => {
-    if (fromScan && !isIntakeUnverified && isPassedBack) {
+    if (fromScan && !isIntakeUnverified && needsPartsRemovalOnScan) {
       setPassedBackScanTime(new Date());
       setShowPassedBackScanModal(true);
     }
-  }, [fromScan, isIntakeUnverified, isPassedBack]);
+  }, [fromScan, isIntakeUnverified, needsPartsRemovalOnScan]);
 
   useEffect(() => {
     return () => {
@@ -720,30 +717,7 @@ function TechnicianRepairPanel({
 
       {/* ── Status: IN_REPAIR & UNVERIFIED SHIPMENT ── */}
       {(() => {
-        const isShipmentUnverified =
-          battery.truck_intake_id &&
-          (battery.intake_status === 'pending_arrival' || !battery.intake_verified_at) &&
-          battery.intake_status !== 'verified';
-
         if (battery.status !== 'in_repair' || pendingPartsRemoval.length > 0) return null;
-
-        if (isShipmentUnverified) {
-          return (
-            <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 dark:border-amber-800/60 dark:bg-amber-950/30">
-              <div className="flex items-center gap-2 mb-1.5">
-                <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-100 text-amber-800 text-xs font-bold dark:bg-amber-900/60 dark:text-amber-200">
-                  ⏳
-                </span>
-                <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
-                  Shipment Arrival Pending Verification
-                </p>
-              </div>
-              <p className="text-xs text-amber-700 dark:text-amber-300">
-                Truck #{battery.intake_truck_number || 'shipment'} has not been verified at the workshop yet. Workshop staff must verify arrival on the Truck Intake page before work can begin.
-              </p>
-            </div>
-          );
-        }
 
         if (isIntakeUnverified) {
           return (

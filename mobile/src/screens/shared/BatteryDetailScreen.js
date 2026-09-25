@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Modal,
   SafeAreaView,
@@ -20,6 +19,7 @@ import Icon from '../../components/ui/Icon';
 import ImageViewerModal from '../../components/ui/ImageViewerModal';
 import formatDuration from '../../utils/format-duration';
 import { resolveImageUrl } from '../../utils/imageUrl';
+import { isIntakeUnverified as intakeIsUnverified } from '../../utils/intake';
 
 function generateBatchId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -401,12 +401,7 @@ export default function BatteryDetailScreen() {
           data.battery?.status === 'tested_parts_removed' ||
           data.battery?.status === 'recycled';
 
-        const isIntakeUnverified = Boolean(
-          data.battery?.truck_intake_id &&
-          (data.battery?.intake_status === 'pending_arrival' ||
-            data.battery?.intake_status !== 'verified' ||
-            !data.battery?.intake_verified_at)
-        );
+        const isIntakeUnverified = intakeIsUnverified(data.battery);
 
         if (fromScan && isIntakeUnverified) {
           setUnverifiedIntakeData({
@@ -662,12 +657,7 @@ export default function BatteryDetailScreen() {
       setActionError('Cannot start work: This battery is marked unserviceable.');
       return;
     }
-    const isIntakeUnverified = Boolean(
-      result?.battery?.truck_intake_id &&
-      (result?.battery?.intake_status === 'pending_arrival' ||
-        result?.battery?.intake_status !== 'verified' ||
-        !result?.battery?.intake_verified_at)
-    );
+    const isIntakeUnverified = intakeIsUnverified(result?.battery);
     if (isIntakeUnverified) {
       setActionError(`Cannot start work: Truck #${result?.battery?.intake_truck_number || ''} arrival has not been verified yet.`);
       return;
@@ -1901,12 +1891,7 @@ export default function BatteryDetailScreen() {
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
           {battery.status === 'in_repair' && pendingPartsRemoval.length === 0 && (
-            Boolean(
-              battery?.truck_intake_id &&
-              (battery?.intake_status === 'pending_arrival' ||
-                battery?.intake_status !== 'verified' ||
-                !battery?.intake_verified_at)
-            ) ? (
+            intakeIsUnverified(battery) ? (
               <View className="mb-5 rounded-2xl border border-amber-300 bg-amber-50/80 p-5 items-center">
                 <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 border border-amber-200">
                   <Icon name="alertTriangle" color="#d97706" size={24} />

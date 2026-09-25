@@ -3,6 +3,7 @@ import { useSelector } from 'react-redux';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import apiClient from '../../../services/api-client';
+import { isIntakeUnverified as intakeIsUnverified } from '../../../utils/permissions';
 import { socket } from '../../../services/socket-client';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
 import Modal from '../../../components/ui/overlays/Modal';
@@ -2216,12 +2217,7 @@ function BatteryDetailPage() {
   const passBackService = (services || []).find((s) => s.service_name === 'Passed back to Technician');
   const isPassedBack = Boolean(passBackService && battery?.status === 'in_repair');
   const hasPendingPartsToRemove = (pendingPartsRemoval && pendingPartsRemoval.length > 0) || isPassedBack;
-  const isIntakeUnverified = Boolean(
-    battery?.truck_intake_id &&
-    (battery?.intake_status === 'pending_arrival' ||
-      battery?.intake_status !== 'verified' ||
-      !battery?.intake_verified_at)
-  );
+  const isIntakeUnverified = intakeIsUnverified(battery);
 
   const cycles = buildCycles(
     buildEvents(

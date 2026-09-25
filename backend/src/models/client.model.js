@@ -845,19 +845,16 @@ async function findOwnedIntake(runner, intakeId, clientId, clientName) {
 
 // Update client's unverified truck intake info (truck number, driver name)
 async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNumber, driverName }) {
+  // findOwnedIntake is the ONLY ownership rule (client_id = me, or an
+  // untagged intake whose batteries all carry my name). No looser fallback:
+  // "client_id IS NULL" alone would let a client claim or edit another
+  // company's unclaimed shipment.
   const existing = await findOwnedIntake(db, intakeId, clientId, clientName);
-  let intakeRecord = existing[0];
+  const intakeRecord = existing[0];
   if (!intakeRecord) {
-    const { rows: tiFallback } = await db.query(
-      `SELECT ti.* FROM truck_intakes ti WHERE ti.id = $1 AND (ti.client_id = $2 OR ti.client_id IS NULL)`,
-      [intakeId, clientId]
-    );
-    if (tiFallback.length === 0) {
-      const err = new Error('Truck intake not found or does not belong to your company.');
-      err.status = 404;
-      throw err;
-    }
-    intakeRecord = tiFallback[0];
+    const err = new Error('Truck intake not found or does not belong to your company.');
+    err.status = 404;
+    throw err;
   }
   if (intakeRecord.status === 'verified' || intakeRecord.verified_at) {
     const err = new Error('Cannot edit an intake batch that has already been verified by the workshop.');
@@ -879,19 +876,16 @@ async function updateClientTruckIntake(clientId, clientName, intakeId, { truckNu
 
 // Add more batteries to an existing unverified truck intake
 async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, { batteries = [] }) {
+  // findOwnedIntake is the ONLY ownership rule (client_id = me, or an
+  // untagged intake whose batteries all carry my name). No looser fallback:
+  // "client_id IS NULL" alone would let a client claim or edit another
+  // company's unclaimed shipment.
   const existing = await findOwnedIntake(db, intakeId, clientId, clientName);
-  let intakeRecord = existing[0];
+  const intakeRecord = existing[0];
   if (!intakeRecord) {
-    const { rows: tiFallback } = await db.query(
-      `SELECT ti.* FROM truck_intakes ti WHERE ti.id = $1 AND (ti.client_id = $2 OR ti.client_id IS NULL)`,
-      [intakeId, clientId]
-    );
-    if (tiFallback.length === 0) {
-      const err = new Error('Truck intake not found or does not belong to your company.');
-      err.status = 404;
-      throw err;
-    }
-    intakeRecord = tiFallback[0];
+    const err = new Error('Truck intake not found or does not belong to your company.');
+    err.status = 404;
+    throw err;
   }
   if (intakeRecord.status === 'verified' || intakeRecord.verified_at) {
     const err = new Error('Cannot add batteries to a batch that has already been verified by the workshop.');
@@ -1004,21 +998,16 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
 
     if (effectiveIntakeId) {
       const intakeRows = await findOwnedIntake(client, effectiveIntakeId, clientId, clientName);
-      let intakeRecord = intakeRows[0];
+      const intakeRecord = intakeRows[0];
       if (!intakeRecord) {
-        const { rows: tiFallback } = await client.query(
-          `SELECT ti.* FROM truck_intakes ti WHERE ti.id = $1`,
-          [effectiveIntakeId]
-        );
-        if (tiFallback.length > 0 && tiFallback[0].client_id && tiFallback[0].client_id !== clientId) {
-          const err = new Error('Truck intake not found.');
-          err.status = 404;
-          throw err;
-        }
-        intakeRecord = tiFallback[0];
+        // Unknown intake, or one this client doesn't own — never fall through
+        // to unlinking the battery from an intake we couldn't even verify.
+        const err = new Error('Truck intake not found or does not belong to your company.');
+        err.status = 404;
+        throw err;
       }
 
-      if (intakeRecord && (intakeRecord.status === 'verified' || intakeRecord.verified_at)) {
+      if (intakeRecord.status === 'verified' || intakeRecord.verified_at) {
         const err = new Error('Cannot remove batteries from an intake batch that has already been verified by the workshop.');
         err.status = 400;
         throw err;
