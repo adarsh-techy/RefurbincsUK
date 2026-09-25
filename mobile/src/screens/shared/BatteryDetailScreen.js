@@ -805,8 +805,8 @@ export default function BatteryDetailScreen() {
   }
 
   async function handleRemoveParts() {
-    if (selectedRemovalIds.length === 0) {
-      setRemovePartsError('Select at least one part to remove');
+    if (selectedRemovalIds.length !== pendingPartsRemoval.length) {
+      setRemovePartsError('All mandatory fitted parts must be selected to confirm removal.');
       return;
     }
     setRemovingParts(true);
@@ -1436,19 +1436,38 @@ export default function BatteryDetailScreen() {
           )}
 
           {fromScan ? (
-            <TouchableOpacity
-              onPress={handleRemoveParts}
-              disabled={removingParts || selectedRemovalIds.length === 0}
-              className="mt-3 items-center rounded-xl bg-amber-600 py-3.5 shadow-md disabled:opacity-50 active:bg-amber-700"
-            >
-              {removingParts ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <Text className="text-xs font-bold text-white">
-                  Confirm Removal &amp; Restock All Parts ({pendingPartsRemoval.length})
-                </Text>
-              )}
-            </TouchableOpacity>
+            (() => {
+              const allPartsSelected =
+                pendingPartsRemoval.length > 0 &&
+                selectedRemovalIds.length === pendingPartsRemoval.length &&
+                pendingPartsRemoval.every((p) => selectedRemovalIds.includes(p.id));
+
+              return (
+                <View>
+                  <TouchableOpacity
+                    onPress={handleRemoveParts}
+                    disabled={removingParts || !allPartsSelected}
+                    className={`mt-3 items-center rounded-xl py-3.5 shadow-md active:bg-amber-700 ${
+                      !allPartsSelected ? 'bg-slate-300 dark:bg-slate-700 opacity-60' : 'bg-amber-600'
+                    }`}
+                  >
+                    {removingParts ? (
+                      <ActivityIndicator color="#fff" />
+                    ) : (
+                      <Text className="text-xs font-bold text-white">
+                        Confirm Removal &amp; Restock All Parts ({selectedRemovalIds.length}/{pendingPartsRemoval.length})
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+
+                  {!allPartsSelected && (
+                    <Text className="mt-2 text-center text-[11px] font-semibold text-amber-700 dark:text-amber-400">
+                      ⚠️ Select all fitted parts ({selectedRemovalIds.length}/{pendingPartsRemoval.length}) to enable confirmation
+                    </Text>
+                  )}
+                </View>
+              );
+            })()
           ) : (
             <View className="mt-3 gap-2">
               <TouchableOpacity
