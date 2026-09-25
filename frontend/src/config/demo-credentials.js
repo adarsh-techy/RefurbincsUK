@@ -48,15 +48,6 @@ export const MOBILE_DEMO_CREDENTIALS = {
     password: '12345678',
     tone: 'violet',
   },
-  akshay: {
-    id: 'akshay',
-    label: 'Akshay',
-    icon: '🛠️',
-    role: 'Technician',
-    email: 'akshay@gmail.com',
-    password: '12345678',
-    tone: 'indigo',
-  },
 };
 
 export default DEMO_CREDENTIALS;

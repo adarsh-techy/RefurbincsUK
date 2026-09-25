@@ -90,8 +90,8 @@ function LoginPage() {
               </button>
             </div>
 
-            {/* Mobile View: Adarsh, Akhil, Akshay */}
-            <div className="grid grid-cols-3 gap-2 sm:hidden">
+            {/* Mobile View: Adarsh, Akhil */}
+            <div className="grid grid-cols-2 gap-2 sm:hidden">
               <button
                 type="button"
                 onClick={() => {
@@ -114,18 +114,6 @@ function LoginPage() {
                 title={`Akhil: ${MOBILE_DEMO_CREDENTIALS.akhil.email}`}
               >
                 ⚡ Akhil
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(MOBILE_DEMO_CREDENTIALS.akshay.email);
-                  setPassword(MOBILE_DEMO_CREDENTIALS.akshay.password);
-                }}
-                className="rounded-md border border-dashed border-indigo-500/50 bg-indigo-500/10 px-2 py-2 text-[11px] font-medium text-indigo-400 transition hover:bg-indigo-500/20 truncate cursor-pointer text-center"
-                title={`Akshay: ${MOBILE_DEMO_CREDENTIALS.akshay.email}`}
-              >
-                🛠️ Akshay
               </button>
             </div>
           </div>
