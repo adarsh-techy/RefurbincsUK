@@ -131,20 +131,18 @@ function FinanceDetailPage() {
     const map = new Map();
 
     repairs.forEach((r, idx) => {
-      const key = r.batteryId
-        ? `battery_${r.batteryId}`
-        : r.batteryCode
-        ? `code_${r.batteryCode}`
-        : `item_${r.id || idx}`;
+      const bCode = (r.batteryCode || r.battery_code || '').trim().toUpperCase();
+      const bId = r.batteryId || r.battery_id;
+      const key = bCode ? `code_${bCode}` : (bId ? `id_${bId}` : `item_${r.id || idx}`);
 
       if (!map.has(key)) {
         map.set(key, {
           key,
-          batteryId: r.batteryId,
-          batteryCode: r.batteryCode,
-          batteryStatus: r.batteryStatus,
-          clientId: r.clientId,
-          clientName: r.clientName || 'Direct / Unassigned',
+          batteryId: bId,
+          batteryCode: r.batteryCode || r.battery_code || (bCode || null),
+          batteryStatus: r.batteryStatus || r.battery_status,
+          clientId: r.clientId || r.client_id,
+          clientName: r.clientName || r.client_name || 'Direct / Unassigned',
           staffList: [],
           services: new Set(),
           parts: new Set(),
@@ -154,44 +152,67 @@ function FinanceDetailPage() {
           serviceFee: 0,
           totalCharge: 0,
           items: [],
-          latestDate: r.repairedAt,
+          latestDate: r.repairedAt || r.charge_date,
           notes: [],
         });
       }
 
       const group = map.get(key);
 
-      group.laborCharge += Number(r.laborCharge || 0);
-      group.partsCharge += Number(r.partsCharge || 0);
-      group.serviceFee += Number(r.serviceFee || 0);
-      group.totalCharge += Number(r.totalCharge || 0);
+      group.laborCharge += Number(r.laborCharge || r.labor_charge || 0);
+      group.partsCharge += Number(r.partsCharge || r.parts_charge || 0);
+      group.serviceFee += Number(r.serviceFee || r.service_fee || 0);
+      group.totalCharge += Number(r.totalCharge || r.total_charge || 0);
+
+      // Merge services if array
+      if (Array.isArray(r.services)) {
+        r.services.forEach((s) => group.services.add(s));
+      }
+      // Merge parts if array
+      if (Array.isArray(r.parts)) {
+        r.parts.forEach((p) => group.parts.add(p));
+      }
 
       const isServiceFee =
         r.chargeType === 'service_fee' || (r.serviceFee > 0 && !r.partsCharge && !r.laborCharge);
       if (isServiceFee) {
         group.chargeTypes.add('service_fee');
         const desc = r.itemDescription || r.partName || 'Service Fee';
-        if (desc) group.services.add(desc);
+        if (desc && !Array.isArray(r.services)) group.services.add(desc);
       } else {
         group.chargeTypes.add('repair');
-        const partsArr = (r.partName || r.itemDescription || '')
-          .split(',')
-          .map((p) => p.trim())
-          .filter(Boolean);
-        partsArr.forEach((p) => group.parts.add(p));
+        if (!Array.isArray(r.parts)) {
+          const partsArr = (r.partName || r.itemDescription || '')
+            .split(',')
+            .map((p) => p.trim())
+            .filter(Boolean);
+          partsArr.forEach((p) => group.parts.add(p));
+        }
+      }
+
+      if (Array.isArray(r.chargeTypes)) {
+        r.chargeTypes.forEach((t) => group.chargeTypes.add(t));
       }
 
       // Track staff members
-      const sName = r.staffName || (r.staffId ? `Staff #${r.staffId}` : 'System Auto');
-      if (sName && !group.staffList.some((s) => s.id === r.staffId && s.name === sName)) {
-        group.staffList.push({ id: r.staffId, name: sName });
+      if (Array.isArray(r.staffList) && r.staffList.length > 0) {
+        r.staffList.forEach((st) => {
+          if (!group.staffList.some((s) => s.id === st.id && s.name === st.name)) {
+            group.staffList.push(st);
+          }
+        });
+      } else {
+        const sName = r.staffName || (r.staffId ? `Staff #${r.staffId}` : 'System Auto');
+        if (sName && !group.staffList.some((s) => s.id === r.staffId && s.name === sName)) {
+          group.staffList.push({ id: r.staffId, name: sName });
+        }
       }
 
-      if (r.batteryStatus) {
-        group.batteryStatus = r.batteryStatus;
+      if (r.batteryStatus || r.battery_status) {
+        group.batteryStatus = r.batteryStatus || r.battery_status;
       }
-      if (r.batteryCode && !group.batteryCode) {
-        group.batteryCode = r.batteryCode;
+      if ((r.batteryCode || r.battery_code) && !group.batteryCode) {
+        group.batteryCode = r.batteryCode || r.battery_code;
       }
       if (r.clientName && r.clientName !== 'Direct / Unassigned') {
         group.clientName = r.clientName;
@@ -200,17 +221,22 @@ function FinanceDetailPage() {
         group.clientId = r.clientId;
       }
 
-      if (r.repairedAt) {
-        if (!group.latestDate || new Date(r.repairedAt) > new Date(group.latestDate)) {
-          group.latestDate = r.repairedAt;
+      const itemDate = r.repairedAt || r.charge_date;
+      if (itemDate) {
+        if (!group.latestDate || new Date(itemDate) > new Date(group.latestDate)) {
+          group.latestDate = itemDate;
         }
       }
 
-      if (r.notes && r.notes.trim()) {
+      if (r.notes && typeof r.notes === 'string' && r.notes.trim()) {
         group.notes.push(r.notes.trim());
       }
 
-      group.items.push(r);
+      if (Array.isArray(r.items) && r.items.length > 0) {
+        r.items.forEach((it) => group.items.push(it));
+      } else {
+        group.items.push(r);
+      }
     });
 
     const list = Array.from(map.values()).map((g) => ({
@@ -218,7 +244,7 @@ function FinanceDetailPage() {
       services: Array.from(g.services),
       parts: Array.from(g.parts),
       chargeTypes: Array.from(g.chargeTypes),
-      items: g.items.sort((a, b) => new Date(b.repairedAt || 0) - new Date(a.repairedAt || 0)),
+      items: g.items.sort((a, b) => new Date(b.repairedAt || b.charge_date || 0) - new Date(a.repairedAt || a.charge_date || 0)),
     }));
 
     list.sort((a, b) => new Date(b.latestDate || 0) - new Date(a.latestDate || 0));
@@ -555,10 +581,10 @@ function FinanceDetailPage() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-white/5">
           <div>
             <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Itemized Battery Charges & Fee Ledger ({filteredBatteries.length} {filteredBatteries.length === 1 ? 'battery' : 'batteries'}{totalItemizedChargesCount > filteredBatteries.length ? ` · ${totalItemizedChargesCount} charges` : ''})
+              Itemized Battery Charges & Fee Ledger ({filteredBatteries.length})
             </h2>
             <p className="text-xs text-slate-500 dark:text-neutral-400">
-              Consolidated battery charges showing combined repairs, mandatory intake fees, and diagnostic services in a single row per battery.
+              Complete breakdown of every billable repair, mandatory intake fee, and diagnostic service consolidated per battery.
             </p>
           </div>
 

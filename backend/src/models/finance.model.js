@@ -600,27 +600,139 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
       avgRate: Number(s.avg_rate || 0),
       totalRevenue: Number(s.total_revenue || 0),
     })),
-    repairs: allChargesRes.rows.map((r) => ({
-      id: r.item_key,
-      chargeType: r.charge_type,
-      batchId: r.item_key,
-      batteryId: r.battery_id,
-      batteryCode: r.battery_code,
-      batteryStatus: r.battery_status,
-      clientId: r.client_id,
-      clientName: r.client_name || 'Direct / Unassigned',
-      staffId: r.staff_id,
-      staffName: r.staff_name || 'System / Auto',
-      partName: r.item_description,
-      itemDescription: r.item_description,
-      partsCharge: Number(r.parts_charge || 0),
-      laborCharge: Number(r.labor_charge || 0),
-      serviceFee: Number(r.service_fee || 0),
-      totalCharge: Number(r.total_charge || 0),
-      notes: r.notes,
-      repairedAt: r.charge_date,
-      durationSeconds: r.duration_seconds != null ? Number(r.duration_seconds) : null,
-    })),
+    repairs: (() => {
+      const batteryMap = new Map();
+
+      allChargesRes.rows.forEach((r, idx) => {
+        const bCode = (r.battery_code || '').trim();
+        const bId = r.battery_id;
+        const key = bCode ? `code_${bCode.toUpperCase()}` : (bId ? `id_${bId}` : `item_${r.item_key || idx}`);
+
+        if (!batteryMap.has(key)) {
+          batteryMap.set(key, {
+            id: `battery_${bId || bCode || idx}`,
+            chargeType: r.charge_type,
+            chargeTypes: new Set(),
+            batchId: r.item_key,
+            batteryId: bId,
+            batteryCode: r.battery_code,
+            batteryStatus: r.battery_status,
+            clientId: r.client_id,
+            clientName: r.client_name || 'Direct / Unassigned',
+            staffId: r.staff_id,
+            staffName: r.staff_name || 'System / Auto',
+            staffList: [],
+            serviceNames: new Set(),
+            partNames: new Set(),
+            partsCharge: 0,
+            laborCharge: 0,
+            serviceFee: 0,
+            totalCharge: 0,
+            notes: [],
+            repairedAt: r.charge_date,
+            durationSeconds: 0,
+            items: [],
+          });
+        }
+
+        const group = batteryMap.get(key);
+
+        group.partsCharge += Number(r.parts_charge || 0);
+        group.laborCharge += Number(r.labor_charge || 0);
+        group.serviceFee += Number(r.service_fee || 0);
+        group.totalCharge += Number(r.total_charge || 0);
+
+        if (r.duration_seconds) {
+          group.durationSeconds += Number(r.duration_seconds);
+        }
+
+        if (r.charge_type) {
+          group.chargeTypes.add(r.charge_type);
+        }
+
+        const sName = r.staff_name || (r.staff_id ? `Staff #${r.staff_id}` : 'System / Auto');
+        if (sName && !group.staffList.some((s) => s.id === r.staff_id && s.name === sName)) {
+          group.staffList.push({ id: r.staff_id, name: sName });
+        }
+
+        if (r.charge_type === 'service_fee') {
+          if (r.item_description) group.serviceNames.add(r.item_description.trim());
+        } else {
+          const parts = (r.item_description || '').split(',').map((p) => p.trim()).filter(Boolean);
+          parts.forEach((p) => group.partNames.add(p));
+        }
+
+        if (r.notes && r.notes.trim()) {
+          group.notes.push(r.notes.trim());
+        }
+
+        if (r.charge_date) {
+          if (!group.repairedAt || new Date(r.charge_date) > new Date(group.repairedAt)) {
+            group.repairedAt = r.charge_date;
+          }
+        }
+
+        if (r.battery_status) {
+          group.batteryStatus = r.battery_status;
+        }
+        if (r.client_name && r.client_name !== 'Direct / Unassigned') {
+          group.clientName = r.client_name;
+        }
+
+        group.items.push({
+          id: r.item_key,
+          chargeType: r.charge_type,
+          batteryId: r.battery_id,
+          batteryCode: r.battery_code,
+          staffId: r.staff_id,
+          staffName: r.staff_name || 'System / Auto',
+          itemDescription: r.item_description,
+          partName: r.item_description,
+          partsCharge: Number(r.parts_charge || 0),
+          laborCharge: Number(r.labor_charge || 0),
+          serviceFee: Number(r.service_fee || 0),
+          totalCharge: Number(r.total_charge || 0),
+          notes: r.notes,
+          repairedAt: r.charge_date,
+        });
+      });
+
+      const consolidated = Array.from(batteryMap.values()).map((e) => {
+        const services = Array.from(e.serviceNames);
+        const parts = Array.from(e.partNames);
+        const allDescriptions = [...services, ...parts];
+
+        return {
+          id: e.id,
+          chargeType: e.chargeTypes.size > 1 ? 'repair, service_fee' : (Array.from(e.chargeTypes)[0] || 'repair'),
+          chargeTypes: Array.from(e.chargeTypes),
+          batchId: e.batchId,
+          batteryId: e.batteryId,
+          batteryCode: e.batteryCode,
+          batteryStatus: e.batteryStatus,
+          clientId: e.clientId,
+          clientName: e.clientName,
+          staffId: e.staffId,
+          staffName: e.staffList.map((s) => s.name).join(', ') || e.staffName,
+          staffList: e.staffList,
+          partName: allDescriptions.join(', '),
+          itemDescription: allDescriptions.join(', '),
+          services,
+          parts,
+          partsCharge: e.partsCharge,
+          laborCharge: e.laborCharge,
+          serviceFee: e.serviceFee,
+          totalCharge: e.totalCharge,
+          notes: e.notes.join('; '),
+          repairedAt: e.repairedAt,
+          durationSeconds: e.durationSeconds || null,
+          items: e.items.sort((a, b) => new Date(b.repairedAt || 0) - new Date(a.repairedAt || 0)),
+        };
+      });
+
+      consolidated.sort((a, b) => new Date(b.repairedAt || 0) - new Date(a.repairedAt || 0));
+      return consolidated;
+    })(),
   };
 }
 
