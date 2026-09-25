@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Image,
   Modal,
   ScrollView,
@@ -377,7 +378,9 @@ export default function BatteryDetailScreen() {
         const canTestInTesting = canTest && isTestingStatus;
         const hasPendingPartsRemoval = (data.pendingPartsRemoval?.length || 0) > 0;
         const latestPassBack = (data.services || []).find(
-          (s) => s.service_name === 'Passed back to Technician'
+          (s) =>
+            s.service_name === 'Passed back to Technician' ||
+            s.service_name?.toLowerCase()?.includes('passed back')
         );
         const isPassedBack = data.battery?.status === 'in_repair' && !!latestPassBack;
         const isTestedPartsRemoved =
@@ -412,24 +415,46 @@ export default function BatteryDetailScreen() {
             ? data.pendingPartsRemoval
             : (data.history || []).filter((h) => !h.removed_at);
 
+          const latestIssue = (data.issues || [])[0];
+          const latestReturn = (data.returns || [])[0];
+          const firstRepair = (data.history || []).find((h) => !h.removed_at) || (data.history || [])[0];
+          const testerStaffName =
+            latestPassBack?.staff_name ||
+            latestIssue?.staff_name ||
+            latestReturn?.staff_name ||
+            'Supervisor / Tester';
+          const isMarkedByMe = Boolean(
+            (currentUser?.name &&
+              testerStaffName.trim().toLowerCase() === currentUser.name.trim().toLowerCase()) ||
+            (latestPassBack?.staff_id &&
+              currentUser?.staff_id &&
+              latestPassBack.staff_id === currentUser.staff_id)
+          );
+
           setCantServiceAlertData({
             mode: 'pending_removal',
             batteryCode: data.battery.battery_code,
+            serialNumber: data.battery.serial_number,
             status: data.battery.status,
-            staffName:
-              latestPassBack?.staff_name ||
-              data.issues?.[0]?.staff_name ||
-              'Supervisor',
-            note: latestPassBack?.notes || data.issues?.[0]?.note || null,
+            staffName: testerStaffName,
+            isMarkedByMe,
+            isTester: Boolean(canTest),
+            note: latestPassBack?.notes || latestIssue?.note || null,
             date:
               latestPassBack?.completed_at ||
-              data.issues?.[0]?.reported_at ||
+              latestIssue?.reported_at ||
+              data.battery?.updated_at ||
               null,
             parts: fittedParts,
             isPassedBack,
             isUnserviceable: data.battery?.status === 'unserviceable',
-            fittedBy: (data.history || [])[0]?.staff_name || 'Technician',
-            fittedAt: (data.history || [])[0]?.repaired_at || null,
+            fittedBy: firstRepair?.staff_name || data.battery?.started_by_name || 'Technician',
+            fittedAt: firstRepair?.repaired_at || null,
+            photos: latestIssue?.photo_urls || [],
+            reason:
+              latestIssue?.reason_label ||
+              latestIssue?.reason ||
+              (latestPassBack ? 'Failed Testing Diagnostics · Passed to Tech' : 'Unserviceable Unit'),
           });
           setShowCantServiceAlertModal(true);
         } else if (
@@ -760,8 +785,38 @@ export default function BatteryDetailScreen() {
   }
 
   async function handleConfirmTestingUnserviceable() {
-    setShowTestingDecisionModal(false);
-    await handleReportIssue();
+    Alert.alert(
+      'Continue to Remove Fitted Parts?',
+      'Are you sure you want to mark this battery unserviceable and continue to remove all fitted parts?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue to Remove',
+          style: 'destructive',
+          onPress: async () => {
+            setShowTestingDecisionModal(false);
+            await handleReportIssue();
+          },
+        },
+      ]
+    );
+  }
+
+  function handleConfirmRemoveFittedPartsFromAlert() {
+    Alert.alert(
+      'Continue to Remove Fitted Parts?',
+      'Are you sure you want to continue and remove all fitted parts from this battery?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Continue to Remove',
+          style: 'destructive',
+          onPress: () => {
+            setShowCantServiceAlertModal(false);
+          },
+        },
+      ]
+    );
   }
 
   function toggleRemovalId(repairId) {
@@ -2811,274 +2866,256 @@ export default function BatteryDetailScreen() {
         animationType="fade"
         onRequestClose={() => setShowCantServiceAlertModal(false)}
       >
-        <View className="flex-1 items-center justify-center bg-black/60 px-5">
-          <View className={`w-full max-w-sm rounded-3xl border p-6 shadow-2xl ${
-            cantServiceAlertData?.mode === 'already_reclaimed'
-              ? 'border-red-300 dark:border-red-800 bg-white dark:bg-slate-900'
-              : 'border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900'
-          }`}>
-            {/* Top Icon & Badge */}
-            <View className="flex-row items-center justify-between mb-3">
-              <View className={`h-12 w-12 items-center justify-center rounded-2xl ${
-                cantServiceAlertData?.mode === 'already_reclaimed'
-                  ? 'bg-red-500/10 border border-red-500/20'
-                  : 'bg-amber-500/10 border border-amber-500/20'
-              }`}>
-                <Icon
-                  name={cantServiceAlertData?.mode === 'already_reclaimed' ? 'slash' : 'alertTriangle'}
-                  color={cantServiceAlertData?.mode === 'already_reclaimed' ? '#dc2626' : '#d97706'}
-                  size={24}
-                />
+        <View className="flex-1 items-center justify-center bg-black/75 px-4">
+          <View className="w-full max-w-sm rounded-3xl border border-amber-300 dark:border-amber-700/80 bg-white dark:bg-slate-900 shadow-2xl overflow-hidden">
+            {/* Header Alert Banner */}
+            <View className="bg-amber-600 px-5 pt-5 pb-4">
+              <View className="flex-row items-center justify-between mb-2">
+                <View className="h-11 w-11 items-center justify-center rounded-2xl bg-white/20 border border-white/30">
+                  <Icon name="alertTriangle" color="#ffffff" size={22} strokeWidth={2.5} />
+                </View>
+                <View className="rounded-full bg-white/20 px-3 py-1 border border-white/30">
+                  <Text className="text-[10px] font-black text-white uppercase tracking-wider">
+                    {cantServiceAlertData?.isPassedBack
+                      ? 'Passed to Tech'
+                      : 'Unserviceable · Remove Parts'}
+                  </Text>
+                </View>
               </View>
-              <View className={`rounded-full px-3 py-1 border ${
-                cantServiceAlertData?.mode === 'already_reclaimed'
-                  ? 'bg-red-50 dark:bg-red-950/40 border-red-200 dark:border-red-800/60'
-                  : 'bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60'
-              }`}>
-                <Text className={`text-[11px] font-bold ${
-                  cantServiceAlertData?.mode === 'already_reclaimed'
-                    ? 'text-red-700 dark:text-red-400'
-                    : 'text-amber-700 dark:text-amber-400'
-                }`}>
-                  {cantServiceAlertData?.mode === 'already_reclaimed'
-                    ? 'Tested - Parts Removed'
-                    : 'Can\'t Service · Mandatory Removal'}
-                </Text>
-              </View>
+
+              <Text className="text-lg font-black text-white tracking-tight">
+                Already Marked Unserviceable &amp; Passed to Tech
+              </Text>
+              <Text className="mt-0.5 text-xs text-amber-100 font-medium leading-relaxed">
+                This battery failed testing and was returned for technician parts removal &amp; rework.
+              </Text>
             </View>
 
-            <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
-              {cantServiceAlertData?.mode === 'already_reclaimed'
-                ? 'Battery Cannot Be Serviced'
-                : 'Battery Can\'t Service'}
-            </Text>
-            <Text className="mt-0.5 mb-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              {cantServiceAlertData?.mode === 'already_reclaimed'
-                ? 'This battery failed testing diagnostics and all fitted parts were already removed and restocked:'
-                : 'This battery failed testing and requires mandatory removal of all fitted parts before closing:'}
-            </Text>
-
-            {cantServiceAlertData?.mode === 'already_reclaimed' ? (
-              /* Full 4-Step Audit Trail for Tested & Parts Removed */
-              <ScrollView nestedScrollEnabled className="mb-4 max-h-72 space-y-2.5">
-                {/* 1. Fitted By */}
-                <View className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3">
-                  <View className="flex-row items-center gap-1.5 mb-1">
-                    <Icon name="wrench" color="#2563eb" size={13} />
-                    <Text className="text-[11px] font-bold text-blue-900 dark:text-blue-300 uppercase tracking-wider">
-                      1. Parts Fitted By
+            {/* Scrollable Details Section */}
+            <ScrollView
+              className="p-4"
+              showsVerticalScrollIndicator={false}
+              style={{ maxHeight: 360 }}
+            >
+              {/* Battery Code Box */}
+              <View className="mb-3 rounded-2xl border border-amber-200 dark:border-amber-900/60 bg-amber-50/70 dark:bg-amber-950/40 p-3 flex-row items-center justify-between">
+                <View>
+                  <Text className="text-[10px] font-bold text-amber-700 dark:text-amber-400 uppercase tracking-wider">
+                    Battery Code
+                  </Text>
+                  <Text className="text-base font-extrabold font-mono text-amber-950 dark:text-amber-200">
+                    {cantServiceAlertData?.batteryCode || battery?.battery_code || code || '—'}
+                  </Text>
+                </View>
+                {cantServiceAlertData?.serialNumber ? (
+                  <View className="items-end">
+                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+                      Serial #
+                    </Text>
+                    <Text className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
+                      {cantServiceAlertData.serialNumber}
                     </Text>
                   </View>
-                  <Text className="text-xs font-bold text-slate-900 dark:text-white">
-                    {cantServiceAlertData.fittedBy}
+                ) : null}
+              </View>
+
+              {/* Testing & Pass-Back Details Box */}
+              <View className="mb-3 space-y-2 rounded-2xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 p-3">
+                {/* Reason / Diagnosis */}
+                <View className="pb-2 border-b border-slate-200/80 dark:border-slate-800">
+                  <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                    Testing Diagnosis
                   </Text>
-                  {cantServiceAlertData.fittedAt && (
-                    <Text className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5">
-                      {new Date(cantServiceAlertData.fittedAt).toLocaleString()}
+                  <View className="self-start rounded-lg bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 px-2.5 py-1">
+                    <Text className="text-xs font-bold text-red-800 dark:text-red-300">
+                      {cantServiceAlertData?.reason || 'Failed Testing Diagnostics'}
                     </Text>
-                  )}
-                  {cantServiceAlertData.fittedParts && cantServiceAlertData.fittedParts.length > 0 && (
-                    <Text className="text-[11px] text-slate-600 dark:text-slate-300 mt-1 font-medium">
-                      Fitted: {cantServiceAlertData.fittedParts.map((p) => p.part_name).filter(Boolean).join(', ')}
-                    </Text>
-                  )}
+                  </View>
                 </View>
 
-                {/* 2. Tested & Reported By */}
-                <View className="rounded-2xl border border-red-200 dark:border-red-900/60 bg-red-50/70 dark:bg-red-950/30 p-3">
-                  <View className="flex-row items-center gap-1.5 mb-1">
-                    <Icon name="alertCircle" color="#dc2626" size={13} />
-                    <Text className="text-[11px] font-bold text-red-900 dark:text-red-300 uppercase tracking-wider">
-                      2. Tested &amp; Reported Can't Service
-                    </Text>
+                {/* Tested & Reported By */}
+                <View className="flex-row items-center justify-between py-1 border-b border-slate-200/80 dark:border-slate-800">
+                  <View className="flex-row items-center gap-1.5">
+                    <Icon name="user" color="#64748b" size={13} />
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tested &amp; Passed By</Text>
                   </View>
-                  <Text className="text-xs font-bold text-red-950 dark:text-red-100">
-                    {cantServiceAlertData.testedBy}
-                  </Text>
-                  {cantServiceAlertData.testedAt && (
-                    <Text className="text-[10px] text-red-800/80 dark:text-red-300/80 mt-0.5">
-                      {new Date(cantServiceAlertData.testedAt).toLocaleString()}
+                  <View className="flex-row items-center gap-1">
+                    <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                      {cantServiceAlertData?.staffName || 'Supervisor / Tester'}
                     </Text>
-                  )}
-                  <View className="mt-1 rounded-lg bg-white/90 dark:bg-slate-900 p-2 border border-red-200/80 dark:border-red-900/40">
-                    <Text className="text-xs font-bold text-red-900 dark:text-red-200">
-                      {cantServiceAlertData.issueReason}
-                    </Text>
-                    {cantServiceAlertData.issueNote && (
-                      <Text className="text-[11px] text-red-700 dark:text-red-300 italic mt-0.5">
-                        "{cantServiceAlertData.issueNote}"
-                      </Text>
+                    {cantServiceAlertData?.isMarkedByMe && (
+                      <View className="rounded bg-blue-100 dark:bg-blue-950/60 px-1.5 py-0.5 border border-blue-200 dark:border-blue-800">
+                        <Text className="text-[9px] font-bold text-blue-700 dark:text-blue-300">You</Text>
+                      </View>
                     )}
                   </View>
                 </View>
 
-                {/* 3. Parts Removed By */}
-                <View className="rounded-2xl border border-amber-200 dark:border-amber-800 bg-amber-50/70 dark:bg-amber-950/30 p-3">
-                  <View className="flex-row items-center gap-1.5 mb-1">
-                    <Icon name="checkCircle" color="#b45309" size={13} />
-                    <Text className="text-[11px] font-bold text-amber-900 dark:text-amber-300 uppercase tracking-wider">
-                      3. All Fitted Parts Reclaimed
-                    </Text>
+                {/* Date & Time */}
+                <View className="flex-row items-center justify-between py-1 border-b border-slate-200/80 dark:border-slate-800">
+                  <View className="flex-row items-center gap-1.5">
+                    <Icon name="clock" color="#64748b" size={13} />
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Date &amp; Time</Text>
                   </View>
-                  <Text className="text-xs font-bold text-amber-950 dark:text-amber-100">
-                    Removed by {cantServiceAlertData.removedBy || 'Technician'}
+                  <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {cantServiceAlertData?.date
+                      ? `${new Date(cantServiceAlertData.date).toLocaleDateString('en-GB', {
+                          day: '2-digit',
+                          month: 'short',
+                          year: 'numeric',
+                        })} · ${new Date(cantServiceAlertData.date).toLocaleTimeString([], {
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        })}`
+                      : '—'}
                   </Text>
-                  {cantServiceAlertData.removedAt && (
-                    <Text className="text-[10px] text-amber-800/80 dark:text-amber-300/80 mt-0.5">
-                      {new Date(cantServiceAlertData.removedAt).toLocaleString()}
-                    </Text>
-                  )}
-                  {cantServiceAlertData.removedParts && cantServiceAlertData.removedParts.length > 0 && (
-                    <Text className="text-[11px] text-amber-900 dark:text-amber-200 mt-1 font-semibold">
-                      Reclaimed to Stock: {cantServiceAlertData.removedParts.map((p) => p.part_name).filter(Boolean).join(', ')}
-                    </Text>
-                  )}
                 </View>
-              </ScrollView>
-            ) : (
-              /* Pending Removal Breakdown */
-              <>
-                <View className="mb-3 rounded-2xl border border-amber-200 dark:border-amber-800/80 bg-amber-50/50 dark:bg-amber-950/30 p-3 space-y-1.5">
-                  <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
-                    <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Battery ID</Text>
-                    <Text className="text-xs font-mono font-bold text-slate-900 dark:text-white">
-                      {battery?.battery_code || code}
-                    </Text>
+
+                {/* Originally Fitted By */}
+                <View className="flex-row items-center justify-between pt-0.5">
+                  <View className="flex-row items-center gap-1.5">
+                    <Icon name="wrench" color="#64748b" size={13} />
+                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Parts Fitted By</Text>
                   </View>
-                  <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
-                    <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Fitted By</Text>
-                    <Text className="text-xs font-bold text-slate-900 dark:text-white">
-                      {cantServiceAlertData?.fittedBy || 'Technician'}
+                  <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    {cantServiceAlertData?.fittedBy || 'Technician'}
+                  </Text>
+                </View>
+
+                {/* Notes (if any) */}
+                {cantServiceAlertData?.note ? (
+                  <View className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
+                      Tester Notes
                     </Text>
-                  </View>
-                  <View className="flex-row items-center justify-between py-0.5 border-b border-amber-200/60 dark:border-amber-800/60">
-                    <Text className="text-[11px] font-semibold text-slate-500 dark:text-slate-400">Tested &amp; Reported By</Text>
-                    <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                      {cantServiceAlertData?.staffName || 'Supervisor'}
-                    </Text>
-                  </View>
-                  {cantServiceAlertData?.note && (
-                    <View className="pt-0.5">
-                      <Text className="text-[11px] text-amber-900 dark:text-amber-200 italic">
+                    <View className="rounded-xl bg-amber-50/80 dark:bg-amber-950/40 p-2.5 border border-amber-200 dark:border-amber-900/40">
+                      <Text className="text-xs text-amber-950 dark:text-amber-200 italic leading-relaxed">
                         "{cantServiceAlertData.note}"
                       </Text>
                     </View>
-                  )}
-                </View>
-
-                <View className="mb-4 rounded-xl border border-amber-300 dark:border-amber-700 bg-amber-100/70 dark:bg-amber-900/40 p-2.5 flex-row items-start gap-2">
-                  <Icon name="wrench" color="#b45309" size={15} />
-                  <View className="flex-1">
-                    <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
-                      Mandatory: Remove All Fitted Parts
-                    </Text>
-                    <Text className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug">
-                      All parts must be physically removed and restocked into inventory.
-                    </Text>
                   </View>
-                </View>
+                ) : null}
 
-                {/* Fitted Parts List */}
-                <View className="mb-4 max-h-28">
-                  {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 && (
-                    <ScrollView nestedScrollEnabled className="space-y-1">
-                      {cantServiceAlertData.parts.map((p, pIdx) => (
-                        <View
-                          key={p.id || pIdx}
-                          className="flex-row items-center justify-between rounded-lg border border-slate-200/80 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 px-2.5 py-1.5"
-                        >
+                {/* Attached Photos (if any) */}
+                {cantServiceAlertData?.photos && cantServiceAlertData.photos.length > 0 && (
+                  <View className="pt-2 border-t border-slate-200/80 dark:border-slate-800">
+                    <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1.5">
+                      Attached Photos ({cantServiceAlertData.photos.length})
+                    </Text>
+                    <View className="flex-row gap-2">
+                      {cantServiceAlertData.photos.slice(0, 3).map((photoUrl, pIdx) => {
+                        const resolved = resolveImageUrl(photoUrl);
+                        return (
+                          <TouchableOpacity
+                            key={pIdx}
+                            activeOpacity={0.8}
+                            onPress={() =>
+                              openPhotoViewer(
+                                cantServiceAlertData.photos.map((u) => resolveImageUrl(u)),
+                                pIdx,
+                                `${cantServiceAlertData.batteryCode} · Unserviceable Photo ${pIdx + 1}`
+                              )
+                            }
+                            className="h-12 w-12 rounded-xl overflow-hidden border border-slate-200 bg-slate-100"
+                          >
+                            <Image source={{ uri: resolved }} className="h-full w-full" resizeMode="cover" />
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Mandatory Fitted Parts to Remove Box */}
+              {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 ? (
+                <View className="mb-2 rounded-2xl border border-amber-300 dark:border-amber-700/80 bg-amber-50/60 dark:bg-amber-950/30 p-3">
+                  <View className="flex-row items-center justify-between mb-1.5">
+                    <View className="flex-row items-center gap-1.5">
+                      <Icon name="wrench" color="#b45309" size={14} />
+                      <Text className="text-xs font-bold text-amber-900 dark:text-amber-200">
+                        Mandatory: Remove Fitted Parts
+                      </Text>
+                    </View>
+                    <View className="rounded-full bg-amber-200/70 dark:bg-amber-900/60 px-2 py-0.5">
+                      <Text className="text-[10px] font-bold text-amber-900 dark:text-amber-200">
+                        {cantServiceAlertData.parts.length} {cantServiceAlertData.parts.length === 1 ? 'part' : 'parts'}
+                      </Text>
+                    </View>
+                  </View>
+                  <Text className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug mb-2">
+                    All fitted parts must be removed and restocked into inventory before closing rework.
+                  </Text>
+                  <View className="space-y-1.5">
+                    {cantServiceAlertData.parts.map((p, pIdx) => (
+                      <View
+                        key={p.id || pIdx}
+                        className="flex-row items-center justify-between rounded-xl border border-amber-200/80 dark:border-amber-800/80 bg-white dark:bg-slate-900 px-3 py-2"
+                      >
+                        <View className="flex-row items-center gap-2 flex-1 mr-2">
+                          <View className="h-2 w-2 rounded-full bg-amber-500" />
                           <Text className="text-xs font-bold text-slate-800 dark:text-slate-200" numberOfLines={1}>
                             {p.part_name}
                           </Text>
-                          <Text className="text-[10px] font-semibold text-slate-600 dark:text-slate-400">
+                        </View>
+                        <View className="rounded-md bg-amber-100 dark:bg-amber-950 px-2 py-0.5">
+                          <Text className="text-[10px] font-bold text-amber-900 dark:text-amber-300">
                             Qty {p.quantity_used || 1}
                           </Text>
                         </View>
-                      ))}
-                    </ScrollView>
-                  )}
+                      </View>
+                    ))}
+                  </View>
                 </View>
-              </>
-            )}
+              ) : null}
+            </ScrollView>
 
             {/* Modal Actions */}
-            <View className="gap-2">
-              {cantServiceAlertData?.mode === 'already_reclaimed' ? (
-                <>
-                  <View className="flex-row items-center justify-between rounded-xl bg-slate-100 dark:bg-slate-800 px-3.5 py-2 mb-1 border border-slate-200 dark:border-slate-700">
-                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Scan Time</Text>
-                    <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={async () => {
-                      setShowCantServiceAlertModal(false);
-                      await handleStartWork();
-                    }}
-                    disabled={submitting}
-                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
-                  >
-                    <Icon name="play" color="#ffffff" size={16} />
-                    <Text className="text-sm font-bold text-white">Start Work Now</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowCantServiceAlertModal(false);
-                      allowExitRef.current = true;
-                      navigation.navigate('Main', {
-                        screen: 'Service',
-                        params: { autoScan: Date.now() },
-                      });
-                    }}
-                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
-                  >
-                    <Icon name="camera" color="#64748b" size={16} />
-                    <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => setShowCantServiceAlertModal(false)}
-                    className="items-center rounded-2xl py-2"
-                  >
-                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">View Battery Record</Text>
-                  </TouchableOpacity>
-                </>
+            <View className="p-4 pt-2 gap-2.5 border-t border-slate-100 dark:border-slate-800">
+              {/* 1. Continue to Remove Fitted Parts */}
+              {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 ? (
+                <TouchableOpacity
+                  onPress={handleConfirmRemoveFittedPartsFromAlert}
+                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
+                >
+                  <Icon name="wrench" color="#ffffff" size={16} />
+                  <Text className="text-sm font-bold text-white">Continue to Remove Fitted Parts</Text>
+                </TouchableOpacity>
               ) : (
-                <>
-                  <View className="flex-row items-center justify-between rounded-xl bg-amber-50 dark:bg-amber-950/40 px-3.5 py-2 mb-1 border border-amber-200 dark:border-amber-800">
-                    <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Scan Time</Text>
-                    <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
-                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                    </Text>
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => setShowCantServiceAlertModal(false)}
-                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
-                  >
-                    <Icon name="play" color="#ffffff" size={16} />
-                    <Text className="text-sm font-bold text-white">Start Work</Text>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity
-                    onPress={() => {
-                      setShowCantServiceAlertModal(false);
-                      allowExitRef.current = true;
-                      navigation.navigate('Main', {
-                        screen: 'Service',
-                        params: { autoScan: Date.now() },
-                      });
-                    }}
-                    className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-2.5 border border-slate-200 dark:border-slate-700"
-                  >
-                    <Icon name="camera" color="#64748b" size={14} />
-                    <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">Scan Next Battery</Text>
-                  </TouchableOpacity>
-                </>
+                <TouchableOpacity
+                  onPress={() => setShowCantServiceAlertModal(false)}
+                  className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
+                >
+                  <Icon name="play" color="#ffffff" size={16} />
+                  <Text className="text-sm font-bold text-white">Continue to Battery Rework</Text>
+                </TouchableOpacity>
               )}
+
+              {/* 2. Scan Next Battery */}
+              <TouchableOpacity
+                onPress={() => {
+                  setShowCantServiceAlertModal(false);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+
+              {/* 3. View Battery Details */}
+              <TouchableOpacity
+                onPress={() => setShowCantServiceAlertModal(false)}
+                className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+              >
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  View Battery Details
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
