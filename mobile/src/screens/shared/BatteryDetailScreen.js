@@ -254,6 +254,8 @@ export default function BatteryDetailScreen() {
   const [showCantServiceAlertModal, setShowCantServiceAlertModal] = useState(false);
   const [cantServiceAlertData, setCantServiceAlertData] = useState(null);
   const [showRemovePartsSuccessModal, setShowRemovePartsSuccessModal] = useState(false);
+  const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
+  const [unverifiedIntakeData, setUnverifiedIntakeData] = useState(null);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -380,7 +382,22 @@ export default function BatteryDetailScreen() {
           data.battery?.status === 'tested_parts_removed' ||
           data.battery?.status === 'recycled';
 
-        if (fromScan && isTestedPartsRemoved) {
+        const isIntakeUnverified = Boolean(
+          data.battery?.truck_intake_id &&
+          (data.battery?.intake_status === 'pending_arrival' ||
+            data.battery?.intake_status !== 'verified' ||
+            !data.battery?.intake_verified_at)
+        );
+
+        if (fromScan && isIntakeUnverified) {
+          setUnverifiedIntakeData({
+            batteryCode: data.battery.battery_code,
+            truckNumber: data.battery.intake_truck_number,
+            driverName: data.battery.intake_driver_name,
+            intakeId: data.battery.truck_intake_id,
+          });
+          setShowUnverifiedIntakeModal(true);
+        } else if (fromScan && isTestedPartsRemoved) {
           const removedParts = (data.history || []).filter((h) => h.removed_at);
           const fittedParts = data.history || [];
           setCantServiceAlertData({
@@ -516,6 +533,16 @@ export default function BatteryDetailScreen() {
   }, [result?.battery?.status, testingStartedAt, isClient]);
 
   async function handleStartWork() {
+    const isIntakeUnverified = Boolean(
+      result?.battery?.truck_intake_id &&
+      (result?.battery?.intake_status === 'pending_arrival' ||
+        result?.battery?.intake_status !== 'verified' ||
+        !result?.battery?.intake_verified_at)
+    );
+    if (isIntakeUnverified) {
+      setActionError(`Cannot start work: Truck #${result?.battery?.intake_truck_number || ''} arrival has not been verified yet.`);
+      return;
+    }
     setSubmitting(true);
     setActionError(null);
     try {
@@ -1347,36 +1374,67 @@ export default function BatteryDetailScreen() {
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
           {(battery.status === 'in_repair' || battery.status === 'tested_parts_removed') && pendingPartsRemoval.length === 0 && (
-            <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
-              <View className="flex-row items-center justify-between mb-1">
-                <Text className="text-sm font-bold text-slate-900">
-                  {battery.status === 'tested_parts_removed'
-                    ? 'Parts Removed · Ready for Rework'
-                    : 'Ready to start?'}
-                </Text>
-                <View className="rounded-full bg-blue-100 px-2.5 py-0.5">
-                  <Text className="text-[10px] font-bold text-blue-700">
-                    {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </Text>
+            Boolean(
+              battery?.truck_intake_id &&
+              (battery?.intake_status === 'pending_arrival' ||
+                battery?.intake_status !== 'verified' ||
+                !battery?.intake_verified_at)
+            ) ? (
+              <View className="mb-5 rounded-2xl border border-amber-300 bg-amber-50/80 p-5 items-center">
+                <View className="mb-3 h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 border border-amber-200">
+                  <Icon name="alertTriangle" color="#d97706" size={24} />
                 </View>
+                <Text className="text-sm font-bold text-amber-900">
+                  Battery Not Verified at Intake
+                </Text>
+                <Text className="mt-1 mb-4 text-xs text-amber-800 text-center leading-relaxed">
+                  This battery arrived on Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot begin until verified.
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    navigation.navigate('Main', {
+                      screen: 'Service',
+                      params: { autoScan: Date.now() },
+                    });
+                  }}
+                  className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 px-5 py-3 shadow-md"
+                >
+                  <Icon name="camera" color="#ffffff" size={16} />
+                  <Text className="text-sm font-bold text-white">Scan Another Battery</Text>
+                </TouchableOpacity>
               </View>
-              <Text className="mt-0.5 mb-3 text-xs text-slate-400">
-                {battery.status === 'tested_parts_removed'
-                  ? 'All fitted parts have been reclaimed. Tap Start Work to begin rework on this battery and record your start time.'
-                  : "This battery hasn't been touched yet. Starting work marks it as in progress."}
-              </Text>
-              <TouchableOpacity
-                onPress={handleStartWork}
-                disabled={submitting}
-                className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
-              >
-                {submitting ? (
-                  <ActivityIndicator color="#fff" />
-                ) : (
-                  <Text className="text-sm font-bold text-white">Start Work</Text>
-                )}
-              </TouchableOpacity>
-            </View>
+            ) : (
+              <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+                <View className="flex-row items-center justify-between mb-1">
+                  <Text className="text-sm font-bold text-slate-900">
+                    {battery.status === 'tested_parts_removed'
+                      ? 'Parts Removed · Ready for Rework'
+                      : 'Ready to start?'}
+                  </Text>
+                  <View className="rounded-full bg-blue-100 px-2.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-blue-700">
+                      {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </Text>
+                  </View>
+                </View>
+                <Text className="mt-0.5 mb-3 text-xs text-slate-400">
+                  {battery.status === 'tested_parts_removed'
+                    ? 'All fitted parts have been reclaimed. Tap Start Work to begin rework on this battery and record your start time.'
+                    : "This battery hasn't been touched yet. Starting work marks it as in progress."}
+                </Text>
+                <TouchableOpacity
+                  onPress={handleStartWork}
+                  disabled={submitting}
+                  className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
+                >
+                  {submitting ? (
+                    <ActivityIndicator color="#fff" />
+                  ) : (
+                    <Text className="text-sm font-bold text-white">Start Work</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            )
           )}
 
           {battery.status === 'in_progress' && (
@@ -2276,6 +2334,86 @@ export default function BatteryDetailScreen() {
                 className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200"
               >
                 <Text className="text-xs font-semibold text-slate-700">View Battery Details</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Unverified Intake Alert Modal ────────────────────────────── */}
+      <Modal
+        visible={showUnverifiedIntakeModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowUnverifiedIntakeModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-5">
+          <View className="w-full max-w-sm rounded-3xl border border-amber-300 dark:border-amber-700 bg-white dark:bg-slate-900 p-6 shadow-2xl">
+            {/* Top Icon & Badge */}
+            <View className="flex-row items-center justify-between mb-3">
+              <View className="h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/20">
+                <Icon name="alertTriangle" color="#d97706" size={24} />
+              </View>
+              <View className="rounded-full px-3 py-1 border bg-amber-50 dark:bg-amber-950/40 border-amber-200 dark:border-amber-800/60">
+                <Text className="text-[11px] font-bold text-amber-700 dark:text-amber-400">
+                  Intake Not Verified
+                </Text>
+              </View>
+            </View>
+
+            <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
+              Battery Not Verified at Intake
+            </Text>
+            <Text className="mt-0.5 mb-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              This battery has not been verified at truck intake yet. Work or testing cannot begin until the workshop verifies arrival.
+            </Text>
+
+            <View className="mb-4 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-slate-950/60 p-3.5 space-y-2">
+              <View className="flex-row justify-between items-center pb-1.5 border-b border-amber-200/60 dark:border-slate-800">
+                <Text className="text-xs text-slate-500 dark:text-slate-400">Battery ID</Text>
+                <Text className="text-xs font-bold text-amber-800 dark:text-amber-300">{unverifiedIntakeData?.batteryCode || code}</Text>
+              </View>
+              <View className="flex-row justify-between items-center pb-1.5 border-b border-amber-200/60 dark:border-slate-800">
+                <Text className="text-xs text-slate-500 dark:text-slate-400">Truck Number</Text>
+                <Text className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                  {unverifiedIntakeData?.truckNumber ? `Truck #${unverifiedIntakeData.truckNumber}` : 'N/A'}
+                </Text>
+              </View>
+              {unverifiedIntakeData?.driverName ? (
+                <View className="flex-row justify-between items-center pb-1.5 border-b border-amber-200/60 dark:border-slate-800">
+                  <Text className="text-xs text-slate-500 dark:text-slate-400">Driver</Text>
+                  <Text className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    {unverifiedIntakeData.driverName}
+                  </Text>
+                </View>
+              ) : null}
+              <View className="flex-row justify-between items-center">
+                <Text className="text-xs text-slate-500 dark:text-slate-400">Shipment Status</Text>
+                <Text className="text-xs font-bold text-amber-700 dark:text-amber-400">Pending Arrival</Text>
+              </View>
+            </View>
+
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={() => {
+                  setShowUnverifiedIntakeModal(false);
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md shadow-blue-600/30"
+              >
+                <Icon name="camera" color="#ffffff" size={16} />
+                <Text className="text-sm font-bold text-white">Scan Another Battery</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowUnverifiedIntakeModal(false)}
+                className="items-center rounded-xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
+              >
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-300">
+                  View Battery Details
+                </Text>
               </TouchableOpacity>
             </View>
           </View>

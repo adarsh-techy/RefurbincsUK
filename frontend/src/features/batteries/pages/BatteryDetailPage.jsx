@@ -2216,6 +2216,12 @@ function BatteryDetailPage() {
   const passBackService = (services || []).find((s) => s.service_name === 'Passed back to Technician');
   const isPassedBack = Boolean(passBackService && battery?.status === 'in_repair');
   const hasPendingPartsToRemove = (pendingPartsRemoval && pendingPartsRemoval.length > 0) || isPassedBack;
+  const isIntakeUnverified = Boolean(
+    battery?.truck_intake_id &&
+    (battery?.intake_status === 'pending_arrival' ||
+      battery?.intake_status !== 'verified' ||
+      !battery?.intake_verified_at)
+  );
 
   const cycles = buildCycles(
     buildEvents(
@@ -2263,13 +2269,54 @@ function BatteryDetailPage() {
         </button>
       ) : (
         <div className="mb-4 flex items-center justify-between">
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            Verified Battery Record
-          </span>
+          {isIntakeUnverified ? (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-xs font-semibold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+              <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+              Intake Not Verified
+            </span>
+          ) : (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300">
+              <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+              Verified Battery Record
+            </span>
+          )}
           <span className="text-xs text-slate-400 dark:text-neutral-500">
             Scanned via QR Code
           </span>
+        </div>
+      )}
+
+      {isIntakeUnverified && (
+        <div className="mb-6 rounded-2xl border border-amber-300 bg-amber-50/90 p-4 dark:border-amber-900/60 dark:bg-amber-950/30">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-700 text-lg dark:bg-amber-900/50 dark:text-amber-300">
+              ⚠️
+            </div>
+            <div className="flex-1">
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                  Shipment Arrival Not Verified
+                </h4>
+                <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-900/80 dark:text-amber-200">
+                  Pending Intake
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
+                This battery arrived under Truck #{battery.intake_truck_number || 'N/A'}{battery.intake_driver_name ? ` (Driver: ${battery.intake_driver_name})` : ''}, but this truck shipment has not been verified yet by workshop staff. Work and testing cannot be started on this battery until arrival is verified.
+              </p>
+              {battery.truck_intake_id && (
+                <div className="mt-2.5">
+                  <Link
+                    to={`/truck-intakes/${battery.truck_intake_id}`}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-700 transition-colors"
+                  >
+                    <span>View Truck Intake #{battery.intake_truck_number}</span>
+                    <FiExternalLink className="h-3 w-3" />
+                  </Link>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 

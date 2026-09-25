@@ -51,24 +51,37 @@ function TechnicianRepairPanel({
 
   const [searchParams] = useSearchParams();
   const fromScan = searchParams.get('fromScan') === 'true';
+  const isIntakeUnverified = Boolean(
+    battery?.truck_intake_id &&
+    (battery?.intake_status === 'pending_arrival' ||
+      battery?.intake_status !== 'verified' ||
+      !battery?.intake_verified_at)
+  );
+  const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
   const [showScanStartWorkModal, setShowScanStartWorkModal] = useState(false);
   const [scanTime, setScanTime] = useState(null);
   const [showPassedBackScanModal, setShowPassedBackScanModal] = useState(false);
   const [passedBackScanTime, setPassedBackScanTime] = useState(null);
 
   useEffect(() => {
-    if (fromScan && battery?.status === 'tested_parts_removed') {
+    if (fromScan && isIntakeUnverified) {
+      setShowUnverifiedIntakeModal(true);
+    }
+  }, [fromScan, isIntakeUnverified]);
+
+  useEffect(() => {
+    if (fromScan && !isIntakeUnverified && battery?.status === 'tested_parts_removed') {
       setScanTime(new Date());
       setShowScanStartWorkModal(true);
     }
-  }, [fromScan, battery?.status]);
+  }, [fromScan, isIntakeUnverified, battery?.status]);
 
   useEffect(() => {
-    if (fromScan && isPassedBack) {
+    if (fromScan && !isIntakeUnverified && isPassedBack) {
       setPassedBackScanTime(new Date());
       setShowPassedBackScanModal(true);
     }
-  }, [fromScan, isPassedBack]);
+  }, [fromScan, isIntakeUnverified, isPassedBack]);
 
   useEffect(() => {
     return () => {
@@ -166,6 +179,10 @@ function TechnicianRepairPanel({
   }
 
   async function handleStartWork() {
+    if (isIntakeUnverified) {
+      setError(`Cannot start work: Truck #${battery.intake_truck_number || ''} arrival has not been verified by the workshop yet.`);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
@@ -494,6 +511,40 @@ function TechnicianRepairPanel({
               <p className="text-xs text-amber-700 dark:text-amber-300">
                 Truck #{battery.intake_truck_number || 'shipment'} has not been verified at the workshop yet. Workshop staff must verify arrival on the Truck Intake page before work can begin.
               </p>
+            </div>
+          );
+        }
+
+        if (isIntakeUnverified) {
+          return (
+            <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50/80 p-5 dark:border-amber-900/60 dark:bg-amber-950/20 text-center">
+              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 text-xl dark:bg-amber-900/40 dark:text-amber-300">
+                ⚠️
+              </div>
+              <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+                Battery Not Verified at Intake
+              </p>
+              <p className="mt-1 mb-4 text-xs text-amber-800/90 dark:text-amber-300/90 max-w-sm mx-auto leading-relaxed">
+                This battery arrived under Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot be started until arrival is verified.
+              </p>
+              <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+                {battery.truck_intake_id && (
+                  <button
+                    type="button"
+                    onClick={() => navigate(`/truck-intakes/${battery.truck_intake_id}`)}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-colors"
+                  >
+                    <span>View Truck Intake #{battery.intake_truck_number}</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={handleScanNext}
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-xs font-semibold text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:bg-surface-800 dark:text-amber-200 transition-colors"
+                >
+                  <span>📷 Scan Another Battery</span>
+                </button>
+              </div>
             </div>
           );
         }
@@ -1262,6 +1313,90 @@ function TechnicianRepairPanel({
                 className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors"
               >
                 <span>📷 Scan Next Battery</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Scan Modal: Intake Not Verified ── */}
+      {showUnverifiedIntakeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs">
+          <div className="w-full max-w-sm rounded-3xl border border-amber-200 bg-white p-6 shadow-2xl dark:border-amber-900/60 dark:bg-surface-900 text-center animate-in fade-in zoom-in-95 duration-150">
+            <div className="mx-auto mb-3.5 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 border border-amber-300 text-amber-700 text-2xl dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-400">
+              ⚠️
+            </div>
+
+            <div className="mb-2 flex items-center justify-center">
+              <span className="rounded-full bg-amber-100 border border-amber-300 px-3 py-1 text-[11px] font-bold text-amber-800 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                Intake Not Verified
+              </span>
+            </div>
+
+            <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">
+              Battery Not Verified at Intake
+            </h3>
+
+            <p className="mb-4 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+              This battery has not been verified at intake yet. Work or testing cannot begin until the workshop verifies the truck shipment arrival.
+            </p>
+
+            {/* Battery & Truck details card */}
+            <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 text-left dark:border-amber-900/40 dark:bg-surface-950 space-y-2">
+              <div className="flex items-center justify-between text-xs pb-1.5 border-b border-amber-200/60 dark:border-neutral-800">
+                <span className="text-slate-500 dark:text-neutral-400 font-medium">Battery ID</span>
+                <span className="font-mono font-bold text-amber-800 dark:text-amber-300">
+                  {battery.battery_code}
+                </span>
+              </div>
+              <div className="flex items-center justify-between text-xs pb-1.5 border-b border-amber-200/60 dark:border-neutral-800">
+                <span className="text-slate-500 dark:text-neutral-400 font-medium">Truck Number</span>
+                <span className="font-semibold text-slate-800 dark:text-white">
+                  {battery.intake_truck_number ? `Truck #${battery.intake_truck_number}` : 'N/A'}
+                </span>
+              </div>
+              {battery.intake_driver_name && (
+                <div className="flex items-center justify-between text-xs pb-1.5 border-b border-amber-200/60 dark:border-neutral-800">
+                  <span className="text-slate-500 dark:text-neutral-400 font-medium">Driver</span>
+                  <span className="font-medium text-slate-700 dark:text-neutral-300">
+                    {battery.intake_driver_name}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-xs">
+                <span className="text-slate-500 dark:text-neutral-400 font-medium">Shipment Status</span>
+                <span className="font-bold text-amber-700 dark:text-amber-400">
+                  Pending Arrival Verification
+                </span>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5">
+              <button
+                type="button"
+                onClick={handleScanNext}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors"
+              >
+                <span>📷 Scan Another Battery</span>
+              </button>
+              {battery.truck_intake_id && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowUnverifiedIntakeModal(false);
+                    navigate(`/truck-intakes/${battery.truck_intake_id}`);
+                  }}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 py-2.5 text-xs font-bold text-amber-900 hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 transition-colors"
+                >
+                  <span>Go to Truck Intake Shipment</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setShowUnverifiedIntakeModal(false)}
+                className="w-full rounded-xl border border-slate-200 bg-slate-100 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors"
+              >
+                View Details
               </button>
             </div>
           </div>
