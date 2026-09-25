@@ -69,12 +69,6 @@ function TechnicianRepairPanel({
     }
   }, [fromScan, isIntakeUnverified]);
 
-  useEffect(() => {
-    if (fromScan && !isIntakeUnverified && battery?.status === 'tested_parts_removed') {
-      setScanTime(new Date());
-      setShowScanStartWorkModal(true);
-    }
-  }, [fromScan, isIntakeUnverified, battery?.status]);
 
   useEffect(() => {
     if (fromScan && !isIntakeUnverified && isPassedBack) {
@@ -179,6 +173,10 @@ function TechnicianRepairPanel({
   }
 
   async function handleStartWork() {
+    if (['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery?.status)) {
+      setError('Cannot start work: This battery is marked unserviceable.');
+      return;
+    }
     if (isIntakeUnverified) {
       setError(`Cannot start work: Truck #${battery.intake_truck_number || ''} arrival has not been verified by the workshop yet.`);
       return;
@@ -404,7 +402,7 @@ function TechnicianRepairPanel({
       )}
 
       {/* ── Status: UNSERVICEABLE (Clean state, no parts to remove) ── */}
-      {battery.status === 'unserviceable' && pendingPartsRemoval.length === 0 && (
+      {(battery.status === 'unserviceable' || battery.status === 'tested_parts_removed') && pendingPartsRemoval.length === 0 && (
         <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50/70 p-5 text-center dark:border-rose-900/40 dark:bg-surface-900">
           <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-xl text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
             ⚠
@@ -495,7 +493,7 @@ function TechnicianRepairPanel({
           (battery.intake_status === 'pending_arrival' || !battery.intake_verified_at) &&
           battery.intake_status !== 'verified';
 
-        if ((battery.status !== 'in_repair' && battery.status !== 'tested_parts_removed') || pendingPartsRemoval.length > 0) return null;
+        if (battery.status !== 'in_repair' || pendingPartsRemoval.length > 0) return null;
 
         if (isShipmentUnverified) {
           return (
@@ -553,18 +551,14 @@ function TechnicianRepairPanel({
           <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-surface-900">
             <div className="flex items-center justify-between mb-1">
               <p className="text-sm font-bold text-slate-900 dark:text-white">
-                {battery.status === 'tested_parts_removed'
-                  ? 'Parts Removed · Ready for Rework'
-                  : 'Ready to start?'}
+                Ready to start?
               </p>
               <span className="rounded-full bg-blue-100 border border-blue-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/60 dark:text-blue-300">
                 {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
             <p className="mt-0.5 mb-3 text-xs text-slate-500 dark:text-neutral-400">
-              {battery.status === 'tested_parts_removed'
-                ? 'All fitted parts have been reclaimed and restocked into inventory. Starting work marks this battery as in progress and records your start time.'
-                : "This battery hasn't been touched yet. Starting work marks it as in progress."}
+              This battery hasn't been touched yet. Starting work marks it as in progress.
             </p>
             {error && <p className="mb-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
             <button

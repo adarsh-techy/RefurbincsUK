@@ -415,6 +415,11 @@ async function startWork(req, res, next) {
         });
       }
     }
+    if (['unserviceable', 'tested_parts_removed', 'recycled'].includes(batteryRecord.status)) {
+      return res.status(400).json({
+        message: 'Cannot start work: This battery is marked unserviceable.',
+      });
+    }
     const battery = await batteryModel.startWork(req.params.id, req.user.id);
     if (!battery) {
       return res.status(409).json({

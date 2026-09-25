@@ -30,17 +30,22 @@ const BLOCKED_STATUS_MESSAGES = {
   repaired: 'This battery has already been repaired.',
   returned: 'This battery has already been returned to the client.',
   unserviceable: 'This battery has been marked unserviceable.',
+  tested_parts_removed: 'This battery has been marked unserviceable and its parts removed.',
+  recycled: 'This battery has been marked recycled.',
 };
 
 const PROCESS_STEPS = ['Intake', 'Started', 'Tested', 'Repaired', 'Returned'];
 const STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, in_testing: 2, repaired: 3, returned: 4 };
 
 const UNSERVICEABLE_STEPS = ['Intake', 'Started', 'Unserviceable', 'Recycled'];
-const UNSERVICEABLE_STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, unserviceable: 2, recycled: 3 };
+const UNSERVICEABLE_STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, unserviceable: 2, tested_parts_removed: 2, recycled: 3 };
 
 function ProcessStepper({ isOngoing, batteryStatus }) {
   const isUnserviceableFlow =
-    isOngoing && (batteryStatus === 'unserviceable' || batteryStatus === 'recycled');
+    isOngoing &&
+    (batteryStatus === 'unserviceable' ||
+      batteryStatus === 'tested_parts_removed' ||
+      batteryStatus === 'recycled');
   const steps = isUnserviceableFlow ? UNSERVICEABLE_STEPS : PROCESS_STEPS;
   const stepIndex = isUnserviceableFlow ? UNSERVICEABLE_STATUS_STEP_INDEX : STATUS_STEP_INDEX;
 
@@ -573,7 +578,6 @@ export default function BatteryDetailScreen() {
         } else if (
           fromScan &&
           data.battery?.status !== 'in_repair' &&
-          data.battery?.status !== 'tested_parts_removed' &&
           !isOwnInProgress &&
           !hasPendingPartsRemoval
         ) {
@@ -651,6 +655,10 @@ export default function BatteryDetailScreen() {
   }, [result?.battery?.status, testingStartedAt, isClient]);
 
   async function handleStartWork() {
+    if (['unserviceable', 'tested_parts_removed', 'recycled'].includes(result?.battery?.status)) {
+      setActionError('Cannot start work: This battery is marked unserviceable.');
+      return;
+    }
     const isIntakeUnverified = Boolean(
       result?.battery?.truck_intake_id &&
       (result?.battery?.intake_status === 'pending_arrival' ||
@@ -1578,7 +1586,7 @@ export default function BatteryDetailScreen() {
         <>
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
-          {(battery.status === 'in_repair' || battery.status === 'tested_parts_removed') && pendingPartsRemoval.length === 0 && (
+          {battery.status === 'in_repair' && pendingPartsRemoval.length === 0 && (
             Boolean(
               battery?.truck_intake_id &&
               (battery?.intake_status === 'pending_arrival' ||
@@ -1597,6 +1605,7 @@ export default function BatteryDetailScreen() {
                 </Text>
                 <TouchableOpacity
                   onPress={() => {
+                    allowExitRef.current = true;
                     navigation.navigate('Main', {
                       screen: 'Service',
                       params: { autoScan: Date.now() },
@@ -1612,9 +1621,7 @@ export default function BatteryDetailScreen() {
               <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
                 <View className="flex-row items-center justify-between mb-1">
                   <Text className="text-sm font-bold text-slate-900">
-                    {battery.status === 'tested_parts_removed'
-                      ? 'Parts Removed · Ready for Rework'
-                      : 'Ready to start?'}
+                    Ready to start?
                   </Text>
                   <View className="rounded-full bg-blue-100 px-2.5 py-0.5">
                     <Text className="text-[10px] font-bold text-blue-700">
@@ -1623,9 +1630,7 @@ export default function BatteryDetailScreen() {
                   </View>
                 </View>
                 <Text className="mt-0.5 mb-3 text-xs text-slate-400">
-                  {battery.status === 'tested_parts_removed'
-                    ? 'All fitted parts have been reclaimed. Tap Start Work to begin rework on this battery and record your start time.'
-                    : "This battery hasn't been touched yet. Starting work marks it as in progress."}
+                  This battery hasn't been touched yet. Starting work marks it as in progress.
                 </Text>
                 <TouchableOpacity
                   onPress={handleStartWork}
@@ -1640,6 +1645,42 @@ export default function BatteryDetailScreen() {
                 </TouchableOpacity>
               </View>
             )
+          )}
+
+          {['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status) && pendingPartsRemoval.length === 0 && (
+            <View className="mb-5 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/20 p-4 shadow-sm">
+              <View className="flex-row items-center gap-2.5 mb-2">
+                <View className="h-8 w-8 rounded-xl bg-rose-100 dark:bg-rose-900/50 border border-rose-200 dark:border-rose-800 items-center justify-center">
+                  <Icon name="slash" color="#e11d48" size={16} />
+                </View>
+                <View className="flex-1">
+                  <Text className="text-sm font-bold text-rose-900 dark:text-rose-200">
+                    Unserviceable Unit · Work Closed
+                  </Text>
+                  <Text className="text-[11px] text-rose-700 dark:text-rose-400">
+                    {battery.status === 'tested_parts_removed'
+                      ? 'All fitted parts have been reclaimed into inventory.'
+                      : 'This unit has been marked unserviceable.'}
+                  </Text>
+                </View>
+              </View>
+              <Text className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
+                No further repair or rework can be performed on this battery.
+              </Text>
+              <TouchableOpacity
+                onPress={() => {
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: 'Service',
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-800 py-3 shadow-md active:bg-slate-800"
+              >
+                <Icon name="camera" color="#ffffff" size={15} />
+                <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
+              </TouchableOpacity>
+            </View>
           )}
 
           {battery.status === 'in_progress' && (

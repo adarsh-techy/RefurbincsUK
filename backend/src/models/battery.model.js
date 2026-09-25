@@ -120,7 +120,7 @@ async function findPage({
       )`);
       // in_progress included so a technician can get back to the battery they
       // already started (the typeahead replaced the old activeOnly filter).
-      conditions.push(`b.status IN ('in_repair', 'in_progress', 'in_testing', 'tested_parts_removed')`);
+      conditions.push(`b.status IN ('in_repair', 'in_progress', 'in_testing')`);
     } else {
       conditions.push(`b.truck_intake_id IS NOT NULL`);
       conditions.push(`EXISTS (
@@ -128,7 +128,7 @@ async function findPage({
         WHERE ti.id = b.truck_intake_id 
           AND (ti.status = 'verified' OR ti.verified_at IS NOT NULL)
       )`);
-      conditions.push(`b.status IN ('in_repair', 'in_progress', 'tested_parts_removed')`);
+      conditions.push(`b.status IN ('in_repair', 'in_progress')`);
     }
   }
 
@@ -665,7 +665,7 @@ async function startWork(id, userId) {
     await client.query('BEGIN');
     const { rows } = await client.query(
       `UPDATE batteries SET status = 'in_progress', work_started_at = now(), started_by_user_id = $2
-       WHERE id = $1 AND status IN ('in_repair', 'tested_parts_removed')
+       WHERE id = $1 AND status = 'in_repair'
        RETURNING *`,
       [id, userId]
     );
