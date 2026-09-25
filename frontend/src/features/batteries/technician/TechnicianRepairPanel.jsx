@@ -207,7 +207,13 @@ function TechnicianRepairPanel({
       setShowRepairedByModal(true);
       return;
     }
-    if (status !== 'in_repair' && status !== 'tested_parts_removed' && !isOwnInProgress && !hasPending) {
+    if (status === 'tested_parts_removed') {
+      // Parts already reclaimed — offer to start rework straight away.
+      setScanTime(new Date());
+      setShowScanStartWorkModal(true);
+      return;
+    }
+    if (status !== 'in_repair' && !isOwnInProgress && !hasPending) {
       setBlockedStatus(status);
     }
   }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval.length]);

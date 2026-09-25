@@ -35,6 +35,13 @@ function parseYMD(str) {
   return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
 }
 
+const DAY_NAMES = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
+
+function formatYMD(d) {
+  if (!d) return null;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function formatShortDate(str) {
   const d = parseYMD(str);
   if (!d) return '';
@@ -160,6 +167,88 @@ function TechnicianHistoryPage() {
   const [typeFilter, setTypeFilter] = useState('all');
   const [customRange, setCustomRange] = useState({ start: null, end: null });
   const [customModalOpen, setCustomModalOpen] = useState(false);
+  // Calendar range picker (ported from mobile HistoryScreen): temp selection
+  // until "Apply", plus the month being viewed.
+  const [tempRange, setTempRange] = useState({ start: null, end: null });
+  const [viewYear, setViewYear] = useState(new Date().getFullYear());
+  const [viewMonth, setViewMonth] = useState(new Date().getMonth());
+
+  function openCustomDateModal() {
+    setTempRange({ ...customRange });
+    const base = customRange.start ? parseYMD(customRange.start) : new Date();
+    setViewYear(base.getFullYear());
+    setViewMonth(base.getMonth());
+    setCustomModalOpen(true);
+  }
+
+  function handlePrevMonth() {
+    if (viewMonth === 0) {
+      setViewYear((y) => y - 1);
+      setViewMonth(11);
+    } else {
+      setViewMonth((m) => m - 1);
+    }
+  }
+
+  function handleNextMonth() {
+    if (viewMonth === 11) {
+      setViewYear((y) => y + 1);
+      setViewMonth(0);
+    } else {
+      setViewMonth((m) => m + 1);
+    }
+  }
+
+  // First tap = start, second tap (later date) = end, earlier tap restarts.
+  function handleSelectDay(ymd) {
+    if (!tempRange.start || (tempRange.start && tempRange.end)) {
+      setTempRange({ start: ymd, end: null });
+    } else if (ymd >= tempRange.start) {
+      setTempRange({ start: tempRange.start, end: ymd });
+    } else {
+      setTempRange({ start: ymd, end: null });
+    }
+  }
+
+  function setModalQuickPreset(preset) {
+    const now = new Date();
+    const today = formatYMD(now);
+    const back = (days) => {
+      const d = new Date(now);
+      d.setDate(d.getDate() - days);
+      return formatYMD(d);
+    };
+    if (preset === 'today') setTempRange({ start: today, end: today });
+    else if (preset === 'yesterday') setTempRange({ start: back(1), end: back(1) });
+    else if (preset === 'week') setTempRange({ start: back(7), end: today });
+    else if (preset === 'month') setTempRange({ start: back(30), end: today });
+  }
+
+  function applyCustomDateFilter() {
+    if (!tempRange.start) {
+      setDateFilter('all');
+      setCustomRange({ start: null, end: null });
+    } else {
+      setCustomRange({ ...tempRange });
+      setDateFilter('custom');
+    }
+    setCustomModalOpen(false);
+  }
+
+  const calendarDays = useMemo(() => {
+    const first = new Date(viewYear, viewMonth, 1);
+    const total = new Date(viewYear, viewMonth + 1, 0).getDate();
+    let offset = first.getDay() - 1; // Monday-first grid
+    if (offset === -1) offset = 6;
+    const days = Array.from({ length: offset }, () => null);
+    for (let d = 1; d <= total; d++) days.push(formatYMD(new Date(viewYear, viewMonth, d)));
+    return days;
+  }, [viewYear, viewMonth]);
+
+  const viewMonthName = useMemo(
+    () => new Date(viewYear, viewMonth, 1).toLocaleDateString([], { month: 'long', year: 'numeric' }),
+    [viewYear, viewMonth]
+  );
 
   useEffect(() => {
     setLoading(true);
@@ -258,6 +347,26 @@ function TechnicianHistoryPage() {
               </button>
             );
           })}
+
+          {/* Custom date-range pill (opens the calendar) */}
+          <button
+            type="button"
+            onClick={openCustomDateModal}
+            className={`flex shrink-0 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+              dateFilter === 'custom'
+                ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
+                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'
+            }`}
+          >
+            <span>📅</span>
+            <span>
+              {dateFilter === 'custom' && customRange.start
+                ? customRange.end && customRange.end !== customRange.start
+                  ? `${formatShortDate(customRange.start)} – ${formatShortDate(customRange.end)}`
+                  : formatShortDate(customRange.start)
+                : 'Custom'}
+            </span>
+          </button>
         </div>
 
         {/* Type Filter Pills & Reset */}
@@ -475,6 +584,100 @@ function TechnicianHistoryPage() {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {/* ── Custom Date Range Picker Modal ─────────────────────────────── */}
+      {customModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/60 sm:items-center sm:p-4" onClick={() => setCustomModalOpen(false)}>
+          <div
+            className="w-full max-w-md rounded-t-3xl border border-slate-200 bg-white p-5 pb-8 shadow-2xl dark:border-white/10 dark:bg-surface-900 sm:rounded-3xl sm:pb-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/10">
+              <div>
+                <p className="text-base font-extrabold text-slate-900 dark:text-white">Filter By Date</p>
+                <p className="text-xs text-slate-400">Select single day or date range</p>
+              </div>
+              <button type="button" onClick={() => setCustomModalOpen(false)} className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300">✕</button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-4 gap-2">
+              {[['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'Last 7d'], ['month', 'Last 30d']].map(([id, label]) => (
+                <button key={id} type="button" onClick={() => setModalQuickPreset(id)} className="rounded-xl bg-slate-100 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300">
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between px-2">
+              <button type="button" onClick={handlePrevMonth} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-base font-bold text-slate-700 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300">‹</button>
+              <span className="text-sm font-extrabold text-slate-900 dark:text-white">{viewMonthName}</span>
+              <button type="button" onClick={handleNextMonth} className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-base font-bold text-slate-700 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300">›</button>
+            </div>
+
+            <div className="mt-3 grid grid-cols-7 gap-1 px-1">
+              {DAY_NAMES.map((d, i) => (
+                <div key={`dn-${i}`} className="text-center text-xs font-bold text-slate-400">{d}</div>
+              ))}
+              {calendarDays.map((ymd, i) => {
+                if (!ymd) return <div key={`empty-${i}`} className="h-10" />;
+                const dayNum = Number(ymd.split('-')[2]);
+                const isSelected = tempRange.start === ymd || tempRange.end === ymd;
+                const inRange = tempRange.start && tempRange.end && ymd > tempRange.start && ymd < tempRange.end;
+                return (
+                  <button
+                    key={ymd}
+                    type="button"
+                    onClick={() => handleSelectDay(ymd)}
+                    className={`h-10 rounded-xl text-xs font-bold transition-colors ${
+                      isSelected
+                        ? 'bg-blue-600 text-white shadow-sm'
+                        : inRange
+                          ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/50 dark:text-blue-300'
+                          : 'text-slate-800 hover:bg-slate-100 dark:text-neutral-200 dark:hover:bg-surface-800'
+                    }`}
+                  >
+                    {dayNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex items-center justify-between rounded-xl border border-slate-100 bg-slate-50 p-3 dark:border-white/10 dark:bg-surface-950">
+              <div>
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Chosen Filter Date</p>
+                <p className="mt-0.5 text-xs font-extrabold text-blue-700 dark:text-blue-400">
+                  {tempRange.start
+                    ? tempRange.end && tempRange.end !== tempRange.start
+                      ? `${formatShortDate(tempRange.start)} – ${formatShortDate(tempRange.end)}`
+                      : `Single Day: ${formatShortDate(tempRange.start)}`
+                    : 'Tap a date above'}
+                </p>
+              </div>
+              {tempRange.start && (
+                <button type="button" onClick={() => setTempRange({ start: null, end: null })} className="text-xs font-bold text-rose-600 hover:underline dark:text-rose-400">Clear</button>
+              )}
+            </div>
+
+            <div className="mt-4 flex gap-3">
+              <button
+                type="button"
+                onClick={() => {
+                  setTempRange({ start: null, end: null });
+                  setDateFilter('all');
+                  setCustomRange({ start: null, end: null });
+                  setCustomModalOpen(false);
+                }}
+                className="flex-1 rounded-2xl bg-slate-100 py-3.5 text-xs font-bold text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300"
+              >
+                Show All Dates
+              </button>
+              <button type="button" onClick={applyCustomDateFilter} className="flex-1 rounded-2xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-sm shadow-blue-600/30 hover:bg-blue-700">
+                Apply Date Filter
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

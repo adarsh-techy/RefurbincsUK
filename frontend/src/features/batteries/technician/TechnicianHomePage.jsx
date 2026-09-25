@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
@@ -56,6 +56,16 @@ function TechnicianHomePage() {
 
   const [checkingScan, setCheckingScan] = useState(false);
   const [unverifiedModalBattery, setUnverifiedModalBattery] = useState(null);
+
+  // "Scan Next Battery" from the repair panel lands here with ?autoScan=1 so
+  // the camera is already open — same as the mobile Service tab's autoScan.
+  const [searchParams, setSearchParams] = useSearchParams();
+  useEffect(() => {
+    if (searchParams.get('autoScan')) {
+      setCameraOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   async function goToBattery(raw) {
     const code = extractBatteryCode(raw);

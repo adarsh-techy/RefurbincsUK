@@ -2583,8 +2583,11 @@ function BatteryDetailPage() {
           battery={battery}
           services={services}
           pendingPartsRemoval={pendingPartsRemoval}
+          history={history}
+          issues={issues}
+          returns={returns}
           onUpdated={load}
-          onDone={() => navigate('/')}
+          onDone={() => navigate('/?autoScan=1')}
         />
       )}
 
