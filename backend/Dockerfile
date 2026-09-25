@@ -13,9 +13,15 @@ ENV NODE_ENV=production
 EXPOSE 5000
 
 # The official alpine image ships a preconfigured unprivileged "node" user
-# (uid 1000) — run as that instead of root. Nothing in this app writes to
-# disk (multer uses memoryStorage, no log files), so no directory needs a
-# chown for this user to work.
+# (uid 1000) — run as that instead of root. The controllers create and write
+# to uploads/<kind> (client logos, invoices, staff docs, issue photos, return
+# docs) at import time, so that tree must exist and be owned by "node"
+# before we drop privileges, or the very first require() fails with EACCES.
+# Mount a persistent volume at /app/uploads in production — the container
+# filesystem is discarded on every deploy.
+RUN mkdir -p /app/uploads/client-logos /app/uploads/invoices /app/uploads/staff-docs \
+             /app/uploads/issue-photos /app/uploads/return-docs \
+ && chown -R node:node /app/uploads
 USER node
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=15s --retries=3 \
