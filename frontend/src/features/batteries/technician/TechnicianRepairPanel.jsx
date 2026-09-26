@@ -79,8 +79,6 @@ function TechnicianRepairPanel({
   const fromScan = searchParams.get('fromScan') === 'true';
   const isIntakeUnverified = intakeIsUnverified(battery);
   const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
-  const [showScanStartWorkModal, setShowScanStartWorkModal] = useState(false);
-  const [scanTime] = useState(null);
   const [showPassedBackScanModal, setShowPassedBackScanModal] = useState(false);
   const [passedBackScanTime, setPassedBackScanTime] = useState(null);
 
@@ -193,7 +191,7 @@ function TechnicianRepairPanel({
     const status = battery.status;
     const hasPending = pendingPartsRemoval.length > 0;
     if (isIntakeUnverified) return; // handled by its own effect above
-    if (needsPartsRemovalOnScan) return; // passed-back / parts-pending effect above
+    if (isPassedBack) return; // passed-back / parts-pending effect above
     if (status === 'unserviceable' || status === 'recycled') {
       setShowUnserviceableAlertModal(true);
       return;
@@ -208,7 +206,7 @@ function TechnicianRepairPanel({
     if (status !== 'in_repair' && !isOwnInProgress && !hasPending) {
       setBlockedStatus(status);
     }
-  }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, needsPartsRemovalOnScan, isOwnInProgress, pendingPartsRemoval.length]);
+  }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval.length]);
 
   // Exit guard (mobile intercepts `beforeRemove`): while a scanned battery
   // has an active repair/testing session or unsaved input, warn before the
@@ -270,17 +268,15 @@ function TechnicianRepairPanel({
   }, [fromScan, isIntakeUnverified]);
 
 
-  // Passed back for rework, OR failed in testing with parts still fitted —
-  // both need the "remove fitted parts" alert on scan (mobile shows the same
-  // cantServiceAlert for `isPassedBack || (unserviceable && pending)`).
-  const needsPartsRemovalOnScan =
-    isPassedBack || (battery?.status === 'unserviceable' && pendingPartsRemoval.length > 0);
+  // isPassedBack already covers "unserviceable with parts still fitted", so
+  // this is the single scan-time trigger for the remove-fitted-parts alert
+  // (mobile's cantServiceAlert).
   useEffect(() => {
-    if (fromScan && !isIntakeUnverified && needsPartsRemovalOnScan) {
+    if (fromScan && !isIntakeUnverified && isPassedBack) {
       setPassedBackScanTime(new Date());
       setShowPassedBackScanModal(true);
     }
-  }, [fromScan, isIntakeUnverified, needsPartsRemovalOnScan]);
+  }, [fromScan, isIntakeUnverified, isPassedBack]);
 
   useEffect(() => {
     return () => {
@@ -1369,79 +1365,6 @@ function TechnicianRepairPanel({
                 </div>
               </>
             )}
-          </div>
-        </div>
-      )}
-
-      {/* ── Parts Removed Battery Scan / Start Work Modal ── */}
-      {showScanStartWorkModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 animate-in fade-in">
-          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-slate-800 dark:bg-surface-900 text-center">
-            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200 text-blue-600 text-2xl dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-400">
-              ⚡
-            </div>
-            
-            <div className="mb-2 flex items-center justify-center">
-              <span className="rounded-full bg-amber-50 border border-amber-200 px-3 py-1 text-[11px] font-bold text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-400">
-                Parts Removed · Ready for Rework
-              </span>
-            </div>
-
-            <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">
-              Start Work on Battery
-            </h3>
-
-            <p className="mb-4 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-              This battery previously had its fitted parts removed & restocked. You can now start repair work and track your service time.
-            </p>
-
-            {/* Scan Time & Battery Info Box */}
-            <div className="mb-5 rounded-2xl border border-slate-200 bg-slate-50 p-3.5 text-left dark:border-neutral-800 dark:bg-surface-950 space-y-2">
-              <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200/60 dark:border-neutral-800">
-                <span className="text-slate-500 dark:text-neutral-400 font-medium">Battery ID</span>
-                <span className="font-mono font-bold text-blue-600 dark:text-blue-400">
-                  {battery.battery_code}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs pb-1.5 border-b border-slate-200/60 dark:border-neutral-800">
-                <span className="text-slate-500 dark:text-neutral-400 font-medium">Scan Time</span>
-                <span className="font-semibold text-slate-800 dark:text-white">
-                  {(scanTime || new Date()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                </span>
-              </div>
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-slate-500 dark:text-neutral-400 font-medium">Scan Date</span>
-                <span className="font-medium text-slate-700 dark:text-neutral-300">
-                  {(scanTime || new Date()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
-                </span>
-              </div>
-            </div>
-
-            {error && <p className="mb-3 text-xs font-semibold text-red-600 dark:text-red-400">{error}</p>}
-
-            <div className="flex flex-col gap-2.5">
-              <button
-                type="button"
-                onClick={async () => {
-                  try {
-                    await handleStartWork();
-                    setShowScanStartWorkModal(false);
-                  } catch {}
-                }}
-                disabled={submitting}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
-              >
-                <span>▶</span>
-                <span>{submitting ? 'Starting Work…' : 'Start Work Now'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowScanStartWorkModal(false)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors"
-              >
-                View Details First
-              </button>
-            </div>
           </div>
         </div>
       )}

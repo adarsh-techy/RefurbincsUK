@@ -2712,12 +2712,8 @@ function BatteryDetailPage() {
                   cardTone = 'amber';
                   cardLabel = 'Repair In Progress';
                 } else if (battery.status === 'in_repair') {
-                  const isShipmentUnverified =
-                    battery.truck_intake_id &&
-                    (battery.intake_status === 'pending_arrival' || !battery.intake_verified_at) &&
-                    battery.intake_status !== 'verified';
                   cardTone = 'amber';
-                  cardLabel = isShipmentUnverified ? 'Awaiting Truck Arrival Verification' : 'Queued for Repair';
+                  cardLabel = intakeIsUnverified(battery) ? 'Awaiting Truck Arrival Verification' : 'Queued for Repair';
                 }
               } else {
                 cardTone = 'emerald';

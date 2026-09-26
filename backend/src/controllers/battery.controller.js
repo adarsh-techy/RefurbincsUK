@@ -433,21 +433,38 @@ async function startWork(req, res, next) {
   }
 }
 
+
+// Who may make testing / QA decisions (start-testing, complete-testing,
+// pass-to-tech): admins always; any workshop login ('technician' or the
+// legacy 'staff' app role) only when its staff record is a supervisor.
+// Returns { staffId } or { error: { status, message } } so the three
+// handlers share one rule and can never drift apart again.
+async function resolveTestingStaff(user) {
+  if (user.role === 'admin' || user.role === 'super_admin') {
+    const staff = await staffModel.findByUserId(user.id);
+    return { staffId: staff ? staff.id : null };
+  }
+  const staff = await staffModel.findByUserId(user.id);
+  if (!staff) {
+    return { error: { status: 409, message: 'Your account is not linked to a staff record.' } };
+  }
+  if ((staff.role || '').toLowerCase() !== 'supervisor') {
+    return {
+      error: {
+        status: 403,
+        message: 'Technicians do not have access to testing. Only Supervisors can perform testing and QA decisions.',
+      },
+    };
+  }
+  return { staffId: staff.id };
+}
+
 // Sets testing_started_at = now() when a Supervisor or Admin scans/opens the battery for testing.
 async function startTesting(req, res, next) {
   try {
-    let canTest = req.user.role === 'admin' || req.user.role === 'super_admin';
-    if (!canTest && (req.user.role === 'technician' || req.user.role === 'staff')) {
-      const staff = await staffModel.findByUserId(req.user.id);
-      const staffRole = (staff?.role || '').toLowerCase();
-      if (staffRole === 'supervisor') {
-        canTest = true;
-      }
-    }
-    if (!canTest) {
-      return res.status(403).json({
-        message: 'Technicians do not have access to testing. Only Supervisors can test batteries.',
-      });
+    const access = await resolveTestingStaff(req.user);
+    if (access.error) {
+      return res.status(access.error.status).json({ message: access.error.message });
     }
 
     const battery = await batteryModel.startTesting(req.params.id);
@@ -465,26 +482,11 @@ async function startTesting(req, res, next) {
 // Supervisors and Admins (Technicians do not have testing permission).
 async function completeTesting(req, res, next) {
   try {
-    let staffId = null;
-    if (req.user.role === 'technician') {
-      const staff = await staffModel.findByUserId(req.user.id);
-      if (!staff) {
-        return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
-      }
-      staffId = staff.id;
-      const staffRole = (staff.role || '').toLowerCase();
-      if (staffRole === 'technician') {
-        return res.status(403).json({
-          message:
-            'Technicians do not have permission to perform testing. Only Supervisors can complete testing.',
-        });
-      }
-    } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
-      const staff = await staffModel.findByUserId(req.user.id);
-      if (staff) {
-        staffId = staff.id;
-      }
+    const access = await resolveTestingStaff(req.user);
+    if (access.error) {
+      return res.status(access.error.status).json({ message: access.error.message });
     }
+    const staffId = access.staffId;
 
     const { serviceIds, notes } = req.body || {};
     const battery = await batteryModel.completeTesting(req.params.id, {
@@ -628,24 +630,11 @@ async function removeParts(req, res, next) {
 // QA queue.
 async function passToTech(req, res, next) {
   try {
-    let staffId = null;
-    if (req.user.role === 'technician') {
-      const staff = await staffModel.findByUserId(req.user.id);
-      if (!staff) {
-        return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
-      }
-      staffId = staff.id;
-      if ((staff.role || '').toLowerCase() !== 'supervisor') {
-        return res.status(403).json({
-          message: 'Technicians cannot pass batteries back. Only Supervisors can perform testing and QA decisions.',
-        });
-      }
-    } else if (req.user.role === 'staff' || req.user.role === 'admin' || req.user.role === 'super_admin') {
-      const staff = await staffModel.findByUserId(req.user.id);
-      if (staff) {
-        staffId = staff.id;
-      }
+    const access = await resolveTestingStaff(req.user);
+    if (access.error) {
+      return res.status(access.error.status).json({ message: access.error.message });
     }
+    const staffId = access.staffId;
 
     const { note } = req.body || {};
     const battery = await batteryModel.passToTech(req.params.id, {

@@ -228,9 +228,6 @@ function ClientBatteriesPage() {
   const [removeBatteryLoading, setRemoveBatteryLoading] = useState(false);
   const [removeBatteryError, setRemoveBatteryError] = useState(null);
 
-  // Non-blocking notice (replaces window.alert) — e.g. trying to edit a verified batch.
-  const [infoNotice, setInfoNotice] = useState(null);
-
   // ── Delete / Cancel Batch State ──────────────────────────────────────
   const [deleteBatchTarget, setDeleteBatchTarget] = useState(null);
   const [deleteBatchLoading, setDeleteBatchLoading] = useState(false);
@@ -473,13 +470,6 @@ function ClientBatteriesPage() {
 
   // ── Edit Batch Handlers ──────────────────────────────────────────────
   function openEditBatch(batch) {
-    // groupMap only ever sets intakeStatus / verifiedAt (see above) — those
-    // are the whole "already verified" signal.
-    if (batch.intakeStatus === 'verified' || batch.verifiedAt) {
-      setInfoNotice('This batch has already been verified by the workshop and cannot be edited.');
-      return;
-    }
-
     setEditBatchTarget({ ...batch, intakeId: resolveBatchIntakeId(batch) });
     setEditBatchTruck(batch.truckNumber || '');
     setEditBatchDriver(batch.driverName || '');
@@ -3615,17 +3605,6 @@ function ClientBatteriesPage() {
             </div>
           </div>
         </Modal>
-      )}
-
-      {infoNotice && (
-        <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <div className="flex max-w-md items-start gap-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-900 shadow-lg dark:border-amber-800/60 dark:bg-amber-950/80 dark:text-amber-200">
-            <span>{infoNotice}</span>
-            <button type="button" onClick={() => setInfoNotice(null)} className="shrink-0 font-bold underline-offset-2 hover:underline">
-              Dismiss
-            </button>
-          </div>
-        </div>
       )}
 
       {/* ── Delete / Cancel Batch Confirmation Modal ──────────────────── */}

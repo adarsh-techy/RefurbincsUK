@@ -86,15 +86,17 @@ function TechnicianHomePage() {
       if (isIntakeUnverified(b)) {
         setCameraOpen(false);
         setUnverifiedModalBattery(b);
+        setCheckingScan(false);
+        scanInFlightRef.current = false; // staying on this page — accept new scans
         return;
       }
     } catch {
       // If lookup fails or battery does not exist, let detail page handle it
-    } finally {
-      setCheckingScan(false);
-      scanInFlightRef.current = false;
     }
 
+    // Navigating away: keep the lock held so a late decode from the same QR
+    // frame burst can't push a second /batteries/:code entry before unmount.
+    setCheckingScan(false);
     setCameraOpen(false);
     navigate(`/batteries/${encodeURIComponent(code)}?fromScan=true`);
   }

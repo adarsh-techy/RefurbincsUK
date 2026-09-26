@@ -992,9 +992,19 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
     const targetBattery = bRows[0];
     const actualBatteryId = targetBattery.id;
 
-    const effectiveIntakeId = (intakeId && intakeId !== 'null' && intakeId !== 'awaiting_pickup' && !isNaN(Number(intakeId)))
+    const requestedIntakeId = (intakeId && intakeId !== 'null' && intakeId !== 'awaiting_pickup' && !isNaN(Number(intakeId)))
       ? Number(intakeId)
-      : targetBattery.truck_intake_id;
+      : null;
+    // The ownership / not-yet-verified checks below must run against the
+    // intake the battery is ACTUALLY on — otherwise naming any other owned,
+    // unverified intake in the URL would unlink the battery from a verified
+    // one (and kill its in-progress status).
+    if (requestedIntakeId && targetBattery.truck_intake_id && requestedIntakeId !== targetBattery.truck_intake_id) {
+      const err = new Error('This battery is not part of that truck intake.');
+      err.status = 400;
+      throw err;
+    }
+    const effectiveIntakeId = targetBattery.truck_intake_id || requestedIntakeId;
 
     if (effectiveIntakeId) {
       const intakeRows = await findOwnedIntake(client, effectiveIntakeId, clientId, clientName);
