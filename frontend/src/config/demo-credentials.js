@@ -35,7 +35,7 @@ export const MOBILE_DEMO_CREDENTIALS = {
     label: 'Adarsh',
     icon: '🔧',
     role: 'Technician',
-    email: 'adarsh@gmail.com',
+    email: 'akshay@gmail.com',
     password: '12345678',
     tone: 'blue',
   },
