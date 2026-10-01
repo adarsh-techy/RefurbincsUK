@@ -1,15 +1,16 @@
-import { useState } from 'react';
+import { useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { Link, useNavigate } from 'react-router-dom';
 import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
-import logo from '../../assets/logo.png';
+import logo from '../../assets/REFURBNICS.png';
+import SplashIntro from './SplashIntro';
 import { DEMO_CREDENTIALS, MOBILE_DEMO_CREDENTIALS } from '../../config/demo-credentials';
 
 const inputClasses =
-  'w-full rounded-md border border-surface-600 bg-black py-2.5 pl-10 pr-3.5 text-sm text-neutral-100 placeholder:text-neutral-500 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
-const labelClasses = 'mb-1.5 block text-sm font-medium text-neutral-200';
-const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-neutral-500';
+  'w-full rounded-md border border-slate-300 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
+const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700';
+const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400';
 
 function LoginPage() {
   const defaultEmail = import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || DEMO_CREDENTIALS.superAdmin.email;
@@ -18,6 +19,7 @@ function LoginPage() {
   const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState(defaultPassword);
   const [showPassword, setShowPassword] = useState(false);
+  const [showSplash, setShowSplash] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { status, error } = useSelector((state) => state.auth);
@@ -25,29 +27,34 @@ function LoginPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     const result = await dispatch(login({ email, password }));
+    // Successful login plays the Eswincha intro screen first; it navigates
+    // into the app once the animation finishes (see finishSplash).
     if (login.fulfilled.match(result)) {
-      navigate('/');
+      setShowSplash(true);
     }
   }
 
+  const finishSplash = useCallback(() => navigate('/'), [navigate]);
+
   return (
-    <div className="flex min-h-screen bg-black">
+    <div className="flex min-h-screen bg-white">
+      {showSplash && <SplashIntro onDone={finishSplash} />}
       <div className="relative hidden w-1/2 lg:block">
         <img src={loginImage} alt="" className="h-full w-full object-cover" />
       </div>
 
-      <div className="flex w-full flex-col justify-center bg-surface-950 px-8 py-12 sm:px-14 lg:w-1/2">
+      <div className="flex w-full flex-col justify-center bg-white px-8 py-12 sm:px-14 lg:w-1/2">
         <div className="mx-auto w-full max-w-sm">
-          <img src={logo} alt="Refurbinics" className="mx-auto mb-8 h-24 w-auto" />
+          <img src={logo} alt="Refurbnics" className="mx-auto mb-8 h-auto w-full max-w-xs" />
 
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-white">Welcome Back!</h1>
-            <p className="mt-1 text-sm text-neutral-400">Sign in to continue</p>
+            <h1 className="text-2xl font-bold text-slate-900">Welcome Back!</h1>
+            <p className="mt-1 text-sm text-slate-500">Sign in to continue</p>
           </div>
 
           {/* Demo quick-fill credentials */}
           <div className="mt-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-[11px] text-neutral-400 font-medium px-0.5">
+            <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-0.5">
               <span>Quick Fill Credentials:</span>
             </div>
 
@@ -59,7 +66,7 @@ function LoginPage() {
                   setEmail(DEMO_CREDENTIALS.superAdmin.email);
                   setPassword(DEMO_CREDENTIALS.superAdmin.password);
                 }}
-                className="rounded-md border border-dashed border-neutral-600 bg-neutral-800/40 px-2 py-2 text-[11px] font-medium text-neutral-300 transition hover:bg-neutral-800/80 truncate cursor-pointer"
+                className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-2 py-2 text-[11px] font-medium text-slate-700 transition hover:bg-slate-100 truncate cursor-pointer"
                 title={`Super Admin: ${DEMO_CREDENTIALS.superAdmin.email}`}
               >
                 👑 Super Admin
@@ -71,7 +78,7 @@ function LoginPage() {
                   setEmail(DEMO_CREDENTIALS.client.email);
                   setPassword(DEMO_CREDENTIALS.client.password);
                 }}
-                className="rounded-md border border-dashed border-emerald-500/50 bg-emerald-500/10 px-2 py-2 text-[11px] font-medium text-emerald-400 transition hover:bg-emerald-500/20 truncate cursor-pointer"
+                className="rounded-md border border-dashed border-emerald-500/50 bg-emerald-500/10 px-2 py-2 text-[11px] font-medium text-emerald-700 transition hover:bg-emerald-500/20 truncate cursor-pointer"
                 title={`Client: ${DEMO_CREDENTIALS.client.email}`}
               >
                 ⚡ HumanForest
@@ -83,7 +90,7 @@ function LoginPage() {
                   setEmail(DEMO_CREDENTIALS.recycle.email);
                   setPassword(DEMO_CREDENTIALS.recycle.password);
                 }}
-                className="rounded-md border border-dashed border-teal-500/50 bg-teal-500/10 px-2 py-2 text-[11px] font-medium text-teal-400 transition hover:bg-teal-500/20 truncate cursor-pointer"
+                className="rounded-md border border-dashed border-teal-500/50 bg-teal-500/10 px-2 py-2 text-[11px] font-medium text-teal-700 transition hover:bg-teal-500/20 truncate cursor-pointer"
                 title={`Recycle: ${DEMO_CREDENTIALS.recycle.email}`}
               >
                 ♻️ Recycle Client
@@ -98,7 +105,7 @@ function LoginPage() {
                   setEmail(MOBILE_DEMO_CREDENTIALS.adarsh.email);
                   setPassword(MOBILE_DEMO_CREDENTIALS.adarsh.password);
                 }}
-                className="rounded-md border border-dashed border-blue-500/50 bg-blue-500/10 px-2 py-2 text-[11px] font-medium text-blue-400 transition hover:bg-blue-500/20 truncate cursor-pointer text-center"
+                className="rounded-md border border-dashed border-blue-500/50 bg-blue-500/10 px-2 py-2 text-[11px] font-medium text-blue-700 transition hover:bg-blue-500/20 truncate cursor-pointer text-center"
                 title={`Adarsh: ${MOBILE_DEMO_CREDENTIALS.adarsh.email}`}
               >
                 🔧 Adarsh
@@ -110,7 +117,7 @@ function LoginPage() {
                   setEmail(MOBILE_DEMO_CREDENTIALS.akhil.email);
                   setPassword(MOBILE_DEMO_CREDENTIALS.akhil.password);
                 }}
-                className="rounded-md border border-dashed border-violet-500/50 bg-violet-500/10 px-2 py-2 text-[11px] font-medium text-violet-400 transition hover:bg-violet-500/20 truncate cursor-pointer text-center"
+                className="rounded-md border border-dashed border-violet-500/50 bg-violet-500/10 px-2 py-2 text-[11px] font-medium text-violet-700 transition hover:bg-violet-500/20 truncate cursor-pointer text-center"
                 title={`Akhil: ${MOBILE_DEMO_CREDENTIALS.akhil.email}`}
               >
                 ⚡ Akhil
@@ -158,7 +165,7 @@ function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
                   {showPassword ? (
@@ -180,7 +187,7 @@ function LoginPage() {
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-400">{error}</p>}
+            {error && <p className="text-sm text-red-600">{error}</p>}
 
             <button
               type="submit"
@@ -206,15 +213,20 @@ function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-neutral-400">
+          <p className="mt-6 text-center text-sm text-slate-500">
             Need an account?{' '}
-            <Link to="/register" className="font-medium text-emerald-400 hover:underline">
+            <Link to="/register" className="font-medium text-emerald-700 hover:underline">
               Create one
             </Link>
           </p>
 
-          <p className="mt-4 text-center text-xs text-neutral-500">
+          <p className="mt-4 text-center text-xs text-slate-400">
             © {new Date().getFullYear()} Refurbinics. All rights reserved.
+          </p>
+          <p className="mt-1 text-center text-xs text-slate-500">
+            Developed by{' '}
+            <span className="font-bold text-blue-600">Eswincha</span>{' '}
+            <span className="font-bold text-red-600">Technologies</span>
           </p>
         </div>
       </div>

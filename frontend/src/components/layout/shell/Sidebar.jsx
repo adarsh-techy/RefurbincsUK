@@ -243,7 +243,6 @@ const CLIENT_NAV_GROUPS = [
     heading: 'Repair Pipeline',
     links: [
       { to: '/my/batteries/packed', label: 'Stage 1: Packed', icon: Icons.stage1, clientPermission: 'client_packed' },
-      { to: '/my/batteries/pending', label: 'Stage 2: In Service', icon: Icons.stage2, clientPermission: 'client_in_service' },
       { to: '/my/batteries/received', label: 'Stage 3: Received', icon: Icons.stage3, clientPermission: 'client_received' },
     ],
   },

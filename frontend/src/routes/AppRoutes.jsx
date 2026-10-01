@@ -1,5 +1,5 @@
 import { lazy } from 'react';
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import ProtectedRoute from './ProtectedRoute';
 import HomeRoute from './HomeRoute';
@@ -154,6 +154,9 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['client']} />}>
             <Route path="/my/certificates" element={<ClientCertificatesPage />} />
             <Route path="/my/batteries" element={<ClientBatteriesPage />} />
+            {/* Stage 2 (In Service) page was removed from the client portal —
+                its batteries now stay visible in the Packed truck detail table. */}
+            <Route path="/my/batteries/pending" element={<Navigate to="/my/batteries/packed" replace />} />
             <Route path="/my/batteries/:bucket" element={<ClientBatteriesPage />} />
             <Route path="/my/history/:eventId" element={<ClientHistoryDetailPage />} />
           </Route>

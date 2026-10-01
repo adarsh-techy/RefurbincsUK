@@ -9,6 +9,13 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 
 const ALL_PERMISSION_KEYS = CLIENT_PERMISSIONS.map((p) => p.key);
 
+// Capitalizes the first letter of every word as the client name is typed
+// ("apex fleet" -> "Apex Fleet"), leaving the rest of each word as entered
+// so acronyms like "UK" or names like "HumanForest" aren't flattened.
+function capitalizeWords(value) {
+  return value.replace(/(^|\s)(\S)/g, (_, space, ch) => space + ch.toUpperCase());
+}
+
 // client: pass an existing client record to edit it (PATCH); omit to create (POST).
 function ClientForm({ client, onSaved, onCancel }) {
   const isEdit = Boolean(client);
@@ -97,7 +104,7 @@ function ClientForm({ client, onSaved, onCancel }) {
           <input
             type="text"
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) => setName(capitalizeWords(e.target.value))}
             placeholder="e.g. Apex Fleet Logistics UK"
             className={inputClasses}
             required

@@ -303,11 +303,62 @@ async function findMyBatteries(clientId, clientName, bucket) {
     );
     return rows;
   } else if (bucket === 'packed') {
-    // Every truck ever packed for repair, whether it's still pending arrival
-    // at the workshop or has already arrived and is awaiting technician
-    // pickup — the client should see every packed truck here, not just the
-    // ones that haven't arrived yet.
-    conditions.push(`b.status = 'in_repair'`);
+    // Every truck ever packed for this client, with EVERY battery that was
+    // on it — including ones since serviced, completed or returned — so a
+    // truck's detail table stays a permanent history instead of emptying
+    // out as batteries move through the workshop. Goes through
+    // battery_visits (every intake a battery has been on) plus the
+    // battery's current truck_intake_id (a packed truck isn't in
+    // battery_visits until it's verified), plus in_repair batteries not yet
+    // on any truck. A row for an older visit whose battery has since been
+    // re-packed onto a newer truck reports 'returned', since that visit ended
+    // with the battery going back to the client; current_status keeps the
+    // live value.
+    const { rows } = await db.query(
+      `WITH ${CLIENT_BATTERY_IDS_CTE},
+       packed_links AS (
+         SELECT bv.battery_id, bv.truck_intake_id FROM battery_visits bv
+         UNION
+         SELECT b.id, b.truck_intake_id FROM batteries b WHERE b.truck_intake_id IS NOT NULL
+         UNION
+         SELECT b.id, NULL::int FROM batteries b WHERE b.truck_intake_id IS NULL AND b.status = 'in_repair'
+       )
+       SELECT b.id, b.battery_code, b.serial_number, b.serial_number_added_by_role, b.serial_number_added_at,
+              CASE
+                WHEN pl.truck_intake_id IS NOT NULL AND b.truck_intake_id IS DISTINCT FROM pl.truck_intake_id THEN 'returned'
+                ELSE b.status
+              END AS status,
+              b.status AS current_status,
+              b.notes, b.created_at, b.truck_intake_id,
+              ti.id AS intake_id, ti.truck_number, ti.driver_name, ti.intake_at, ti.status AS intake_status, ti.verified_at,
+              last_repair.repaired_at AS last_repaired_at,
+              last_return.return_id, last_return.return_truck, last_return.return_driver, last_return.return_date,
+              last_return.return_status, last_return.return_verified_at
+       FROM packed_links pl
+       JOIN client_battery_ids cb ON cb.id = pl.battery_id
+       JOIN batteries b ON b.id = pl.battery_id
+       LEFT JOIN truck_intakes ti ON ti.id = pl.truck_intake_id
+       LEFT JOIN LATERAL (
+         SELECT r.repaired_at
+         FROM repairs r
+         WHERE r.battery_id = b.id
+         ORDER BY r.repaired_at DESC
+         LIMIT 1
+       ) last_repair ON true
+       LEFT JOIN LATERAL (
+         SELECT ret.id AS return_id, ret.truck_number AS return_truck, ret.driver_name AS return_driver, ret.returned_at AS return_date,
+                ret.status AS return_status, ret.verified_at AS return_verified_at
+         FROM return_batteries rb
+         JOIN returns ret ON ret.id = rb.return_id
+         WHERE rb.battery_id = b.id
+         ORDER BY ret.returned_at DESC
+         LIMIT 1
+       ) last_return ON true
+       WHERE ti.id IS NULL OR ti.client_id = $1 OR ti.client_id IS NULL
+       ORDER BY COALESCE(ti.intake_at, b.created_at) DESC, b.battery_code ASC`,
+      [clientId, clientName]
+    );
+    return rows;
   } else if (bucket === 'pending') {
     conditions.push(`b.status IN ('in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired', 'unserviceable')`);
   } else if (statuses) {

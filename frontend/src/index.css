@@ -84,3 +84,115 @@ html.dark,
   }
 }
 
+
+
+/* ── Login splash intro (SplashIntro.jsx): "Eswincha Technologies" fill ──
+   A pale ghost of the name sits underneath; a solid copy is revealed by ONE
+   continuous left→right sweep across both words with a soft feathered edge.
+   The sweep is two counter-moving transforms (.ew-reveal slides right while
+   .ew-reveal-inner slides left by the same amount, so the text stays put) —
+   transforms run on the compositor, so the fill stays smooth instead of
+   repainting every frame the way an animated mask/clip-path does. */
+.ew-credit {
+  --ew-feather: 2.5em;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  opacity: 0;
+  animation: ew-enter 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+.ew-by {
+  font-size: clamp(0.7rem, 1.4vw, 0.9rem);
+  font-weight: 600;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+
+.ew-name {
+  position: relative;
+  display: block;
+  max-width: 100%;
+  font-size: clamp(1.6rem, 6vw, 3.75rem);
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  line-height: 1.2;
+}
+
+.ew-line {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  column-gap: 0.35em;
+}
+
+.ew-line .ew-blue { color: #2563eb; }
+.ew-line .ew-red { color: #dc2626; }
+.ew-line--ghost .ew-blue { color: rgba(37, 99, 235, 0.12); }
+.ew-line--ghost .ew-red { color: rgba(220, 38, 38, 0.12); }
+
+/* Wider than the name by the feather, so the soft edge fully clears the
+   last letter; its right edge fades out over --ew-feather. */
+.ew-reveal {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  right: calc(-1 * var(--ew-feather));
+  overflow: hidden;
+  -webkit-mask-image: linear-gradient(90deg, #000 calc(100% - var(--ew-feather)), transparent);
+  mask-image: linear-gradient(90deg, #000 calc(100% - var(--ew-feather)), transparent);
+  transform: translateX(-100%);
+  animation: ew-sweep 2.1s cubic-bezier(0.45, 0.05, 0.35, 1) 0.45s forwards;
+  will-change: transform;
+}
+
+.ew-reveal-inner {
+  display: block;
+  width: 100%;
+  padding-right: var(--ew-feather);
+  transform: translateX(100%);
+  animation: ew-sweep-back 2.1s cubic-bezier(0.45, 0.05, 0.35, 1) 0.45s forwards;
+  will-change: transform;
+}
+
+.ew-splash {
+  cursor: pointer;
+}
+
+/* Only the name fades — the white backdrop stays fully opaque until the
+   app navigates away, so the login form underneath never shows through. */
+.ew-splash--leaving .ew-credit {
+  opacity: 1;
+  animation: ew-splash-out 0.3s ease-out forwards;
+}
+
+@keyframes ew-enter {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes ew-sweep {
+  to { transform: translateX(0); }
+}
+
+@keyframes ew-sweep-back {
+  to { transform: translateX(0); }
+}
+
+@keyframes ew-splash-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(1.02); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ew-credit,
+  .ew-reveal,
+  .ew-reveal-inner {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}

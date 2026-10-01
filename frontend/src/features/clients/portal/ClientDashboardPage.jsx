@@ -19,7 +19,6 @@ import {
   FiCheck,
   FiSearch,
   FiActivity,
-  FiTool,
   FiPackage,
   FiLayers,
   FiRefreshCw,
@@ -316,8 +315,6 @@ function ClientDashboardPage() {
   const unserviceable = Number(stats?.unserviceable_count || 0);
   const repairVisits = Number(stats?.repair_visit_count || 0);
   const balanceOwed = Number(stats?.balance || 0);
-
-  const activeWorkshop = inProgress + inTesting + repaired;
 
   // Filtered batteries for table based on active tab and search query
   const filteredBatteries = useMemo(() => {
@@ -622,7 +619,7 @@ function ClientDashboardPage() {
 
         {/* Card 3: Stage 2 · In Workshop Service */}
         <Link
-          to="/my/batteries/pending"
+          to="/my/batteries/packed"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-blue-200/90 bg-gradient-to-br from-blue-50/50 via-white to-blue-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-400 dark:border-blue-900/40 dark:from-blue-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
@@ -649,7 +646,7 @@ function ClientDashboardPage() {
 
         {/* Card 4: Repaired & QA Passed */}
         <Link
-          to="/my/batteries/pending"
+          to="/my/batteries/packed"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-teal-200/90 bg-gradient-to-br from-teal-50/50 via-white to-teal-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-teal-400 dark:border-teal-900/40 dark:from-teal-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
@@ -870,7 +867,7 @@ function ClientDashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           {/* Stage 1: Packed to Repair */}
           <Link
             to="/my/batteries/packed"
@@ -899,38 +896,6 @@ function ClientDashboardPage() {
             </div>
             <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-bold text-amber-700 dark:border-white/5 dark:text-amber-400">
               <span>Inspect Packed List</span>
-              <span className="transition-transform group-hover:translate-x-1">→</span>
-            </div>
-          </Link>
-
-          {/* Stage 2: In Service & Testing */}
-          <Link
-            to="/my/batteries/pending"
-            className="group relative flex flex-col justify-between rounded-2xl border border-blue-200/80 bg-gradient-to-b from-blue-50/50 to-white p-5 shadow-2xs transition-all hover:border-blue-400 hover:shadow-md dark:border-blue-900/40 dark:from-blue-950/20 dark:to-surface-850"
-          >
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-700 shadow-2xs dark:bg-blue-950/60 dark:text-blue-300">
-                    <FiTool className="h-5 w-5" />
-                  </span>
-                  <span className="text-xs font-black uppercase tracking-wider text-blue-800 dark:text-blue-300">
-                    Stage 2
-                  </span>
-                </div>
-                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-extrabold text-blue-900 dark:bg-blue-950/70 dark:text-blue-200">
-                  {activeWorkshop} Units
-                </span>
-              </div>
-              <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-800 dark:text-white dark:group-hover:text-blue-300">
-                Workshop Service & Testing
-              </h3>
-              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-                Precision cell replacement, BMS diagnostics, and automated charge/discharge cycle bench testing.
-              </p>
-            </div>
-            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-bold text-blue-700 dark:border-white/5 dark:text-blue-400">
-              <span>Inspect Service Queue</span>
               <span className="transition-transform group-hover:translate-x-1">→</span>
             </div>
           </Link>

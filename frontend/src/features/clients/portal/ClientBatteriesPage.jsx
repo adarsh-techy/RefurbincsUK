@@ -417,6 +417,11 @@ function ClientBatteriesPage() {
     const batch = rawBatches.find((b) => b.key === activeBatchKey);
     if (!batch) return null;
 
+    // The packed bucket already returns every battery ever on each truck
+    // (including serviced/returned ones), so don't swap in the current-intake
+    // list, which would drop batteries since re-packed onto a newer truck.
+    if (effectiveBucket === 'packed') return batch;
+
     if (allRegisteredBatteries && allRegisteredBatteries.length > 0) {
       const isReceived = effectiveBucket === 'received';
       const allBatchBatteries = allRegisteredBatteries.filter((item) => {

@@ -23,7 +23,7 @@ export function getBaseUrl() {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl && !envUrl.includes('exp.direct')) return envUrl;
 
-  return 'http://192.168.31.243:5000/api';
+  return 'https://refurbincsuk.onrender.com/api';
 }
 
 const apiClient = axios.create({

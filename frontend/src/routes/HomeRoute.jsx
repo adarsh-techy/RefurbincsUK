@@ -10,7 +10,6 @@ const CLIENT_PAGE_FALLBACKS = [
   { perm: 'client_dashboard', isDashboard: true },
   { perm: 'client_all_batteries', path: '/my/batteries/all' },
   { perm: 'client_packed', path: '/my/batteries/packed' },
-  { perm: 'client_in_service', path: '/my/batteries/pending' },
   { perm: 'client_received', path: '/my/batteries/received' },
   { perm: 'client_battery_sorting', path: '/my/battery-sorting' },
   { perm: 'client_invoices', path: '/my/invoices' },

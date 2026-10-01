@@ -11,12 +11,17 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.refurbinics.technician",
       "adaptiveIcon": {
         "backgroundColor": "#ffffff",
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -31,6 +36,12 @@
       ],
       "expo-sharing",
       "expo-status-bar"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "b0487851-7e26-4be5-addb-8202b21bb646"
+      }
+    },
+    "owner": "work.adarsh"
   }
 }

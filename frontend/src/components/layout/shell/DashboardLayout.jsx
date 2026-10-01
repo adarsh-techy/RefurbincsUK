@@ -4,6 +4,7 @@ import { Outlet, Link } from 'react-router-dom';
 import Sidebar from './Sidebar';
 import Navbar from './Navbar';
 import PortalHeader from './PortalHeader';
+import AppFooter from './AppFooter';
 import ClientNotificationBell from '../widgets/ClientNotificationBell';
 import MessagesHeaderIcon from '../widgets/MessagesHeaderIcon';
 import ThemeToggle from '../theme/ThemeToggle';
@@ -108,6 +109,7 @@ function DashboardLayout() {
             <Outlet />
           </Suspense>
         </main>
+        <AppFooter />
 
         {isCustomizerOpen && <ThemeCustomizerModal onClose={closeCustomizer} />}
       </div>
@@ -129,6 +131,7 @@ function DashboardLayout() {
             <Outlet />
           </Suspense>
         </main>
+        <AppFooter className="mb-16 md:mb-0" />
         {isCustomizerOpen && <ThemeCustomizerModal onClose={closeCustomizer} />}
       </div>
     );
@@ -142,7 +145,7 @@ function DashboardLayout() {
         style={{ backgroundColor: wrapperBgColor }}
       >
         <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-        <div className="flex min-w-0 flex-1 flex-col md:pl-64">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col md:pl-64">
           <header
             className={`sticky top-0 z-30 flex h-16 sm:h-20 shrink-0 items-center justify-between gap-2 sm:gap-3 px-3.5 sm:px-6 transition-colors shadow-xs border-b border-slate-200/80 dark:border-white/10 ${
               isAccentHeader ? 'text-white border-white/20' : ''
@@ -186,6 +189,7 @@ function DashboardLayout() {
               <Outlet />
             </Suspense>
           </main>
+          <AppFooter />
         </div>
 
         {isCustomizerOpen && <ThemeCustomizerModal onClose={closeCustomizer} />}
@@ -200,7 +204,7 @@ function DashboardLayout() {
       style={{ backgroundColor: wrapperBgColor }}
     >
       <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-      <div className="flex min-w-0 flex-1 flex-col md:pl-64">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col md:pl-64">
         <Navbar onMenuClick={() => setMobileNavOpen(true)} />
         <main
           className="min-w-0 flex-1 p-3 sm:p-6 transition-colors pb-safe"
@@ -210,6 +214,7 @@ function DashboardLayout() {
             <Outlet />
           </Suspense>
         </main>
+        <AppFooter />
       </div>
       <LowStockAlert />
       <UnserviceableBatteriesAlert />

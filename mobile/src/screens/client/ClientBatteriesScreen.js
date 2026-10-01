@@ -327,7 +327,7 @@ export default function ClientBatteriesScreen() {
       ) : (
         <FlatList
           data={filteredBatteries}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={(item) => `${item.id}-${item.intake_id ?? item.return_id ?? 'none'}`}
           contentContainerClassName="p-4 gap-3 pb-16"
           refreshControl={
             <RefreshControl
