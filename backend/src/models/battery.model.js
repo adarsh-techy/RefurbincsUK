@@ -797,7 +797,7 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [], durati
            testing_duration_seconds = CASE 
              WHEN status = 'in_testing' THEN 
                CASE
-                 WHEN $6::int IS NOT NULL AND $6::int > 0 THEN $6::int
+                 WHEN $2::int IS NOT NULL AND $2::int > 0 THEN $2::int
                  ELSE EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int
                END
              ELSE testing_duration_seconds 
@@ -806,7 +806,7 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [], durati
            work_started_at = NULL
        WHERE id = $1 AND status IN ('in_progress', 'in_testing')
        RETURNING *`,
-      [id, staffId, reasonId, note || null, Array.isArray(photoUrls) ? photoUrls : [], durationSeconds]
+      [id, durationSeconds]
     );
     if (rows.length === 0) {
       await client.query('ROLLBACK');
