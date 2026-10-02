@@ -11,6 +11,7 @@ function TechnicianProfilePage() {
   const user = useSelector((state) => state.auth.user);
 
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -19,6 +20,7 @@ function TechnicianProfilePage() {
 
   function closePasswordForm() {
     setShowPasswordForm(false);
+    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setError(null);
@@ -35,8 +37,9 @@ function TechnicianProfilePage() {
     setSubmitting(true);
     setError(null);
     try {
-      const { data } = await apiClient.patch('/auth/change-password', { newPassword });
+      const { data } = await apiClient.patch('/auth/change-password', { currentPassword, newPassword });
       dispatch(setUser(data.user));
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setSuccess(true);
@@ -119,6 +122,20 @@ function TechnicianProfilePage() {
               >
                 Cancel
               </button>
+            </div>
+
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-500 dark:text-neutral-400">
+                Current Password
+              </label>
+              <input
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                placeholder="Enter current password"
+                required
+                className="w-full rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-surface-950 dark:text-white"
+              />
             </div>
 
             <div>

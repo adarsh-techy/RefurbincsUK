@@ -15,6 +15,13 @@ async function findAll({ roles } = {}) {
   return rows;
 }
 
+// True once at least one user account exists — gates the bootstrap-only
+// /auth/register endpoint.
+async function anyExist() {
+  const { rows } = await db.query('SELECT 1 FROM users LIMIT 1');
+  return rows.length > 0;
+}
+
 async function findById(id) {
   const { rows } = await db.query(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1`, [id]);
   return rows[0];
@@ -62,4 +69,4 @@ async function remove(id) {
   await db.query('DELETE FROM users WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, findById, findByEmail, create, update, updatePassword, remove };
+module.exports = { findAll, anyExist, findById, findByEmail, create, update, updatePassword, remove };

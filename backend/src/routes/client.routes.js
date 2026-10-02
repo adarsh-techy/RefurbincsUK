@@ -18,9 +18,10 @@ const uploadLogo = multer({
 });
 
 router.use(requireAuth);
-// Read is open to any authenticated user: the Truck Intake form needs the
-// client list for its dropdown regardless of who can manage clients.
-router.get('/', clientController.list);
+// Office roles only: the Truck Intake form needs the client list for its
+// dropdown, but a client login must never see other clients (or their
+// billing via /:id below).
+router.get('/', requireRole('super_admin', 'admin', 'staff'), clientController.list);
 router.get('/me/dashboard', requireRole('client'), clientController.myDashboard);
 router.get('/me/batteries', requireRole('client'), clientController.myBatteries);
 router.post('/me/batteries/pack-to-repair', requireRole('client'), clientController.packBatteryForRepair);
@@ -36,7 +37,7 @@ router.get('/me/transactions', requireRole('client'), clientController.myTransac
 router.get('/me/history', requireRole('client'), clientController.myHistory);
 router.get('/me/invoices', requireRole('client'), clientController.myInvoices);
 router.get('/me/notifications', requireRole('client'), clientController.myNotifications);
-router.get('/:id', clientController.getById);
+router.get('/:id', requireRole('super_admin', 'admin', 'staff'), clientController.getById);
 router.post('/', requirePermission('clients'), uploadLogo.single('logo'), clientController.create);
 // Editing/removing clients is super_admin only, distinct from the 'clients'
 // permission (which only covers adding new clients).

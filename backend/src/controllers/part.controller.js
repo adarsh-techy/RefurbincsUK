@@ -28,12 +28,18 @@ async function getById(req, res, next) {
   }
 }
 
+function formatPartName(str) {
+  if (!str || typeof str !== 'string') return str;
+  const trimmed = str.trim();
+  return trimmed ? trimmed.charAt(0).toUpperCase() + trimmed.slice(1) : trimmed;
+}
+
 async function create(req, res, next) {
   try {
     const { name, sku, quantity, repairCost, serviceCharge } = req.body;
     const part = await partModel.create({
-      name,
-      sku,
+      name: formatPartName(name),
+      sku: sku ? sku.trim() : sku,
       quantity: quantity || 0,
       repairCost: repairCost || 0,
       serviceCharge: serviceCharge || 0,
@@ -49,8 +55,8 @@ async function update(req, res, next) {
   try {
     const { name, sku, quantity, repairCost, serviceCharge } = req.body;
     const part = await partModel.update(req.params.id, {
-      name,
-      sku,
+      name: formatPartName(name),
+      sku: sku ? sku.trim() : sku,
       quantity: quantity || 0,
       repairCost: repairCost || 0,
       serviceCharge: serviceCharge || 0,

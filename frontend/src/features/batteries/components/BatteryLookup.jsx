@@ -81,7 +81,12 @@ function BatteryLookup() {
                   onClick={() => goToBattery(b.battery_code)}
                   className="flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-sm hover:bg-brand-50 dark:hover:bg-surface-800"
                 >
-                  <span className="font-medium text-slate-800 dark:text-neutral-100">{b.battery_code}</span>
+                  <div className="flex flex-col">
+                    <span className="font-medium text-slate-800 dark:text-neutral-100">{b.battery_code}</span>
+                    {b.serial_number && (
+                      <span className="text-[11px] text-slate-400 dark:text-neutral-400">SN: {b.serial_number}</span>
+                    )}
+                  </div>
                   <StatusBadge status={b.status} />
                 </button>
               </li>

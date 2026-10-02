@@ -18,9 +18,12 @@ const pool = env.db.url
       password: env.db.password,
     });
 
+// Fired when an *idle* pooled connection drops (managed Postgres such as
+// Neon closes idle connections routinely). The pool discards that client and
+// opens a fresh one on the next query, so log it and carry on — exiting here
+// took the whole API down, dropping every in-flight request.
 pool.on('error', (err) => {
-  console.error('Unexpected PostgreSQL error', err);
-  process.exit(1);
+  console.error('Unexpected PostgreSQL error on idle client', err);
 });
 
 module.exports = {

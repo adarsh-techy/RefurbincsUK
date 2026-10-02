@@ -28,7 +28,9 @@ export function getBaseUrl() {
 
 const apiClient = axios.create({
   baseURL: getBaseUrl(),
-  timeout: 15000,
+  // Generous on purpose: the hosted backend can take ~50s to wake from sleep
+  // on the first request, and a 15s limit made that look like a broken app.
+  timeout: 60000,
 });
 
 apiClient.interceptors.request.use(async (config) => {

@@ -18,6 +18,7 @@ export default function ProfileScreen() {
   const navigation = useNavigation();
   const user = useSelector((state) => state.auth.user);
   const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -26,6 +27,7 @@ export default function ProfileScreen() {
 
   function closePasswordForm() {
     setShowPasswordForm(false);
+    setCurrentPassword('');
     setNewPassword('');
     setConfirmPassword('');
     setError(null);
@@ -34,6 +36,10 @@ export default function ProfileScreen() {
 
   async function handleSubmit() {
     setSuccess(false);
+    if (!currentPassword) {
+      setError('Enter your current password');
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -41,8 +47,9 @@ export default function ProfileScreen() {
     setSubmitting(true);
     setError(null);
     try {
-      const { data } = await apiClient.patch('/auth/change-password', { newPassword });
+      const { data } = await apiClient.patch('/auth/change-password', { currentPassword, newPassword });
       dispatch(setUser(data.user));
+      setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
       setSuccess(true);
@@ -140,6 +147,17 @@ export default function ProfileScreen() {
               </TouchableOpacity>
             </View>
             <View className="gap-3.5">
+              <View>
+                <Text className="mb-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">Current Password</Text>
+                <TextInput
+                  value={currentPassword}
+                  onChangeText={setCurrentPassword}
+                  secureTextEntry
+                  placeholder="Enter current password"
+                  placeholderTextColor="#64748b"
+                  className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white focus:border-blue-500"
+                />
+              </View>
               <View>
                 <Text className="mb-1.5 text-xs font-semibold text-slate-500 dark:text-slate-400">New Password</Text>
                 <TextInput

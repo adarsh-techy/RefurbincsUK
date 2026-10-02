@@ -45,10 +45,13 @@ async function getById(req, res, next) {
 
     if (isClientRole(req.user.role)) {
       const client = await clientModel.findByUserId(req.user.id);
-      if (client) {
-        clientId = client.id;
-        clientName = client.name;
+      // Without a linked client record there's nothing to scope to — reject
+      // rather than fall through to an unscoped (all clients) lookup.
+      if (!client) {
+        return res.status(409).json({ message: 'Account is not linked to a client record.' });
       }
+      clientId = client.id;
+      clientName = client.name;
     }
 
     const ticket = await ticketModel.findById(id, { clientId, clientName });
@@ -126,10 +129,13 @@ async function addMessage(req, res, next) {
     let clientName = null;
     if (isClientRole(req.user.role)) {
       const client = await clientModel.findByUserId(req.user.id);
-      if (client) {
-        clientId = client.id;
-        clientName = client.name;
+      // Without a linked client record there's nothing to scope to — reject
+      // rather than fall through to an unscoped (all clients) lookup.
+      if (!client) {
+        return res.status(409).json({ message: 'Account is not linked to a client record.' });
       }
+      clientId = client.id;
+      clientName = client.name;
     }
 
     const ticket = await ticketModel.findById(id, { clientId, clientName });
@@ -171,10 +177,13 @@ async function updateStatus(req, res, next) {
     let clientName = null;
     if (isClientRole(req.user.role)) {
       const client = await clientModel.findByUserId(req.user.id);
-      if (client) {
-        clientId = client.id;
-        clientName = client.name;
+      // Without a linked client record there's nothing to scope to — reject
+      // rather than fall through to an unscoped (all clients) lookup.
+      if (!client) {
+        return res.status(409).json({ message: 'Account is not linked to a client record.' });
       }
+      clientId = client.id;
+      clientName = client.name;
     }
 
     const ticket = await ticketModel.findById(id, { clientId, clientName });
@@ -198,10 +207,13 @@ async function getStats(req, res, next) {
 
     if (isClientRole(req.user.role)) {
       const client = await clientModel.findByUserId(req.user.id);
-      if (client) {
-        clientId = client.id;
-        clientName = client.name;
+      // Without a linked client record there's nothing to scope to — reject
+      // rather than fall through to an unscoped (all clients) lookup.
+      if (!client) {
+        return res.status(409).json({ message: 'Account is not linked to a client record.' });
       }
+      clientId = client.id;
+      clientName = client.name;
     }
 
     const stats = await ticketModel.getStats({ clientId, clientName });

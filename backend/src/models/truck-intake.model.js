@@ -60,12 +60,22 @@ async function verifyArrival(id, userId) {
            verified_at = now(),
            verified_by_user_id = $2
        WHERE id = $1
+         AND status IS DISTINCT FROM 'verified'
        RETURNING *`,
       [intakeId, userId]
     );
 
     if (rows.length === 0) {
       await client.query('ROLLBACK');
+      // Already verified (stale tab, double click, retry): verifying again
+      // would reset every battery on this truck — including ones already in
+      // testing, repaired or returned — back to 'in_repair'.
+      const { rows: existing } = await db.query('SELECT id FROM truck_intakes WHERE id = $1', [intakeId]);
+      if (existing.length > 0) {
+        const err = new Error('This truck intake has already been verified.');
+        err.status = 409;
+        throw err;
+      }
       return null;
     }
 

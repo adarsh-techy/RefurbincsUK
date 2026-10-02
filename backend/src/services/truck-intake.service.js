@@ -2,6 +2,8 @@ const truckIntakeModel = require('../models/truck-intake.model');
 const batteryModel = require('../models/battery.model');
 const serviceModel = require('../models/service.model');
 
+const MAX_NEW_BATTERIES_PER_INTAKE = 5000;
+
 // Creates one truck intake record plus a uniquely-coded battery row for each
 // brand-new battery delivered (batteryCount), and attaches any already-
 // tracked batteries scanned in by their existing QR code (scannedBatteryIds)
@@ -45,6 +47,16 @@ async function createIntakeWithBatteries({
     }
     return battery;
   });
+
+  // A typo'd count (or a bad spreadsheet cell) would otherwise try to build
+  // and insert millions of battery rows, exhausting memory.
+  if (Number(batteryCount || 0) > MAX_NEW_BATTERIES_PER_INTAKE) {
+    const err = new Error(
+      `A single truck intake can register at most ${MAX_NEW_BATTERIES_PER_INTAKE.toLocaleString()} new batteries.`
+    );
+    err.status = 400;
+    throw err;
+  }
 
   const totalCount = Number(batteryCount || 0) + scannedBatteries.length;
   const intake = await truckIntakeModel.create({

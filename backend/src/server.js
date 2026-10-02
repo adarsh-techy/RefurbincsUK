@@ -19,6 +19,13 @@ const CERT_DIR = path.join(__dirname, '..', 'certs');
 const KEY_PATH = path.join(CERT_DIR, 'key.pem');
 const CERT_PATH = path.join(CERT_DIR, 'cert.pem');
 
+// Last-resort net: a rejected promise nobody awaited (e.g. a DB blip inside a
+// fire-and-forget call) would otherwise terminate the process on Node 15+,
+// dropping every in-flight request. Log it and keep serving.
+process.on('unhandledRejection', (reason) => {
+  console.error('Unhandled promise rejection:', reason);
+});
+
 async function start() {
   try {
     const { rows } = await db.query(

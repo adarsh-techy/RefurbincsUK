@@ -1,8 +1,16 @@
 /**
  * Demo Login Credentials
  * Dedicated configuration file for quick-fill credentials on the Login page.
+ *
+ * Only enabled in local dev, or when a build explicitly opts in with
+ * VITE_ENABLE_DEMO_LOGIN=true. Otherwise both exports are null and the
+ * bundler drops the credentials entirely, so a production build doesn't
+ * ship working logins (including super admin) to anyone who opens the site.
  */
-export const DEMO_CREDENTIALS = {
+export const DEMO_LOGIN_ENABLED =
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
+
+export const DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
   superAdmin: {
     id: 'superAdmin',
     label: 'Super Admin',
@@ -29,10 +37,10 @@ export const DEMO_CREDENTIALS = {
   },
 };
 
-export const MOBILE_DEMO_CREDENTIALS = {
+export const MOBILE_DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
   adarsh: {
     id: 'adarsh',
-    label: 'Adarsh',
+    label: 'Akshay tech',
     icon: '🔧',
     role: 'Technician',
     email: 'akshay@gmail.com',
@@ -41,7 +49,7 @@ export const MOBILE_DEMO_CREDENTIALS = {
   },
   akhil: {
     id: 'akhil',
-    label: 'Akhil',
+    label: 'Akhil super',
     icon: '⚡',
     role: 'Technician',
     email: 'akhil@gmail.com',

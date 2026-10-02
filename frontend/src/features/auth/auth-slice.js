@@ -32,9 +32,15 @@ export const register = createAsyncThunk(
 // Validates the stored token against the backend. Rejects (and the reducer
 // below clears storage) if the token is missing, expired, or invalid, so a
 // stale localStorage entry can never grant dashboard access on its own.
-export const verifySession = createAsyncThunk('auth/verifySession', async () => {
-  const { data } = await apiClient.get('/auth/me');
-  return data.user;
+export const verifySession = createAsyncThunk('auth/verifySession', async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await apiClient.get('/auth/me');
+    return data.user;
+  } catch (err) {
+    // Only a real 401 means the session is invalid; a 5xx or network blip
+    // (e.g. the backend waking from sleep) must not sign the user out.
+    return rejectWithValue({ unauthorized: err.response?.status === 401 });
+  }
 });
 
 const storedUser = localStorage.getItem('user');
@@ -110,12 +116,14 @@ const authSlice = createSlice({
         state.user = action.payload;
         localStorage.setItem('user', JSON.stringify(action.payload));
       })
-      .addCase(verifySession.rejected, (state) => {
+      .addCase(verifySession.rejected, (state, action) => {
         state.authChecked = true;
-        state.user = null;
-        state.token = null;
-        localStorage.removeItem('token');
-        localStorage.removeItem('user');
+        if (action.payload?.unauthorized) {
+          state.user = null;
+          state.token = null;
+          localStorage.removeItem('token');
+          localStorage.removeItem('user');
+        }
       });
   },
 });

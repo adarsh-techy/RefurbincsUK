@@ -82,6 +82,9 @@ export default function LoginScreen() {
   const [testResult, setTestResult] = useState(null);
 
   useEffect(() => {
+    // The server override is a development tool only (see the __DEV__ guard
+    // on its button below) — a release build always uses the built-in URL.
+    if (!__DEV__) return;
     AsyncStorage.getItem('custom_server_url').then((val) => {
       if (val && !val.includes('192.0.0.2')) {
         setServerUrl(val);
@@ -137,7 +140,8 @@ export default function LoginScreen() {
         contentContainerClassName="flex-grow justify-center px-6 py-10"
         keyboardShouldPersistTaps="handled"
       >
-        {/* Top Right Server Settings Button */}
+        {/* Top Right Server Settings Button — dev builds only */}
+        {__DEV__ && (
         <View className="items-end mb-2">
           <TouchableOpacity
             onPress={() => setShowSettings(true)}
@@ -147,6 +151,7 @@ export default function LoginScreen() {
             <Text className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Server</Text>
           </TouchableOpacity>
         </View>
+        )}
 
         {/* ── Brand Mark ────────────────────────────────────────────────── */}
         <View className="mb-9 items-center">
@@ -189,7 +194,9 @@ export default function LoginScreen() {
             Sign in with your client or staff credentials to continue.
           </Text>
 
-          {/* Quick Fill Accounts */}
+          {/* Quick Fill Accounts — dev builds only, so a release APK doesn't
+              ship working logins to whoever installs it */}
+          {__DEV__ && (
           <View className="mb-5">
             <Text className="mb-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
               Quick Fill Logins
@@ -218,6 +225,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
             </View>
           </View>
+          )}
 
           <View className="gap-4">
             <View>

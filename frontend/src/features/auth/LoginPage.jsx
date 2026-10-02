@@ -1,11 +1,11 @@
 import { useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/REFURBNICS.png';
 import SplashIntro from './SplashIntro';
-import { DEMO_CREDENTIALS, MOBILE_DEMO_CREDENTIALS } from '../../config/demo-credentials';
+import { DEMO_LOGIN_ENABLED, DEMO_CREDENTIALS, MOBILE_DEMO_CREDENTIALS } from '../../config/demo-credentials';
 
 const inputClasses =
   'w-full rounded-md border border-slate-300 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
@@ -13,8 +13,13 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700';
 const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400';
 
 function LoginPage() {
-  const defaultEmail = import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || DEMO_CREDENTIALS.superAdmin.email;
-  const defaultPassword = import.meta.env.VITE_DEFAULT_LOGIN_PASSWORD || DEMO_CREDENTIALS.superAdmin.password;
+  // Pre-filled only when demo logins are enabled (see config/demo-credentials.js)
+  const defaultEmail = DEMO_LOGIN_ENABLED
+    ? import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || DEMO_CREDENTIALS.superAdmin.email
+    : '';
+  const defaultPassword = DEMO_LOGIN_ENABLED
+    ? import.meta.env.VITE_DEFAULT_LOGIN_PASSWORD || DEMO_CREDENTIALS.superAdmin.password
+    : '';
 
   const [email, setEmail] = useState(defaultEmail);
   const [password, setPassword] = useState(defaultPassword);
@@ -30,7 +35,13 @@ function LoginPage() {
     // Successful login plays the Eswincha intro screen first; it navigates
     // into the app once the animation finishes (see finishSplash).
     if (login.fulfilled.match(result)) {
-      setShowSplash(true);
+      const role = result.payload?.user?.role;
+      const isStaffRole = role === 'staff' || role === 'technician' || role === 'supervisor';
+      if (isStaffRole) {
+        finishSplash();
+      } else {
+        setShowSplash(true);
+      }
     }
   }
 
@@ -53,6 +64,7 @@ function LoginPage() {
           </div>
 
           {/* Demo quick-fill credentials */}
+          {DEMO_LOGIN_ENABLED && (
           <div className="mt-4 flex flex-col gap-2">
             <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-0.5">
               <span>Quick Fill Credentials:</span>
@@ -124,6 +136,7 @@ function LoginPage() {
               </button>
             </div>
           </div>
+          )}
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>
@@ -213,14 +226,7 @@ function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-6 text-center text-sm text-slate-500">
-            Need an account?{' '}
-            <Link to="/register" className="font-medium text-emerald-700 hover:underline">
-              Create one
-            </Link>
-          </p>
-
-          <p className="mt-4 text-center text-xs text-slate-400">
+          <p className="mt-6 text-center text-xs text-slate-400">
             © {new Date().getFullYear()} Refurbinics. All rights reserved.
           </p>
           <p className="mt-1 text-center text-xs text-slate-500">

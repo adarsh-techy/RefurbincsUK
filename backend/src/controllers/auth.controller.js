@@ -62,14 +62,19 @@ async function login(req, res, next) {
   }
 }
 
-// TEMPORARY: open self-registration for initial setup, before any admin
-// accounts exist. Remove this endpoint (and the frontend register page)
-// once the real admin-management flow (POST /api/users, super_admin only)
-// is in use. Grants full permissions since it's just a bootstrap tool, not
-// the real permission-assignment UI.
+// Bootstrap only: creates the very first admin account on an empty database.
+// Once any user exists this is closed — it's unauthenticated and grants full
+// permissions, so leaving it open lets anyone on the internet make themselves
+// a super admin. Further accounts go through POST /api/users (super_admin).
 async function register(req, res, next) {
   try {
     const { name, email, password, role } = req.body;
+
+    if (await userModel.anyExist()) {
+      return res.status(403).json({
+        message: 'Registration is closed. Ask a super admin to create your account.',
+      });
+    }
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
@@ -95,16 +100,22 @@ async function register(req, res, next) {
   }
 }
 
-async function me(req, res) {
-  let staffRole = undefined;
-  const staff = await staffModel.findByUserId(req.user.id);
-  if (staff?.role) {
-    staffRole = staff.role;
-  } else if (req.user.role === 'technician') {
-    staffRole = 'technician';
+async function me(req, res, next) {
+  try {
+    let staffRole = undefined;
+    const staff = await staffModel.findByUserId(req.user.id);
+    if (staff?.role) {
+      staffRole = staff.role;
+    } else if (req.user.role === 'technician') {
+      staffRole = 'technician';
+    }
+    const clientLogoPath = await attachClientLogo(req.user);
+    res.json({ user: { ...req.user, staff_role: staffRole, client_logo_path: clientLogoPath } });
+  } catch (err) {
+    // Without this a DB hiccup here was an unhandled rejection, which kills
+    // the whole Node process (Express 4 doesn't catch async handler errors).
+    next(err);
   }
-  const clientLogoPath = await attachClientLogo(req.user);
-  res.json({ user: { ...req.user, staff_role: staffRole, client_logo_path: clientLogoPath } });
 }
 
 // Sets the caller's own password — used by the forced first-login change
@@ -127,7 +138,9 @@ async function changePassword(req, res, next) {
       }
       const fullUser = await userModel.findByEmail(req.user.email);
       if (!fullUser || !(await bcrypt.compare(currentPassword, fullUser.password_hash))) {
-        return res.status(401).json({ message: 'Current password is incorrect' });
+        // 400, not 401: the apps treat any 401 as "session expired" and log
+        // the user out, which would hide this message behind a login screen.
+        return res.status(400).json({ message: 'Current password is incorrect' });
       }
     }
 

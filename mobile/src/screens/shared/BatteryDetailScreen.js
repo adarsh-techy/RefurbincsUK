@@ -252,6 +252,7 @@ export default function BatteryDetailScreen() {
   const [showRepairedByModal, setShowRepairedByModal] = useState(false);
   const [repairedByInfo, setRepairedByInfo] = useState(null);
   const [showTestChoiceModal, setShowTestChoiceModal] = useState(false);
+  const [showConfirmSubmitForTestingModal, setShowConfirmSubmitForTestingModal] = useState(false);
   const [showCompletedModal, setShowCompletedModal] = useState(false);
   const [showSubmittedModal, setShowSubmittedModal] = useState(false);
   const [isSubmittedSuccess, setIsSubmittedSuccess] = useState(false);
@@ -630,7 +631,12 @@ export default function BatteryDetailScreen() {
 
   const workStartedAt = result?.battery?.work_started_at;
   useEffect(() => {
-    if (result?.battery?.status !== 'in_progress' || !workStartedAt || isClient) return;
+    if (result?.battery?.status !== 'in_progress' || !workStartedAt || isClient || showIssueForm) {
+      if (result?.battery?.status !== 'in_progress' || !workStartedAt) {
+        setElapsedSeconds(0);
+      }
+      return;
+    }
     const startMs = new Date(workStartedAt).getTime();
     function tick() {
       setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
@@ -638,11 +644,16 @@ export default function BatteryDetailScreen() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [result?.battery?.status, workStartedAt, isClient]);
+  }, [result?.battery?.status, workStartedAt, isClient, showIssueForm]);
 
   const testingStartedAt = result?.battery?.testing_started_at;
   useEffect(() => {
-    if (result?.battery?.status !== 'in_testing' || !testingStartedAt || isClient) return;
+    if (result?.battery?.status !== 'in_testing' || !testingStartedAt || isClient || showTestingUnserviceableForm) {
+      if (result?.battery?.status !== 'in_testing' || !testingStartedAt) {
+        setTestingElapsedSeconds(0);
+      }
+      return;
+    }
     const startMs = new Date(testingStartedAt).getTime();
     function tick() {
       setTestingElapsedSeconds(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
@@ -650,7 +661,7 @@ export default function BatteryDetailScreen() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [result?.battery?.status, testingStartedAt, isClient]);
+  }, [result?.battery?.status, testingStartedAt, isClient, showTestingUnserviceableForm]);
 
   async function handleStartWork() {
     if (['unserviceable', 'tested_parts_removed', 'recycled'].includes(result?.battery?.status)) {
@@ -704,6 +715,8 @@ export default function BatteryDetailScreen() {
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
       });
+      setTestingElapsedSeconds(0);
+      setElapsedSeconds(0);
       setSelectedServiceIds([]);
       setTestingNotes('');
       await load();
@@ -791,6 +804,8 @@ export default function BatteryDetailScreen() {
         note: issueNote || undefined,
         photos: photosPayload.length > 0 ? photosPayload : undefined,
       });
+      setElapsedSeconds(0);
+      setTestingElapsedSeconds(0);
       setShowIssueForm(false);
       setShowTestingUnserviceableForm(false);
       setSelectedReasonId(null);
@@ -814,6 +829,8 @@ export default function BatteryDetailScreen() {
       await apiClient.patch(`/batteries/${result.battery.id}/pass-to-tech`, {
         note: issueNote || undefined,
       });
+      setElapsedSeconds(0);
+      setTestingElapsedSeconds(0);
       setShowTestingDecisionModal(false);
       setShowTestingUnserviceableForm(false);
       setSelectedServiceIds([]);
@@ -871,6 +888,15 @@ export default function BatteryDetailScreen() {
     setSelectedPartIds((prev) => (prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id]));
   }
 
+  function requestSubmitForTesting() {
+    if (selectedPartIds.length === 0) {
+      setActionError('Select at least one part');
+      return;
+    }
+    setActionError(null);
+    setShowConfirmSubmitForTestingModal(true);
+  }
+
   async function handleComplete() {
     if (selectedPartIds.length === 0) {
       setActionError('Select at least one part');
@@ -890,6 +916,7 @@ export default function BatteryDetailScreen() {
       }
       setSelectedPartIds([]);
       setNotes('');
+      setShowConfirmSubmitForTestingModal(false);
       // A technician who can't test just gets a done confirmation. A
       // supervisor doing their own repair gets a choice: test this
       // battery right now, or step away and leave it queued for testing.
@@ -1385,7 +1412,7 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              This battery has been successfully tested and marked as repaired. Ready for return to client.
+              Test work is completed and testing timer has stopped. This battery has been successfully tested and marked as repaired. Ready for return to client.
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -1440,7 +1467,7 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              This unit has been declared unserviceable and moved to the recycling queue.
+              Work on this battery is completed and the timer has stopped. This unit has been declared unserviceable and moved to the recycling queue.
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -2027,7 +2054,7 @@ export default function BatteryDetailScreen() {
                   />
 
                   <TouchableOpacity
-                    onPress={handleComplete}
+                    onPress={requestSubmitForTesting}
                     disabled={submitting}
                     className="mt-3 items-center rounded-xl bg-blue-600 py-3.5 shadow-md disabled:opacity-50"
                   >
@@ -2645,6 +2672,105 @@ export default function BatteryDetailScreen() {
           </Modal>
         );
       })()}
+
+      {/* ── Confirm Submit for Testing Modal ── */}
+      <Modal
+        visible={showConfirmSubmitForTestingModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowConfirmSubmitForTestingModal(false)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/70 px-5">
+          <View className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-5 shadow-2xl border border-slate-200 dark:border-slate-800">
+            <View className="flex-row items-center gap-3 mb-3">
+              <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-900/40">
+                <Icon name="check-circle" size={22} color="#2563eb" />
+              </View>
+              <View className="flex-1">
+                <Text className="text-base font-extrabold text-slate-900 dark:text-white">
+                  Submit for Testing?
+                </Text>
+                <Text className="text-xs text-slate-500 dark:text-slate-400">
+                  Please verify fitted parts
+                </Text>
+              </View>
+            </View>
+
+            <View className="mb-4 rounded-2xl bg-slate-50 dark:bg-slate-800/60 p-3.5 border border-slate-200 dark:border-slate-700">
+              <View className="flex-row justify-between pb-2 border-b border-slate-200 dark:border-slate-700">
+                <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">Battery Code</Text>
+                <Text className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                  {battery?.battery_code || code}
+                </Text>
+              </View>
+
+              {battery?.serial_number ? (
+                <View className="flex-row justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                  <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">Battery Number</Text>
+                  <Text className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                    {battery.serial_number}
+                  </Text>
+                </View>
+              ) : null}
+
+              {elapsedSeconds > 0 ? (
+                <View className="flex-row justify-between py-2 border-b border-slate-200 dark:border-slate-700">
+                  <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">Repair Duration</Text>
+                  <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">
+                    {formatDuration(elapsedSeconds)}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View className="pt-2">
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+                  Fitted Parts ({selectedPartIds.length})
+                </Text>
+                {parts
+                  .filter((p) => selectedPartIds.includes(p.id))
+                  .map((p) => (
+                    <Text key={p.id} className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1">
+                      • {p.name}
+                    </Text>
+                  ))}
+              </View>
+
+              {notes?.trim() ? (
+                <View className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-0.5">Notes</Text>
+                  <Text className="text-xs text-slate-600 dark:text-slate-300 italic">{notes}</Text>
+                </View>
+              ) : null}
+            </View>
+
+            {actionError ? (
+              <View className="mb-3 rounded-xl bg-red-50 dark:bg-red-950/40 p-2.5 border border-red-200 dark:border-red-900/40">
+                <Text className="text-xs text-center font-semibold text-red-600 dark:text-red-400">{actionError}</Text>
+              </View>
+            ) : null}
+
+            <TouchableOpacity
+              onPress={handleComplete}
+              disabled={submitting}
+              className="w-full items-center rounded-2xl bg-blue-600 py-3.5 shadow-md mb-2 active:bg-blue-700 disabled:opacity-50"
+            >
+              {submitting ? (
+                <ActivityIndicator color="#fff" />
+              ) : (
+                <Text className="text-sm font-bold text-white">✓ Yes, Submit for Testing</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setShowConfirmSubmitForTestingModal(false)}
+              disabled={submitting}
+              className="w-full items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 active:bg-slate-200 dark:active:bg-slate-700"
+            >
+              <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">Cancel / Keep Editing</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* ── Test Now / Exit Choice Modal (For a supervisor who just
            repaired a battery themselves and can also test it) ──────────── */}

@@ -6,7 +6,7 @@ const { requireAuth, requireRole } = require('../middlewares/auth');
 router.use(requireAuth);
 
 // Client or Admin can submit rating
-router.post('/', ratingController.create);
+router.post('/', requireRole('client', 'recycle_client', 'super_admin', 'admin', 'staff'), ratingController.create);
 
 // Client can view their previous ratings
 router.get('/my', requireRole('client', 'recycle_client'), ratingController.myRatings);

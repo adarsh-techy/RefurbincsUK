@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import QRCode from 'qrcode';
 import apiClient from '../../../services/api-client';
 import { isIntakeUnverified as intakeIsUnverified } from '../../../utils/permissions';
@@ -484,6 +484,7 @@ function ClientBatteryDetailView({
   onEditSerial = null,
 }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const authUser = useSelector((state) => state.auth.user);
   const isAdminRole = authUser?.role === 'admin';
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -637,7 +638,9 @@ function ClientBatteryDetailView({
         <button
           type="button"
           onClick={() => {
-            if (window.history.state?.idx > 0) {
+            if (location.state?.from) {
+              navigate(location.state.from);
+            } else if (window.history.state?.idx > 0) {
               navigate(-1);
             } else if (isAdmin) {
               navigate('/batteries/recycled');
@@ -648,7 +651,15 @@ function ClientBatteryDetailView({
           className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200/80 hover:bg-slate-50 hover:border-slate-300 dark:bg-white/5 dark:text-neutral-200 dark:border-white/10 dark:hover:bg-white/10 shadow-xs transition-all cursor-pointer"
         >
           <FiArrowLeft className="w-4 h-4 text-emerald-500" />
-          <span>{isAdmin ? 'Back to Recycled Batteries' : 'Back to Fleet Overview'}</span>
+          <span>
+            {location.state?.from?.includes('batch=')
+              ? 'Back to Truck Details'
+              : location.state?.from
+              ? 'Back'
+              : isAdmin
+              ? 'Back to Recycled Batteries'
+              : 'Back to Fleet Overview'}
+          </span>
         </button>
 
         <div className="flex items-center gap-2.5">
@@ -1935,9 +1946,11 @@ function ClientBatteryDetailView({
 function BatteryDetailPage() {
   const { code } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const user = useSelector((state) => state.auth.user);
   const isTechnician = user?.role === 'technician';
   const isStaff = user?.role === 'staff';
+  const isStaffRole = isStaff || isTechnician || user?.role === 'supervisor';
   const isClient = user?.role === 'client';
   const isRecycleClient = user?.role === 'recycle_client';
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
@@ -2042,7 +2055,9 @@ function BatteryDetailPage() {
   const canShowBack = fallbackBackTo !== null;
 
   function handleBack() {
-    if (window.history.state && window.history.state.idx > 0) {
+    if (location.state?.from) {
+      navigate(location.state.from);
+    } else if (window.history.state && window.history.state.idx > 0) {
       navigate(-1);
     } else if (fallbackBackTo) {
       navigate(fallbackBackTo);
@@ -2350,102 +2365,104 @@ function BatteryDetailPage() {
         </Modal>
       )}
 
-      <div
-        className={`mb-6 flex flex-wrap items-center gap-4 rounded-xl border-l-4 border-y border-r p-5 shadow-sm dark:border-y-white/10 dark:border-r-white/10 ${
-          hasPendingPartsToRemove
-            ? 'border-l-amber-500 border-amber-300 bg-gradient-to-r from-amber-50 to-white dark:border-amber-700/60 dark:bg-surface-900 dark:from-amber-950/30 dark:to-surface-950'
-            : `border-slate-200 bg-gradient-to-r dark:bg-surface-900 ${STATUS_ACCENT[battery.status] || 'border-slate-300'} ${STATUS_BANNER_BG[battery.status] || 'from-white to-slate-50 dark:from-surface-900 dark:to-surface-950'}`
-        }`}
-      >
-        <span
-          className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+      {!isStaffRole && (
+        <div
+          className={`mb-6 flex flex-wrap items-center gap-4 rounded-xl border-l-4 border-y border-r p-5 shadow-sm dark:border-y-white/10 dark:border-r-white/10 ${
             hasPendingPartsToRemove
-              ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400/40 dark:bg-amber-900/40 dark:text-amber-300'
-              : (STATUS_ICON_BG[battery.status] || 'bg-slate-100 text-slate-500 dark:bg-surface-800 dark:text-neutral-300')
+              ? 'border-l-amber-500 border-amber-300 bg-gradient-to-r from-amber-50 to-white dark:border-amber-700/60 dark:bg-surface-900 dark:from-amber-950/30 dark:to-surface-950'
+              : `border-slate-200 bg-gradient-to-r dark:bg-surface-900 ${STATUS_ACCENT[battery.status] || 'border-slate-300'} ${STATUS_BANNER_BG[battery.status] || 'from-white to-slate-50 dark:from-surface-900 dark:to-surface-950'}`
           }`}
         >
-          {hasPendingPartsToRemove ? <FiTool className="h-6 w-6" /> : <FiCpu className="h-6 w-6" />}
-        </span>
-        <div className="flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <StatusBadge
-              status={battery.status}
-              isPassedBack={isPassedBack}
-              hasPendingParts={hasPendingPartsToRemove}
-            />
-            {!isTechnician && battery.client_name && (
-              <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
-                Client: {battery.client_name}
-              </span>
-            )}
-            {battery.serial_number ? (
-              <span
-                className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                  battery.serial_number_added_by_role === 'client'
-                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
-                    : 'bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300'
-                }`}
-              >
-                {battery.serial_number_added_by_role === 'client' && (
-                  <FiShield className="h-3 w-3 text-amber-600" />
-                )}
-                Battery No: {battery.serial_number}
-                {isAdmin && (
-                  <button
-                    type="button"
-                    onClick={() => openSerialModal(battery)}
-                    title="Edit Battery Number"
-                    className="ml-0.5 rounded text-slate-400 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-neutral-300 cursor-pointer"
-                  >
-                    <FiTool className="h-3 w-3" />
-                  </button>
-                )}
-              </span>
-            ) : user && !isTechnician && !isRecycleClient ? (
-              <button
-                type="button"
-                onClick={() => openSerialModal(battery)}
-                className="flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs font-medium text-slate-400 hover:border-blue-400 hover:text-blue-600 dark:border-white/20 dark:text-neutral-400 dark:hover:border-blue-500 dark:hover:text-blue-400 cursor-pointer"
-              >
-                + Assign Battery Number
-              </button>
-            ) : null}
+          <span
+            className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-full ${
+              hasPendingPartsToRemove
+                ? 'bg-amber-100 text-amber-800 ring-2 ring-amber-400/40 dark:bg-amber-900/40 dark:text-amber-300'
+                : (STATUS_ICON_BG[battery.status] || 'bg-slate-100 text-slate-500 dark:bg-surface-800 dark:text-neutral-300')
+            }`}
+          >
+            {hasPendingPartsToRemove ? <FiTool className="h-6 w-6" /> : <FiCpu className="h-6 w-6" />}
+          </span>
+          <div className="flex-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <StatusBadge
+                status={battery.status}
+                isPassedBack={isPassedBack}
+                hasPendingParts={hasPendingPartsToRemove}
+              />
+              {!isTechnician && battery.client_name && (
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
+                  Client: {battery.client_name}
+                </span>
+              )}
+              {battery.serial_number ? (
+                <span
+                  className={`flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                    battery.serial_number_added_by_role === 'client'
+                      ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/15 dark:text-amber-300'
+                      : 'bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300'
+                  }`}
+                >
+                  {battery.serial_number_added_by_role === 'client' && (
+                    <FiShield className="h-3 w-3 text-amber-600" />
+                  )}
+                  Battery No: {battery.serial_number}
+                  {isAdmin && (
+                    <button
+                      type="button"
+                      onClick={() => openSerialModal(battery)}
+                      title="Edit Battery Number"
+                      className="ml-0.5 rounded text-slate-400 hover:text-slate-600 dark:text-neutral-500 dark:hover:text-neutral-300 cursor-pointer"
+                    >
+                      <FiTool className="h-3 w-3" />
+                    </button>
+                  )}
+                </span>
+              ) : user && !isTechnician && !isRecycleClient ? (
+                <button
+                  type="button"
+                  onClick={() => openSerialModal(battery)}
+                  className="flex items-center gap-1 rounded-full border border-dashed border-slate-300 px-2.5 py-0.5 text-xs font-medium text-slate-400 hover:border-blue-400 hover:text-blue-600 dark:border-white/20 dark:text-neutral-400 dark:hover:border-blue-500 dark:hover:text-blue-400 cursor-pointer"
+                >
+                  + Assign Battery Number
+                </button>
+              ) : null}
 
-            {battery.status === 'in_progress' && battery.started_by_name && (
-              <span className="flex items-center gap-1 rounded-full bg-critical-100 px-2.5 py-0.5 text-xs font-medium text-critical-700 dark:bg-red-500/15 dark:text-red-300">
-                Being worked on by {battery.started_by_name}
-              </span>
+              {battery.status === 'in_progress' && battery.started_by_name && (
+                <span className="flex items-center gap-1 rounded-full bg-critical-100 px-2.5 py-0.5 text-xs font-medium text-critical-700 dark:bg-red-500/15 dark:text-red-300">
+                  Being worked on by {battery.started_by_name}
+                </span>
+              )}
+            </div>
+            <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
+              Tracked since{' '}
+              {battery.created_at ? new Date(battery.created_at).toLocaleDateString() : '—'}
+            </p>
+            {repairVisitsThisMonth > 1 && (
+              <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-critical-600 dark:text-red-400">
+                <FiAlertTriangle className="h-4 w-4" />
+                Serviced {repairVisitsThisMonth} times this month — worth a closer look.
+              </p>
             )}
           </div>
-          <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
-            Tracked since{' '}
-            {battery.created_at ? new Date(battery.created_at).toLocaleDateString() : '—'}
-          </p>
-          {repairVisitsThisMonth > 1 && (
-            <p className="mt-1.5 flex items-center gap-1.5 text-sm font-semibold text-critical-600 dark:text-red-400">
-              <FiAlertTriangle className="h-4 w-4" />
-              Serviced {repairVisitsThisMonth} times this month — worth a closer look.
-            </p>
-          )}
-        </div>
 
-        <button
-          type="button"
-          onClick={() => setShowQrModal(true)}
-          title="View / download QR code"
-          className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm transition-transform hover:scale-105 dark:border-white/10 dark:bg-surface-800 cursor-pointer"
-        >
-          {qrDataUrl ? (
-            <img
-              src={qrDataUrl}
-              alt={`QR code for battery ${battery.battery_code}`}
-              className="h-16 w-16 rounded-md bg-white p-0.5"
-            />
-          ) : (
-            <div className="h-16 w-16 animate-pulse rounded-md bg-slate-100 dark:bg-surface-800" />
-          )}
-        </button>
-      </div>
+          <button
+            type="button"
+            onClick={() => setShowQrModal(true)}
+            title="View / download QR code"
+            className="shrink-0 rounded-lg border border-slate-200 bg-white p-1.5 shadow-sm transition-transform hover:scale-105 dark:border-white/10 dark:bg-surface-800 cursor-pointer"
+          >
+            {qrDataUrl ? (
+              <img
+                src={qrDataUrl}
+                alt={`QR code for battery ${battery.battery_code}`}
+                className="h-16 w-16 rounded-md bg-white p-0.5"
+              />
+            ) : (
+              <div className="h-16 w-16 animate-pulse rounded-md bg-slate-100 dark:bg-surface-800" />
+            )}
+          </button>
+        </div>
+      )}
 
       {(battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && result.issues?.[0] && (
         <div className="mb-6 rounded-xl border border-critical-200 bg-critical-50 p-5 dark:border-red-500/30 dark:bg-red-500/10 shadow-xs">

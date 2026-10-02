@@ -21,6 +21,11 @@ function PartForm({ part, onSaved, onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  function capitalizeFirst(val) {
+    if (!val) return '';
+    return val.charAt(0).toUpperCase() + val.slice(1);
+  }
+
   function updateField(field, value) {
     setForm((prev) => ({ ...prev, [field]: value }));
   }
@@ -31,8 +36,8 @@ function PartForm({ part, onSaved, onCancel }) {
     setError(null);
     try {
       const payload = {
-        name: form.name,
-        sku: form.sku || undefined,
+        name: capitalizeFirst(form.name.trim()),
+        sku: form.sku?.trim() || undefined,
         quantity: Number(form.quantity) || 0,
         repairCost: Number(form.repairCost) || 0,
         serviceCharge: Number(form.serviceCharge) || 0,
@@ -59,7 +64,7 @@ function PartForm({ part, onSaved, onCancel }) {
             type="text"
             list="existing-part-names"
             value={form.name}
-            onChange={(e) => updateField('name', e.target.value)}
+            onChange={(e) => updateField('name', capitalizeFirst(e.target.value))}
             placeholder="e.g. 12V Cell Module"
             className={inputClasses}
             required

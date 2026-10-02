@@ -10,29 +10,35 @@ const uploadIssuePhotos = multer({
 
 // Must precede '/:code' below, or these would be swallowed as battery code
 // lookups.
-router.get('/count-by-client', requireAuth, batteryController.countByClient);
-router.get('/serial-numbers', requireAuth, batteryController.listSerialNumbers);
-router.get('/repeat-intakes-this-month', requireAuth, batteryController.repeatIntakesThisMonth);
-router.get('/unserviceable-count', requireAuth, batteryController.unserviceableCount);
+router.get('/count-by-client', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.countByClient);
+router.get('/serial-numbers', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.listSerialNumbers);
+router.get('/repeat-intakes-this-month', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.repeatIntakesThisMonth);
+router.get('/unserviceable-count', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.unserviceableCount);
 
 // Public / client QR code tracking endpoint — anyone scanning a QR code can see
 // full battery details and history, while authenticated users are also identified.
 router.get('/:code', optionalAuth, batteryController.getByCode);
 
 router.use(requireAuth);
-router.get('/', batteryController.list);
+// The full fleet list spans every client, so it's workshop logins only —
+// clients read their own batteries through /clients/me/batteries.
+router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.list);
 
 // Registering a battery from the Generate QR Code page is a routine
-// front-desk action, open to any authenticated user.
-router.post('/generate', batteryController.generate);
+// front-desk action, open to office logins (not clients/technicians).
+router.post('/generate', requireRole('super_admin', 'admin', 'staff'), batteryController.generate);
 // Bulk generating up to 50,000 QR codes for a client.
-router.post('/generate-bulk', batteryController.generateBulk);
-// Assigning a client (for the Generate QR Code page) is a routine
-// front-desk action, open to any authenticated user.
-router.patch('/:id/client', batteryController.updateClient);
+router.post('/generate-bulk', requireRole('super_admin', 'admin', 'staff'), batteryController.generateBulk);
+// Assigning a client (for the Generate QR Code page).
+router.patch('/:id/client', requireRole('super_admin', 'admin', 'staff'), batteryController.updateClient);
 // Assigning or updating physical Battery Number (serial_number).
-// Open to admin and client (client-locked once client sets it).
-router.patch('/:id/serial-number', batteryController.updateSerialNumber);
+// Open to workshop logins and the owning client (client-locked once the
+// client sets it; ownership is enforced in the controller).
+router.patch(
+  '/:id/serial-number',
+  requireRole('client', 'super_admin', 'admin', 'staff', 'technician'),
+  batteryController.updateSerialNumber
+);
 // A technician or staff claiming a battery to start work on — before any part is
 // logged, so it shows as actively being worked on rather than just queued.
 router.patch(

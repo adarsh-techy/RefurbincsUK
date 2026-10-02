@@ -20,6 +20,11 @@ function storageKey(userId) {
   return `battery-sort-groups-${userId || 'guest'}`;
 }
 
+function capitalizeFirstLetter(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
+
 export default function ClientSortingScreen() {
   const user = useSelector((state) => state.auth.user);
   const [groups, setGroups] = useState([]);
@@ -102,7 +107,7 @@ export default function ClientSortingScreen() {
   }
 
   function handleNameSubmit() {
-    const trimmed = nameInput.trim();
+    const trimmed = capitalizeFirstLetter(nameInput.trim());
     if (!trimmed) return;
 
     if (nameModalMode === 'create') {
@@ -365,9 +370,10 @@ function NameModal({ visible, mode, value, onChangeValue, onCancel, onSubmit }) 
           <Text className="mb-2 mt-4 text-xs font-semibold text-slate-500 dark:text-slate-400">Group Name</Text>
           <TextInput
             value={value}
-            onChangeText={onChangeValue}
+            onChangeText={(text) => onChangeValue(capitalizeFirstLetter(text))}
             placeholder="e.g. Site A Requirement, Order #204"
             placeholderTextColor="#64748b"
+            autoCapitalize="sentences"
             autoFocus
             className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white"
           />

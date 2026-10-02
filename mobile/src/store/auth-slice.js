@@ -34,22 +34,28 @@ export const login = createAsyncThunk(
       const msg =
         err.response?.data?.message ||
         (err.code === 'ECONNABORTED'
-          ? 'Connection timed out. Make sure your phone and server are on the same Wi-Fi.'
+          ? 'The server took too long to respond. It may be starting up — please try again in a moment.'
           : !err.response
-          ? 'Network error. Cannot reach backend server at ' + apiClient.defaults.baseURL
+          ? 'Cannot reach the server. Check your internet connection and try again.'
           : err.message || 'Unable to sign in. Please try again.');
       return rejectWithValue(msg);
     }
   }
 );
 
-// Validates the stored token against the backend. Rejects (and the reducer
-// below clears storage) if the token is missing, expired, or invalid, so a
-// stale AsyncStorage entry can never grant access on its own.
-export const verifySession = createAsyncThunk('auth/verifySession', async () => {
-  const { data } = await apiClient.get('/auth/me');
-  await AsyncStorage.setItem('user', JSON.stringify(data.user));
-  return data.user;
+// Validates the stored token against the backend. Only a real rejection
+// from the server (401: token missing, expired, or invalid) signs the user
+// out — a timeout or network blip (e.g. the backend waking from sleep) keeps
+// the stored session, since every later request is still checked by the
+// server and a 401 there logs out via the api-client interceptor.
+export const verifySession = createAsyncThunk('auth/verifySession', async (_, { rejectWithValue }) => {
+  try {
+    const { data } = await apiClient.get('/auth/me');
+    await AsyncStorage.setItem('user', JSON.stringify(data.user));
+    return data.user;
+  } catch (err) {
+    return rejectWithValue({ unauthorized: err.response?.status === 401 });
+  }
 });
 
 // Replaces the stored user in place — e.g. after changing password, where
@@ -109,10 +115,12 @@ const authSlice = createSlice({
         state.authChecked = true;
         state.user = action.payload;
       })
-      .addCase(verifySession.rejected, (state) => {
+      .addCase(verifySession.rejected, (state, action) => {
         state.authChecked = true;
-        state.user = null;
-        state.token = null;
+        if (action.payload?.unauthorized) {
+          state.user = null;
+          state.token = null;
+        }
       })
       .addCase(setUser.fulfilled, (state, action) => {
         state.user = action.payload;

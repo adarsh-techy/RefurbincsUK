@@ -92,6 +92,7 @@ function TechnicianRepairPanel({
   const [showConfirmRemovePartsModal, setShowConfirmRemovePartsModal] = useState(false);
   const [confirmRemoveMode, setConfirmRemoveMode] = useState('scan_alert'); // 'scan_alert' | 'testing_decision'
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
+  const [showConfirmSubmitForTestingModal, setShowConfirmSubmitForTestingModal] = useState(false);
   const pendingExitHrefRef = useRef(null);
   const [lightbox, setLightbox] = useState(null); // { images, index, title }
   const scanHandledRef = useRef(false);
@@ -310,7 +311,12 @@ function TechnicianRepairPanel({
   // Live timer for in_progress
   const workStartedAt = battery?.work_started_at;
   useEffect(() => {
-    if (battery?.status !== 'in_progress' || !workStartedAt) return;
+    if (battery?.status !== 'in_progress' || !workStartedAt || showIssueForm) {
+      if (battery?.status !== 'in_progress' || !workStartedAt) {
+        setElapsedSeconds(0);
+      }
+      return;
+    }
     const startMs = new Date(workStartedAt).getTime();
     function tick() {
       setElapsedSeconds(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
@@ -318,13 +324,15 @@ function TechnicianRepairPanel({
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [battery?.status, workStartedAt]);
+  }, [battery?.status, workStartedAt, showIssueForm]);
 
   // Live timer for in_testing
   const testingStartedAt = battery?.testing_started_at;
   useEffect(() => {
-    if (battery?.status !== 'in_testing' || !testingStartedAt) {
-      setTestingElapsedSeconds(0);
+    if (battery?.status !== 'in_testing' || !testingStartedAt || showTestingUnserviceableForm) {
+      if (battery?.status !== 'in_testing' || !testingStartedAt) {
+        setTestingElapsedSeconds(0);
+      }
       return;
     }
     const startMs = new Date(testingStartedAt).getTime();
@@ -334,7 +342,7 @@ function TechnicianRepairPanel({
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [battery?.status, testingStartedAt]);
+  }, [battery?.status, testingStartedAt, showTestingUnserviceableForm]);
 
   async function handleStartTesting() {
     setSubmitting(true);
@@ -396,6 +404,15 @@ function TechnicianRepairPanel({
     }
   }
 
+  function requestSubmitForTesting() {
+    if (selectedPartIds.length === 0) {
+      setError('Select at least one part');
+      return;
+    }
+    setError(null);
+    setShowConfirmSubmitForTestingModal(true);
+  }
+
   async function handleCompleteRepair() {
     if (selectedPartIds.length === 0) {
       setError('Select at least one part');
@@ -416,6 +433,7 @@ function TechnicianRepairPanel({
       setElapsedSeconds(0);
       setSelectedPartIds([]);
       setNotes('');
+      setShowConfirmSubmitForTestingModal(false);
       if (onUpdated) onUpdated();
       if (canTest) {
         setModalType('supervisor_choice');
@@ -440,6 +458,8 @@ function TechnicianRepairPanel({
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
       });
+      setTestingElapsedSeconds(0);
+      setElapsedSeconds(0);
       setSelectedServiceIds([]);
       setTestingNotes('');
       onUpdated();
@@ -458,6 +478,8 @@ function TechnicianRepairPanel({
       await apiClient.patch(`/batteries/${battery.id}/pass-to-tech`, {
         note: issueNote || undefined,
       });
+      setTestingElapsedSeconds(0);
+      setElapsedSeconds(0);
       setShowTestingUnserviceableForm(false);
       setShowTestingDecisionModal(false);
       setIssueNote('');
@@ -485,6 +507,7 @@ function TechnicianRepairPanel({
         photos: issuePhotos.length > 0 ? issuePhotos : undefined,
       });
       setElapsedSeconds(0);
+      setTestingElapsedSeconds(0);
       setShowIssueForm(false);
       setShowTestingUnserviceableForm(false);
       setSelectedReasonId('');
@@ -511,6 +534,8 @@ function TechnicianRepairPanel({
         note: issueNote || 'Test failed - removing fitted parts',
         photos: issuePhotos.length > 0 ? issuePhotos : undefined,
       });
+      setElapsedSeconds(0);
+      setTestingElapsedSeconds(0);
       setShowTestingUnserviceableForm(false);
       setShowTestingDecisionModal(false);
       setIssueNote('');
@@ -830,7 +855,7 @@ function TechnicianRepairPanel({
 
               <button
                 type="button"
-                onClick={handleCompleteRepair}
+                onClick={requestSubmitForTesting}
                 disabled={submitting}
                 className="mt-3 flex w-full items-center justify-center rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
@@ -1241,9 +1266,9 @@ function TechnicianRepairPanel({
                 <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-50 border border-emerald-200 text-emerald-600 text-2xl">
                   ✓
                 </div>
-                <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">Completed!</h3>
+                <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">Testing Work Completed!</h3>
                 <p className="mb-5 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> has been marked repaired and is ready for return to the client.
+                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> test work is completed and testing timer has stopped. It has been marked repaired and is ready for return to the client.
                 </p>
                 <div className="flex flex-col gap-2.5">
                   <button
@@ -1276,7 +1301,7 @@ function TechnicianRepairPanel({
                 </div>
                 <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">Passed to Technician!</h3>
                 <p className="mb-5 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> has been moved back to in_repair for rework and parts removal.
+                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> testing has stopped and unit has been moved back to in_repair for rework and parts removal.
                 </p>
                 <div className="flex flex-col gap-2.5">
                   <button
@@ -1307,7 +1332,7 @@ function TechnicianRepairPanel({
                 </div>
                 <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">Reported Successfully!</h3>
                 <p className="mb-5 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> has been marked unserviceable. Your repair work on this battery is finished and time is stopped.
+                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> has been marked unserviceable. Work on this battery is completed and the timer has stopped.
                 </p>
                 <div className="flex flex-col gap-2.5">
                   <button
@@ -1953,6 +1978,105 @@ function TechnicianRepairPanel({
           </div>
         </div>
       )}
+
+      {/* ── Confirm: Submit for Testing Modal ── */}
+      {showConfirmSubmitForTestingModal && (() => {
+        const selectedParts = (parts || []).filter((p) => selectedPartIds.includes(p.id));
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+            <div className="w-full max-w-sm overflow-hidden rounded-3xl border border-blue-200/80 bg-white shadow-2xl dark:border-blue-900/60 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
+              <div className="bg-blue-600 px-5 pt-5 pb-4">
+                <div className="mb-2 flex items-center justify-between">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-white/30 bg-white/20 text-xl text-white">
+                    🔍
+                  </div>
+                  <span className="rounded-full border border-white/30 bg-white/20 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-white">
+                    Testing Queue
+                  </span>
+                </div>
+                <h3 className="text-lg font-black tracking-tight text-white">
+                  Submit for Testing?
+                </h3>
+                <p className="mt-0.5 text-xs font-medium leading-relaxed text-blue-100">
+                  Please verify the fitted parts before submitting this battery to the testing queue.
+                </p>
+              </div>
+
+              <div className="p-5">
+                <div className="mb-4 space-y-2 rounded-2xl border border-slate-200 bg-slate-50/70 p-3.5 text-xs dark:border-white/10 dark:bg-surface-950/60">
+                  <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-white/10">
+                    <span className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">Battery Code</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{battery.battery_code}</span>
+                  </div>
+
+                  {battery.serial_number && (
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-white/10">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">Battery Number</span>
+                      <span className="font-mono font-bold text-slate-900 dark:text-white">{battery.serial_number}</span>
+                    </div>
+                  )}
+
+                  {elapsedSeconds > 0 && (
+                    <div className="flex items-center justify-between border-b border-slate-200/60 pb-2 dark:border-white/10">
+                      <span className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">Repair Time</span>
+                      <span className="font-bold text-blue-600 dark:text-blue-400">{formatDuration(elapsedSeconds)}</span>
+                    </div>
+                  )}
+
+                  {selectedParts.length > 0 && (
+                    <div>
+                      <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">
+                        <span>Fitted Parts</span>
+                        <span>{selectedParts.length} {selectedParts.length === 1 ? 'part' : 'parts'}</span>
+                      </div>
+                      <div className="space-y-1 max-h-36 overflow-y-auto">
+                        {selectedParts.map((pt) => (
+                          <div key={pt.id} className="flex items-center justify-between rounded-lg border border-slate-200/80 bg-white px-2.5 py-1.5 dark:border-white/10 dark:bg-surface-900">
+                            <span className="truncate font-semibold text-slate-800 dark:text-neutral-200">• {pt.name}</span>
+                            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400">Qty 1</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {notes?.trim() && (
+                    <div className="pt-1 border-t border-slate-200/60 dark:border-white/10">
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 block mb-0.5">Notes</span>
+                      <p className="text-xs text-slate-700 dark:text-neutral-300 italic">{notes}</p>
+                    </div>
+                  )}
+                </div>
+
+                {error && (
+                  <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                    {error}
+                  </div>
+                )}
+
+                <div className="flex flex-col gap-2.5">
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={handleCompleteRepair}
+                    className="w-full rounded-2xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                  >
+                    {submitting ? 'Submitting…' : '✓ Yes, Submit for Testing'}
+                  </button>
+                  <button
+                    type="button"
+                    disabled={submitting}
+                    onClick={() => setShowConfirmSubmitForTestingModal(false)}
+                    className="w-full rounded-2xl border border-slate-200 bg-slate-100 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors"
+                  >
+                    Cancel / Keep Editing
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Fullscreen photo lightbox ── */}
       {lightbox && (

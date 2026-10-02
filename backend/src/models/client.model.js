@@ -259,6 +259,44 @@ async function remove(id) {
   await db.query('DELETE FROM clients WHERE id = $1', [id]);
 }
 
+// Guard for the client-portal packing endpoints, which look a battery up by
+// whatever code/serial the client typed or scanned. Without this, a client
+// could pull another client's battery onto their own truck, or reset one
+// that's mid-repair / already finished back to 'in_repair'.
+const NOT_PACKABLE_STATUSES = new Set([
+  'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired',
+  'unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled',
+]);
+
+async function assertClientCanPack(conn, battery, clientId, clientName) {
+  let intake = null;
+  if (battery.truck_intake_id) {
+    const { rows } = await conn.query(
+      'SELECT client_id, status, verified_at FROM truck_intakes WHERE id = $1',
+      [battery.truck_intake_id]
+    );
+    intake = rows[0] || null;
+  }
+
+  const ownedByName =
+    battery.client_name && battery.client_name.trim().toLowerCase() === String(clientName || '').trim().toLowerCase();
+  const ownedByIntake = intake && intake.client_id && Number(intake.client_id) === Number(clientId);
+  const unassigned = !battery.client_name && !(intake && intake.client_id);
+  if (!ownedByName && !ownedByIntake && !unassigned) {
+    const err = new Error(`Battery ${battery.battery_code} is registered to another client and can't be packed from this account.`);
+    err.status = 403;
+    throw err;
+  }
+
+  const atWorkshop =
+    battery.status === 'in_repair' && intake && (intake.status === 'verified' || intake.verified_at);
+  if (NOT_PACKABLE_STATUSES.has(battery.status) || atWorkshop) {
+    const err = new Error(`Battery ${battery.battery_code} is already at the workshop and can't be packed again until it's returned.`);
+    err.status = 409;
+    throw err;
+  }
+}
+
 // Which battery statuses fall into each of the client dashboard's 3 lists.
 // Every status maps to exactly one bucket: 'packed' (just arrived, not
 // started), 'pending' (work started or finished but not yet shipped back),
@@ -493,7 +531,10 @@ async function findMyTransactions(clientId, clientName) {
 // 2. Packed for Return (when batteries are dispatched/returned to client)
 // 3. Invoice Sent (when invoices are issued for services)
 async function findMyNotifications(clientId, clientName, { limit = 50, offset = 0, type } = {}) {
-  const filterClause = type && type !== 'all' ? `WHERE type = '${type}'` : '';
+  // `type` comes straight from the query string — only ever interpolate one
+  // of the three known literals, never the raw value.
+  const NOTIFICATION_TYPES = ['intake', 'return', 'invoice'];
+  const filterClause = NOTIFICATION_TYPES.includes(type) ? `WHERE type = '${type}'` : '';
   const { rows } = await db.query(
     `WITH ${CLIENT_BATTERY_IDS_CTE},
      events AS (
@@ -625,6 +666,7 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
       let battery = existingRows[0];
 
       if (battery) {
+        await assertClientCanPack(client, battery, clientId, clientName);
         // Update battery to in_repair and link intake if provided
         const { rows: updatedRows } = await client.query(
           `UPDATE batteries
@@ -826,6 +868,7 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
       );
       if (existingRows.length > 0) {
         const b = existingRows[0];
+        await assertClientCanPack(client, b, clientId, clientName);
         const { rows: updated } = await client.query(
           `UPDATE batteries
            SET status = 'in_repair',
@@ -966,6 +1009,7 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
       );
       if (existingRows.length > 0) {
         const b = existingRows[0];
+        await assertClientCanPack(client, b, clientId, clientName);
         const { rows: updated } = await client.query(
           `UPDATE batteries
            SET status = 'in_repair',
@@ -1255,6 +1299,9 @@ async function replaceSortGroups(clientId, userId, groups) {
     if (Array.isArray(groups) && groups.length > 0) {
       for (const g of groups) {
         if (!g || !g.id || !g.name) continue;
+        const rawName = String(g.name).trim();
+        const formattedName = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : '';
+        if (!formattedName) continue;
         const groupBatteries = Array.isArray(g.batteries) ? g.batteries : [];
         await client.query(
           `INSERT INTO client_sort_groups (id, client_id, user_id, name, batteries, created_at, updated_at)
@@ -1263,7 +1310,7 @@ async function replaceSortGroups(clientId, userId, groups) {
             String(g.id),
             clientId || null,
             userId || null,
-            String(g.name).trim(),
+            formattedName,
             JSON.stringify(groupBatteries),
             g.createdAt || null,
           ]

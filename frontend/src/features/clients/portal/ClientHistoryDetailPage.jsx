@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Link, useNavigate, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
 import TableState from '../../../components/ui/table/TableState';
@@ -47,6 +47,7 @@ function exportTruckManifestCsv(event) {
 function ClientHistoryDetailPage() {
   const { eventId } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const [event, setEvent] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -190,6 +191,7 @@ function ClientHistoryDetailPage() {
                       <td className="px-4 py-2.5">
                         <Link
                           to={`/batteries/${encodeURIComponent(b.code)}`}
+                          state={{ from: location.pathname + location.search }}
                           className="font-mono font-bold text-brand-600 hover:underline dark:text-emerald-400 flex items-center gap-1"
                         >
                           <span>{b.code}</span>
@@ -205,6 +207,7 @@ function ClientHistoryDetailPage() {
                       <td className="px-4 py-2.5">
                         <Link
                           to={`/batteries/${encodeURIComponent(b.code)}`}
+                          state={{ from: location.pathname + location.search }}
                           className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors"
                         >
                           <span>View Battery</span>

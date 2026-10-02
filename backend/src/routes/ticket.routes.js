@@ -1,8 +1,10 @@
 const router = require('express').Router();
 const ticketController = require('../controllers/ticket.controller');
-const { requireAuth } = require('../middlewares/auth');
+const { requireAuth, requireRole } = require('../middlewares/auth');
 
 router.use(requireAuth);
+// Support tickets are between clients and the office — not technicians.
+router.use(requireRole('client', 'recycle_client', 'super_admin', 'admin', 'staff'));
 
 router.get('/stats', ticketController.getStats);
 router.get('/', ticketController.list);

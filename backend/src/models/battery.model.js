@@ -82,7 +82,7 @@ async function findPage({
   }
   if (q) {
     params.push(`%${q}%`);
-    conditions.push(`b.battery_code ILIKE $${params.length}`);
+    conditions.push(`(b.battery_code ILIKE $${params.length} OR b.serial_number ILIKE $${params.length})`);
   }
   // Combined battery-ID-or-client-name search, for the Generated QR Codes
   // list — separate from `q` above (which only matches battery_code and is
@@ -91,7 +91,7 @@ async function findPage({
   if (search) {
     params.push(`%${search}%`);
     conditions.push(
-      `(b.battery_code ILIKE $${params.length} OR b.client_name ILIKE $${params.length} OR EXISTS (SELECT 1 FROM battery_issues bi JOIN issue_reasons ir ON ir.id = bi.reason_id WHERE bi.battery_id = b.id AND (ir.label ILIKE $${params.length} OR bi.note ILIKE $${params.length})))`
+      `(b.battery_code ILIKE $${params.length} OR b.serial_number ILIKE $${params.length} OR b.client_name ILIKE $${params.length} OR EXISTS (SELECT 1 FROM battery_issues bi JOIN issue_reasons ir ON ir.id = bi.reason_id WHERE bi.battery_id = b.id AND (ir.label ILIKE $${params.length} OR bi.note ILIKE $${params.length})))`
     );
   }
   if (qrGenerated === true) {
@@ -573,6 +573,20 @@ async function removeParts(batteryId, repairIds = [], staffId) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+
+    // A finished battery (repaired, sent back, recycled) still has its parts
+    // fitted — reclaiming them here would restock inventory that isn't on
+    // the shelf and flip a good battery to "parts removed".
+    const { rows: current } = await client.query(
+      'SELECT status FROM batteries WHERE id = $1 FOR UPDATE',
+      [batteryId]
+    );
+    if (current[0] && ['repaired', 'returned', 'recycled'].includes(current[0].status)) {
+      const err = new Error('Parts can only be removed from a battery that is still in the workshop.');
+      err.status = 409;
+      throw err;
+    }
+
     const hasSpecificIds = Array.isArray(repairIds) && repairIds.length > 0;
     const queryStr = hasSpecificIds
       ? `SELECT id, part_id, quantity_used FROM repairs
@@ -584,6 +598,12 @@ async function removeParts(batteryId, repairIds = [], staffId) {
     const queryParams = hasSpecificIds ? [batteryId, repairIds] : [batteryId];
 
     const { rows: targets } = await client.query(queryStr, queryParams);
+    // Nothing to reclaim (already removed / double tap): leave the battery's
+    // status alone instead of committing a status change alongside the 409.
+    if (targets.length === 0) {
+      await client.query('ROLLBACK');
+      return { removedCount: 0, battery: null };
+    }
     for (const t of targets) {
       await client.query('UPDATE parts SET quantity = quantity + $2 WHERE id = $1', [
         t.part_id,
@@ -722,7 +742,8 @@ async function completeTesting(id, { serviceIds = [], staffId = null, notes = nu
       `UPDATE batteries
        SET status = 'repaired',
            testing_duration_seconds = EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int,
-           testing_started_at = NULL
+           testing_started_at = NULL,
+           work_started_at = NULL
        WHERE id = $1 AND status = 'in_testing'
        RETURNING *`,
       [id]
@@ -768,7 +789,14 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
-      `UPDATE batteries SET status = 'unserviceable'
+      `UPDATE batteries
+       SET status = 'unserviceable',
+           testing_duration_seconds = CASE 
+             WHEN status = 'in_testing' THEN EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int 
+             ELSE testing_duration_seconds 
+           END,
+           testing_started_at = NULL,
+           work_started_at = NULL
        WHERE id = $1 AND status IN ('in_progress', 'in_testing')
        RETURNING *`,
       [id]
@@ -901,13 +929,34 @@ async function findRepeatIntakesThisMonth() {
   return rows;
 }
 
+const BATTERY_NUMBER_DIGITS = 7;
+
 // Bulk creates batteries for a client directly from Generate QR Code page (1 to 50,000 QR codes).
 // Uses PostgreSQL generate_series for ultra-fast multi-row insertion in a single query.
 async function createManyForClient({ clientName, count, startNumber }) {
   const prefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
   const start = Number(startNumber) > 0 ? Number(startNumber) : (await maxSequenceByClientName(clientName)) + 1;
   const end = start + Number(count) - 1;
-  const padLength = Math.max(4, String(end).length);
+  // Battery numbers are zero-padded to 7 digits (HUM-0000001).
+  const padLength = Math.max(BATTERY_NUMBER_DIGITS, String(end).length);
+
+  // Older codes used 4-digit padding (HUM-0001), so the UNIQUE constraint on
+  // battery_code alone wouldn't stop HUM-0000001 duplicating HUM-0001's
+  // number — check the numeric range explicitly. Raised as 23505 so the
+  // controller returns its existing "already exist" 409.
+  const { rows: clash } = await db.query(
+    `SELECT 1 FROM batteries
+     WHERE battery_code LIKE $1
+       AND regexp_replace(battery_code, '^.*-', '') ~ '^[0-9]+$'
+       AND regexp_replace(battery_code, '^.*-', '')::bigint BETWEEN $2 AND $3
+     LIMIT 1`,
+    [`${prefix}-%`, start, end]
+  );
+  if (clash.length) {
+    const err = new Error('Battery number range overlaps existing batteries');
+    err.code = '23505';
+    throw err;
+  }
 
   const { rows } = await db.query(
     `INSERT INTO batteries (battery_code, client_name, qr_generated_at, status)

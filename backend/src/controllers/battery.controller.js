@@ -134,6 +134,33 @@ async function getByCode(req, res, next) {
       serviceModel.findBatteryServices(battery.id),
       batteryModel.findPendingPartsRemoval(battery.id),
     ]);
+    // This endpoint is public (QR scans). The page only ever shows pricing to
+    // a signed-in super admin, so don't put it — or internal staff/user ids —
+    // in the JSON an anonymous visitor receives: battery codes are sequential
+    // and would let anyone scrape every client's repair pricing. Nulled
+    // rather than removed so the page's Number(...) sums stay at 0.
+    if (!req.user) {
+      const publicHistory = history.map((h) => ({
+        ...h,
+        price: null,
+        labor_charge: null,
+        staff_id: null,
+        user_id: null,
+        removed_by_staff_id: null,
+      }));
+      const publicServices = services.map((sv) => ({ ...sv, rate: null }));
+      return res.json({
+        battery,
+        history: publicHistory,
+        returns,
+        visits,
+        issues,
+        recycleBatch,
+        services: publicServices,
+        pendingPartsRemoval,
+      });
+    }
+
     res.json({ battery, history, returns, visits, issues, recycleBatch, services, pendingPartsRemoval });
   } catch (err) {
     next(err);

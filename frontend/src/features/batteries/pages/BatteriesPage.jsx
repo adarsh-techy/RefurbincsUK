@@ -162,6 +162,22 @@ function BatteriesPage() {
       ),
     },
     {
+      key: 'serial_number',
+      label: 'Battery Number',
+      sortValue: (row) => row.serial_number || '',
+      render: (row) =>
+        row.serial_number ? (
+          <div className="flex flex-col gap-0.5">
+            <span className="font-semibold text-slate-800 dark:text-neutral-100">{row.serial_number}</span>
+            {row.serial_number_added_by_role === 'client' && (
+              <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">Set by Client</span>
+            )}
+          </div>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
+    },
+    {
       key: 'client_name',
       label: 'Client',
       sortValue: (row) => row.client_name || '',

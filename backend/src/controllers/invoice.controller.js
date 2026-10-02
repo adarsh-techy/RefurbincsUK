@@ -242,12 +242,15 @@ async function downloadFile(req, res, next) {
       return res.status(404).json({ message: 'Invoice PDF file not found.' });
     }
 
-    // Security: If caller is client role, ensure this invoice belongs to their client_id
-    if (req.user.role === 'client') {
+    // Security: a client login may only fetch its own client's invoices;
+    // otherwise only admins may download (not technicians/staff logins).
+    if (req.user.role === 'client' || req.user.role === 'recycle_client') {
       const client = await clientModel.findByUserId(req.user.id);
       if (!client || Number(client.id) !== Number(invoice.client_id)) {
         return res.status(403).json({ message: 'Access denied to this invoice.' });
       }
+    } else if (!['super_admin', 'admin'].includes(req.user.role)) {
+      return res.status(403).json({ message: 'Access denied to this invoice.' });
     }
 
     const fullPath = path.join(UPLOADS_DIR, invoice.file_path);

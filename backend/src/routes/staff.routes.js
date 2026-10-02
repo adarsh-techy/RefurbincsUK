@@ -33,12 +33,13 @@ const uploadDoc = multer({
 });
 
 router.use(requireAuth);
-// Read is open to any authenticated user: the Repairs form needs the staff
-// list to populate its dropdown regardless of who's logged the repair.
-router.get('/', staffController.list);
+// Staff records hold salary, passport and NI numbers, so reads are limited to
+// office roles (the Repairs form's staff dropdown) — never client or
+// technician logins.
+router.get('/', requireRole('super_admin', 'admin', 'staff'), staffController.list);
 // Must come before /:id or it would be swallowed as an id param.
 router.get('/me', staffController.myProfile);
-router.get('/:id', staffController.getById);
+router.get('/:id', requireRole('super_admin', 'admin', 'staff'), staffController.getById);
 router.post('/', requirePermission('staff'), uploadDoc.single('docFile'), staffController.create);
 // Editing/removing staff records is super_admin only, distinct from the
 // 'staff' permission (which only covers adding new staff).

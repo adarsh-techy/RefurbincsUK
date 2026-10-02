@@ -15,6 +15,8 @@ import RowActions from '../../../components/ui/table/RowActions';
 import useFetchList from '../../../utils/use-fetch-list';
 import { downloadQrSheet, previewQrSheet, DEFAULT_COLUMNS, ROWS, SHEET_SIZE } from '../../../utils/generate-qr-sheet';
 
+const BATTERY_NUMBER_DIGITS = 7;
+
 const inputClasses =
   'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30';
 const formInputClasses =
@@ -138,14 +140,16 @@ function GenerateQrPage() {
   }, [bulkClientName]);
 
   // ── Individual: derived battery ID ────────────────────────────────────────
+  // Battery numbers are zero-padded to 7 digits (HUM-0000001), matching the
+  // backend's bulk generation.
   const clientPrefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
-  const computedBatteryId = clientPrefix ? `${clientPrefix}-${String(suggestedNumber).padStart(4, '0')}` : '';
+  const computedBatteryId = clientPrefix ? `${clientPrefix}-${String(suggestedNumber).padStart(BATTERY_NUMBER_DIGITS, '0')}` : '';
 
   // ── Bulk: preview range ────────────────────────────────────────────────────
   const bulkStart = Number(bulkStartNumber) > 0 ? Number(bulkStartNumber) : bulkSuggestedStart;
   const bulkEnd = bulkStart + (Math.max(Number(bulkCount) || 1, 1)) - 1;
   const bulkPrefix = bulkClientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
-  const padLen = Math.max(4, String(bulkEnd).length);
+  const padLen = Math.max(BATTERY_NUMBER_DIGITS, String(bulkEnd).length);
   const bulkFirstPreview = bulkPrefix ? `${bulkPrefix}-${String(bulkStart).padStart(padLen, '0')}` : '—';
   const bulkLastPreview = bulkPrefix ? `${bulkPrefix}-${String(bulkEnd).padStart(padLen, '0')}` : '—';
 
@@ -565,8 +569,8 @@ function GenerateQrPage() {
               </button>
               <button
                 type="submit"
-                disabled={submitting}
-                className="rounded-md bg-violet-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-800 disabled:opacity-50"
+                disabled={submitting || !clientName.trim()}
+                className="rounded-md bg-violet-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {submitting ? 'Generating…' : 'Generate QR Code'}
               </button>
@@ -630,19 +634,24 @@ function GenerateQrPage() {
             <div>
               <label className={labelClasses}>
                 Starting Number
-                {bulkClientName && (
+                {bulkClientName ? (
                   <span className="ml-2 text-xs font-normal text-slate-400 dark:text-neutral-500">
                     (next for {bulkClientName}: {bulkSuggestedStart})
+                  </span>
+                ) : (
+                  <span className="ml-2 text-xs font-normal text-slate-400 dark:text-neutral-500">
+                    (Select a client first)
                   </span>
                 )}
               </label>
               <input
                 type="number"
                 min="1"
+                disabled={!bulkClientName.trim()}
                 value={bulkStartNumber}
                 onChange={(e) => setBulkStartNumber(e.target.value)}
-                placeholder={bulkClientName ? String(bulkSuggestedStart) : 'e.g. 1'}
-                className={`${formInputClasses} [appearance:textfield]`}
+                placeholder={bulkClientName.trim() ? String(bulkSuggestedStart) : 'Select a client first'}
+                className={`${formInputClasses} [appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50`}
               />
               <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
                 Leave blank to auto-continue from the last generated number for this client.
@@ -650,16 +659,24 @@ function GenerateQrPage() {
             </div>
 
             <div>
-              <label className={labelClasses}>How many QR Codes</label>
+              <label className={labelClasses}>
+                How many QR Codes
+                {!bulkClientName.trim() && (
+                  <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">
+                    (Select a client first)
+                  </span>
+                )}
+              </label>
               {/* Quick presets */}
               <div className="mb-2 flex flex-wrap gap-1.5">
                 {BULK_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
+                    disabled={!bulkClientName.trim()}
                     onClick={() => setBulkCount(String(preset))}
-                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors ${
-                      bulkCount === String(preset)
+                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 ${
+                      bulkCount === String(preset) && bulkClientName.trim()
                         ? 'border-violet-500 bg-violet-100 text-violet-700 dark:border-violet-400 dark:bg-violet-900/40 dark:text-violet-300'
                         : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-300 dark:hover:border-violet-500 dark:hover:text-violet-300'
                     }`}
@@ -672,13 +689,17 @@ function GenerateQrPage() {
                 type="number"
                 min="1"
                 max="50000"
+                disabled={!bulkClientName.trim()}
                 value={bulkCount}
                 onChange={(e) => setBulkCount(e.target.value)}
-                className={`${formInputClasses} [appearance:textfield]`}
+                placeholder={bulkClientName.trim() ? 'e.g. 500' : 'Select a client first'}
+                className={`${formInputClasses} [appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50`}
                 required
               />
               <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-                Maximum 50,000 per batch. Battery Numbers can be assigned later by Admin or Client.
+                {bulkClientName.trim()
+                  ? 'Maximum 50,000 per batch. Battery Numbers can be assigned later by Admin or Client.'
+                  : 'Select a client above before choosing how many QR codes to generate.'}
               </p>
             </div>
 
@@ -694,8 +715,8 @@ function GenerateQrPage() {
               </button>
               <button
                 type="submit"
-                disabled={bulkSubmitting}
-                className="rounded-md bg-violet-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-600 disabled:opacity-50"
+                disabled={bulkSubmitting || !bulkClientName.trim()}
+                className="rounded-md bg-violet-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
               >
                 {bulkSubmitting ? 'Generating…' : 'Generate Bulk QR Codes'}
               </button>
@@ -746,21 +767,22 @@ function GenerateQrPage() {
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Count</span>
                     <span className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-                      {Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '—'}
+                      {bulkClientName.trim() && Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '—'}
                     </span>
                   </div>
                   <div className="mb-3 flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">First ID</span>
-                    <span className="font-mono text-sm font-semibold text-violet-700 dark:text-violet-300">{bulkFirstPreview}</span>
+                    <span className="font-mono text-sm font-semibold text-violet-700 dark:text-violet-300">{bulkClientName.trim() ? bulkFirstPreview : '—'}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Last ID</span>
-                    <span className="font-mono text-sm font-semibold text-violet-700 dark:text-violet-300">{bulkLastPreview}</span>
+                    <span className="font-mono text-sm font-semibold text-violet-700 dark:text-violet-300">{bulkClientName.trim() ? bulkLastPreview : '—'}</span>
                   </div>
                 </div>
                 <p className="text-xs text-slate-400 dark:text-neutral-500">
-                  All {Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '…'} batteries will be created instantly.
-                  Battery Numbers (physical serials) are optional — Admin or Client can fill them in after printing.
+                  {bulkClientName.trim()
+                    ? `All ${Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '…'} batteries will be created instantly. Battery Numbers (physical serials) are optional — Admin or Client can fill them in after printing.`
+                    : 'Select a client on the left to configure quantity and preview the generated ID range.'}
                 </p>
               </>
             )}

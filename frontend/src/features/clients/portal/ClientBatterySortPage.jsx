@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import * as XLSX from 'xlsx';
@@ -16,9 +16,23 @@ import {
   fetchSortGroups,
   saveSortGroups,
 } from '../../../utils/sort-groups';
+import {
+  FiLayers,
+  FiCalendar,
+  FiPackage,
+  FiTruck,
+  FiCheckCircle,
+  FiTrash2,
+  FiArrowRight,
+} from 'react-icons/fi';
 
 const formInputClasses =
   'w-full rounded-md border border-blue-300 bg-blue-50 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/20 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30';
+
+function capitalizeFirstLetter(str) {
+  if (!str) return '';
+  return str.charAt(0).toUpperCase() + str.slice(1);
+}
 
 // A battery is registered with status 'returned' from day one — it means
 // "currently with the client", not "came back from a service visit" — so a
@@ -58,6 +72,8 @@ function ClientBatterySortPage() {
   const { customTheme } = useTheme();
   const accent = customTheme?.accentColor || '#10b981';
   const { user } = useSelector((state) => state.auth);
+  const scanInputRef = useRef(null);
+  const scanBoxRef = useRef(null);
 
   const [registeredBatteries, setRegisteredBatteries] = useState([]);
   const [groups, setGroups] = useState([]);
@@ -127,6 +143,18 @@ function ClientBatterySortPage() {
     savedGroupBatteries !== null &&
     JSON.stringify(activeGroup.batteries || []) !== JSON.stringify(savedGroupBatteries || [])
   );
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (scanBoxRef.current && !scanBoxRef.current.contains(event.target)) {
+        setShowSuggestions(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
 
   function openGroup(group) {
     setActiveGroupId(group.id);
@@ -349,20 +377,22 @@ function ClientBatterySortPage() {
     return map;
   }, [groups]);
 
-  const scanSuggestions = useMemo(() => {
-    const q = scanInput.trim().toLowerCase();
+  const availableFleetBatteries = useMemo(() => {
     return registeredBatteries
       .filter((b) => !allSortedBatteryMap.has(b.battery_code.toUpperCase()))
-      .filter((b) => !NOT_WITH_CLIENT_STATUSES.has(b.status))
-      .filter((b) => {
-        if (!q) return true;
-        return (
-          b.battery_code.toLowerCase().includes(q) ||
-          (b.serial_number && b.serial_number.toLowerCase().includes(q))
-        );
-      })
-      .slice(0, 8);
-  }, [registeredBatteries, scanInput, allSortedBatteryMap, NOT_WITH_CLIENT_STATUSES]);
+      .filter((b) => !NOT_WITH_CLIENT_STATUSES.has(b.status));
+  }, [registeredBatteries, allSortedBatteryMap, NOT_WITH_CLIENT_STATUSES]);
+
+  const scanSuggestions = useMemo(() => {
+    const q = scanInput.trim().toLowerCase();
+    if (!q) return availableFleetBatteries.slice(0, 250);
+    return availableFleetBatteries
+      .filter((b) =>
+        b.battery_code.toLowerCase().includes(q) ||
+        (b.serial_number && b.serial_number.toLowerCase().includes(q))
+      )
+      .slice(0, 250);
+  }, [availableFleetBatteries, scanInput]);
 
   const filteredGroups = useMemo(() => {
     const q = groupSearch.trim().toLowerCase();
@@ -390,7 +420,7 @@ function ClientBatterySortPage() {
 
   function handleNameSubmit(e) {
     e.preventDefault();
-    const trimmed = nameInput.trim();
+    const trimmed = capitalizeFirstLetter(nameInput.trim());
     if (!trimmed) return;
 
     // Check uniqueness (case-insensitive) except against self when renaming
@@ -483,12 +513,31 @@ function ClientBatterySortPage() {
     );
     setScanInput('');
     setAddError(null);
+    scanInputRef.current?.focus();
+    setShowSuggestions(true);
   }
 
   function handleScanKeyDown(e) {
+    if (e.key === 'Escape') {
+      setShowSuggestions(false);
+      return;
+    }
     if (e.key === 'Enter') {
       e.preventDefault();
-      addBatteryToActiveGroup(scanInput);
+      const trimmed = scanInput.trim().toUpperCase();
+      if (!trimmed) return;
+      if (showSuggestions && scanSuggestions.length > 0) {
+        const exactMatch = scanSuggestions.find(
+          (b) =>
+            b.battery_code.toUpperCase() === trimmed ||
+            (b.serial_number && b.serial_number.toUpperCase() === trimmed)
+        );
+        if (exactMatch) {
+          addBatteryToActiveGroup(exactMatch.battery_code);
+          return;
+        }
+      }
+      addBatteryToActiveGroup(trimmed);
     }
   }
 
@@ -576,8 +625,9 @@ function ClientBatterySortPage() {
           </p>
 
           <div className="flex gap-2">
-            <div className="relative flex-1">
+            <div ref={scanBoxRef} className="relative flex-1">
               <input
+                ref={scanInputRef}
                 type="text"
                 value={scanInput}
                 onChange={(e) => {
@@ -586,44 +636,72 @@ function ClientBatterySortPage() {
                 }}
                 onKeyDown={handleScanKeyDown}
                 onFocus={() => setShowSuggestions(true)}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                onClick={() => setShowSuggestions(true)}
                 placeholder="Scan or type battery code / serial…"
                 autoComplete="off"
                 className={formInputClasses}
               />
-              {showSuggestions && scanSuggestions.length > 0 && (
-                <div className="absolute left-0 right-0 top-full z-40 mt-1 max-h-60 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-800">
-                  {scanSuggestions.map((b) => (
-                    <button
-                      key={b.id}
-                      type="button"
-                      onMouseDown={() => {
-                        addBatteryToActiveGroup(b.battery_code);
-                        setShowSuggestions(false);
-                      }}
-                      className="flex w-full items-center justify-between border-b border-slate-100 px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-emerald-50 dark:border-surface-700/50 dark:hover:bg-surface-700 last:border-0"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="font-mono font-semibold text-slate-800 dark:text-neutral-100">
-                          {b.battery_code}
-                        </span>
-                        {b.serial_number && (
-                          <span className="text-xs text-slate-500 dark:text-neutral-400">
-                            (SN: {b.serial_number})
+              {showSuggestions && (
+                <div
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="absolute left-0 right-0 top-full z-40 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-800"
+                >
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-slate-50/95 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 backdrop-blur-xs dark:border-surface-700 dark:bg-surface-900/95 dark:text-neutral-400">
+                    <span>
+                      {scanInput.trim() ? 'Matching Fleet Batteries' : 'Available Fleet Batteries'}
+                    </span>
+                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-surface-700 dark:text-neutral-200 font-bold">
+                      {scanSuggestions.length}
+                      {!scanInput.trim() && availableFleetBatteries.length > scanSuggestions.length ? ` of ${availableFleetBatteries.length}` : ''}
+                    </span>
+                  </div>
+
+                  {scanSuggestions.length === 0 ? (
+                    <div className="p-4 text-center text-xs text-slate-500 dark:text-neutral-400">
+                      {scanInput.trim()
+                        ? `No available battery matches "${scanInput}".`
+                        : 'All available batteries are already sorted into groups.'}
+                    </div>
+                  ) : (
+                    scanSuggestions.map((b) => (
+                      <button
+                        key={b.id}
+                        type="button"
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => {
+                          addBatteryToActiveGroup(b.battery_code);
+                          scanInputRef.current?.focus();
+                          setShowSuggestions(true);
+                        }}
+                        className="group flex w-full items-center justify-between border-b border-slate-100 px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-emerald-50 dark:border-surface-700/50 dark:hover:bg-surface-700 last:border-0 cursor-pointer"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-semibold text-slate-800 dark:text-neutral-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
+                            {b.battery_code}
                           </span>
-                        )}
-                      </div>
-                      {hasBeenServiced(b) ? (
-                        <ClientStatusBadge
-                          status={b.status}
-                          isVerified={b.return_status === 'verified' || Boolean(b.return_verified_at)}
-                          returnStatus={b.return_status}
-                        />
-                      ) : (
-                        <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
-                      )}
-                    </button>
-                  ))}
+                          {b.serial_number && (
+                            <span className="text-xs text-slate-500 dark:text-neutral-400 font-mono">
+                              (SN: {b.serial_number})
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                          {hasBeenServiced(b) ? (
+                            <ClientStatusBadge
+                              status={b.status}
+                              isVerified={b.return_status === 'verified' || Boolean(b.return_verified_at)}
+                              returnStatus={b.return_status}
+                            />
+                          ) : (
+                            <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
+                          )}
+                          <span className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-2xs group-hover:bg-emerald-700 transition-colors">
+                            + Add
+                          </span>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
               )}
             </div>
@@ -827,7 +905,7 @@ function ClientBatterySortPage() {
                 <input
                   type="text"
                   value={nameInput}
-                  onChange={(e) => setNameInput(e.target.value)}
+                  onChange={(e) => setNameInput(capitalizeFirstLetter(e.target.value))}
                   placeholder="e.g. Site A Requirement, 40Ah Batch, Order #204"
                   autoComplete="off"
                   autoFocus
@@ -1023,8 +1101,9 @@ function ClientBatterySortPage() {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-4.5 sm:grid-cols-2 lg:grid-cols-3">
           {filteredGroups.map((group) => {
+            const totalCount = (group.batteries || []).length;
             const groupPacked = (group.batteries || [])
               .map((code) => ({
                 code,
@@ -1041,120 +1120,153 @@ function ClientBatterySortPage() {
                 }
               }
             }
+            const readyCount = Math.max(0, totalCount - groupPacked.length);
 
             return (
               <div
                 key={group.id}
                 onClick={() => openGroup(group)}
-                className={`group relative flex cursor-pointer flex-col justify-between rounded-2xl border p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                className={`group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:bg-surface-900 cursor-pointer pl-6 ${
                   hasPacked
-                    ? 'border-red-300 bg-red-50/70 hover:border-red-500 dark:border-red-500/35 dark:bg-red-950/20 dark:hover:border-red-500/60'
-                    : 'border-slate-200/90 bg-white hover:border-emerald-500/80 dark:border-white/10 dark:bg-surface-900 dark:hover:border-emerald-400/60'
+                    ? 'border-rose-200/90 hover:border-rose-400 dark:border-rose-900/40 dark:hover:border-rose-700/60'
+                    : 'border-slate-200/90 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'
                 }`}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border ${
+                {/* Classic Left Color Stripe */}
+                <div
+                  className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                    hasPacked
+                      ? 'bg-gradient-to-b from-rose-500 to-amber-500'
+                      : 'bg-gradient-to-b from-emerald-500 to-teal-500'
+                  }`}
+                />
+
+                {/* Card Header: Icon, Group Name, Count Pill */}
+                <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-slate-100 dark:border-white/5">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div
+                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-2xs ${
                         hasPacked
-                          ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-950/40 dark:text-red-400 dark:border-red-500/30'
-                          : 'bg-emerald-50 text-emerald-700 border-emerald-100 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-800/40'
-                      }`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                          <path d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-19.5 0v6a2.25 2.25 0 0 0 2.25 2.25h15a2.25 2.25 0 0 0 2.25-2.25v-6m-19.5 0h19.5M4.5 9.75V6a2.25 2.25 0 0 1 2.25-2.25h10.5A2.25 2.25 0 0 1 19.5 6v3.75" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0">
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                          ? 'bg-rose-50 text-rose-600 border-rose-200/70 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
+                          : 'bg-emerald-50 text-emerald-600 border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
+                      }`}
+                    >
+                      <FiLayers className="h-5 w-5" />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                           Sort Group
                         </span>
-                        <h3 className={`truncate text-base font-extrabold transition-colors ${
-                          hasPacked
-                            ? 'text-slate-900 group-hover:text-red-700 dark:text-white dark:group-hover:text-red-400'
-                            : 'text-slate-900 group-hover:text-emerald-600 dark:text-white dark:group-hover:text-emerald-400'
-                        }`}>
-                          {group.name}
-                        </h3>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {hasPacked && (
-                        <span className="inline-flex items-center gap-1 rounded-xl border border-red-300 bg-red-100 px-2 py-0.5 text-[11px] font-extrabold text-red-800 shadow-2xs dark:border-red-500/30 dark:bg-red-950/50 dark:text-red-300">
-                          📦 {groupPacked.length} Packed
-                        </span>
-                      )}
-                      <span className={`inline-flex items-center gap-1 rounded-xl border px-2.5 py-1 text-xs font-extrabold shadow-2xs ${
-                        hasPacked
-                          ? 'border-red-300/80 bg-red-100 text-red-800 dark:border-red-500/30 dark:bg-red-950/50 dark:text-red-300'
-                          : 'border-emerald-200/80 bg-emerald-50 text-emerald-800 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300'
-                      }`}>
-                        {group.batteries.length}
-                      </span>
-                    </div>
-                  </div>
-
-                  <div className={`mt-4 rounded-xl p-3 text-xs ${hasPacked ? 'bg-red-100/60 dark:bg-red-950/20 dark:border dark:border-red-900/30' : 'bg-slate-50/80 dark:bg-white/5'}`}>
-                    <div className="flex items-center justify-between text-slate-600 dark:text-neutral-400">
-                      <span className="text-slate-400 dark:text-neutral-500">Created:</span>
-                      <span className="font-medium text-slate-700 dark:text-neutral-300">
-                        {formatDate(group.createdAt)}
-                      </span>
-                    </div>
-                    {hasPacked && latestPackedDate && (
-                      <div className="mt-1.5 flex items-center justify-between font-semibold text-red-700 dark:text-red-400">
-                        <span className="text-slate-500 dark:text-neutral-400">Packed to Service:</span>
-                        <span className="font-normal dark:text-red-200/90">{formatDate(latestPackedDate)}</span>
-                      </div>
-                    )}
-                    {group.batteries.length > 0 && (
-                      <div className="mt-2 flex flex-wrap gap-1 border-t border-slate-200/50 pt-2 dark:border-white/5">
-                        {group.batteries.slice(0, 4).map((code) => {
-                          const b = codeToBattery.get(String(code).trim().toUpperCase());
-                          const bPacked = isBatteryPackedForRepair(b);
-                          return (
-                            <span
-                              key={code}
-                              className={`rounded px-1.5 py-0.5 font-mono text-[10px] font-semibold ${
-                                bPacked
-                                  ? 'bg-red-200/80 text-red-900 border border-red-300 dark:bg-red-950/50 dark:text-red-300 dark:border-red-500/30'
-                                  : 'bg-white text-slate-600 dark:bg-surface-800 dark:text-neutral-300'
-                              }`}
-                            >
-                              {code}
-                            </span>
-                          );
-                        })}
-                        {group.batteries.length > 4 && (
-                          <span className="rounded bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-400 dark:bg-surface-800">
-                            +{group.batteries.length - 4} more
+                        {hasPacked && (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/70 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:text-rose-300">
+                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                            {groupPacked.length} In Service
                           </span>
                         )}
                       </div>
-                    )}
+                      <h3 className="truncate text-base font-extrabold text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mt-0.5">
+                        {group.name}
+                      </h3>
+                    </div>
+                  </div>
+
+                  <span
+                    className={`inline-flex items-center gap-1 shrink-0 rounded-xl px-2.5 py-1 text-xs font-black shadow-2xs border ${
+                      hasPacked
+                        ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
+                    }`}
+                  >
+                    <span>{totalCount}</span>
+                    <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase">
+                      {totalCount === 1 ? 'Unit' : 'Units'}
+                    </span>
+                  </span>
+                </div>
+
+                {/* Structured Logistics Metric Summary (No Raw Battery Chips) */}
+                <div className="mt-3.5 grid grid-cols-2 gap-2">
+                  {/* Volume Metric */}
+                  <div className="flex items-center gap-2.5 rounded-xl bg-slate-50/80 dark:bg-surface-800/60 p-2.5 border border-slate-100 dark:border-white/5">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                      <FiPackage className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        Available
+                      </span>
+                      <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
+                        {readyCount} {readyCount === 1 ? 'Battery' : 'Batteries'}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Status / Logistics Metric */}
+                  <div className="flex items-center gap-2.5 rounded-xl bg-slate-50/80 dark:bg-surface-800/60 p-2.5 border border-slate-100 dark:border-white/5">
+                    <div
+                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        hasPacked
+                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                      }`}
+                    >
+                      {hasPacked ? <FiTruck className="h-4 w-4" /> : <FiCheckCircle className="h-4 w-4" />}
+                    </div>
+                    <div className="min-w-0">
+                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        {hasPacked ? 'In Repair' : 'Inventory'}
+                      </span>
+                      <span
+                        className={`block truncate text-xs font-black ${
+                          hasPacked
+                            ? 'text-rose-700 dark:text-rose-400'
+                            : 'text-emerald-700 dark:text-emerald-400'
+                        }`}
+                      >
+                        {hasPacked ? `${groupPacked.length} Dispatched` : 'Ready to Pack'}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
-                <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/5">
+                {/* Date & Subtitle */}
+                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400">
+                  <div className="flex items-center gap-1.5">
+                    <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
+                    <span>Created {formatDate(group.createdAt)}</span>
+                  </div>
+                  {hasPacked && latestPackedDate && (
+                    <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                      Packed {formatDate(latestPackedDate)}
+                    </span>
+                  )}
+                </div>
+
+                {/* Footer: Delete action & CTA */}
+                <div className="mt-3.5 flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/5">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       requestDeleteGroup(group);
                     }}
-                    className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:text-neutral-500 dark:hover:bg-red-950/30 dark:hover:text-red-400"
+                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-colors"
                     title="Delete group"
                   >
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                      <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
-                    </svg>
+                    <FiTrash2 className="h-3.5 w-3.5" />
+                    <span>Delete</span>
                   </button>
-                  <span className={`inline-flex items-center gap-1 text-xs font-bold transition-all group-hover:translate-x-0.5 ${
-                    hasPacked
-                      ? 'text-red-700 group-hover:text-red-800 dark:text-red-400'
-                      : 'text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400'
-                  }`}>
+
+                  <span
+                    className={`inline-flex items-center gap-1.5 text-xs font-black transition-all group-hover:translate-x-0.5 ${
+                      hasPacked
+                        ? 'text-rose-600 group-hover:text-rose-700 dark:text-rose-400'
+                        : 'text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400'
+                    }`}
+                  >
                     <span>Open Group</span>
-                    <span>→</span>
+                    <FiArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
                   </span>
                 </div>
               </div>
@@ -1176,7 +1288,7 @@ function ClientBatterySortPage() {
               <input
                 type="text"
                 value={nameInput}
-                onChange={(e) => setNameInput(e.target.value)}
+                onChange={(e) => setNameInput(capitalizeFirstLetter(e.target.value))}
                 placeholder="e.g. Site A Requirement, 40Ah Batch, Order #204"
                 autoComplete="off"
                 autoFocus

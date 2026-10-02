@@ -23,46 +23,57 @@ import {
   FiCpu,
   FiMaximize2,
   FiShield,
+  FiArrowRight,
 } from 'react-icons/fi';
 
 const EVENT_CONFIG = {
   packed: {
     label: 'Packed for Repair',
     icon: FiPackage,
-    color: 'text-indigo-500 dark:text-indigo-400',
-    bg: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800/50',
+    color: 'text-indigo-600 dark:text-indigo-400',
+    bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/60 dark:text-indigo-300 dark:border-indigo-800/50',
+    stripe: 'bg-indigo-500',
+    iconBg: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300',
     dot: 'bg-indigo-500',
     badge: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/30 dark:text-indigo-300',
   },
   intake: {
     label: 'Workshop Intake',
     icon: FiTruck,
-    color: 'text-blue-500 dark:text-blue-400',
-    bg: 'bg-blue-500/10 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800/50',
+    color: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/50',
+    stripe: 'bg-blue-500',
+    iconBg: 'bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300',
     dot: 'bg-blue-500',
     badge: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
   },
   return: {
     label: 'Returned to Fleet',
     icon: FiCheckCircle,
-    color: 'text-emerald-500 dark:text-emerald-400',
-    bg: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-800/50',
+    color: 'text-emerald-600 dark:text-emerald-400',
+    bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50',
+    stripe: 'bg-emerald-500',
+    iconBg: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300',
     dot: 'bg-emerald-500',
     badge: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300',
   },
   sort: {
     label: 'Battery Sorted',
     icon: FiLayers,
-    color: 'text-teal-500 dark:text-teal-400',
-    bg: 'bg-teal-500/10 text-teal-700 dark:text-teal-300 border-teal-200 dark:border-teal-800/50',
+    color: 'text-teal-600 dark:text-teal-400',
+    bg: 'bg-teal-50 text-teal-700 border-teal-200 dark:bg-teal-950/60 dark:text-teal-300 dark:border-teal-800/50',
+    stripe: 'bg-teal-500',
+    iconBg: 'bg-teal-100 text-teal-700 dark:bg-teal-900/50 dark:text-teal-300',
     dot: 'bg-teal-500',
     badge: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300',
   },
   scrap: {
     label: 'Scrapped / Recycled',
     icon: FiInfo,
-    color: 'text-rose-500 dark:text-rose-400',
-    bg: 'bg-rose-500/10 text-rose-700 dark:text-rose-300 border-rose-200 dark:border-rose-800/50',
+    color: 'text-rose-600 dark:text-rose-400',
+    bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800/50',
+    stripe: 'bg-rose-500',
+    iconBg: 'bg-rose-100 text-rose-700 dark:bg-rose-900/50 dark:text-rose-300',
     dot: 'bg-rose-500',
     badge: 'bg-rose-100 text-rose-800 dark:bg-rose-900/30 dark:text-rose-300',
   },
@@ -671,107 +682,122 @@ function ClientHistoryPage() {
                     <div
                       key={event.id}
                       onClick={() => navigate(`/my/history/${event.id}`)}
-                      className="group relative rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all hover:border-blue-400 hover:shadow-lg dark:border-white/10 dark:bg-surface-900 dark:hover:border-blue-500/50 cursor-pointer"
+                      className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20 cursor-pointer pl-6 sm:pl-7"
                     >
+                      {/* Left Classic Colored Accent Stripe */}
+                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${conf.stripe || 'bg-slate-400'}`} />
+
                       {/* Timeline Node Dot */}
                       <span
                         className={`absolute -left-6 sm:-left-8 top-6 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full ring-4 ring-white dark:ring-surface-950 ${conf.dot}`}
                       />
 
-                      {/* Top Header: Truck ID, Status Badge & Timestamp */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3.5 border-b border-slate-100 dark:border-white/5">
-                        <div className="flex items-center gap-2.5 flex-wrap">
-                          {/* Truck Vehicle ID Badge */}
-                          <span className="font-mono text-sm font-black text-slate-900 dark:text-white bg-slate-100 dark:bg-surface-800 px-3 py-1 rounded-xl border border-slate-200/80 dark:border-white/10 flex items-center gap-1.5 shadow-2xs">
-                            <FiTruck className="w-4 h-4 text-blue-600 dark:text-blue-400" />
-                            <span>{truckTitle}</span>
-                          </span>
-
-                          {/* Stage / Type Badge */}
-                          <span
-                            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-black border uppercase tracking-wider ${conf.bg}`}
-                          >
-                            <Icon className="w-3.5 h-3.5" />
-                            <span>{event.type_label || conf.label}</span>
-                          </span>
-
-                          {/* Battery Count Pill */}
-                          <span className="px-3 py-1 rounded-xl text-xs font-black bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 border border-blue-200/60 dark:border-blue-800/40">
-                            {count} {count === 1 ? 'Battery' : 'Batteries'} Loaded
-                          </span>
+                      {/* Top Header: Truck ID, Stage Badge & Time */}
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100 dark:border-white/5">
+                        <div className="flex items-center gap-3">
+                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${conf.iconBg} shadow-2xs`}>
+                            <Icon className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                              <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                                {truckTitle}
+                              </h4>
+                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border tracking-wide uppercase ${conf.bg}`}>
+                                <span className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
+                                <span>{event.type_label || conf.label}</span>
+                              </span>
+                            </div>
+                            <p className="text-xs text-slate-400 dark:text-neutral-500 mt-0.5">
+                              {event.reference ? `Reference: ${event.reference}` : 'Consignment Batch'}
+                              {event.staff_name ? ` • Handled by ${event.staff_name}` : ''}
+                            </p>
+                          </div>
                         </div>
 
                         {/* Timestamp & Relative Badge */}
-                        <div className="flex items-center gap-2 text-xs text-slate-400 dark:text-neutral-500">
-                          <span className="font-bold text-slate-700 dark:text-neutral-300">
-                            {formatEventTime(event.timestamp)}
-                          </span>
-                          <span>•</span>
-                          <span className="font-semibold text-slate-500 dark:text-neutral-400">
+                        <div className="flex sm:flex-col sm:items-end justify-between sm:justify-center gap-0.5 text-xs shrink-0">
+                          <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-neutral-200">
+                            <FiClock className="h-3.5 w-3.5 text-slate-400" />
+                            <span>{formatEventTime(event.timestamp)}</span>
+                          </div>
+                          <span className="text-[11px] font-semibold text-slate-400 dark:text-neutral-400">
                             {formatRelativeTime(event.timestamp)}
                           </span>
                         </div>
                       </div>
 
-                      {/* Event Details Body */}
-                      <div className="mt-3.5 flex flex-col md:flex-row md:items-center justify-between gap-3">
-                        <div className="space-y-2 flex-1 min-w-0">
-                          <p className="font-bold text-sm text-slate-800 dark:text-neutral-100">
-                            {event.details}
-                          </p>
-
-                          {/* Batteries Quick Preview Chips */}
-                          {event.batteries_list && event.batteries_list.length > 0 && (
-                            <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                              <span className="text-[11px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-wider mr-1">
-                                Manifest Preview:
-                              </span>
-                              {event.batteries_list.slice(0, 6).map((b) => (
-                                <span
-                                  key={b.code}
-                                  className="font-mono text-xs px-2.5 py-0.5 rounded-lg bg-slate-100 text-slate-700 dark:bg-surface-800 dark:text-neutral-200 font-bold border border-slate-200/60 dark:border-white/10"
-                                >
-                                  {b.code}
-                                </span>
-                              ))}
-                              {event.batteries_list.length > 6 && (
-                                <span className="text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 px-2 py-0.5 rounded-lg">
-                                  +{event.batteries_list.length - 6} more
-                                </span>
-                              )}
-                            </div>
-                          )}
+                      {/* Key Logistics Metrics Grid */}
+                      <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                        {/* Battery Volume */}
+                        <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 dark:bg-surface-800/80 px-3.5 py-2.5 border border-slate-100 dark:border-white/5">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            <FiPackage className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                              Shipment Volume
+                            </span>
+                            <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
+                              {count} {count === 1 ? 'Battery' : 'Batteries'} Loaded
+                            </span>
+                          </div>
                         </div>
 
-                        {/* View Truck Details Action Pill */}
-                        <div className="shrink-0 flex items-center gap-2">
-                          <div className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 group-hover:text-blue-700 dark:text-blue-300 bg-blue-50 group-hover:bg-blue-100 dark:bg-blue-950/60 dark:group-hover:bg-blue-900/60 px-3.5 py-2 rounded-xl transition-all shadow-2xs">
-                            <FiMaximize2 className="w-3.5 h-3.5" />
-                            <span>Click to view details</span>
+                        {/* Logistics Driver */}
+                        <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 dark:bg-surface-800/80 px-3.5 py-2.5 border border-slate-100 dark:border-white/5">
+                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-200/70 text-slate-700 dark:bg-surface-700 dark:text-neutral-300">
+                            <FiUser className="h-4 w-4" />
+                          </div>
+                          <div className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                              Transport / Driver
+                            </span>
+                            <span className="block truncate text-xs font-bold text-slate-800 dark:text-neutral-100">
+                              {event.driver_name ? event.driver_name : (event.staff_name || 'Fleet Transport')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Delivery Status */}
+                        <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 dark:bg-surface-800/80 px-3.5 py-2.5 border border-slate-100 dark:border-white/5">
+                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                            event.verified_by_client
+                              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
+                              : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                          }`}>
+                            {event.verified_by_client ? <FiCheckCircle className="h-4 w-4" /> : <FiShield className="h-4 w-4" />}
+                          </div>
+                          <div className="min-w-0">
+                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                              Delivery Status
+                            </span>
+                            <span className={`block truncate text-xs font-bold ${
+                              event.verified_by_client
+                                ? 'text-emerald-700 dark:text-emerald-300'
+                                : 'text-amber-700 dark:text-amber-300'
+                            }`}>
+                              {event.verified_by_client ? 'Verified Delivery' : 'In Transit / Pending'}
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      {/* Event Tags & Logistics Meta Footer */}
-                      <div className="mt-3.5 flex items-center justify-between gap-2 flex-wrap pt-2.5 text-xs border-t border-slate-100 dark:border-white/5">
-                        <div className="flex items-center gap-2 flex-wrap">
-                          {event.driver_name && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-slate-700 dark:bg-surface-800 dark:text-neutral-200 font-bold border border-slate-200/60 dark:border-white/10">
-                              <FiUser className="w-3 h-3 text-slate-400 dark:text-neutral-400" />
-                              <span>Driver: {event.driver_name}</span>
-                            </span>
-                          )}
+                      {/* Event Details / Notes */}
+                      {event.details && (
+                        <p className="mt-3 text-xs font-medium text-slate-600 dark:text-neutral-300 leading-relaxed">
+                          {event.details}
+                        </p>
+                      )}
 
-                          {event.verified_by_client && (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 font-bold border border-emerald-200 dark:border-emerald-800/40">
-                              <FiCheckCircle className="w-3 h-3 text-emerald-500" />
-                              <span>Verified Delivery</span>
-                            </span>
-                          )}
-                        </div>
-
-                        <span className="text-[11px] text-slate-400 dark:text-neutral-500 italic">
-                          Click card to view full manifest table
+                      {/* Footer with Action Cue */}
+                      <div className="mt-3.5 flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-white/5 text-xs">
+                        <span className="text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+                          Click card to view complete batch manifest table
+                        </span>
+                        <span className="inline-flex items-center gap-1.5 font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-200">
+                          <span>View Manifest</span>
+                          <FiArrowRight className="h-3.5 w-3.5" />
                         </span>
                       </div>
                     </div>

@@ -1,5 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
 import DataTable from '../../../components/ui/table/DataTable';
@@ -160,7 +160,31 @@ function ClientBatteriesPage() {
   }, [effectiveBucket, search, date, statusFilter]);
 
   // Selected Truck Batch for Dedicated Detail Page (NOT a popup!)
-  const [activeBatchKey, setActiveBatchKey] = useState(null);
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const batchParam = searchParams.get('batch');
+  const [activeBatchKey, setActiveBatchKeyState] = useState(batchParam || null);
+
+  useEffect(() => {
+    setActiveBatchKeyState(batchParam || null);
+  }, [batchParam]);
+
+  function setActiveBatchKey(key) {
+    setActiveBatchKeyState(key);
+    setSearchParams(
+      (prev) => {
+        const next = new URLSearchParams(prev);
+        if (key) {
+          next.set('batch', key);
+        } else {
+          next.delete('batch');
+        }
+        return next;
+      },
+      { replace: false }
+    );
+  }
+
   const [batchSearch, setBatchSearch] = useState('');
   const [batchStatusFilter, setBatchStatusFilter] = useState('all');
 
@@ -281,7 +305,9 @@ function ClientBatteriesPage() {
 
   useEffect(() => {
     loadData();
-    setActiveBatchKey(null);
+    if (!searchParams.get('batch')) {
+      setActiveBatchKeyState(null);
+    }
     setSearch('');
     setDate('');
     setStatusFilter('');
@@ -1053,6 +1079,7 @@ function ClientBatteriesPage() {
       render: (row) => (
         <Link
           to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+          state={{ from: location.pathname + location.search }}
           className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
         >
           {row.battery_code}
@@ -1215,34 +1242,9 @@ function ClientBatteriesPage() {
               </button>
             </>
           )}
-          {effectiveBucket === 'received' && (
-            isReturnRated(selectedBatch?.intakeId || selectedBatch?.returnId) ? (
-              <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
-                <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span>Rated</span>
-              </span>
-            ) : (
-              <button
-                type="button"
-                onClick={() => {
-                  setRatingModalData({
-                    isOpen: true,
-                    batteryCode: row.battery_code,
-                    batteryCodes: [row.battery_code],
-                    truckNumber: selectedBatch?.truckNumber || '',
-                    driverName: selectedBatch?.driverName || '',
-                    returnId: selectedBatch?.intakeId || selectedBatch?.returnId || null,
-                  });
-                }}
-                className="inline-flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 border border-amber-300 hover:bg-amber-100 dark:bg-amber-950/50 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs cursor-pointer"
-              >
-                <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
-                <span>Rate</span>
-              </button>
-            )
-          )}
           <Link
             to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+            state={{ from: location.pathname + location.search }}
             className="inline-flex items-center gap-1 rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-emerald-600"
           >
             <span>History →</span>
@@ -1262,6 +1264,7 @@ function ClientBatteriesPage() {
       render: (row) => (
         <Link
           to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+          state={{ from: location.pathname + location.search }}
           className="font-medium text-blue-700 hover:underline dark:text-blue-400 font-mono"
         >
           {row.battery_code}
@@ -1334,6 +1337,7 @@ function ClientBatteriesPage() {
       render: (row) => (
         <Link
           to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+          state={{ from: location.pathname + location.search }}
           className="font-medium text-blue-700 hover:underline dark:text-blue-400 font-mono"
         >
           {row.battery_code}
@@ -1626,6 +1630,10 @@ function ClientBatteriesPage() {
         </TableState>
       </div>
     );
+  }
+
+  if (loading && activeBatchKey) {
+    return <TableState>Loading truck batch details…</TableState>;
   }
 
   // ═════════════════════════════════════════════════════════════════════
