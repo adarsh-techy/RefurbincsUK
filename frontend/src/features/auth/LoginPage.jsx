@@ -63,103 +63,62 @@ function LoginPage() {
             <p className="mt-1 text-sm text-slate-500">Sign in to continue</p>
           </div>
 
-          {/* 1-Click Quick Fill Credentials */}
+          {/* Simple Quick Fill Buttons */}
           {DEMO_LOGIN_ENABLED && (
-            <div className="mt-5 flex flex-col gap-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 shadow-xs">
-              <div className="flex items-center justify-between px-1">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
-                  <span className="relative flex h-2 w-2">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
-                  </span>
-                  Quick Demo Login
-                </span>
-                <span className="text-[11px] text-slate-500 font-medium">Click to fill</span>
+            <div className="mt-4">
+              <div className="mb-2 flex items-center justify-between text-xs text-slate-500 font-medium">
+                <span>Quick Fill:</span>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
-                {/* Super Admin */}
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => {
                     setEmail(DEMO_CREDENTIALS.superAdmin.email);
                     setPassword(DEMO_CREDENTIALS.superAdmin.password);
                   }}
-                  className={`group relative flex flex-col justify-between rounded-xl p-2.5 text-left transition-all cursor-pointer border ${
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-1 text-xs font-semibold transition cursor-pointer ${
                     email === DEMO_CREDENTIALS.superAdmin.email
-                      ? 'border-indigo-500 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-500/25 text-indigo-950'
-                      : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40 text-slate-700'
+                      ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
                   }`}
-                  title={`Super Admin: ${DEMO_CREDENTIALS.superAdmin.email}`}
+                  title="Super Admin: superadmin@gmail.com"
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base">👑</span>
-                      <span className="text-xs font-bold truncate">Super Admin</span>
-                    </div>
-                    {email === DEMO_CREDENTIALS.superAdmin.email && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
-                    )}
-                  </div>
-                  <span className="mt-1 text-[11px] font-medium text-slate-500 group-hover:text-indigo-600 truncate w-full">
-                    superadmin@gmail.com
-                  </span>
+                  <span>👑</span>
+                  <span className="truncate">Admin</span>
                 </button>
 
-                {/* HumanForest */}
                 <button
                   type="button"
                   onClick={() => {
                     setEmail(DEMO_CREDENTIALS.client.email);
                     setPassword(DEMO_CREDENTIALS.client.password);
                   }}
-                  className={`group relative flex flex-col justify-between rounded-xl p-2.5 text-left transition-all cursor-pointer border ${
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-1 text-xs font-semibold transition cursor-pointer ${
                     email === DEMO_CREDENTIALS.client.email
-                      ? 'border-emerald-500 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-500/25 text-emerald-950'
-                      : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40 text-slate-700'
+                      ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300'
                   }`}
-                  title={`HumanForest: ${DEMO_CREDENTIALS.client.email}`}
+                  title="HumanForest: humanforest@gmail.com"
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base">⚡</span>
-                      <span className="text-xs font-bold truncate">HumanForest</span>
-                    </div>
-                    {email === DEMO_CREDENTIALS.client.email && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
-                    )}
-                  </div>
-                  <span className="mt-1 text-[11px] font-medium text-slate-500 group-hover:text-emerald-600 truncate w-full">
-                    humanforest@gmail.com
-                  </span>
+                  <span>⚡</span>
+                  <span className="truncate">HumanForest</span>
                 </button>
 
-                {/* Recycle Client */}
                 <button
                   type="button"
                   onClick={() => {
                     setEmail(DEMO_CREDENTIALS.recycle.email);
                     setPassword(DEMO_CREDENTIALS.recycle.password);
                   }}
-                  className={`group relative flex flex-col justify-between rounded-xl p-2.5 text-left transition-all cursor-pointer border ${
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-1 text-xs font-semibold transition cursor-pointer ${
                     email === DEMO_CREDENTIALS.recycle.email
-                      ? 'border-teal-500 bg-teal-50/90 shadow-xs ring-2 ring-teal-500/25 text-teal-950'
-                      : 'border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/40 text-slate-700'
+                      ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-teal-50 hover:border-teal-300'
                   }`}
-                  title={`Recycle Client: ${DEMO_CREDENTIALS.recycle.email}`}
+                  title="Recycle Client: recycle@gmail.com"
                 >
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-base">♻️</span>
-                      <span className="text-xs font-bold truncate">Recycle Client</span>
-                    </div>
-                    {email === DEMO_CREDENTIALS.recycle.email && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-teal-600" />
-                    )}
-                  </div>
-                  <span className="mt-1 text-[11px] font-medium text-slate-500 group-hover:text-teal-600 truncate w-full">
-                    recycle@gmail.com
-                  </span>
+                  <span>♻️</span>
+                  <span className="truncate">Recycle</span>
                 </button>
               </div>
             </div>
