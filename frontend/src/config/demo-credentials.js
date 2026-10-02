@@ -8,16 +8,16 @@
  * ship working logins (including super admin) to anyone who opens the site.
  */
 export const DEMO_LOGIN_ENABLED =
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
+  import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'false' ? false : true;
 
-export const DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
+export const DEMO_CREDENTIALS = {
   superAdmin: {
     id: 'superAdmin',
     label: 'Super Admin',
     icon: '👑',
     email: import.meta.env.VITE_DEMO_SUPERADMIN_EMAIL || 'superadmin@gmail.com',
     password: import.meta.env.VITE_DEMO_SUPERADMIN_PASSWORD || '12345678',
-    tone: 'neutral',
+    tone: 'indigo',
   },
   client: {
     id: 'client',

@@ -63,79 +63,106 @@ function LoginPage() {
             <p className="mt-1 text-sm text-slate-500">Sign in to continue</p>
           </div>
 
-          {/* Demo quick-fill credentials */}
+          {/* 1-Click Quick Fill Credentials */}
           {DEMO_LOGIN_ENABLED && (
-          <div className="mt-4 flex flex-col gap-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium px-0.5">
-              <span>Quick Fill Credentials:</span>
+            <div className="mt-5 flex flex-col gap-2.5 rounded-2xl border border-slate-200/90 bg-slate-50/70 p-3 shadow-xs">
+              <div className="flex items-center justify-between px-1">
+                <span className="flex items-center gap-1.5 text-xs font-bold text-slate-800">
+                  <span className="relative flex h-2 w-2">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                  </span>
+                  Quick Demo Login
+                </span>
+                <span className="text-[11px] text-slate-500 font-medium">Click to fill</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                {/* Super Admin */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(DEMO_CREDENTIALS.superAdmin.email);
+                    setPassword(DEMO_CREDENTIALS.superAdmin.password);
+                  }}
+                  className={`group relative flex flex-col justify-between rounded-xl p-2.5 text-left transition-all cursor-pointer border ${
+                    email === DEMO_CREDENTIALS.superAdmin.email
+                      ? 'border-indigo-500 bg-indigo-50/90 shadow-xs ring-2 ring-indigo-500/25 text-indigo-950'
+                      : 'border-slate-200 bg-white hover:border-indigo-300 hover:bg-indigo-50/40 text-slate-700'
+                  }`}
+                  title={`Super Admin: ${DEMO_CREDENTIALS.superAdmin.email}`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">👑</span>
+                      <span className="text-xs font-bold truncate">Super Admin</span>
+                    </div>
+                    {email === DEMO_CREDENTIALS.superAdmin.email && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-indigo-600" />
+                    )}
+                  </div>
+                  <span className="mt-1 text-[11px] font-medium text-slate-500 group-hover:text-indigo-600 truncate w-full">
+                    superadmin@gmail.com
+                  </span>
+                </button>
+
+                {/* HumanForest */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(DEMO_CREDENTIALS.client.email);
+                    setPassword(DEMO_CREDENTIALS.client.password);
+                  }}
+                  className={`group relative flex flex-col justify-between rounded-xl p-2.5 text-left transition-all cursor-pointer border ${
+                    email === DEMO_CREDENTIALS.client.email
+                      ? 'border-emerald-500 bg-emerald-50/90 shadow-xs ring-2 ring-emerald-500/25 text-emerald-950'
+                      : 'border-slate-200 bg-white hover:border-emerald-300 hover:bg-emerald-50/40 text-slate-700'
+                  }`}
+                  title={`HumanForest: ${DEMO_CREDENTIALS.client.email}`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">⚡</span>
+                      <span className="text-xs font-bold truncate">HumanForest</span>
+                    </div>
+                    {email === DEMO_CREDENTIALS.client.email && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-600" />
+                    )}
+                  </div>
+                  <span className="mt-1 text-[11px] font-medium text-slate-500 group-hover:text-emerald-600 truncate w-full">
+                    humanforest@gmail.com
+                  </span>
+                </button>
+
+                {/* Recycle Client */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(DEMO_CREDENTIALS.recycle.email);
+                    setPassword(DEMO_CREDENTIALS.recycle.password);
+                  }}
+                  className={`group relative flex flex-col justify-between rounded-xl p-2.5 text-left transition-all cursor-pointer border ${
+                    email === DEMO_CREDENTIALS.recycle.email
+                      ? 'border-teal-500 bg-teal-50/90 shadow-xs ring-2 ring-teal-500/25 text-teal-950'
+                      : 'border-slate-200 bg-white hover:border-teal-300 hover:bg-teal-50/40 text-slate-700'
+                  }`}
+                  title={`Recycle Client: ${DEMO_CREDENTIALS.recycle.email}`}
+                >
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-base">♻️</span>
+                      <span className="text-xs font-bold truncate">Recycle Client</span>
+                    </div>
+                    {email === DEMO_CREDENTIALS.recycle.email && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-teal-600" />
+                    )}
+                  </div>
+                  <span className="mt-1 text-[11px] font-medium text-slate-500 group-hover:text-teal-600 truncate w-full">
+                    recycle@gmail.com
+                  </span>
+                </button>
+              </div>
             </div>
-
-            {/* Desktop / Tablet view: Super Admin, HumanForest, Recycle Client */}
-            <div className="hidden sm:grid sm:grid-cols-3 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(DEMO_CREDENTIALS.superAdmin.email);
-                  setPassword(DEMO_CREDENTIALS.superAdmin.password);
-                }}
-                className="rounded-md border border-dashed border-slate-300 bg-slate-50 px-2 py-2 text-[11px] font-medium text-slate-700 transition hover:bg-slate-100 truncate cursor-pointer"
-                title={`Super Admin: ${DEMO_CREDENTIALS.superAdmin.email}`}
-              >
-                👑 Super Admin
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(DEMO_CREDENTIALS.client.email);
-                  setPassword(DEMO_CREDENTIALS.client.password);
-                }}
-                className="rounded-md border border-dashed border-emerald-500/50 bg-emerald-500/10 px-2 py-2 text-[11px] font-medium text-emerald-700 transition hover:bg-emerald-500/20 truncate cursor-pointer"
-                title={`Client: ${DEMO_CREDENTIALS.client.email}`}
-              >
-                ⚡ HumanForest
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(DEMO_CREDENTIALS.recycle.email);
-                  setPassword(DEMO_CREDENTIALS.recycle.password);
-                }}
-                className="rounded-md border border-dashed border-teal-500/50 bg-teal-500/10 px-2 py-2 text-[11px] font-medium text-teal-700 transition hover:bg-teal-500/20 truncate cursor-pointer"
-                title={`Recycle: ${DEMO_CREDENTIALS.recycle.email}`}
-              >
-                ♻️ Recycle Client
-              </button>
-            </div>
-
-            {/* Mobile View: Adarsh, Akhil */}
-            <div className="grid grid-cols-2 gap-2 sm:hidden">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(MOBILE_DEMO_CREDENTIALS.adarsh.email);
-                  setPassword(MOBILE_DEMO_CREDENTIALS.adarsh.password);
-                }}
-                className="rounded-md border border-dashed border-blue-500/50 bg-blue-500/10 px-2 py-2 text-[11px] font-medium text-blue-700 transition hover:bg-blue-500/20 truncate cursor-pointer text-center"
-                title={`Adarsh: ${MOBILE_DEMO_CREDENTIALS.adarsh.email}`}
-              >
-                🔧 Adarsh
-              </button>
-
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail(MOBILE_DEMO_CREDENTIALS.akhil.email);
-                  setPassword(MOBILE_DEMO_CREDENTIALS.akhil.password);
-                }}
-                className="rounded-md border border-dashed border-violet-500/50 bg-violet-500/10 px-2 py-2 text-[11px] font-medium text-violet-700 transition hover:bg-violet-500/20 truncate cursor-pointer text-center"
-                title={`Akhil: ${MOBILE_DEMO_CREDENTIALS.akhil.email}`}
-              >
-                ⚡ Akhil
-              </button>
-            </div>
-          </div>
           )}
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
