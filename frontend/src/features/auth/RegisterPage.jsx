@@ -14,7 +14,6 @@ function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('client');
   const [showPassword, setShowPassword] = useState(false);
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -22,7 +21,7 @@ function RegisterPage() {
 
   async function handleSubmit(e) {
     e.preventDefault();
-    const result = await dispatch(register({ name, email, password, role }));
+    const result = await dispatch(register({ name, email, password, role: 'super_admin' }));
     if (register.fulfilled.match(result)) {
       navigate('/');
     }
@@ -39,13 +38,17 @@ function RegisterPage() {
           <img src={logo} alt="Refurbnics" className="mx-auto mb-6 h-auto w-full max-w-xs" />
 
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-slate-900">Create an Account</h1>
-            <p className="mt-1 text-sm text-slate-500">Sign up to access the battery platform</p>
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold mb-3">
+              <span>👑</span>
+              <span>Super Admin Portal</span>
+            </div>
+            <h1 className="text-2xl font-bold text-slate-900">Create Super Admin</h1>
+            <p className="mt-1 text-sm text-slate-500">Register new Super Admin credentials</p>
           </div>
 
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>
-              <label className={labelClasses}>Full Name / Company</label>
+              <label className={labelClasses}>Full Name</label>
               <div className="relative">
                 <svg viewBox="0 0 20 20" fill="currentColor" className={iconClasses}>
                   <path d="M10 8a3 3 0 100-6 3 3 0 000 6zM3.465 14.493a1.23 1.23 0 00.41 1.412A9.957 9.957 0 0010 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 00-13.074.003z" />
@@ -55,7 +58,7 @@ function RegisterPage() {
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   className={inputClasses}
-                  placeholder="e.g. HumanForest Ltd"
+                  placeholder="e.g. John Doe"
                   required
                 />
               </div>
@@ -73,7 +76,7 @@ function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputClasses}
-                  placeholder="name@company.com"
+                  placeholder="admin@example.com"
                   required
                 />
               </div>
@@ -123,16 +126,11 @@ function RegisterPage() {
             </div>
 
             <div>
-              <label className={labelClasses}>Account Type</label>
-              <select
-                value={role}
-                onChange={(e) => setRole(e.target.value)}
-                className="w-full rounded-md border border-slate-300 bg-white py-2.5 px-3.5 text-sm text-slate-900 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-              >
-                <option value="client">Client / Fleet Partner</option>
-                <option value="recycle_client">Recycle Partner</option>
-                <option value="admin">Staff / Admin</option>
-              </select>
+              <label className={labelClasses}>Assigned Role</label>
+              <div className="flex items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50/60 py-2.5 px-3.5 text-sm font-semibold text-indigo-900">
+                <span className="text-base">👑</span>
+                <span>Super Admin (Full Platform Access)</span>
+              </div>
             </div>
 
             {error && <p className="text-sm text-red-600">{error}</p>}
@@ -157,7 +155,7 @@ function RegisterPage() {
                   />
                 </svg>
               )}
-              {status === 'loading' ? 'Creating account…' : 'Create Account'}
+              {status === 'loading' ? 'Creating Super Admin…' : 'Create Super Admin Account'}
             </button>
           </form>
 

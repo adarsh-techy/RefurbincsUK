@@ -77,22 +77,14 @@ async function register(req, res, next) {
       return res.status(409).json({ message: 'An account with that email already exists' });
     }
 
-    const safeRole = ['client', 'recycle_client', 'admin', 'super_admin'].includes(role) ? role : 'client';
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await userModel.create({
       name,
       email,
       passwordHash,
-      role: safeRole,
-      permissions: safeRole === 'admin' || safeRole === 'super_admin' ? PERMISSIONS : [],
+      role: 'super_admin',
+      permissions: PERMISSIONS,
     });
-
-    if (safeRole === 'client' || safeRole === 'recycle_client') {
-      await db.query(
-        'INSERT INTO clients (name, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [name, user.id]
-      );
-    }
 
     res.status(201).json({
       token: signToken(user),

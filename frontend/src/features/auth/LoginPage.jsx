@@ -213,12 +213,12 @@ function LoginPage() {
           </form>
 
           <div className="mt-5 text-center text-sm text-slate-600">
-            Don't have an account?{' '}
+            Need a Super Admin account?{' '}
             <Link
               to="/register"
               className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
             >
-              Create Account
+              Create Super Admin
             </Link>
           </div>
 
