@@ -76,8 +76,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      {/* TEMPORARY: remove this route once real admin management is in use. */}
       <Route path="/register" element={<RegisterPage />} />
+      <Route path="/create-account" element={<RegisterPage />} />
+      <Route path="/signup" element={<RegisterPage />} />
 
       {/* Battery Detail & Full History: Accessible both publicly via QR scan and when logged in */}
       <Route element={<DashboardLayout />}>

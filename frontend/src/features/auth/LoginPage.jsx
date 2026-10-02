@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/REFURBNICS.png';
@@ -211,6 +211,16 @@ function LoginPage() {
               {status === 'loading' ? 'Signing in…' : 'Login'}
             </button>
           </form>
+
+          <div className="mt-5 text-center text-sm text-slate-600">
+            Don't have an account?{' '}
+            <Link
+              to="/register"
+              className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
+            >
+              Create Account
+            </Link>
+          </div>
 
           <p className="mt-6 text-center text-xs text-slate-400">
             © {new Date().getFullYear()} Refurbinics. All rights reserved.

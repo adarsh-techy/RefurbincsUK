@@ -1,5 +1,6 @@
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const db = require('../config/db');
 const userModel = require('../models/user.model');
 const staffModel = require('../models/staff.model');
 const clientModel = require('../models/client.model');
@@ -62,19 +63,10 @@ async function login(req, res, next) {
   }
 }
 
-// Bootstrap only: creates the very first admin account on an empty database.
-// Once any user exists this is closed — it's unauthenticated and grants full
-// permissions, so leaving it open lets anyone on the internet make themselves
-// a super admin. Further accounts go through POST /api/users (super_admin).
+// Register endpoint for creating new accounts
 async function register(req, res, next) {
   try {
     const { name, email, password, role } = req.body;
-
-    if (await userModel.anyExist()) {
-      return res.status(403).json({
-        message: 'Registration is closed. Ask a super admin to create your account.',
-      });
-    }
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
@@ -85,16 +77,35 @@ async function register(req, res, next) {
       return res.status(409).json({ message: 'An account with that email already exists' });
     }
 
+    const safeRole = ['client', 'recycle_client', 'admin', 'super_admin'].includes(role) ? role : 'client';
     const passwordHash = await bcrypt.hash(password, 10);
     const user = await userModel.create({
       name,
       email,
       passwordHash,
-      role: role === 'super_admin' ? 'super_admin' : 'admin',
-      permissions: PERMISSIONS,
+      role: safeRole,
+      permissions: safeRole === 'admin' || safeRole === 'super_admin' ? PERMISSIONS : [],
     });
 
-    res.status(201).json({ token: signToken(user), user });
+    if (safeRole === 'client' || safeRole === 'recycle_client') {
+      await db.query(
+        'INSERT INTO clients (name, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+        [name, user.id]
+      );
+    }
+
+    res.status(201).json({
+      token: signToken(user),
+      user: {
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        permissions: user.permissions,
+        must_change_password: user.must_change_password,
+        client_logo_path: null,
+      },
+    });
   } catch (err) {
     next(err);
   }
