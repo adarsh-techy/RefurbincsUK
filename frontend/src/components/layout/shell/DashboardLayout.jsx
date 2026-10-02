@@ -126,12 +126,12 @@ function DashboardLayout() {
         <div className="dark">
           <PortalHeader />
         </div>
-        <main className="flex-1 p-3 pb-20 sm:p-6 md:pb-8">
+        <main className="flex-1 p-2.5 pb-16 sm:p-6 md:pb-8">
           <Suspense fallback={<PageFallback />}>
             <Outlet />
           </Suspense>
         </main>
-        <AppFooter className="mb-16 md:mb-0" />
+        <AppFooter className="mb-14 md:mb-0" />
         {isCustomizerOpen && <ThemeCustomizerModal onClose={closeCustomizer} />}
       </div>
     );

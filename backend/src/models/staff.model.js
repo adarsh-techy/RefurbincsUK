@@ -139,25 +139,61 @@ async function findById(id) {
 // current status so the work-history list can show whether that battery
 // has since moved on or is still in progress.
 async function findRepairs(staffId) {
+  // price/labor_charge are for the admin Staff detail page only — the
+  // technician's own /staff/me strips them (see staff.controller myProfile).
+  //
+  // battery_status is the battery's status *right now*, which says nothing
+  // about a repair done on an earlier visit — so `outcome` works out what
+  // happened to THIS job:
+  //   failed     its parts were pulled back out, or it's the battery's latest
+  //              repair and the battery ended up unserviceable/recycled
+  //   completed  the battery passed testing / went back to the client, or
+  //              has since been repaired again or returned (an older visit)
+  //   active     still in the workshop pipeline after this repair
   const { rows } = await db.query(
-    `SELECT
-       MIN(r.id) AS id,
-       array_agg(r.id ORDER BY r.id) AS repair_ids,
-       r.batch_id,
-       MAX(b.battery_code) AS battery_code,
-       MAX(b.status) AS battery_status,
-       string_agg(p.name, ', ' ORDER BY p.name) AS part_name,
-       SUM(r.price) AS price,
-       SUM(r.labor_charge) AS labor_charge,
-       MIN(r.notes) AS notes,
-       MIN(r.repaired_at) AS repaired_at,
-       MIN(r.duration_seconds) AS duration_seconds
-     FROM repairs r
-     JOIN batteries b ON b.id = r.battery_id
-     JOIN parts p ON p.id = r.part_id
-     WHERE r.staff_id = $1
-     GROUP BY r.batch_id
-     ORDER BY MIN(r.repaired_at) DESC`,
+    `WITH mine AS (
+       SELECT
+         MIN(r.id) AS id,
+         array_agg(r.id ORDER BY r.id) AS repair_ids,
+         r.batch_id,
+         r.battery_id,
+         b.battery_code,
+         b.status AS battery_status,
+         string_agg(p.name, ', ' ORDER BY p.name) AS part_name,
+         SUM(r.price) AS price,
+         SUM(r.labor_charge) AS labor_charge,
+         MIN(r.notes) AS notes,
+         MIN(r.repaired_at) AS repaired_at,
+         MIN(r.duration_seconds) AS duration_seconds,
+         bool_and(r.removed_at IS NOT NULL) AS parts_removed
+       FROM repairs r
+       JOIN batteries b ON b.id = r.battery_id
+       JOIN parts p ON p.id = r.part_id
+       WHERE r.staff_id = $1
+       GROUP BY r.batch_id, r.battery_id, b.battery_code, b.status
+     )
+     SELECT
+       m.id, m.repair_ids, m.batch_id, m.battery_code, m.battery_status,
+       m.part_name, m.price, m.labor_charge, m.notes, m.repaired_at, m.duration_seconds, m.parts_removed,
+       CASE
+         WHEN m.parts_removed THEN 'failed'
+         WHEN EXISTS (
+           SELECT 1 FROM repairs later
+           WHERE later.battery_id = m.battery_id
+             AND later.batch_id <> m.batch_id
+             AND later.repaired_at > m.repaired_at
+         ) THEN 'completed'
+         WHEN EXISTS (
+           SELECT 1 FROM return_batteries rb
+           JOIN returns ret ON ret.id = rb.return_id
+           WHERE rb.battery_id = m.battery_id AND ret.returned_at > m.repaired_at
+         ) THEN 'completed'
+         WHEN m.battery_status IN ('repaired', 'returned') THEN 'completed'
+         WHEN m.battery_status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') THEN 'failed'
+         ELSE 'active'
+       END AS outcome
+     FROM mine m
+     ORDER BY m.repaired_at DESC`,
     [staffId]
   );
   return rows;
@@ -172,13 +208,15 @@ async function findIssues(staffId) {
        bi.id,
        b.battery_code,
        b.status AS battery_status,
-       ir.label AS reason_label,
+       COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason_label,
        bi.note,
        bi.reported_at,
        bi.photo_urls
      FROM battery_issues bi
      JOIN batteries b ON b.id = bi.battery_id
-     JOIN issue_reasons ir ON ir.id = bi.reason_id
+     -- LEFT JOIN: an issue raised from a failed test has no reason_id, and an
+     -- inner join silently dropped it from the reporter's history.
+     LEFT JOIN issue_reasons ir ON ir.id = bi.reason_id
      WHERE bi.staff_id = $1
      ORDER BY bi.reported_at DESC`,
     [staffId]
@@ -186,4 +224,31 @@ async function findIssues(staffId) {
   return rows;
 }
 
-module.exports = { findAll, findByUserId, create, update, remove, findById, findRepairs, findIssues };
+// Testing/QA work this staff member (a supervisor) has signed off, newest
+// first: one row per battery per sign-off, with the test services they
+// ticked comma-joined. `passed_back` marks a battery they sent back to the
+// technician pool instead of passing. Without this a supervisor's dashboard
+// and history only showed repairs they'd done by hand, never their testing.
+// No rates selected: this only feeds the technician's own screens.
+async function findTests(staffId) {
+  const { rows } = await db.query(
+    `SELECT
+       MIN(bs.id) AS id,
+       b.battery_code,
+       b.status AS battery_status,
+       string_agg(bs.service_name, ', ' ORDER BY bs.service_name)
+         FILTER (WHERE bs.service_name <> 'Passed back to Technician') AS service_name,
+       bool_or(bs.service_name = 'Passed back to Technician') AS passed_back,
+       MIN(bs.notes) AS notes,
+       bs.completed_at AS tested_at
+     FROM battery_services bs
+     JOIN batteries b ON b.id = bs.battery_id
+     WHERE bs.staff_id = $1
+     GROUP BY bs.battery_id, b.battery_code, b.status, bs.completed_at
+     ORDER BY bs.completed_at DESC`,
+    [staffId]
+  );
+  return rows;
+}
+
+module.exports = { findAll, findByUserId, create, update, remove, findById, findRepairs, findIssues, findTests };

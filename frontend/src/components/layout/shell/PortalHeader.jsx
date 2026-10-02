@@ -67,12 +67,12 @@ function PortalHeader() {
 
   return (
     <>
-      <header className="sticky top-0 z-30 flex h-16 items-center gap-2 border-b border-slate-200/80 bg-white px-3 dark:border-white/10 dark:bg-surface-950/90 dark:backdrop-blur sm:gap-4 sm:px-6 shadow-xs">
+      <header className="sticky top-0 z-30 flex h-12 sm:h-16 items-center gap-2 border-b border-slate-200/80 bg-white px-2.5 sm:px-6 dark:border-white/10 dark:bg-surface-950/90 dark:backdrop-blur sm:gap-4 shadow-xs">
         <Link to="/" className="flex items-center">
           <img
             src={brandLogo}
             alt="Refurbinics"
-            className="h-10 sm:h-11 w-auto max-w-[200px] sm:max-w-[220px] object-contain"
+            className="h-7 sm:h-11 w-auto max-w-[130px] sm:max-w-[220px] object-contain"
           />
         </Link>
 
@@ -101,23 +101,23 @@ function PortalHeader() {
           </nav>
         )}
 
-        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-2 sm:gap-4">
+        <div className="ml-auto flex min-w-0 shrink-0 items-center gap-1.5 sm:gap-4">
           <UkClock />
           <span className="hidden truncate text-sm font-medium text-slate-700 dark:text-neutral-300 sm:inline">
             {user?.name}
           </span>
           <button
             onClick={handleLogout}
-            className="shrink-0 rounded-xl bg-slate-100 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-200 active:bg-slate-300 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors"
+            className="shrink-0 rounded-lg sm:rounded-xl bg-slate-100 px-2.5 py-1.5 sm:px-3.5 sm:py-2 text-[11px] sm:text-xs font-bold text-slate-700 hover:bg-slate-200 active:bg-slate-300 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors"
           >
             Logout
           </button>
         </div>
       </header>
 
-      {/* Mobile Bottom Tab Bar — exact replica of mobile app MainTabs */}
+      {/* Mobile Bottom Tab Bar — compact on mobile */}
       {isTechnician && (
-        <div className="fixed bottom-0 inset-x-0 z-40 flex h-16 items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md px-2 py-1 shadow-lg dark:border-white/10 dark:bg-black/95 md:hidden">
+        <div className="fixed bottom-0 inset-x-0 z-40 flex h-12 sm:h-14 items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md px-1.5 py-0.5 shadow-lg dark:border-white/10 dark:bg-black/95 md:hidden">
           {TECHNICIAN_TABS.map((tab) => {
             const IconComp = tab.icon;
             return (
@@ -126,15 +126,15 @@ function PortalHeader() {
                 to={tab.to}
                 end={tab.end}
                 className={({ isActive }) =>
-                  `flex flex-1 flex-col items-center justify-center py-1 transition-colors ${
+                  `flex flex-1 flex-col items-center justify-center py-0.5 transition-colors ${
                     isActive ? 'text-blue-600 dark:text-blue-400 font-bold' : 'text-slate-500 dark:text-neutral-400 font-medium'
                   }`
                 }
               >
                 {({ isActive }) => (
                   <>
-                    <IconComp className={`h-5 w-5 mb-0.5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
-                    <span className="text-[10px] tracking-tight">{tab.label}</span>
+                    <IconComp className={`h-4 w-4 sm:h-5 sm:w-5 mb-0.5 ${isActive ? 'stroke-[2.5]' : 'stroke-2'}`} />
+                    <span className="text-[9px] sm:text-[10px] tracking-tight">{tab.label}</span>
                   </>
                 )}
               </NavLink>

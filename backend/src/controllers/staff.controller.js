@@ -210,11 +210,18 @@ async function myProfile(req, res, next) {
     if (!staff) {
       return res.status(409).json({ message: 'Your account is not linked to a staff record.' });
     }
-    const [repairs, issues] = await Promise.all([
+    const [repairs, issues, tests] = await Promise.all([
       staffModel.findRepairs(staff.id),
       staffModel.findIssues(staff.id),
+      staffModel.findTests(staff.id),
     ]);
-    res.json({ staff, repairs, issues });
+    // Only what the technician screens show — the full staff row also holds
+    // salary, passport/NI numbers and share code, which have no business in
+    // a browser or phone just to render a name and role. Same for repair
+    // pricing: it's for the admin Staff detail page, not technician logins.
+    const { id, name, role, email, phone } = staff;
+    const ownRepairs = repairs.map(({ price, labor_charge, ...rest }) => rest);
+    res.json({ staff: { id, name, role, email, phone }, repairs: ownRepairs, issues, tests });
   } catch (err) {
     next(err);
   }

@@ -626,13 +626,13 @@ function TechnicianRepairPanel({
 
 
   return (
-    <div className="mb-6">
+    <div className="mb-4 sm:mb-6">
       {/* ── Passed Back to Technician Banner ── */}
       {battery.status === 'in_repair' && passBackService && (
-        <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
+        <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-amber-300 bg-amber-50 p-3 sm:p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
           <div className="mb-1 flex items-center gap-2">
             <span className="text-amber-800 dark:text-amber-300">⚠</span>
-            <span className="text-sm font-bold text-amber-900 dark:text-amber-200">
+            <span className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200">
               Marked Can't Service · Passed to Technician
             </span>
           </div>
@@ -653,20 +653,20 @@ function TechnicianRepairPanel({
 
       {/* ── Status: UNSERVICEABLE (Clean state, no parts to remove) ── */}
       {(battery.status === 'unserviceable' || battery.status === 'tested_parts_removed') && pendingPartsRemoval.length === 0 && (
-        <div className="mb-5 rounded-2xl border border-rose-200 bg-rose-50/70 p-5 text-center dark:border-rose-900/40 dark:bg-surface-900">
-          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-100 text-xl text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
+        <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-rose-200 bg-rose-50/70 p-3.5 sm:p-5 text-center dark:border-rose-900/40 dark:bg-surface-900">
+          <div className="mx-auto mb-2.5 sm:mb-3 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-rose-100 text-lg sm:text-xl text-rose-600 dark:bg-rose-950/50 dark:text-rose-400">
             ⚠
           </div>
-          <p className="text-sm font-bold text-slate-900 dark:text-white">
+          <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
             Battery Marked Unserviceable
           </p>
-          <p className="mt-1 mb-4 text-xs text-slate-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+          <p className="mt-1 mb-3 sm:mb-4 text-xs text-slate-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
             This battery ({battery.battery_code}) was marked unserviceable and cannot be repaired.
           </p>
           <button
             type="button"
             onClick={handleScanNext}
-            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors"
           >
             <span>📷 Scan Next Battery</span>
           </button>
@@ -676,18 +676,18 @@ function TechnicianRepairPanel({
       {/* ── Mandatory: Remove All Fitted Parts ── */}
       {(battery.status === 'unserviceable' || battery.status === 'in_repair') &&
         pendingPartsRemoval.length > 0 && (
-          <div className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
+          <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-amber-200 bg-amber-50/70 p-3 sm:p-4 dark:border-amber-900/50 dark:bg-amber-950/20">
             <div className="mb-1 flex items-center gap-2">
               <span className="text-amber-800">🔧</span>
-              <span className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              <span className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200">
                 Mandatory: Remove All Fitted Parts
               </span>
             </div>
-            <p className="mb-3 text-[11px] leading-relaxed text-amber-800/80 dark:text-amber-300">
+            <p className="mb-2.5 sm:mb-3 text-[11px] leading-relaxed text-amber-800/80 dark:text-amber-300">
               This battery failed testing. All previously fitted parts must be physically removed and restocked into inventory:
             </p>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5 sm:gap-2">
               {pendingPartsRemoval.map((p) => {
                 const isChecked = selectedRemovalIds.includes(p.id);
                 return (
@@ -695,15 +695,15 @@ function TechnicianRepairPanel({
                     key={p.id}
                     type="button"
                     onClick={() => toggleRemovalId(p.id)}
-                    className={`flex items-center justify-between rounded-xl border p-3 transition-colors ${
+                    className={`flex items-center justify-between rounded-lg sm:rounded-xl border p-2 sm:p-3 transition-colors ${
                       isChecked
                         ? 'border-amber-500 bg-amber-100/70 dark:border-amber-600 dark:bg-amber-900/40'
                         : 'border-amber-200 bg-white dark:border-white/10 dark:bg-surface-900'
                     }`}
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2">
                       <div
-                        className={`flex h-5 w-5 items-center justify-center rounded-md border text-xs font-bold ${
+                        className={`flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-md border text-xs font-bold ${
                           isChecked
                             ? 'border-amber-600 bg-amber-600 text-white'
                             : 'border-slate-300 bg-white dark:border-neutral-600 dark:bg-surface-800'
@@ -729,7 +729,7 @@ function TechnicianRepairPanel({
               type="button"
               onClick={handleRemoveParts}
               disabled={removingParts || selectedRemovalIds.length < pendingPartsRemoval.length}
-              className="mt-3 flex w-full items-center justify-center rounded-xl bg-amber-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-50 transition-colors"
+              className="mt-2.5 sm:mt-3 flex w-full items-center justify-center rounded-xl bg-amber-600 py-2.5 sm:py-3.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-50 transition-colors"
             >
               {removingParts ? 'Restocking Parts…' : `Confirm Removal & Restock All Parts (${pendingPartsRemoval.length})`}
             </button>
@@ -742,22 +742,22 @@ function TechnicianRepairPanel({
 
         if (isIntakeUnverified) {
           return (
-            <div className="mb-5 rounded-2xl border border-amber-300 bg-amber-50/80 p-5 dark:border-amber-900/60 dark:bg-amber-950/20 text-center">
-              <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-100 text-amber-700 text-xl dark:bg-amber-900/40 dark:text-amber-300">
+            <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-amber-300 bg-amber-50/80 p-3.5 sm:p-5 dark:border-amber-900/60 dark:bg-amber-950/20 text-center">
+              <div className="mx-auto mb-2.5 sm:mb-3 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-amber-100 text-amber-700 text-lg sm:text-xl dark:bg-amber-900/40 dark:text-amber-300">
                 ⚠️
               </div>
-              <p className="text-sm font-bold text-amber-900 dark:text-amber-200">
+              <p className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200">
                 Battery Not Verified at Intake
               </p>
-              <p className="mt-1 mb-4 text-xs text-amber-800/90 dark:text-amber-300/90 max-w-sm mx-auto leading-relaxed">
+              <p className="mt-1 mb-3 sm:mb-4 text-xs text-amber-800/90 dark:text-amber-300/90 max-w-sm mx-auto leading-relaxed">
                 This battery arrived under Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot be started until arrival is verified.
               </p>
-              <div className="flex flex-col sm:flex-row gap-2.5 justify-center">
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-2.5 justify-center">
                 {battery.truck_intake_id && (
                   <button
                     type="button"
                     onClick={() => navigate(`/truck-intakes/${battery.truck_intake_id}`)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-colors"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-amber-600 px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-bold text-white shadow-sm hover:bg-amber-700 transition-colors"
                   >
                     <span>View Truck Intake #{battery.intake_truck_number}</span>
                   </button>
@@ -765,7 +765,7 @@ function TechnicianRepairPanel({
                 <button
                   type="button"
                   onClick={handleScanNext}
-                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-white px-4 py-2.5 text-xs font-semibold text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:bg-surface-800 dark:text-amber-200 transition-colors"
+                  className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-amber-300 bg-white px-3.5 py-2 sm:px-4 sm:py-2.5 text-xs font-semibold text-amber-900 hover:bg-amber-50 dark:border-amber-800 dark:bg-surface-800 dark:text-amber-200 transition-colors"
                 >
                   <span>📷 Scan Another Battery</span>
                 </button>
@@ -775,16 +775,16 @@ function TechnicianRepairPanel({
         }
 
         return (
-          <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-surface-900">
+          <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-blue-200 bg-blue-50/70 p-3 sm:p-4 dark:border-blue-900/40 dark:bg-surface-900">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-sm font-bold text-slate-900 dark:text-white">
+              <p className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
                 Ready to start?
               </p>
-              <span className="rounded-full bg-blue-100 border border-blue-200/80 px-2.5 py-0.5 text-[11px] font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/60 dark:text-blue-300">
+              <span className="rounded-full bg-blue-100 border border-blue-200/80 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950/60 dark:text-blue-300">
                 {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </span>
             </div>
-            <p className="mt-0.5 mb-3 text-xs text-slate-500 dark:text-neutral-400">
+            <p className="mt-0.5 mb-2.5 sm:mb-3 text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
               This battery hasn't been touched yet. Starting work marks it as in progress.
             </p>
             {error && <p className="mb-2 text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -792,7 +792,7 @@ function TechnicianRepairPanel({
               type="button"
               onClick={handleStartWork}
               disabled={submitting}
-              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
             >
               <span>▶</span>
               <span>{submitting ? 'Starting…' : 'Start Work'}</span>
@@ -803,11 +803,11 @@ function TechnicianRepairPanel({
 
       {/* ── Status: IN_PROGRESS ── */}
       {battery.status === 'in_progress' && (
-        <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-surface-900">
+        <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-blue-200 bg-blue-50/70 p-3 sm:p-4 dark:border-blue-900/40 dark:bg-surface-900">
           {/* Live Timer Banner */}
-          <div className="mb-3 flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <div className="mb-2.5 sm:mb-3 flex items-center justify-between rounded-lg sm:rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 sm:px-3.5 sm:py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
             <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300">Time on repair</span>
-            <span className="text-base font-extrabold text-emerald-700 dark:text-emerald-400">
+            <span className="text-sm sm:text-base font-extrabold text-emerald-700 dark:text-emerald-400">
               {formatDuration(elapsedSeconds)}
             </span>
           </div>
@@ -818,7 +818,7 @@ function TechnicianRepairPanel({
                 Select Parts Changed ({selectedPartIds.length})
               </p>
 
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5 sm:gap-2">
                 {parts.map((p) => {
                   const selected = selectedPartIds.includes(p.id);
                   const disabled = p.quantity <= 0;
@@ -828,7 +828,7 @@ function TechnicianRepairPanel({
                       type="button"
                       disabled={disabled}
                       onClick={() => togglePart(p.id)}
-                      className={`flex items-center justify-between rounded-xl border p-3 text-left transition-colors ${
+                      className={`flex items-center justify-between rounded-lg sm:rounded-xl border p-2 sm:p-3 text-left transition-colors ${
                         selected
                           ? 'border-blue-500 bg-blue-100/70 dark:border-blue-500 dark:bg-blue-950/40'
                           : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800'
@@ -848,7 +848,7 @@ function TechnicianRepairPanel({
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Notes (optional)"
-                className="mt-3 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-surface-950 dark:text-white"
+                className="mt-2.5 sm:mt-3 w-full rounded-lg sm:rounded-xl border border-slate-300 bg-white px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-surface-950 dark:text-white"
               />
 
               {error && <p className="mt-2 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
@@ -857,7 +857,7 @@ function TechnicianRepairPanel({
                 type="button"
                 onClick={requestSubmitForTesting}
                 disabled={submitting}
-                className="mt-3 flex w-full items-center justify-center rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                className="mt-2.5 sm:mt-3 flex w-full items-center justify-center rounded-xl bg-blue-600 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
               >
                 {submitting ? 'Submitting…' : 'Submit for Testing'}
               </button>
@@ -865,12 +865,12 @@ function TechnicianRepairPanel({
           )}
 
           {/* Issue Report Section */}
-          <div className={showIssueForm ? 'pt-0' : 'mt-4 border-t border-slate-200 pt-3 dark:border-white/10'}>
+          <div className={showIssueForm ? 'pt-0' : 'mt-3 sm:mt-4 border-t border-slate-200 pt-2.5 sm:pt-3 dark:border-white/10'}>
             {!showIssueForm ? (
               <button
                 type="button"
                 onClick={() => setShowIssueForm(true)}
-                className="w-full rounded-xl border border-red-200 bg-red-50 py-3 text-xs font-bold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400"
+                className="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 sm:py-3 text-xs font-bold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400"
               >
                 Can't service this battery?
               </button>
@@ -959,18 +959,18 @@ function TechnicianRepairPanel({
 
       {/* ── Status: IN_TESTING ── */}
       {battery.status === 'in_testing' && (
-        <div className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4 dark:border-blue-900/40 dark:bg-surface-900">
+        <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-blue-200 bg-blue-50/70 p-3 sm:p-4 dark:border-blue-900/40 dark:bg-surface-900">
           {canTest ? (
             <>
               {!battery.testing_started_at ? (
-                <div className="rounded-xl border border-blue-200 bg-white p-5 text-center dark:border-blue-900/50 dark:bg-surface-950 shadow-sm">
-                  <div className="mx-auto mb-2.5 flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 text-xl dark:bg-blue-950/50 dark:text-blue-400">
+                <div className="rounded-xl border border-blue-200 bg-white p-3.5 sm:p-5 text-center dark:border-blue-900/50 dark:bg-surface-950 shadow-sm">
+                  <div className="mx-auto mb-2.5 flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl sm:rounded-2xl bg-blue-50 text-blue-600 text-lg sm:text-xl dark:bg-blue-950/50 dark:text-blue-400">
                     ⏱
                   </div>
-                  <p className="text-base font-bold text-slate-900 dark:text-white">
+                  <p className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                     Ready to Begin Testing?
                   </p>
-                  <p className="mt-1 mb-4 text-xs text-slate-500 dark:text-neutral-400 max-w-xs mx-auto leading-relaxed">
+                  <p className="mt-1 mb-3 sm:mb-4 text-xs text-slate-500 dark:text-neutral-400 max-w-xs mx-auto leading-relaxed">
                     Click the button below to start testing this battery and begin the diagnostic timer.
                   </p>
                   {error && <p className="mb-3 text-xs text-red-600 dark:text-red-400">{error}</p>}
@@ -978,7 +978,7 @@ function TechnicianRepairPanel({
                     type="button"
                     onClick={handleStartTesting}
                     disabled={submitting}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                   >
                     <span>▶</span>
                     <span>{submitting ? 'Starting Timer…' : 'Start Testing Timer'}</span>
@@ -987,7 +987,7 @@ function TechnicianRepairPanel({
               ) : (
                 <>
                   {/* Live Testing Timer Banner (Supervisor only) */}
-                  <div className="mb-3 flex items-center justify-between rounded-xl border border-blue-200 bg-blue-100/70 px-3.5 py-2.5 dark:border-blue-900 dark:bg-blue-950/40">
+                  <div className="mb-2.5 sm:mb-3 flex items-center justify-between rounded-lg sm:rounded-xl border border-blue-200 bg-blue-100/70 px-3 py-2 sm:px-3.5 sm:py-2.5 dark:border-blue-900 dark:bg-blue-950/40">
                     <div className="flex items-center gap-2">
                       <span className="relative flex h-2 w-2">
                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75"></span>
@@ -995,14 +995,14 @@ function TechnicianRepairPanel({
                       </span>
                       <span className="text-xs font-bold text-blue-800 dark:text-blue-300">Time in testing</span>
                     </div>
-                    <span className="text-base font-extrabold text-blue-700 dark:text-blue-400 font-mono">
+                    <span className="text-sm sm:text-base font-extrabold text-blue-700 dark:text-blue-400 font-mono">
                       {formatDuration(testingElapsedSeconds)}
                     </span>
                   </div>
 
                   {availableServices.length > 0 && (
-                    <div className="mb-3">
-                      <div className="flex items-center justify-between mb-2">
+                    <div className="mb-2.5 sm:mb-3">
+                      <div className="flex items-center justify-between mb-1.5 sm:mb-2">
                         <span className="text-xs font-bold text-slate-900 dark:text-white">
                           Services Performed ({selectedServiceIds.length})
                         </span>
@@ -1019,7 +1019,7 @@ function TechnicianRepairPanel({
                         )}
                       </div>
 
-                      <div className="flex flex-col gap-2">
+                      <div className="flex flex-col gap-1.5 sm:gap-2">
                         {availableServices.map((s) => {
                           const isChecked = selectedServiceIds.includes(s.id);
                           return (
@@ -1027,15 +1027,15 @@ function TechnicianRepairPanel({
                               key={s.id}
                               type="button"
                               onClick={() => toggleService(s.id)}
-                              className={`flex items-center justify-between rounded-xl border p-3 text-left transition-colors ${
+                              className={`flex items-center justify-between rounded-lg sm:rounded-xl border p-2 sm:p-3 text-left transition-colors ${
                                 isChecked
                                   ? 'border-blue-500 bg-blue-100/70 dark:border-blue-500 dark:bg-blue-950/40'
                                   : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800'
                               }`}
                             >
-                              <div className="flex items-center gap-2.5 flex-1 pr-2">
+                              <div className="flex items-center gap-2 flex-1 pr-2">
                                 <div
-                                  className={`flex h-5 w-5 items-center justify-center rounded-md border text-xs font-bold ${
+                                  className={`flex h-4 w-4 sm:h-5 sm:w-5 items-center justify-center rounded-md border text-xs font-bold ${
                                     isChecked
                                       ? 'border-blue-600 bg-blue-600 text-white'
                                       : 'border-slate-300 bg-white dark:border-neutral-600 dark:bg-surface-900'
@@ -1060,7 +1060,7 @@ function TechnicianRepairPanel({
                     value={testingNotes}
                     onChange={(e) => setTestingNotes(e.target.value)}
                     placeholder="Testing Notes (optional)"
-                    className="mb-3 w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-surface-950 dark:text-white"
+                    className="mb-2.5 sm:mb-3 w-full rounded-lg sm:rounded-xl border border-slate-300 bg-white px-3 py-2 sm:px-3.5 sm:py-2.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none dark:border-neutral-700 dark:bg-surface-950 dark:text-white"
                   />
 
                   {error && <p className="mb-2 text-xs font-medium text-red-600 dark:text-red-400">{error}</p>}
@@ -1069,18 +1069,18 @@ function TechnicianRepairPanel({
                     type="button"
                     onClick={handleCompleteTesting}
                     disabled={submitting}
-                    className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                    className="flex w-full items-center justify-center rounded-xl bg-blue-600 py-2.5 sm:py-3.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
                   >
                     {submitting ? 'Completing…' : 'Complete Testing & Approve'}
                   </button>
 
                   {/* Can't Service / Pass back section */}
-                  <div className="mt-4 border-t border-slate-200 pt-3 dark:border-white/10">
+                  <div className="mt-3 sm:mt-4 border-t border-slate-200 pt-2.5 sm:pt-3 dark:border-white/10">
                     {!showTestingUnserviceableForm ? (
                       <button
                         type="button"
                         onClick={() => setShowTestingUnserviceableForm(true)}
-                        className="w-full rounded-xl border border-red-200 bg-red-50 py-3 text-xs font-bold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400"
+                        className="w-full rounded-xl border border-red-200 bg-red-50 py-2.5 sm:py-3 text-xs font-bold text-red-600 hover:bg-red-100 transition-colors dark:border-red-900/40 dark:bg-red-950/20 dark:text-red-400"
                       >
                         Can't service this battery?
                       </button>

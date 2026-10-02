@@ -109,8 +109,8 @@ function TechnicianHomePage() {
   }
 
   return (
-    <div className="flex min-h-[75vh] flex-col items-center justify-center px-4 py-8 text-center">
-      <div className="mb-5 flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
+    <div className="flex min-h-[60vh] sm:min-h-[75vh] flex-col items-center justify-center px-3 py-4 sm:py-8 text-center">
+      <div className="mb-3 sm:mb-5 flex h-14 w-14 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 24 24"
@@ -119,19 +119,19 @@ function TechnicianHomePage() {
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"
-          className="h-8 w-8"
+          className="h-6 w-6 sm:h-8 sm:w-8"
         >
           <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
           <circle cx="12" cy="13" r="3" />
         </svg>
       </div>
 
-      <h1 className="text-lg font-semibold text-slate-900 dark:text-white">Scan a Battery to Begin</h1>
-      <p className="mt-2 max-w-xs text-center text-sm text-slate-500 dark:text-neutral-400">
+      <h1 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Scan a Battery to Begin</h1>
+      <p className="mt-1 sm:mt-2 max-w-xs text-center text-xs sm:text-sm text-slate-500 dark:text-neutral-400">
         Scan the QR code on a battery to start work, log the parts you changed, and mark it complete.
       </p>
 
-      <div className="mt-6 flex w-full max-w-xs flex-col items-center gap-3">
+      <div className="mt-4 sm:mt-6 flex w-full max-w-xs flex-col items-center gap-2.5 sm:gap-3">
         {cameraOpen ? (
           <div className="w-full">
             <QrScanner onScan={goToBattery} onClose={() => setCameraOpen(false)} />
@@ -141,13 +141,13 @@ function TechnicianHomePage() {
             type="button"
             onClick={() => setCameraOpen(true)}
             disabled={checkingScan}
-            className="w-full rounded-md bg-blue-600 px-4 py-3.5 text-base font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors"
+            className="w-full rounded-xl bg-blue-600 px-4 py-2.5 sm:py-3.5 text-sm sm:text-base font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors"
           >
             {checkingScan ? 'Checking Battery…' : 'Scan with Camera'}
           </button>
         )}
 
-        <div className="flex w-full items-center gap-2 text-xs text-slate-400">
+        <div className="flex w-full items-center gap-2 text-[11px] sm:text-xs text-slate-400">
           <div className="h-px flex-1 bg-slate-200 dark:bg-neutral-800" />
           or search by code
           <div className="h-px flex-1 bg-slate-200 dark:bg-neutral-800" />
@@ -168,20 +168,20 @@ function TechnicianHomePage() {
             placeholder="Type battery code"
             autoCapitalize="characters"
             autoComplete="off"
-            className="w-full rounded-md border border-blue-200 bg-blue-50 px-3.5 py-3 text-center text-base font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-900/40 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
+            className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 sm:px-3.5 sm:py-3 text-center text-sm sm:text-base font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-900/40 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
           />
 
           {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-md border border-blue-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900 divide-y divide-slate-100 dark:divide-white/5">
+            <div className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900 divide-y divide-slate-100 dark:divide-white/5">
               {suggestions.map((item) => (
                 <button
                   key={item.id}
                   type="button"
                   onMouseDown={(e) => e.preventDefault()}
                   onClick={() => goToBattery(item.battery_code)}
-                  className="flex w-full items-center justify-between px-3.5 py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-surface-800"
+                  className="flex w-full items-center justify-between px-3 py-2 sm:px-3.5 sm:py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-surface-800"
                 >
-                  <span className="text-sm font-semibold text-slate-900 dark:text-white">
+                  <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
                     {item.battery_code}
                   </span>
                   <StatusBadge status={item.status} />

@@ -5,6 +5,7 @@ import TableState from '../../../components/ui/table/TableState';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
 import formatDuration from '../../../utils/format-duration';
 import { resolveImageUrl } from '../../../utils/image-url';
+import { repairBadgeStatus } from './work-outcome';
 
 const DATE_FILTERS = [
   { id: 'all', label: 'All Dates' },
@@ -17,6 +18,7 @@ const DATE_FILTERS = [
 const TYPE_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'repair', label: 'Repairs' },
+  { id: 'test', label: 'Testing' },
   { id: 'issue', label: 'Unserviceable' },
 ];
 
@@ -95,7 +97,7 @@ function matchesDateFilter(dateStr, filter, customStart, customEnd) {
   return true;
 }
 
-function buildTimeline(repairs, issues) {
+function buildTimeline(repairs, issues, tests) {
   const repairEntries = (repairs || []).map((r) => ({
     ...r,
     kind: 'repair',
@@ -106,7 +108,13 @@ function buildTimeline(repairs, issues) {
     kind: 'issue',
     sortDate: i.reported_at,
   }));
-  return [...repairEntries, ...issueEntries].sort(
+  // A supervisor's testing sign-offs (and batteries passed back to a technician)
+  const testEntries = (tests || []).map((t) => ({
+    ...t,
+    kind: 'test',
+    sortDate: t.tested_at,
+  }));
+  return [...repairEntries, ...issueEntries, ...testEntries].sort(
     (a, b) => new Date(b.sortDate || 0) - new Date(a.sortDate || 0)
   );
 }
@@ -264,7 +272,7 @@ function TechnicianHistoryPage() {
 
   const rawTimeline = useMemo(() => {
     if (!data) return [];
-    return buildTimeline(data.repairs, data.issues);
+    return buildTimeline(data.repairs, data.issues, data.tests);
   }, [data]);
 
   const filteredTimeline = useMemo(() => {
@@ -276,7 +284,7 @@ function TechnicianHistoryPage() {
       }
       if (q) {
         const code = (item.battery_code || '').toLowerCase();
-        const part = (item.part_name || '').toLowerCase();
+        const part = (item.part_name || item.service_name || '').toLowerCase();
         const reason = (item.reason_label || item.reason_code || '').toLowerCase();
         const note = (item.note || item.notes || '').toLowerCase();
         if (!code.includes(q) && !part.includes(q) && !reason.includes(q) && !note.includes(q)) {
@@ -305,9 +313,9 @@ function TechnicianHistoryPage() {
   return (
     <div className="mx-auto max-w-3xl pb-16">
       {/* ── Search & Filter Controls Header ────────────────────────────── */}
-      <div className="mb-4 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
+      <div className="mb-3 sm:mb-4 rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
         {/* Search Input */}
-        <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 dark:border-neutral-700 dark:bg-surface-950">
+        <div className="flex items-center gap-2 rounded-xl sm:rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 sm:px-3.5 sm:py-2.5 dark:border-neutral-700 dark:bg-surface-950">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-slate-400">
             <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
           </svg>
@@ -326,7 +334,7 @@ function TechnicianHistoryPage() {
         </div>
 
         {/* Date Filter Pills */}
-        <div className="mt-3 flex items-center gap-1.5 overflow-x-auto pb-1">
+        <div className="mt-2.5 sm:mt-3 flex items-center gap-1 sm:gap-1.5 overflow-x-auto pb-1">
           {DATE_FILTERS.map((df) => {
             const active = dateFilter === df.id;
             return (
@@ -337,7 +345,7 @@ function TechnicianHistoryPage() {
                   setDateFilter(df.id);
                   if (df.id !== 'custom') setCustomRange({ start: null, end: null });
                 }}
-                className={`shrink-0 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+                className={`shrink-0 rounded-lg sm:rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold transition-all ${
                   active
                     ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                     : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'
@@ -352,7 +360,7 @@ function TechnicianHistoryPage() {
           <button
             type="button"
             onClick={openCustomDateModal}
-            className={`flex shrink-0 items-center gap-1 rounded-xl px-3 py-1.5 text-xs font-bold transition-all ${
+            className={`flex shrink-0 items-center gap-1 rounded-lg sm:rounded-xl px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold transition-all ${
               dateFilter === 'custom'
                 ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/30'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'
@@ -370,7 +378,7 @@ function TechnicianHistoryPage() {
         </div>
 
         {/* Type Filter Pills & Reset */}
-        <div className="mt-2.5 flex items-center justify-between">
+        <div className="mt-2 sm:mt-2.5 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             {TYPE_FILTERS.map((tf) => {
               const active = typeFilter === tf.id;
@@ -379,7 +387,7 @@ function TechnicianHistoryPage() {
                   key={tf.id}
                   type="button"
                   onClick={() => setTypeFilter(tf.id)}
-                  className={`rounded-lg border px-2.5 py-1 text-[11px] font-bold transition-all ${
+                  className={`rounded-md sm:rounded-lg border px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-[11px] font-bold transition-all ${
                     active
                       ? 'border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-300'
                       : 'border-slate-200 bg-white text-slate-500 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-400'
@@ -395,7 +403,7 @@ function TechnicianHistoryPage() {
             <button
               type="button"
               onClick={resetFilters}
-              className="text-[11px] font-semibold text-rose-600 hover:underline dark:text-rose-400"
+              className="text-[10px] sm:text-[11px] font-semibold text-rose-600 hover:underline dark:text-rose-400"
             >
               Reset Filters
             </button>
@@ -404,12 +412,12 @@ function TechnicianHistoryPage() {
       </div>
 
       {/* Summary Bar */}
-      <div className="mb-4 flex items-center justify-between rounded-2xl bg-slate-100/80 px-4 py-2 text-[11px] font-semibold text-slate-500 dark:bg-surface-900/60 dark:text-neutral-400">
+      <div className="mb-3 sm:mb-4 flex items-center justify-between rounded-xl sm:rounded-2xl bg-slate-100/80 px-3 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-[11px] font-semibold text-slate-500 dark:bg-surface-900/60 dark:text-neutral-400">
         <span>
           Showing {filteredTimeline.length} record{filteredTimeline.length === 1 ? '' : 's'} across {dateGroups.length} date{dateGroups.length === 1 ? '' : 's'}
         </span>
         {dateFilter !== 'all' && (
-          <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-bold uppercase text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+          <span className="flex items-center gap-1.5 rounded-full bg-blue-100 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold uppercase text-blue-700 dark:bg-blue-950 dark:text-blue-300">
             {DATE_FILTERS.find((d) => d.id === dateFilter)?.label}
             <button type="button" onClick={() => setDateFilter('all')}>✕</button>
           </span>
@@ -418,34 +426,34 @@ function TechnicianHistoryPage() {
 
       {/* Date-Wise Grouped Feed */}
       {dateGroups.length === 0 ? (
-        <div className="rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-sm dark:border-white/10 dark:bg-surface-900">
-          <p className="text-sm font-bold text-slate-800 dark:text-white">
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-6 sm:p-8 text-center shadow-sm dark:border-white/10 dark:bg-surface-900">
+          <p className="text-xs sm:text-sm font-bold text-slate-800 dark:text-white">
             {hasActiveFilters ? 'No matching records found' : 'Nothing logged yet'}
           </p>
           <p className="mt-1 text-xs text-slate-400">
             {hasActiveFilters
               ? 'Try selecting a different filter or clearing your search.'
-              : 'Completed repairs and reported issues will appear here date-wise.'}
+              : 'Completed repairs, testing and reported issues will appear here date-wise.'}
           </p>
           {hasActiveFilters && (
             <button
               type="button"
               onClick={resetFilters}
-              className="mt-4 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm"
+              className="mt-3 sm:mt-4 rounded-xl bg-blue-600 px-3.5 py-1.5 sm:px-4 sm:py-2 text-xs font-bold text-white shadow-sm"
             >
               Clear All Filters
             </button>
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-3.5 sm:gap-5">
           {dateGroups.map((group) => (
-            <div key={group.dateKey} className="flex flex-col gap-2.5">
+            <div key={group.dateKey} className="flex flex-col gap-2 sm:gap-2.5">
               {/* Date Header Tag */}
               <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 sm:gap-2">
                   <span
-                    className={`h-2.5 w-2.5 rounded-full ${
+                    className={`h-2 w-2 sm:h-2.5 sm:w-2.5 rounded-full ${
                       group.isToday ? 'bg-emerald-500 ring-2 ring-emerald-500/20' : 'bg-blue-500'
                     }`}
                   />
@@ -457,19 +465,19 @@ function TechnicianHistoryPage() {
                     {group.label}
                   </span>
                 </div>
-                <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-400">
+                <span className="rounded-full bg-slate-200/80 px-2 py-0.5 text-[9px] sm:text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-400">
                   {group.data.length} unit{group.data.length === 1 ? '' : 's'}
                 </span>
               </div>
 
               {/* Items for this date */}
-              <div className="flex flex-col gap-2">
+              <div className="flex flex-col gap-1.5 sm:gap-2">
                 {group.data.map((item) =>
                   item.kind === 'issue' ? (
                     <Link
                       key={`issue-${item.id}`}
                       to={`/batteries/${item.battery_code}`}
-                      className="group rounded-2xl border border-rose-200 bg-white p-4 shadow-sm transition-all hover:border-rose-300 dark:border-rose-900/40 dark:bg-surface-900"
+                      className="group rounded-xl sm:rounded-2xl border border-rose-200 bg-white p-3 sm:p-4 shadow-sm transition-all hover:border-rose-300 dark:border-rose-900/40 dark:bg-surface-900"
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -527,11 +535,59 @@ function TechnicianHistoryPage() {
                         </span>
                       </div>
                     </Link>
+                  ) : item.kind === 'test' ? (
+                    <Link
+                      key={`test-${item.id}`}
+                      to={`/batteries/${item.battery_code}`}
+                      className="group rounded-xl sm:rounded-2xl border border-violet-200 bg-white p-3 sm:p-4 shadow-sm transition-all hover:border-violet-300 dark:border-violet-900/40 dark:bg-surface-900"
+                    >
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-full bg-violet-100 text-xs font-black text-violet-700 dark:bg-violet-950 dark:text-violet-400">
+                            {item.passed_back ? '↩' : '✓'}
+                          </span>
+                          <span className="text-sm font-extrabold text-violet-700 dark:text-violet-400">
+                            {item.battery_code}
+                          </span>
+                          {!item.passed_back && <StatusBadge status="repaired" />}
+                        </div>
+                        <span className="text-[11px] font-medium text-slate-400">
+                          {item.tested_at
+                            ? new Date(item.tested_at).toLocaleTimeString([], {
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : ''}
+                        </span>
+                      </div>
+
+                      <div className="rounded-xl border border-violet-100 bg-violet-50/70 p-2.5 dark:border-violet-950 dark:bg-violet-950/20">
+                        <p className="text-xs font-bold text-violet-900 dark:text-violet-200">
+                          {item.passed_back
+                            ? 'Passed back to technician'
+                            : `Tested: ${item.service_name || 'Passed QA'}`}
+                        </p>
+                        {item.notes && (
+                          <p className="mt-1 text-xs leading-relaxed text-violet-800 dark:text-violet-300">
+                            {item.notes}
+                          </p>
+                        )}
+                      </div>
+
+                      <div className="mt-2.5 flex items-center justify-between text-[11px]">
+                        <span className="font-bold uppercase tracking-wider text-violet-600 dark:text-violet-400 text-[10px]">
+                          {item.passed_back ? 'Sent Back For Rework' : 'Testing Completed'}
+                        </span>
+                        <span className="font-bold text-slate-400 group-hover:text-slate-600 dark:text-neutral-500 dark:group-hover:text-white">
+                          Details ›
+                        </span>
+                      </div>
+                    </Link>
                   ) : (
                     <Link
                       key={`repair-${item.id}`}
                       to={`/batteries/${item.battery_code}`}
-                      className="group rounded-2xl border border-slate-200 bg-white p-4 shadow-sm transition-all hover:border-blue-300 dark:border-white/10 dark:bg-surface-900"
+                      className="group rounded-xl sm:rounded-2xl border border-slate-200 bg-white p-3 sm:p-4 shadow-sm transition-all hover:border-blue-300 dark:border-white/10 dark:bg-surface-900"
                     >
                       <div className="mb-2 flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2">
@@ -543,7 +599,7 @@ function TechnicianHistoryPage() {
                           <span className="text-sm font-extrabold text-blue-700 dark:text-blue-400">
                             {item.battery_code}
                           </span>
-                          <StatusBadge status={item.battery_status || 'repaired'} />
+                          <StatusBadge status={repairBadgeStatus(item)} />
                         </div>
                         <span className="text-[11px] font-medium text-slate-400">
                           {item.repaired_at
