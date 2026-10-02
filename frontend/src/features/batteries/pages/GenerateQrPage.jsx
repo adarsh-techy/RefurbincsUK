@@ -473,7 +473,7 @@ function GenerateQrPage() {
           onClick={() => { setActiveTab('individual'); setError(null); setQrResult(null); }}
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
             activeTab === 'individual'
-              ? 'bg-white shadow-sm text-blue-700 dark:bg-blue-900/40 dark:text-blue-300'
+              ? 'bg-violet-600 shadow-sm text-white dark:bg-blue-900/40 dark:text-blue-300'
               : 'text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200'
           }`}
         >
@@ -487,7 +487,7 @@ function GenerateQrPage() {
           onClick={() => { setActiveTab('bulk'); setBulkError(null); setBulkResult(null); }}
           className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
             activeTab === 'bulk'
-              ? 'bg-white shadow-sm text-violet-700 dark:bg-violet-900/40 dark:text-violet-300'
+              ? 'bg-violet-600 shadow-sm text-white dark:bg-violet-900/40 dark:text-violet-300'
               : 'text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200'
           }`}
         >
