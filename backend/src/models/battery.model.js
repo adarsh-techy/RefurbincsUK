@@ -734,19 +734,22 @@ async function startTesting(id) {
 // logged, see repair.model.js create). Stamps how long testing took, same
 // pattern as work_started_at -> repairs.duration_seconds for the repair
 // phase itself.
-async function completeTesting(id, { serviceIds = [], staffId = null, notes = null } = {}) {
+async function completeTesting(id, { serviceIds = [], staffId = null, notes = null, durationSeconds = null } = {}) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
     const { rows } = await client.query(
       `UPDATE batteries
        SET status = 'repaired',
-           testing_duration_seconds = EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int,
+           testing_duration_seconds = CASE
+             WHEN $2::int IS NOT NULL AND $2::int > 0 THEN $2::int
+             ELSE EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int
+           END,
            testing_started_at = NULL,
            work_started_at = NULL
        WHERE id = $1 AND status = 'in_testing'
        RETURNING *`,
-      [id]
+      [id, durationSeconds]
     );
     if (!rows[0]) {
       await client.query('ROLLBACK');
@@ -784,7 +787,7 @@ async function completeTesting(id, { serviceIds = [], staffId = null, notes = nu
 // battery_issues and moves the battery to the terminal 'unserviceable'
 // status in one transaction. Returns undefined if the battery doesn't exist
 // or isn't in a reportable state.
-async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
+async function reportIssue(id, { staffId, reasonId, note, photoUrls = [], durationSeconds = null }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -792,14 +795,18 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
       `UPDATE batteries
        SET status = 'unserviceable',
            testing_duration_seconds = CASE 
-             WHEN status = 'in_testing' THEN EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int 
+             WHEN status = 'in_testing' THEN 
+               CASE
+                 WHEN $6::int IS NOT NULL AND $6::int > 0 THEN $6::int
+                 ELSE EXTRACT(EPOCH FROM (now() - COALESCE(testing_started_at, now())))::int
+               END
              ELSE testing_duration_seconds 
            END,
            testing_started_at = NULL,
            work_started_at = NULL
        WHERE id = $1 AND status IN ('in_progress', 'in_testing')
        RETURNING *`,
-      [id]
+      [id, staffId, reasonId, note || null, Array.isArray(photoUrls) ? photoUrls : [], durationSeconds]
     );
     if (rows.length === 0) {
       await client.query('ROLLBACK');

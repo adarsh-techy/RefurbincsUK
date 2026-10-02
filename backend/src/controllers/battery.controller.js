@@ -515,11 +515,12 @@ async function completeTesting(req, res, next) {
     }
     const staffId = access.staffId;
 
-    const { serviceIds, notes } = req.body || {};
+    const { serviceIds, notes, durationSeconds } = req.body || {};
     const battery = await batteryModel.completeTesting(req.params.id, {
       serviceIds: Array.isArray(serviceIds) ? serviceIds.map(Number).filter(Boolean) : [],
       staffId,
       notes: typeof notes === 'string' ? notes.trim() : null,
+      durationSeconds: durationSeconds != null && !isNaN(Number(durationSeconds)) ? Math.round(Number(durationSeconds)) : null,
     });
     if (!battery) {
       return res.status(409).json({
@@ -595,11 +596,17 @@ async function reportIssue(req, res, next) {
       }
     }
 
+    const durationSeconds =
+      req.body.durationSeconds != null && !isNaN(Number(req.body.durationSeconds))
+        ? Math.round(Number(req.body.durationSeconds))
+        : null;
+
     const battery = await batteryModel.reportIssue(req.params.id, {
       staffId: staffId,
       reasonId,
       note,
       photoUrls,
+      durationSeconds,
     });
     if (!battery) {
       return res.status(409).json({

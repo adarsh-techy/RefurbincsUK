@@ -26,8 +26,14 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
     (r) => r.id !== reason?.id && Number(r.sort_order) === (Number(form.sortOrder) || 0)
   );
 
+  function capitalizeFirst(val) {
+    if (!val) return '';
+    return val.charAt(0).toUpperCase() + val.slice(1);
+  }
+
   function updateField(field, value) {
-    setForm((prev) => ({ ...prev, [field]: value }));
+    const nextVal = field === 'label' ? capitalizeFirst(value) : value;
+    setForm((prev) => ({ ...prev, [field]: nextVal }));
   }
 
   async function handleSubmit(e) {
@@ -40,7 +46,7 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
     setError(null);
     try {
       const payload = {
-        label: form.label.trim(),
+        label: capitalizeFirst(form.label.trim()),
         sortOrder: Number(form.sortOrder) || 0,
         active: form.active,
       };
@@ -67,6 +73,7 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
             value={form.label}
             onChange={(e) => updateField('label', e.target.value)}
             placeholder="Enter issue reason description"
+            autoCapitalize="sentences"
             className={inputClasses}
             required
           />
