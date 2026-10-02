@@ -1,15 +1,16 @@
 const env = require('./env');
 
 // Allow requests from:
-//   - No origin (server-to-server / curl)
-//   - Any port-5173 origin in development (localhost, 127.0.0.1, LAN IP)
+//   - No origin (server-to-server / curl / native mobile app)
+//   - Any host/port in development (localhost, 127.0.0.1, LAN IP)
+//   - Any Vercel deployment (*.vercel.app, preview URLs, branch URLs)
+//   - Custom domains (*.refurbnics.co.uk, *.refurbinics.com, etc.)
 //   - The configured CLIENT_URL origin(s) in production (comma-separated)
-//   - Any Vercel preview URL matching refurbinics*.vercel.app (these change
-//     on every push, so a static string can never match them all)
-// Shared between the Express CORS middleware (app.js) and the Socket.IO
-// server (realtime/index.js) so both accept exactly the same origins.
-const vercelPreviewOrigin = /^https:\/\/refurbinics[a-z0-9-]*\.vercel\.app$/i;
-const devOrigin = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0|\[::1\]|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|172\.(1[6-9]|2\d|3[01])\.\d+\.\d+)(:\d+)?$/i;
+//
+// Shared between Express CORS middleware (app.js) and Socket.IO (realtime/index.js).
+
+const vercelOrigin = /^https:\/\/[a-z0-9-.]+\.vercel\.app$/i;
+const refurbnicsDomain = /^https:\/\/(.*\.)?(refurbnics|refurbinics)\.(co\.uk|com)$/i;
 
 function corsOrigin(origin, callback) {
   // Allow requests with no origin (e.g. server-to-server, curl, mobile native apps)
@@ -20,9 +21,11 @@ function corsOrigin(origin, callback) {
     return callback(null, true);
   }
 
-  // Vercel preview URLs change on every push and are exercised against the
-  // live backend (not just local dev), so this stays allowed in production.
-  if (vercelPreviewOrigin.test(origin)) return callback(null, true);
+  // Any vercel.app deployment (e.g. refurbincs-uk-git-main-adarsh-techys-projects.vercel.app, preview URLs)
+  if (vercelOrigin.test(origin)) return callback(null, true);
+
+  // Refurbnics / Refurbinics production domains
+  if (refurbnicsDomain.test(origin)) return callback(null, true);
 
   // Allow explicitly configured CLIENT_URL(s)
   if (env.clientUrls.includes(origin)) return callback(null, true);
