@@ -14,16 +14,22 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
+  function capitalizeFirst(val) {
+    if (!val) return '';
+    return val.charAt(0).toUpperCase() + val.slice(1);
+  }
+
   async function handleSubmit(e) {
     e.preventDefault();
     setSubmitting(true);
     setError(null);
     try {
+      const formattedName = capitalizeFirst(name.trim());
       if (isEdit) {
-        await apiClient.patch(`/clients/${client.id}`, { name });
+        await apiClient.patch(`/clients/${client.id}`, { name: formattedName });
       } else {
         await apiClient.post('/clients', {
-          name,
+          name: formattedName,
           email: grantLogin ? email : undefined,
           tempPassword: grantLogin ? tempPassword : undefined,
           role: 'recycle_client',
@@ -44,7 +50,7 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
         <input
           type="text"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => setName(capitalizeFirst(e.target.value))}
           placeholder="e.g. EcoRecycle Solutions"
           className={inputClasses}
           required
