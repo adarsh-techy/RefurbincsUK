@@ -37,24 +37,24 @@ export const DEMO_CREDENTIALS = {
   },
 };
 
-export const MOBILE_DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
-  adarsh: {
-    id: 'adarsh',
-    label: 'Akshay tech',
-    icon: '🔧',
-    role: 'Technician',
-    email: 'akshay@gmail.com',
-    password: '12345678',
-    tone: 'blue',
-  },
+export const MOBILE_DEMO_CREDENTIALS = {
   akhil: {
     id: 'akhil',
-    label: 'Akhil super',
-    icon: '⚡',
+    label: 'Akhil Tech',
+    icon: '🔧',
     role: 'Technician',
     email: 'akhil@gmail.com',
     password: '12345678',
     tone: 'violet',
+  },
+  akshay: {
+    id: 'akshay',
+    label: 'Akshay Sup',
+    icon: '⚡',
+    role: 'Supervisor',
+    email: 'akshay@gmail.com',
+    password: '12345678',
+    tone: 'blue',
   },
 };
 

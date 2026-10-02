@@ -69,7 +69,9 @@ function LoginPage() {
               <div className="mb-2 flex items-center justify-between text-xs text-slate-500 font-medium">
                 <span>Quick Fill:</span>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+
+              {/* Desktop / Tablet View (sm and above): Admin, HumanForest, Recycle */}
+              <div className="hidden sm:grid sm:grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => {
@@ -119,6 +121,43 @@ function LoginPage() {
                 >
                   <span>♻️</span>
                   <span className="truncate">Recycle</span>
+                </button>
+              </div>
+
+              {/* Mobile View (< sm): Akhil Tech & Akshay Sup */}
+              <div className="grid grid-cols-2 gap-2 sm:hidden">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(MOBILE_DEMO_CREDENTIALS.akhil.email);
+                    setPassword(MOBILE_DEMO_CREDENTIALS.akhil.password);
+                  }}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-2 text-xs font-semibold transition cursor-pointer ${
+                    email === MOBILE_DEMO_CREDENTIALS.akhil.email
+                      ? 'border-violet-500 bg-violet-50 text-violet-700 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-violet-50 hover:border-violet-300'
+                  }`}
+                  title="Akhil Tech: akhil@gmail.com"
+                >
+                  <span>🔧</span>
+                  <span className="truncate">Akhil Tech</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEmail(MOBILE_DEMO_CREDENTIALS.akshay.email);
+                    setPassword(MOBILE_DEMO_CREDENTIALS.akshay.password);
+                  }}
+                  className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-2 text-xs font-semibold transition cursor-pointer ${
+                    email === MOBILE_DEMO_CREDENTIALS.akshay.email
+                      ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-2xs'
+                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:border-blue-300'
+                  }`}
+                  title="Akshay Sup: akshay@gmail.com"
+                >
+                  <span>⚡</span>
+                  <span className="truncate">Akshay Sup</span>
                 </button>
               </div>
             </div>
