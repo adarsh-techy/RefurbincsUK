@@ -94,6 +94,7 @@ function TechnicianRepairPanel({
   const [showExitConfirmModal, setShowExitConfirmModal] = useState(false);
   const [showConfirmSubmitForTestingModal, setShowConfirmSubmitForTestingModal] = useState(false);
   const pendingExitHrefRef = useRef(null);
+  const allowExitRef = useRef(false);
   const [lightbox, setLightbox] = useState(null); // { images, index, title }
   const scanHandledRef = useRef(false);
 
@@ -209,59 +210,6 @@ function TechnicianRepairPanel({
     }
   }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval.length]);
 
-  // Exit guard (mobile intercepts `beforeRemove`): while a scanned battery
-  // has an active repair/testing session or unsaved input, warn before the
-  // tab closes AND before any in-app link navigates away from this page.
-  const hasActiveSession =
-    fromScan ||
-    battery?.status === 'in_progress' ||
-    battery?.status === 'in_testing' ||
-    selectedPartIds.length > 0 ||
-    selectedServiceIds.length > 0 ||
-    notes.trim().length > 0 ||
-    issuePhotos.length > 0;
-  const exitGuardActive = hasActiveSession && !modalType && !blockedStatus;
-  useEffect(() => {
-    if (!exitGuardActive) return undefined;
-    function onBeforeUnload(e) {
-      e.preventDefault();
-      e.returnValue = '';
-    }
-    function onClickCapture(e) {
-      const anchor = e.target.closest?.('a[href]');
-      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
-      const href = anchor.getAttribute('href');
-      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
-      if (href === window.location.pathname + window.location.search) return;
-      e.preventDefault();
-      e.stopPropagation();
-      pendingExitHrefRef.current = href;
-      setShowExitConfirmModal(true);
-    }
-    window.addEventListener('beforeunload', onBeforeUnload);
-    document.addEventListener('click', onClickCapture, true);
-    return () => {
-      window.removeEventListener('beforeunload', onBeforeUnload);
-      document.removeEventListener('click', onClickCapture, true);
-    };
-  }, [exitGuardActive]);
-
-  function handleConfirmExit() {
-    setShowExitConfirmModal(false);
-    const href = pendingExitHrefRef.current;
-    pendingExitHrefRef.current = null;
-    if (href && /^https?:\/\//.test(href)) {
-      window.location.href = href;
-    } else {
-      navigate(href || '/');
-    }
-  }
-
-  function handleCancelExit() {
-    setShowExitConfirmModal(false);
-    pendingExitHrefRef.current = null;
-  }
-
   useEffect(() => {
     if (fromScan && isIntakeUnverified) {
       setShowUnverifiedIntakeModal(true);
@@ -343,6 +291,60 @@ function TechnicianRepairPanel({
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
   }, [battery?.status, testingStartedAt, showTestingUnserviceableForm]);
+
+  // Exit guard (mobile intercepts `beforeRemove`): while a battery has an
+  // active repair/testing session (running timer) or unsaved inputs, warn
+  // before the tab closes AND before any in-app link navigates away.
+  const isWorkSessionActive =
+    (battery?.status === 'in_progress' && Boolean(workStartedAt)) ||
+    (battery?.status === 'in_testing' && Boolean(testingStartedAt));
+  const hasUnsavedInputs =
+    selectedPartIds.length > 0 ||
+    selectedServiceIds.length > 0 ||
+    notes.trim().length > 0 ||
+    issuePhotos.length > 0;
+  const hasActiveSession = !allowExitRef.current && (isWorkSessionActive || hasUnsavedInputs);
+  const exitGuardActive = hasActiveSession && !modalType && !blockedStatus;
+  useEffect(() => {
+    if (!exitGuardActive) return undefined;
+    function onBeforeUnload(e) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+    function onClickCapture(e) {
+      const anchor = e.target.closest?.('a[href]');
+      if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
+      const href = anchor.getAttribute('href');
+      if (!href || href.startsWith('#') || href.startsWith('mailto:') || href.startsWith('tel:')) return;
+      if (href === window.location.pathname + window.location.search) return;
+      e.preventDefault();
+      e.stopPropagation();
+      pendingExitHrefRef.current = href;
+      setShowExitConfirmModal(true);
+    }
+    window.addEventListener('beforeunload', onBeforeUnload);
+    document.addEventListener('click', onClickCapture, true);
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload);
+      document.removeEventListener('click', onClickCapture, true);
+    };
+  }, [exitGuardActive]);
+
+  function handleConfirmExit() {
+    setShowExitConfirmModal(false);
+    const href = pendingExitHrefRef.current;
+    pendingExitHrefRef.current = null;
+    if (href && /^https?:\/\//.test(href)) {
+      window.location.href = href;
+    } else {
+      navigate(href || '/');
+    }
+  }
+
+  function handleCancelExit() {
+    setShowExitConfirmModal(false);
+    pendingExitHrefRef.current = null;
+  }
 
   async function handleStartTesting() {
     setSubmitting(true);
@@ -433,6 +435,7 @@ function TechnicianRepairPanel({
       setElapsedSeconds(0);
       setSelectedPartIds([]);
       setNotes('');
+      allowExitRef.current = true;
       setShowConfirmSubmitForTestingModal(false);
       if (onUpdated) onUpdated();
       if (canTest) {
@@ -458,11 +461,12 @@ function TechnicianRepairPanel({
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
       });
+      allowExitRef.current = true;
       setTestingElapsedSeconds(0);
       setElapsedSeconds(0);
       setSelectedServiceIds([]);
       setTestingNotes('');
-      onUpdated();
+      if (onUpdated) onUpdated();
       triggerModalAndRedirect('completed');
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -609,6 +613,7 @@ function TechnicianRepairPanel({
 
   function handleScanNext() {
     if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    allowExitRef.current = true;
     setModalType(null);
     if (onDone) {
       onDone();
@@ -619,6 +624,7 @@ function TechnicianRepairPanel({
 
   function handleCloseModal() {
     if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    allowExitRef.current = true;
     setModalType(null);
     if (onUpdated) onUpdated();
   }
@@ -1280,7 +1286,18 @@ function TechnicianRepairPanel({
                   </button>
                   <button
                     type="button"
-                    onClick={handleCloseModal}
+                    onClick={() => {
+                      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+                      allowExitRef.current = true;
+                      setModalType(null);
+                      if (onDone) {
+                        onDone();
+                      } else if (user?.role === 'technician') {
+                        navigate('/batteries/technician');
+                      } else {
+                        navigate('/batteries');
+                      }
+                    }}
                     className="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300"
                   >
                     Back to Service List

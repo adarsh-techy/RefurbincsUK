@@ -326,15 +326,17 @@ export default function BatteryDetailScreen() {
         return;
       }
 
-      // Check if user came from scanning or has an active session/unsaved repair progress
-      const isScanOrWorkSession =
-        fromScan ||
-        result?.battery?.status === 'in_progress' ||
-        result?.battery?.status === 'in_testing' ||
+      // Check if user has an active session (running timer) or unsaved repair progress
+      const isWorkSessionActive =
+        (result?.battery?.status === 'in_progress' && Boolean(result?.battery?.work_started_at)) ||
+        (result?.battery?.status === 'in_testing' && Boolean(result?.battery?.testing_started_at));
+      const hasUnsavedProgress =
         selectedPartIds.length > 0 ||
         selectedServiceIds.length > 0 ||
         notes.trim().length > 0 ||
         issuePhotos.length > 0;
+
+      const isScanOrWorkSession = isWorkSessionActive || hasUnsavedProgress;
 
       if (!isScanOrWorkSession) {
         return;
@@ -715,6 +717,7 @@ export default function BatteryDetailScreen() {
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
       });
+      allowExitRef.current = true;
       setTestingElapsedSeconds(0);
       setElapsedSeconds(0);
       setSelectedServiceIds([]);

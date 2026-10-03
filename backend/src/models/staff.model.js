@@ -234,8 +234,10 @@ async function findTests(staffId) {
   const { rows } = await db.query(
     `SELECT
        MIN(bs.id) AS id,
+       b.id AS battery_id,
        b.battery_code,
        b.status AS battery_status,
+       b.testing_duration_seconds,
        string_agg(bs.service_name, ', ' ORDER BY bs.service_name)
          FILTER (WHERE bs.service_name <> 'Passed back to Technician') AS service_name,
        bool_or(bs.service_name = 'Passed back to Technician') AS passed_back,
@@ -244,7 +246,7 @@ async function findTests(staffId) {
      FROM battery_services bs
      JOIN batteries b ON b.id = bs.battery_id
      WHERE bs.staff_id = $1
-     GROUP BY bs.battery_id, b.battery_code, b.status, bs.completed_at
+     GROUP BY bs.battery_id, b.id, b.battery_code, b.status, b.testing_duration_seconds, bs.completed_at
      ORDER BY bs.completed_at DESC`,
     [staffId]
   );

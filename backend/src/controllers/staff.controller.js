@@ -191,11 +191,12 @@ async function getById(req, res, next) {
     if (!staff) {
       return res.status(404).json({ message: 'Staff member not found' });
     }
-    const [repairs, issues] = await Promise.all([
+    const [repairs, issues, tests] = await Promise.all([
       staffModel.findRepairs(req.params.id),
       staffModel.findIssues(req.params.id),
+      staffModel.findTests(req.params.id),
     ]);
-    res.json({ staff, repairs, issues: issues || [] });
+    res.json({ staff, repairs, issues: issues || [], tests: tests || [] });
   } catch (err) {
     next(err);
   }

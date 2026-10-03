@@ -21,9 +21,11 @@ function PartForm({ part, onSaved, onCancel }) {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
-  function capitalizeFirst(val) {
+  // Capitalizes the first letter of every word as the name is typed
+  // ("bms board" -> "Bms Board"); the rest of each word is left as entered.
+  function capitalizeWords(val) {
     if (!val) return '';
-    return val.charAt(0).toUpperCase() + val.slice(1);
+    return val.replace(/(^|\s)(\S)/g, (_, space, ch) => space + ch.toUpperCase());
   }
 
   function updateField(field, value) {
@@ -36,7 +38,7 @@ function PartForm({ part, onSaved, onCancel }) {
     setError(null);
     try {
       const payload = {
-        name: capitalizeFirst(form.name.trim()),
+        name: capitalizeWords(form.name.trim()),
         sku: form.sku?.trim() || undefined,
         quantity: Number(form.quantity) || 0,
         repairCost: Number(form.repairCost) || 0,
@@ -64,7 +66,7 @@ function PartForm({ part, onSaved, onCancel }) {
             type="text"
             list="existing-part-names"
             value={form.name}
-            onChange={(e) => updateField('name', capitalizeFirst(e.target.value))}
+            onChange={(e) => updateField('name', capitalizeWords(e.target.value))}
             placeholder="e.g. 12V Cell Module"
             className={inputClasses}
             required

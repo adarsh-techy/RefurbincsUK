@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   Image,
   Modal,
+  RefreshControl,
   ScrollView,
   Text,
   TextInput,
@@ -17,14 +18,21 @@ import formatDuration from '../../utils/format-duration';
 import { resolveImageUrl } from '../../utils/imageUrl';
 
 const DATE_FILTERS = [
-  { id: 'all', label: 'All Dates' },
+  { id: 'all', label: 'All' },
   { id: 'today', label: 'Today' },
   { id: 'yesterday', label: 'Yesterday' },
-  { id: 'week', label: 'Last 7 Days' },
-  { id: 'month', label: 'Last 30 Days' },
+  { id: 'week', label: '7 Days' },
+  { id: 'month', label: '30 Days' },
 ];
 
-const TYPE_FILTERS = [
+const SUPERVISOR_TYPE_FILTERS = [
+  { id: 'all', label: 'All' },
+  { id: 'passed', label: 'Passed QA' },
+  { id: 'passed_back', label: 'Passed Back' },
+  { id: 'issue', label: 'Unserviceable' },
+];
+
+const TECHNICIAN_TYPE_FILTERS = [
   { id: 'all', label: 'All' },
   { id: 'repair', label: 'Repairs' },
   { id: 'issue', label: 'Unserviceable' },
@@ -110,7 +118,25 @@ function matchesDateFilter(dateStr, filter, customStart, customEnd) {
   return true;
 }
 
-function buildTimeline(repairs, issues) {
+function buildTimeline(repairs, issues, tests, isSupervisor) {
+  if (isSupervisor) {
+    // ONLY tester history: tests and test unserviceable issues. Strictly NO tech repairs!
+    const testEntries = (tests || []).map((t) => ({
+      ...t,
+      kind: 'test',
+      sortDate: t.tested_at,
+    }));
+    const issueEntries = (issues || []).map((i) => ({
+      ...i,
+      kind: 'issue',
+      sortDate: i.reported_at,
+    }));
+    return [...testEntries, ...issueEntries].sort(
+      (a, b) => new Date(b.sortDate || 0) - new Date(a.sortDate || 0)
+    );
+  }
+
+  // ONLY tech history: repairs and reported issues. Strictly NO supervisor tests!
   const repairEntries = (repairs || []).map((r) => ({
     ...r,
     kind: 'repair',
@@ -176,6 +202,8 @@ function groupTimelineByDate(items) {
 export default function HistoryScreen() {
   const navigation = useNavigation();
   const [rawTimeline, setRawTimeline] = useState(null);
+  const [staffInfo, setStaffInfo] = useState(null);
+  const [summaryStats, setSummaryStats] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -191,11 +219,46 @@ export default function HistoryScreen() {
   const [viewYear, setViewYear] = useState(new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
 
+  const isSupervisor = useMemo(() => {
+    return (staffInfo?.role || '').toLowerCase() === 'supervisor';
+  }, [staffInfo?.role]);
+
+  const typeFilters = isSupervisor ? SUPERVISOR_TYPE_FILTERS : TECHNICIAN_TYPE_FILTERS;
+
   const load = useCallback(() => {
     setError(null);
     return apiClient
       .get('/staff/me')
-      .then(({ data }) => setRawTimeline(buildTimeline(data.repairs, data.issues || [])))
+      .then(({ data }) => {
+        setStaffInfo(data.staff);
+        const supervisor = (data.staff?.role || '').toLowerCase() === 'supervisor';
+        setRawTimeline(
+          buildTimeline(data.repairs || [], data.issues || [], data.tests || [], supervisor)
+        );
+        if (supervisor) {
+          const tests = data.tests || [];
+          const issues = data.issues || [];
+          const passed = tests.filter((t) => !t.passed_back);
+          const passedBack = tests.filter((t) => t.passed_back);
+          setSummaryStats({
+            total: tests.length,
+            passed: passed.length,
+            passedBack: passedBack.length,
+            issues: issues.length,
+          });
+        } else {
+          const repairs = data.repairs || [];
+          const issues = data.issues || [];
+          const completed = repairs.filter(
+            (r) => r.battery_status === 'repaired' || r.outcome !== 'failed'
+          );
+          setSummaryStats({
+            total: repairs.length,
+            completed: completed.length,
+            issues: issues.length,
+          });
+        }
+      })
       .catch((err) => setError(err.response?.data?.message || err.message));
   }, []);
 
@@ -216,8 +279,16 @@ export default function HistoryScreen() {
 
     return rawTimeline.filter((item) => {
       // 1. Type filter
-      if (typeFilter !== 'all' && item.kind !== typeFilter) {
-        return false;
+      if (typeFilter !== 'all') {
+        if (isSupervisor) {
+          if (typeFilter === 'passed' && (item.kind !== 'test' || item.passed_back)) return false;
+          if (typeFilter === 'passed_back' && (item.kind !== 'test' || !item.passed_back))
+            return false;
+          if (typeFilter === 'issue' && item.kind !== 'issue') return false;
+        } else {
+          if (typeFilter === 'repair' && item.kind !== 'repair') return false;
+          if (typeFilter === 'issue' && item.kind !== 'issue') return false;
+        }
       }
 
       // 2. Date filter (including custom range)
@@ -228,7 +299,7 @@ export default function HistoryScreen() {
       // 3. Search query filter
       if (q) {
         const codeMatch = item.battery_code?.toLowerCase().includes(q);
-        const partMatch = item.part_name?.toLowerCase().includes(q);
+        const partMatch = (item.part_name || item.service_name)?.toLowerCase().includes(q);
         const reasonMatch =
           item.reason_label?.toLowerCase().includes(q) ||
           item.reason_code?.toLowerCase().includes(q);
@@ -238,7 +309,7 @@ export default function HistoryScreen() {
 
       return true;
     });
-  }, [rawTimeline, search, dateFilter, typeFilter, customRange]);
+  }, [rawTimeline, search, dateFilter, typeFilter, customRange, isSupervisor]);
 
   // Date-wise sectioned groups
   const dateGroups = useMemo(() => {
@@ -359,44 +430,163 @@ export default function HistoryScreen() {
     });
   }, [viewYear, viewMonth]);
 
-  if (rawTimeline === null && !error) {
-    return (
-      <View className="flex-1 items-center justify-center bg-slate-50">
-        <ActivityIndicator color="#2563eb" size="large" />
-        <Text className="mt-3 text-sm font-medium text-slate-500">Loading your repair history…</Text>
-      </View>
-    );
-  }
-
   return (
     <View className="flex-1 bg-slate-50">
-      {/* ── Search & Filter Controls Header ────────────────────────────── */}
-      <View className="border-b border-slate-200/80 bg-white px-4 pt-3 pb-3 shadow-sm">
-        {/* Search Input */}
-        <View className="flex-row items-center gap-2 rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2.5">
-          <Icon name="search" color="#94a3b8" size={15} />
+      {/* ── Top Header & Stats Summary Banner ────────────────────────── */}
+      <View className="bg-white px-4 pt-3 pb-3 border-b border-slate-200/80 shadow-2xs">
+        {/* Role Title & Staff Badge */}
+        <View className="flex-row items-center justify-between mb-2.5">
+          <View>
+            <View className="flex-row items-center gap-2">
+              <Text className="text-lg font-black text-slate-900 tracking-tight">
+                {isSupervisor ? 'Testing History' : 'Repair History'}
+              </Text>
+              <View
+                className={`rounded-full px-2 py-0.5 ${
+                  isSupervisor ? 'bg-violet-100' : 'bg-blue-100'
+                }`}
+              >
+                <Text
+                  className={`text-[10px] font-black uppercase tracking-wider ${
+                    isSupervisor ? 'text-violet-700' : 'text-blue-700'
+                  }`}
+                >
+                  {isSupervisor ? 'Supervisor' : 'Technician'}
+                </Text>
+              </View>
+            </View>
+            <Text className="text-xs text-slate-400">
+              {isSupervisor
+                ? 'QA testing sign-offs and rework passes'
+                : 'Completed repairs and replaced parts'}
+            </Text>
+          </View>
+
+          {staffInfo?.name && (
+            <View className="flex-row items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
+              <View className="h-2 w-2 rounded-full bg-emerald-500" />
+              <Text className="text-[11px] font-bold text-slate-700">{staffInfo.name}</Text>
+            </View>
+          )}
+        </View>
+
+        {/* 3-Column Metrics Strip */}
+        {summaryStats && (
+          <View className="flex-row gap-2 mt-1 mb-2.5">
+            {isSupervisor ? (
+              <>
+                <View className="flex-1 rounded-xl bg-violet-50/80 p-2.5 border border-violet-100">
+                  <Text className="text-[10px] font-bold text-violet-700">Total Tested</Text>
+                  <Text className="text-base font-black text-violet-950 mt-0.5">
+                    {summaryStats.total}
+                  </Text>
+                </View>
+                <View className="flex-1 rounded-xl bg-emerald-50/80 p-2.5 border border-emerald-100">
+                  <Text className="text-[10px] font-bold text-emerald-700">Passed QA</Text>
+                  <Text className="text-base font-black text-emerald-950 mt-0.5">
+                    {summaryStats.passed}
+                  </Text>
+                </View>
+                <View className="flex-1 rounded-xl bg-amber-50/80 p-2.5 border border-amber-100">
+                  <Text className="text-[10px] font-bold text-amber-700">Passed Back</Text>
+                  <Text className="text-base font-black text-amber-950 mt-0.5">
+                    {summaryStats.passedBack}
+                  </Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <View className="flex-1 rounded-xl bg-blue-50/80 p-2.5 border border-blue-100">
+                  <Text className="text-[10px] font-bold text-blue-700">Total Repairs</Text>
+                  <Text className="text-base font-black text-blue-950 mt-0.5">
+                    {summaryStats.total}
+                  </Text>
+                </View>
+                <View className="flex-1 rounded-xl bg-emerald-50/80 p-2.5 border border-emerald-100">
+                  <Text className="text-[10px] font-bold text-emerald-700">Completed</Text>
+                  <Text className="text-base font-black text-emerald-950 mt-0.5">
+                    {summaryStats.completed}
+                  </Text>
+                </View>
+                <View className="flex-1 rounded-xl bg-rose-50/80 p-2.5 border border-rose-100">
+                  <Text className="text-[10px] font-bold text-rose-700">Issues</Text>
+                  <Text className="text-base font-black text-rose-950 mt-0.5">
+                    {summaryStats.issues}
+                  </Text>
+                </View>
+              </>
+            )}
+          </View>
+        )}
+
+        {/* Search Bar */}
+        <View className="flex-row items-center rounded-xl bg-slate-100 px-2.5 py-1.5 border border-slate-200/60">
+          <Icon name="search" color="#94a3b8" size={13} />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search battery code, part, reason…"
+            placeholder={
+              isSupervisor
+                ? 'Search battery code, tested services…'
+                : 'Search battery code, parts fitted…'
+            }
             placeholderTextColor="#94a3b8"
-            autoCapitalize="characters"
-            autoCorrect={false}
-            className="flex-1 text-xs text-slate-900"
+            className="flex-1 ml-2 text-xs text-slate-800 p-0"
           />
-          {search.length > 0 && (
-            <TouchableOpacity onPress={() => setSearch('')} hitSlop={10} className="p-1">
-              <Icon name="close" color="#94a3b8" size={13} />
+          {search ? (
+            <TouchableOpacity onPress={() => setSearch('')} hitSlop={5}>
+              <Icon name="close" color="#64748b" size={12} />
+            </TouchableOpacity>
+          ) : null}
+        </View>
+
+        {/* Type Filter Segmented Control & Reset */}
+        <View className="mt-2 flex-row items-center justify-between">
+          <View className="flex-row gap-0.5 rounded-lg bg-slate-100 p-0.5">
+            {typeFilters.map((tf) => {
+              const active = typeFilter === tf.id;
+              return (
+                <TouchableOpacity
+                  key={tf.id}
+                  activeOpacity={0.7}
+                  onPress={() => setTypeFilter(tf.id)}
+                  className={`rounded-md px-2 py-1 ${
+                    active
+                      ? isSupervisor
+                        ? 'bg-white shadow-2xs'
+                        : 'bg-white shadow-2xs'
+                      : 'bg-transparent'
+                  }`}
+                >
+                  <Text
+                    className={`text-[10px] font-bold ${
+                      active
+                        ? isSupervisor
+                          ? 'text-violet-700'
+                          : 'text-blue-700'
+                        : 'text-slate-600'
+                    }`}
+                  >
+                    {tf.label}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </View>
+
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={resetFilters} hitSlop={5}>
+              <Text className="text-[10px] font-bold text-rose-600">Reset</Text>
             </TouchableOpacity>
           )}
         </View>
 
-        {/* Date Filter Horizontal Pills */}
-        <View className="mt-2.5">
+        {/* Date Filter Pills */}
+        <View className="mt-2">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-1.5 pr-4"
+            contentContainerClassName="flex-row gap-1"
           >
             {DATE_FILTERS.map((df) => {
               const active = dateFilter === df.id;
@@ -410,12 +600,16 @@ export default function HistoryScreen() {
                       setCustomRange({ start: null, end: null });
                     }
                   }}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    active ? 'bg-blue-600 shadow-sm shadow-blue-600/30' : 'bg-slate-100'
+                  className={`rounded-md px-2 py-0.5 ${
+                    active
+                      ? isSupervisor
+                        ? 'bg-violet-600'
+                        : 'bg-blue-600'
+                      : 'bg-slate-100'
                   }`}
                 >
                   <Text
-                    className={`text-xs font-bold ${
+                    className={`text-[10px] font-bold ${
                       active ? 'text-white' : 'text-slate-600'
                     }`}
                   >
@@ -429,69 +623,39 @@ export default function HistoryScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={openCustomDateModal}
-              className={`flex-row items-center gap-1 rounded-xl px-3 py-1.5 ${
+              className={`flex-row items-center gap-1 rounded-md px-2 py-0.5 ${
                 dateFilter === 'custom'
-                  ? 'bg-blue-600 shadow-sm shadow-blue-600/30'
-                  : 'bg-slate-100 border border-slate-200/80'
+                  ? isSupervisor
+                    ? 'bg-violet-600'
+                    : 'bg-blue-600'
+                  : 'bg-slate-100 border border-slate-200/60'
               }`}
             >
               <Text
-                className={`text-xs font-bold ${
+                className={`text-[10px] font-bold ${
                   dateFilter === 'custom' ? 'text-white' : 'text-slate-700'
                 }`}
               >
                 {dateFilter === 'custom' && customRange.start
                   ? customRange.end && customRange.end !== customRange.start
-                    ? `${formatShortDate(customRange.start)} – ${formatShortDate(customRange.end)}`
+                    ? `${formatShortDate(customRange.start)}–${formatShortDate(customRange.end)}`
                     : formatShortDate(customRange.start)
-                  : 'Custom Date…'}
+                  : '📅 Custom'}
               </Text>
             </TouchableOpacity>
           </ScrollView>
         </View>
-
-        {/* Type Filter Pills & Reset */}
-        <View className="mt-2 flex-row items-center justify-between">
-          <View className="flex-row gap-1.5">
-            {TYPE_FILTERS.map((tf) => {
-              const active = typeFilter === tf.id;
-              return (
-                <TouchableOpacity
-                  key={tf.id}
-                  activeOpacity={0.7}
-                  onPress={() => setTypeFilter(tf.id)}
-                  className={`rounded-lg px-2.5 py-1 border ${
-                    active ? 'border-blue-600 bg-blue-50' : 'border-slate-200 bg-white'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      active ? 'text-blue-700' : 'text-slate-500'
-                    }`}
-                  >
-                    {tf.label}
-                  </Text>
-                </TouchableOpacity>
-              );
-            })}
-          </View>
-
-          {hasActiveFilters && (
-            <TouchableOpacity onPress={resetFilters} hitSlop={5}>
-              <Text className="text-[11px] font-semibold text-rose-600">Reset Filters</Text>
-            </TouchableOpacity>
-          )}
-        </View>
       </View>
 
-      {/* ── Summary / Active Date Filter Bar ─────────────────────────────── */}
-      <View className="flex-row items-center justify-between px-4 py-2 bg-slate-100/70 border-b border-slate-200/60">
-        <Text className="text-[11px] font-semibold text-slate-500">
-          Showing {filteredTimeline.length} records across {dateGroups.length} date{dateGroups.length === 1 ? '' : 's'}
+      {/* ── Summary Count Bar ────────────────────────────────────────── */}
+      <View className="flex-row items-center justify-between px-4 py-2 bg-slate-100/80 border-b border-slate-200/60">
+        <Text className="text-[11px] font-bold text-slate-500">
+          {filteredTimeline.length} unit{filteredTimeline.length === 1 ? '' : 's'} across{' '}
+          {dateGroups.length} date{dateGroups.length === 1 ? '' : 's'}
         </Text>
         {dateFilter !== 'all' && (
-          <View className="flex-row items-center gap-1.5 rounded-full bg-blue-100 px-2.5 py-0.5">
-            <Text className="text-[10px] font-bold text-blue-700 uppercase">
+          <View className="flex-row items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-0.5">
+            <Text className="text-[10px] font-bold text-slate-700 uppercase">
               {dateFilter === 'custom'
                 ? customRange.end && customRange.end !== customRange.start
                   ? `${formatShortDate(customRange.start)} – ${formatShortDate(customRange.end)}`
@@ -505,7 +669,7 @@ export default function HistoryScreen() {
               }}
               hitSlop={5}
             >
-              <Icon name="close" color="#1e40af" size={10} />
+              <Icon name="close" color="#475569" size={10} />
             </TouchableOpacity>
           </View>
         )}
@@ -521,28 +685,48 @@ export default function HistoryScreen() {
       <ScrollView
         className="flex-1"
         contentContainerClassName="p-4 gap-4 pb-16"
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            tintColor={isSupervisor ? '#7c3aed' : '#2563eb'}
+          />
+        }
       >
-        {dateGroups.length === 0 ? (
+        {rawTimeline === null ? (
+          <View className="items-center justify-center p-12">
+            <ActivityIndicator size="small" color={isSupervisor ? '#7c3aed' : '#2563eb'} />
+            <Text className="text-xs font-semibold text-slate-400 mt-2">Loading history…</Text>
+          </View>
+        ) : dateGroups.length === 0 ? (
           hasActiveFilters ? (
-            <View className="items-center rounded-3xl border border-slate-200/80 bg-white p-8 shadow-sm mt-4">
-              <View className="mb-1.5"><Icon name="search" color="#94a3b8" size={22} /></View>
+            <View className="items-center rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xs mt-4">
+              <View className="mb-1.5">
+                <Icon name="search" color="#94a3b8" size={22} />
+              </View>
               <Text className="text-sm font-bold text-slate-800">No matching records found</Text>
               <Text className="text-xs text-slate-400 text-center mt-1">
-                Try selecting a different date filter or clearing your search.
+                Try selecting a different filter or clearing your search.
               </Text>
               <TouchableOpacity
                 onPress={resetFilters}
-                className="mt-4 rounded-xl bg-blue-600 px-4 py-2"
+                className={`mt-4 rounded-xl px-4 py-2 ${
+                  isSupervisor ? 'bg-violet-600' : 'bg-blue-600'
+                }`}
               >
                 <Text className="text-xs font-bold text-white">Clear All Filters</Text>
               </TouchableOpacity>
             </View>
           ) : (
-            <View className="items-center rounded-3xl border border-slate-200/80 bg-white p-8 shadow-sm mt-4">
-              <View className="mb-1.5"><Icon name="clock" color="#94a3b8" size={22} /></View>
+            <View className="items-center rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xs mt-4">
+              <View className="mb-1.5">
+                <Icon name="clock" color="#94a3b8" size={22} />
+              </View>
               <Text className="text-sm font-bold text-slate-800">Nothing logged yet</Text>
               <Text className="text-xs text-slate-400 text-center mt-1">
-                Completed repairs and reported issues will appear here date-wise.
+                {isSupervisor
+                  ? 'Completed testing sign-offs and passes will appear here date-wise.'
+                  : 'Completed repairs and reported workshop issues will appear here date-wise.'}
               </Text>
             </View>
           )
@@ -553,13 +737,19 @@ export default function HistoryScreen() {
               <View className="flex-row items-center justify-between px-1">
                 <View className="flex-row items-center gap-1.5">
                   <View
-                    className={`h-2 w-2 rounded-full ${
-                      group.isToday ? 'bg-emerald-500' : 'bg-blue-500'
+                    className={`h-2.5 w-2.5 rounded-full ${
+                      group.isToday
+                        ? 'bg-emerald-500'
+                        : isSupervisor
+                          ? 'bg-violet-500'
+                          : 'bg-blue-500'
                     }`}
                   />
                   <Text
                     className={`text-xs font-extrabold ${
-                      group.isToday ? 'text-emerald-700' : 'text-slate-700'
+                      group.isToday
+                        ? 'text-emerald-700'
+                        : 'text-slate-800'
                     }`}
                   >
                     {group.label}
@@ -573,21 +763,189 @@ export default function HistoryScreen() {
               </View>
 
               {/* Items for this date */}
-              <View className="gap-2">
-                {group.data.map((item) =>
-                  item.kind === 'issue' ? (
+              <View className="gap-2.5">
+                {group.data.map((item) => {
+                  if (item.kind === 'test') {
+                    // SUPERVISOR TEST CARD
+                    const isPassedBack = item.passed_back;
+                    return (
+                      <TouchableOpacity
+                        key={`test-${item.id}`}
+                        activeOpacity={0.7}
+                        onPress={() =>
+                          navigation.navigate('BatteryDetail', { code: item.battery_code })
+                        }
+                        className={`rounded-2xl border bg-white p-3.5 shadow-2xs overflow-hidden ${
+                          isPassedBack ? 'border-amber-200' : 'border-emerald-200'
+                        }`}
+                      >
+                        {/* Top row */}
+                        <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
+                          <View className="flex-row items-center gap-2">
+                            <View
+                              className={`h-6 w-6 items-center justify-center rounded-full ${
+                                isPassedBack ? 'bg-amber-100' : 'bg-emerald-100'
+                              }`}
+                            >
+                              <Text
+                                className={`text-xs font-black ${
+                                  isPassedBack ? 'text-amber-700' : 'text-emerald-700'
+                                }`}
+                              >
+                                {isPassedBack ? '↩' : '✓'}
+                              </Text>
+                            </View>
+                            <Text className="font-mono text-sm font-extrabold text-slate-900">
+                              {item.battery_code}
+                            </Text>
+                            {isPassedBack ? (
+                              <View className="rounded-full bg-amber-100 px-2 py-0.5">
+                                <Text className="text-[10px] font-black uppercase text-amber-800">
+                                  Sent Back to Tech
+                                </Text>
+                              </View>
+                            ) : (
+                              <StatusBadge status="repaired" />
+                            )}
+                          </View>
+
+                          <Text className="text-[11px] font-medium text-slate-400">
+                            {item.tested_at
+                              ? new Date(item.tested_at).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : ''}
+                          </Text>
+                        </View>
+
+                        {/* Details Box */}
+                        <View
+                          className={`rounded-xl p-2.5 border ${
+                            isPassedBack
+                              ? 'bg-amber-50/70 border-amber-100'
+                              : 'bg-emerald-50/70 border-emerald-100'
+                          }`}
+                        >
+                          <Text
+                            className={`text-xs font-bold ${
+                              isPassedBack ? 'text-amber-900' : 'text-emerald-900'
+                            }`}
+                          >
+                            {isPassedBack
+                              ? 'Passed back for technician rework'
+                              : `Verified: ${item.service_name || 'Full QA Sign-off'}`}
+                          </Text>
+                          {item.notes ? (
+                            <Text
+                              className={`mt-1 text-xs leading-relaxed ${
+                                isPassedBack ? 'text-amber-800' : 'text-emerald-800'
+                              }`}
+                            >
+                              {item.notes}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        {/* Footer row */}
+                        <View className="mt-2.5 flex-row items-center justify-between">
+                          {typeof item.testing_duration_seconds === 'number' &&
+                          item.testing_duration_seconds > 0 ? (
+                            <View className="rounded-md bg-violet-50 px-2 py-0.5 border border-violet-100">
+                              <Text className="text-[10px] font-bold text-violet-700">
+                                ⏱️ Test: {formatDuration(item.testing_duration_seconds)}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text className="text-[10px] font-bold uppercase text-slate-400">
+                              QA Sign-off
+                            </Text>
+                          )}
+                          <Text className="text-xs font-bold text-blue-600">Details ›</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  if (item.kind === 'repair') {
+                    // TECHNICIAN REPAIR CARD
+                    return (
+                      <TouchableOpacity
+                        key={`repair-${item.id}`}
+                        activeOpacity={0.7}
+                        onPress={() =>
+                          navigation.navigate('BatteryDetail', { code: item.battery_code })
+                        }
+                        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs"
+                      >
+                        <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
+                          <View className="flex-row items-center gap-2">
+                            <View className="h-6 w-6 items-center justify-center rounded-full bg-blue-100">
+                              <Icon name="wrench" color="#1d4ed8" size={12} />
+                            </View>
+                            <Text className="font-mono text-sm font-extrabold text-blue-700">
+                              {item.battery_code}
+                            </Text>
+                            <StatusBadge status={item.battery_status || 'repaired'} />
+                          </View>
+                          <Text className="text-[11px] font-medium text-slate-400">
+                            {item.repaired_at
+                              ? new Date(item.repaired_at).toLocaleTimeString([], {
+                                  hour: '2-digit',
+                                  minute: '2-digit',
+                                })
+                              : ''}
+                          </Text>
+                        </View>
+
+                        <View className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
+                          <Text className="text-xs font-bold text-slate-700" numberOfLines={2}>
+                            {item.part_name ? `Parts: ${item.part_name}` : 'Completed service & inspection'}
+                          </Text>
+                          {item.notes ? (
+                            <Text className="mt-1 text-xs text-slate-500 leading-relaxed">
+                              {item.notes}
+                            </Text>
+                          ) : null}
+                        </View>
+
+                        <View className="mt-2.5 flex-row items-center justify-between">
+                          {typeof item.duration_seconds === 'number' &&
+                          item.duration_seconds > 0 ? (
+                            <View className="rounded-md bg-blue-50 px-2 py-0.5 border border-blue-100">
+                              <Text className="text-[10px] font-bold text-blue-700">
+                                ⏱️ Duration: {formatDuration(item.duration_seconds)}
+                              </Text>
+                            </View>
+                          ) : (
+                            <Text className="text-[10px] font-bold uppercase text-slate-400">
+                              Completed Repair
+                            </Text>
+                          )}
+                          <Text className="text-xs font-bold text-blue-600">Details ›</Text>
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  }
+
+                  // ISSUE CARD (UNSERVICEABLE)
+                  return (
                     <TouchableOpacity
                       key={`issue-${item.id}`}
                       activeOpacity={0.7}
-                      onPress={() => navigation.navigate('BatteryDetail', { code: item.battery_code })}
-                      className="rounded-2xl border border-rose-200/80 bg-white p-3.5 shadow-sm"
+                      onPress={() =>
+                        navigation.navigate('BatteryDetail', { code: item.battery_code })
+                      }
+                      className="rounded-2xl border border-rose-200/90 bg-white p-3.5 shadow-2xs"
                     >
                       <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
                         <View className="flex-row items-center gap-2">
                           <View className="h-6 w-6 items-center justify-center rounded-full bg-rose-100">
                             <Icon name="alertTriangle" color="#be123c" size={12} />
                           </View>
-                          <Text className="text-sm font-extrabold text-rose-700">{item.battery_code}</Text>
+                          <Text className="font-mono text-sm font-extrabold text-rose-700">
+                            {item.battery_code}
+                          </Text>
                           <StatusBadge status={item.battery_status || 'unserviceable'} />
                         </View>
                         <Text className="text-[11px] font-medium text-slate-400">
@@ -605,20 +963,30 @@ export default function HistoryScreen() {
                           Issue: {item.reason_label || item.reason_code}
                         </Text>
                         {item.note ? (
-                          <Text className="mt-1 text-xs text-rose-600 leading-relaxed">{item.note}</Text>
+                          <Text className="mt-1 text-xs text-rose-600 leading-relaxed">
+                            {item.note}
+                          </Text>
                         ) : null}
                         {item.photo_urls && item.photo_urls.length > 0 && (
                           <View className="mt-2 pt-2 border-t border-rose-200/60">
                             <View className="flex-row items-center gap-1.5 mb-1.5">
                               <Icon name="photo" color="#be123c" size={12} />
                               <Text className="text-[10px] font-bold text-rose-800">
-                                {item.photo_urls.length} Attached Photo{item.photo_urls.length > 1 ? 's' : ''}
+                                {item.photo_urls.length} Attached Photo
+                                {item.photo_urls.length > 1 ? 's' : ''}
                               </Text>
                             </View>
                             <View className="flex-row items-center gap-2">
                               {item.photo_urls.map((photo, pIdx) => (
-                                <View key={pIdx} className="h-12 w-12 rounded-lg border border-rose-200 overflow-hidden bg-white shadow-2xs">
-                                  <Image source={{ uri: resolveImageUrl(photo) }} className="h-full w-full" resizeMode="cover" />
+                                <View
+                                  key={pIdx}
+                                  className="h-12 w-12 rounded-lg border border-rose-200 overflow-hidden bg-white"
+                                >
+                                  <Image
+                                    source={{ uri: resolveImageUrl(photo) }}
+                                    className="h-full w-full"
+                                    resizeMode="cover"
+                                  />
                                 </View>
                               ))}
                             </View>
@@ -626,62 +994,15 @@ export default function HistoryScreen() {
                         )}
                       </View>
 
-                      <View className="mt-2 flex-row items-center justify-between">
+                      <View className="mt-2.5 flex-row items-center justify-between">
                         <Text className="text-[10px] font-semibold text-rose-600 uppercase">
                           Marked Unserviceable
                         </Text>
                         <Text className="text-xs font-bold text-slate-400">Details ›</Text>
                       </View>
                     </TouchableOpacity>
-                  ) : (
-                    <TouchableOpacity
-                      key={`repair-${item.id}`}
-                      activeOpacity={0.7}
-                      onPress={() => navigation.navigate('BatteryDetail', { code: item.battery_code })}
-                      className="rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-sm"
-                    >
-                      <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
-                        <View className="flex-row items-center gap-2">
-                          <View className="h-6 w-6 items-center justify-center rounded-full bg-emerald-100">
-                            <Icon name="wrench" color="#047857" size={12} />
-                          </View>
-                          <Text className="text-sm font-extrabold text-blue-700">{item.battery_code}</Text>
-                          <StatusBadge status={item.battery_status || 'repaired'} />
-                        </View>
-                        <Text className="text-[11px] font-medium text-slate-400">
-                          {item.repaired_at
-                            ? new Date(item.repaired_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : ''}
-                        </Text>
-                      </View>
-
-                      <View className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-                        <Text className="text-xs font-bold text-slate-700" numberOfLines={2}>
-                          {item.part_name ? `Part: ${item.part_name}` : 'Completed service & inspection'}
-                        </Text>
-                        {item.notes ? (
-                          <Text className="mt-1 text-xs text-slate-500 leading-relaxed">{item.notes}</Text>
-                        ) : null}
-                      </View>
-
-                      <View className="mt-2 flex-row items-center justify-between">
-                        {typeof item.duration_seconds === 'number' && item.duration_seconds > 0 ? (
-                          <View className="rounded-md bg-blue-50 px-2 py-0.5 border border-blue-100">
-                            <Text className="text-[10px] font-bold text-blue-700">
-                              ⏱️ Duration: {formatDuration(item.duration_seconds)}
-                            </Text>
-                          </View>
-                        ) : (
-                          <View />
-                        )}
-                        <Text className="text-xs font-bold text-slate-400">Details ›</Text>
-                      </View>
-                    </TouchableOpacity>
-                  )
-                )}
+                  );
+                })}
               </View>
             </View>
           ))
@@ -759,67 +1080,80 @@ export default function HistoryScreen() {
               </TouchableOpacity>
             </View>
 
-            {/* Weekday initial headers */}
-            <View className="mt-3 flex-row justify-between px-1">
-              {DAY_NAMES.map((d, i) => (
-                <View key={`day-name-${i}`} className="w-10 items-center">
-                  <Text className="text-xs font-bold text-slate-400">{d}</Text>
-                </View>
-              ))}
-            </View>
+            {/* Calendar Days Grid */}
+            <View className="mt-3">
+              <View className="flex-row justify-between mb-1.5 px-1">
+                {DAY_NAMES.map((d, i) => (
+                  <View key={`dn-${i}`} className="w-10 items-center">
+                    <Text className="text-xs font-bold text-slate-400">{d}</Text>
+                  </View>
+                ))}
+              </View>
 
-            {/* Days Grid */}
-            <View className="mt-1 flex-row flex-wrap justify-between px-1">
-              {calendarDays.map((ymdStr, i) => {
-                if (!ymdStr) {
-                  return <View key={`empty-${i}`} className="h-10 w-10" />;
-                }
-                const dayNum = Number(ymdStr.split('-')[2]);
-                const isStart = tempRange.start === ymdStr;
-                const isEnd = tempRange.end === ymdStr;
-                const inRange =
-                  tempRange.start &&
-                  tempRange.end &&
-                  ymdStr > tempRange.start &&
-                  ymdStr < tempRange.end;
-                const isSelected = isStart || isEnd;
+              <View className="flex-row flex-wrap">
+                {calendarDays.map((ymd, i) => {
+                  if (!ymd) {
+                    return <View key={`empty-${i}`} className="w-[14.28%] h-10" />;
+                  }
+                  const dayNum = Number(ymd.split('-')[2]);
+                  const isSelected = tempRange.start === ymd || tempRange.end === ymd;
+                  const inRange =
+                    tempRange.start &&
+                    tempRange.end &&
+                    ymd > tempRange.start &&
+                    ymd < tempRange.end;
 
-                return (
-                  <TouchableOpacity
-                    key={ymdStr}
-                    activeOpacity={0.7}
-                    onPress={() => handleSelectDay(ymdStr)}
-                    className={`my-0.5 h-10 w-10 items-center justify-center rounded-xl ${
-                      isSelected
-                        ? 'bg-blue-600 shadow-sm'
-                        : inRange
-                        ? 'bg-blue-100'
-                        : 'bg-transparent'
-                    }`}
-                  >
-                    <Text
-                      className={`text-xs font-bold ${
-                        isSelected
-                          ? 'text-white'
-                          : inRange
-                          ? 'text-blue-800'
-                          : 'text-slate-800'
-                      }`}
+                  return (
+                    <View
+                      key={ymd}
+                      className="w-[14.28%] h-10 items-center justify-center p-0.5"
                     >
-                      {dayNum}
-                    </Text>
-                  </TouchableOpacity>
-                );
-              })}
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => handleSelectDay(ymd)}
+                        className={`h-9 w-9 items-center justify-center rounded-xl ${
+                          isSelected
+                            ? isSupervisor
+                              ? 'bg-violet-600 shadow-sm'
+                              : 'bg-blue-600 shadow-sm'
+                            : inRange
+                              ? isSupervisor
+                                ? 'bg-violet-100'
+                                : 'bg-blue-100'
+                              : 'bg-transparent'
+                        }`}
+                      >
+                        <Text
+                          className={`text-xs font-bold ${
+                            isSelected
+                              ? 'text-white'
+                              : inRange
+                                ? isSupervisor
+                                  ? 'text-violet-900'
+                                  : 'text-blue-900'
+                                : 'text-slate-800'
+                          }`}
+                        >
+                          {dayNum}
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
+                  );
+                })}
+              </View>
             </View>
 
-            {/* Active Selection Indicator */}
-            <View className="mt-4 rounded-xl bg-slate-50 p-3 border border-slate-100 flex-row items-center justify-between">
+            {/* Selection display */}
+            <View className="mt-4 flex-row items-center justify-between rounded-xl bg-slate-50 p-3 border border-slate-100">
               <View>
-                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
                   Chosen Filter Date
                 </Text>
-                <Text className="text-xs font-extrabold text-blue-700 mt-0.5">
+                <Text
+                  className={`mt-0.5 text-xs font-extrabold ${
+                    isSupervisor ? 'text-violet-700' : 'text-blue-700'
+                  }`}
+                >
                   {tempRange.start
                     ? tempRange.end && tempRange.end !== tempRange.start
                       ? `${formatShortDate(tempRange.start)} – ${formatShortDate(tempRange.end)}`
@@ -837,22 +1171,28 @@ export default function HistoryScreen() {
               )}
             </View>
 
-            {/* Action Buttons */}
+            {/* Action buttons */}
             <View className="mt-4 flex-row gap-3">
               <TouchableOpacity
+                activeOpacity={0.7}
                 onPress={() => {
                   setTempRange({ start: null, end: null });
                   setDateFilter('all');
                   setCustomRange({ start: null, end: null });
                   setCustomModalOpen(false);
                 }}
-                className="flex-1 items-center rounded-2xl bg-slate-100 py-3.5"
+                className="flex-1 items-center justify-center rounded-2xl bg-slate-100 py-3.5"
               >
                 <Text className="text-xs font-bold text-slate-600">Show All Dates</Text>
               </TouchableOpacity>
               <TouchableOpacity
+                activeOpacity={0.8}
                 onPress={applyCustomDateFilter}
-                className="flex-1 items-center rounded-2xl bg-blue-600 py-3.5 shadow-sm shadow-blue-600/30"
+                className={`flex-1 items-center justify-center rounded-2xl py-3.5 ${
+                  isSupervisor
+                    ? 'bg-violet-600 shadow-md shadow-violet-600/30'
+                    : 'bg-blue-600 shadow-md shadow-blue-600/30'
+                }`}
               >
                 <Text className="text-xs font-bold text-white">Apply Date Filter</Text>
               </TouchableOpacity>

@@ -5,6 +5,13 @@ const inputClasses =
   'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-500 dark:focus:ring-blue-500/30';
 const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
 
+// Capitalizes the first letter of every word as the reason is typed
+// ("battery swollen" -> "Battery Swollen"); the rest of each word is left as
+// entered.
+function capitalizeWords(value) {
+  return value.replace(/(^|\s)(\S)/g, (_, space, ch) => space + ch.toUpperCase());
+}
+
 // reason: pass an existing issue reason to edit it (PATCH); omit to create
 // (POST). existingReasons: the full list from the page above, so a taken
 // sort order can be flagged before submitting instead of only after a 409.
@@ -65,7 +72,7 @@ function IssueReasonForm({ reason, existingReasons = [], onSaved, onCancel }) {
           <input
             type="text"
             value={form.label}
-            onChange={(e) => updateField('label', e.target.value)}
+            onChange={(e) => updateField('label', capitalizeWords(e.target.value))}
             placeholder="Enter issue reason description"
             className={inputClasses}
             required

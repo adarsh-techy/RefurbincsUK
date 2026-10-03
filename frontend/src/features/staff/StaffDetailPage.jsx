@@ -342,7 +342,13 @@ function StaffDetailPage() {
                 <Badge tone={staff.active ? 'good' : 'neutral'}>
                   {staff.active ? 'Active' : 'Inactive'}
                 </Badge>
-                <span className="inline-flex items-center rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-bold text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+                <span
+                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold ${
+                    staff.role === 'supervisor'
+                      ? 'bg-red-50 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                      : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                  }`}
+                >
                   {roleLabel}
                 </span>
               </div>

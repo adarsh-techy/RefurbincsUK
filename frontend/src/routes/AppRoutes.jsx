@@ -62,13 +62,25 @@ const TrashDetailPage = lazy(() => import('../features/trash/TrashDetailPage'));
 
 function HistoryRouter() {
   const user = useSelector((state) => state.auth.user);
-  if (user?.role === 'technician') return <TechnicianHistoryPage />;
+  const isStaff =
+    user?.role === 'technician' ||
+    user?.role === 'supervisor' ||
+    user?.role === 'staff' ||
+    user?.staff_role === 'supervisor' ||
+    user?.staff_role === 'technician';
+  if (isStaff) return <TechnicianHistoryPage />;
   return <ClientHistoryPage />;
 }
 
 function ProfileRouter() {
   const user = useSelector((state) => state.auth.user);
-  if (user?.role === 'technician') return <TechnicianProfilePage />;
+  const isStaff =
+    user?.role === 'technician' ||
+    user?.role === 'supervisor' ||
+    user?.role === 'staff' ||
+    user?.staff_role === 'supervisor' ||
+    user?.staff_role === 'technician';
+  if (isStaff) return <TechnicianProfilePage />;
   return <ClientProfilePage />;
 }
 

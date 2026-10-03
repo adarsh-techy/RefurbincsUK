@@ -56,8 +56,9 @@ function StaffPage() {
       label: 'Role',
       render: (row) => {
         const role = row.role ? row.role.charAt(0).toUpperCase() + row.role.slice(1) : 'Technician';
+        const isSupervisor = row.role === 'supervisor';
         return (
-          <span className="font-medium text-slate-800 dark:text-neutral-200">
+          <span className={`font-semibold ${isSupervisor ? 'text-red-600 dark:text-red-400' : 'text-blue-600 dark:text-blue-400'}`}>
             {role}
           </span>
         );

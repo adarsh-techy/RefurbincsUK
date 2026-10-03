@@ -22,6 +22,12 @@ const labelClasses =
   'mb-1.5 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300';
 
 // staff: pass an existing staff record to edit it (PATCH); omit to create (POST).
+// Capitalizes the first letter of every word as the name is typed
+// ("john smith" -> "John Smith"); the rest of each word is left as entered.
+function capitalizeWords(value) {
+  return value.replace(/(^|\s)(\S)/g, (_, space, ch) => space + ch.toUpperCase());
+}
+
 function StaffForm({ staff, onSaved, onCancel }) {
   const isEdit = Boolean(staff);
   const [form, setForm] = useState({
@@ -136,7 +142,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
               <input
                 type="text"
                 value={form.name}
-                onChange={(e) => updateField('name', e.target.value)}
+                onChange={(e) => updateField('name', capitalizeWords(e.target.value))}
                 placeholder="e.g. Harry Taylor"
                 className={inputClasses}
                 required
@@ -151,14 +157,20 @@ function StaffForm({ staff, onSaved, onCancel }) {
               <span>Workshop Role</span>
               <span className="text-red-500">*</span>
             </label>
+            {/* Technician reads blue, Supervisor red — on the closed select
+                and in its option list */}
             <select
               value={form.role}
               onChange={(e) => updateField('role', e.target.value)}
-              className={inputClasses}
+              className={`${inputClasses} font-semibold ${
+                form.role === 'supervisor'
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-blue-600 dark:text-blue-400'
+              }`}
               required
             >
-              <option value="technician">Technician — Workshop Repairs only</option>
-              <option value="supervisor">Supervisor — Repairs & Testing Signoff</option>
+              <option value="technician" className="font-semibold text-blue-600">Technician — Workshop Repairs only</option>
+              <option value="supervisor" className="font-semibold text-red-600">Supervisor — Repairs & Testing Signoff</option>
             </select>
           </div>
 
@@ -318,13 +330,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
               <input
                 type="checkbox"
                 checked={grantLogin}
-                onChange={(e) => {
-                  const checked = e.target.checked;
-                  setGrantLogin(checked);
-                  if (checked && !tempPassword) {
-                    generateRandomPassword();
-                  }
-                }}
+                onChange={(e) => setGrantLogin(e.target.checked)}
                 className="sr-only peer"
               />
               <div className="w-11 h-6 bg-slate-200 peer-focus:outline-hidden rounded-full peer dark:bg-surface-700 peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all dark:border-surface-600 peer-checked:bg-blue-600"></div>
