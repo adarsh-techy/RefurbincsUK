@@ -457,13 +457,12 @@ function TechnicianRepairPanel({
       await apiClient.patch(`/batteries/${battery.id}/complete-testing`, {
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
-        durationSeconds: testingElapsedSeconds > 0 ? testingElapsedSeconds : undefined,
       });
       setTestingElapsedSeconds(0);
       setElapsedSeconds(0);
       setSelectedServiceIds([]);
       setTestingNotes('');
-      if (onUpdated) onUpdated();
+      onUpdated();
       triggerModalAndRedirect('completed');
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -485,7 +484,7 @@ function TechnicianRepairPanel({
       setShowTestingDecisionModal(false);
       setIssueNote('');
       setIssuePhotos([]);
-      if (onUpdated) onUpdated();
+      onUpdated();
       triggerModalAndRedirect('passed_back');
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -502,14 +501,10 @@ function TechnicianRepairPanel({
     setSubmitting(true);
     setError(null);
     try {
-      const activeSeconds = (battery.status === 'in_testing' || isTesting)
-        ? testingElapsedSeconds
-        : elapsedSeconds;
       await apiClient.patch(`/batteries/${battery.id}/report-issue`, {
         reasonId: selectedReasonId ? Number(selectedReasonId) : null,
         note: issueNote || undefined,
         photos: issuePhotos.length > 0 ? issuePhotos : undefined,
-        durationSeconds: activeSeconds > 0 ? activeSeconds : undefined,
       });
       setElapsedSeconds(0);
       setTestingElapsedSeconds(0);
@@ -538,7 +533,6 @@ function TechnicianRepairPanel({
         reasonId: selectedReasonId ? Number(selectedReasonId) : null,
         note: issueNote || 'Test failed - removing fitted parts',
         photos: issuePhotos.length > 0 ? issuePhotos : undefined,
-        durationSeconds: testingElapsedSeconds > 0 ? testingElapsedSeconds : undefined,
       });
       setElapsedSeconds(0);
       setTestingElapsedSeconds(0);
@@ -546,7 +540,6 @@ function TechnicianRepairPanel({
       setShowTestingDecisionModal(false);
       setIssueNote('');
       setIssuePhotos([]);
-      triggerModalAndRedirect('unserviceable');
       if (onUpdated) onUpdated();
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -1354,7 +1347,7 @@ function TechnicianRepairPanel({
                     onClick={handleCloseModal}
                     className="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300"
                   >
-                    {pendingPartsRemoval.length > 0 ? 'Proceed to Remove Fitted Parts' : 'Done'}
+                    Done
                   </button>
                 </div>
                 {user?.role === 'technician' && !canTest && (

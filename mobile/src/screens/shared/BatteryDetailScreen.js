@@ -714,7 +714,6 @@ export default function BatteryDetailScreen() {
       await apiClient.patch(`/batteries/${result.battery.id}/complete-testing`, {
         serviceIds: selectedServiceIds,
         notes: testingNotes || undefined,
-        durationSeconds: testingElapsedSeconds > 0 ? testingElapsedSeconds : undefined,
       });
       setTestingElapsedSeconds(0);
       setElapsedSeconds(0);
@@ -800,15 +799,10 @@ export default function BatteryDetailScreen() {
     setActionError(null);
     try {
       const photosPayload = issuePhotos.map((p) => p.dataUri);
-      const activeSeconds =
-        result?.battery?.status === 'in_testing' || showTestingUnserviceableForm
-          ? testingElapsedSeconds
-          : elapsedSeconds;
       await apiClient.patch(`/batteries/${result.battery.id}/report-issue`, {
         reasonId: selectedReasonId,
         note: issueNote || undefined,
         photos: photosPayload.length > 0 ? photosPayload : undefined,
-        durationSeconds: activeSeconds > 0 ? activeSeconds : undefined,
       });
       setElapsedSeconds(0);
       setTestingElapsedSeconds(0);
