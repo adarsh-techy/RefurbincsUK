@@ -173,7 +173,7 @@ function RecycledBatteriesPage() {
       />
 
       <div className="mb-4 sm:mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-emerald-200 p-3 shadow-xs dark:border-emerald-800/40 bg-white/50 dark:bg-surface-900/50">
-        <div className="min-w-[16rem] flex-1 sm:flex-none">
+        <div className="w-full sm:w-auto min-w-0 sm:min-w-[16rem] flex-1 sm:flex-none">
           <label htmlFor="recycled-search" className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-neutral-200 uppercase tracking-wider">
             Search battery / client / reason
           </label>

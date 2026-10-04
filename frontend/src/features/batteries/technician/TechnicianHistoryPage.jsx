@@ -896,7 +896,7 @@ function TechnicianHistoryPage() {
               </button>
             </div>
 
-            <div className="mt-3 grid grid-cols-4 gap-2">
+            <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[['today', 'Today'], ['yesterday', 'Yesterday'], ['week', 'Last 7d'], ['month', 'Last 30d']].map(([id, label]) => (
                 <button
                   key={id}

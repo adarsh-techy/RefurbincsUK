@@ -275,7 +275,7 @@ export default function ClientNotificationsPage() {
           })}
         </div>
 
-        <div className="relative min-w-[240px]">
+        <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[240px]">
           <input
             type="text"
             value={search}

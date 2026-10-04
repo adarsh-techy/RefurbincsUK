@@ -11,6 +11,9 @@
 html {
   -webkit-text-size-adjust: 100%;
   touch-action: manipulation;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 body {
@@ -20,6 +23,19 @@ body {
   background-color: var(--custom-page-bg, #ffffff);
   color: #0f172a;
   -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
+}
+
+#root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow-x: hidden;
+  max-width: 100vw;
+  width: 100%;
 }
 
 html.dark body,

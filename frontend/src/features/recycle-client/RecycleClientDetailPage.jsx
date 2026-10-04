@@ -211,7 +211,7 @@ function RecycleClientDetailPage() {
             </p>
           </div>
 
-          <div className="relative min-w-[14rem]">
+          <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[14rem]">
             <input
               type="text"
               value={search}

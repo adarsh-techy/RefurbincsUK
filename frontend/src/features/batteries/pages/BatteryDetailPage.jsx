@@ -1260,7 +1260,7 @@ function ClientBatteryDetailView({
         </div>
 
         {isRecycled ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {[
               { label: 'Intake & Logging', desc: 'Received at workshop facility', icon: FiPackage, state: 'done' },
               { label: 'Workshop Diagnostics', desc: 'Multi-point safety assessment', icon: FiActivity, state: 'done' },
@@ -1311,7 +1311,7 @@ function ClientBatteryDetailView({
             })}
           </div>
         ) : isUnserviceable ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {UNSERVICEABLE_STEPS.map((step, idx) => {
               const Icon = step.icon;
               const isFailed = step.state === 'failed';
@@ -1361,7 +1361,7 @@ function ClientBatteryDetailView({
             })}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {CLIENT_STEPS.map((step, idx) => {
               const isCompleted = idx < currentStepIdx || (idx === currentStepIdx && isReturned);
               const isCurrent = idx === currentStepIdx && !isReturned;

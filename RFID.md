@@ -1,6 +1,12 @@
 # RFID for Battery Scanning — Plan
 
-> Companion to [`cerebrum.md`](./cerebrum.md). Written 2026-09-26.
+> Companion to [`cerebrum.md`](./cerebrum.md). Written 2026-09-26; refreshed 2026-10-05.
+> **Full setup guide with hardware list, step-by-step code, testing checklist and costs: [`RFID.pdf`](./RFID.pdf).**
+>
+> Changes since first written: the next migration number is **054** (053 is taken); battery codes are
+> now 7-digit (`HUM-0000123`); the mobile app already ships as an **EAS build**, so the "Expo Go has no
+> NFC" concern is solved by `npx expo install react-native-nfc-manager` + `eas build`; new backend routes
+> must carry a role guard (`requireRole('super_admin','admin','staff')` for assign-tag — see cerebrum §3.1).
 > Goal: let workshop staff and clients identify a battery by tapping/reading an RFID tag
 > instead of (or in addition to) scanning its QR code.
 
@@ -67,7 +73,7 @@ Starter shopping list (~£40): 20 on-metal NFC tags + 1 ACR122U USB reader.
 ### 5.1 Database — 1 migration
 
 ```sql
--- backend/src/db/migrations/053_battery_rfid_tag.sql
+-- backend/src/db/migrations/054_battery_rfid_tag.sql
 -- Links a physical RFID/NFC tag (factory UID or EPC) to a battery so a tag read
 -- can resolve to a battery exactly like a QR scan does.
 ALTER TABLE batteries ADD COLUMN IF NOT EXISTS rfid_tag VARCHAR(64) UNIQUE;
@@ -120,7 +126,7 @@ CREATE INDEX IF NOT EXISTS idx_batteries_rfid_tag ON batteries(rfid_tag);
 | Step | Work | Effort |
 |---|---|---|
 | 1 | Order 20 on-metal NFC tags + ACR122U; test read range on a battery | 1 week lead time |
-| 2 | Migration 053 + `findByCode` OR-match + return `rfid_tag` | ½ day |
+| 2 | Migration 054 + `findByCode` OR-match + return `rfid_tag` | ½ day |
 | 3 | Assign-tag endpoint + `BatteryDetailPage` UI | ½ day |
 | 4 | Mobile NFC read hook + "Tap RFID" buttons + Program-tag screen (dev build) | 2–3 days |
 | 5 | Pilot on one client's fleet; compare scan time / error rate vs QR | 2 weeks |

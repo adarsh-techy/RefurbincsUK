@@ -564,19 +564,20 @@ function CertificatesPage() {
             </div>
           ) : (
             <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-850 shadow-xs">
-              <table className="w-full text-left text-xs">
-                <thead className="bg-slate-50 border-b border-slate-200 dark:bg-surface-800 dark:border-white/10">
-                  <tr>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Client</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Tier & Milestone</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Certificate Title</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">CO₂ Saved</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Certificate Code</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Issued Date</th>
-                    <th className="px-4 py-3 text-right font-bold text-slate-700 dark:text-neutral-300 whitespace-nowrap">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs min-w-[700px] sm:min-w-0">
+                  <thead className="bg-slate-50 border-b border-slate-200 dark:bg-surface-800 dark:border-white/10">
+                    <tr>
+                      <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Client</th>
+                      <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Tier & Milestone</th>
+                      <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Certificate Title</th>
+                      <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">CO₂ Saved</th>
+                      <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Certificate Code</th>
+                      <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Issued Date</th>
+                      <th className="px-4 py-3 text-right font-bold text-slate-700 dark:text-neutral-300 whitespace-nowrap">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 dark:divide-white/5">
                   {filteredCertificates.map((cert) => {
                     const logo = getLogoUrl(cert.client_logo_path);
                     const tier = getTierForCertificate(cert);

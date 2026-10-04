@@ -828,7 +828,7 @@ function StaffDetailPage() {
           {/* Search, Filter Bar and Date Presets */}
           <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-4 rounded-3xl border border-slate-200/90 shadow-2xs dark:bg-surface-900 dark:border-white/10">
             {/* Search Input */}
-            <div className="relative min-w-[260px] flex-1">
+            <div className="relative w-full lg:w-auto min-w-0 sm:min-w-[260px] flex-1">
               <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4" />
               <input
                 type="text"

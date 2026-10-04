@@ -495,7 +495,7 @@ function InvoicesPage() {
 
       {/* Filter Toolbar */}
       <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-        <div className="min-w-[13rem] flex-1 sm:flex-none">
+        <div className="w-full sm:w-auto min-w-0 sm:min-w-[13rem] flex-1 sm:flex-none">
           <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
             Search Invoice
           </label>

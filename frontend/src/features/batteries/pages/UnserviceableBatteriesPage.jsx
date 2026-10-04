@@ -112,7 +112,7 @@ function UnserviceableBatteriesPage() {
       />
 
       <div className="mb-4 sm:mb-5 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-3 shadow-xs dark:border-blue-800/40">
-        <div className="min-w-[16rem] flex-1 sm:flex-none">
+        <div className="w-full sm:w-auto min-w-0 sm:min-w-[16rem] flex-1 sm:flex-none">
           <label htmlFor="unserviceable-search" className="mb-1.5 block text-xs font-bold text-slate-700 dark:text-neutral-200 uppercase tracking-wider">
             Search battery / client / reason
           </label>

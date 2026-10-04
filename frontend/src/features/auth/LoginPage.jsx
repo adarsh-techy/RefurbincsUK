@@ -6,14 +6,9 @@ import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/REFURBNICS.png';
 import SplashIntro from './SplashIntro';
-import { DEMO_LOGIN_ENABLED, DEMO_CREDENTIALS, MOBILE_DEMO_CREDENTIALS } from '../../config/demo-credentials';
+import { DEMO_LOGIN_ENABLED, DEMO_CREDENTIALS } from '../../config/demo-credentials';
 
-const inputClasses =
-  'w-full rounded-md border border-slate-300 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
-const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700';
-const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400';
-
-function LoginPage() {
+export default function LoginPage() {
   const defaultEmail = DEMO_LOGIN_ENABLED
     ? import.meta.env.VITE_DEFAULT_LOGIN_EMAIL || DEMO_CREDENTIALS.superAdmin.email
     : '';
@@ -50,152 +45,137 @@ function LoginPage() {
       {showSplash && <SplashIntro onDone={finishSplash} />}
 
       {/* =========================================================================
-          DESKTOP VIEW (>= lg): Reverted to original split-screen layout with battery hero image
+          DESKTOP VIEW (>= lg): Split-screen with left-side image & exact right card
           ========================================================================= */}
       <div className="hidden lg:flex min-h-screen bg-white">
+        {/* Left Side: Brand Hero Image */}
         <div className="relative w-1/2">
           <img src={loginImage} alt="Refurbnics Battery" className="h-full w-full object-cover" />
         </div>
 
-        <div className="flex w-1/2 flex-col justify-center bg-white px-8 py-12 sm:px-14">
-          <div className="mx-auto w-full max-w-sm">
-            <img src={logo} alt="Refurbnics" className="mx-auto mb-8 h-auto w-full max-w-xs" />
-
-            <div className="text-center">
-              <h1 className="text-2xl font-bold text-slate-900">Welcome Back!</h1>
-              <p className="mt-1 text-sm text-slate-500">Sign in to continue</p>
+        {/* Right Side: Exact Reference Design */}
+        <div className="flex w-1/2 flex-col justify-center bg-white px-8 py-10 sm:px-14 lg:px-16 overflow-y-auto selection:bg-[#0d5c3a]/20 selection:text-[#0d5c3a]">
+          <div className="mx-auto w-full max-w-[400px]">
+            {/* Top Logo */}
+            <div className="flex justify-center mb-8">
+              <img
+                src={logo}
+                alt="Refurbnics"
+                className="h-12 sm:h-14 w-auto object-contain"
+              />
             </div>
 
-            {/* Quick Fill Buttons on Desktop */}
-            {DEMO_LOGIN_ENABLED && (
-              <div className="mt-4">
-                <div className="mb-2 flex items-center justify-between text-xs text-slate-500 font-medium">
-                  <span>Quick Fill:</span>
-                </div>
+            {/* Heading */}
+            <div className="mb-6">
+              <h1 className="text-3xl sm:text-[34px] font-bold text-[#111827] tracking-tight leading-tight">
+                Welcome back.
+              </h1>
+              <p className="mt-1.5 text-base text-[#4b5563]">
+                Sign in to your account.
+              </p>
+            </div>
 
-                <div className="grid grid-cols-3 gap-2">
+            {/* Quick Access */}
+            {DEMO_LOGIN_ENABLED && (
+              <div className="mb-5 sm:mb-6">
+                <label className="block text-sm font-medium text-[#4b5563] mb-2.5">
+                  Quick access
+                </label>
+                <div className="grid grid-cols-3 gap-3">
                   <button
                     type="button"
                     onClick={() => {
                       setEmail(DEMO_CREDENTIALS.superAdmin.email);
                       setPassword(DEMO_CREDENTIALS.superAdmin.password);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-1 text-xs font-semibold transition cursor-pointer ${
+                    className={`w-full py-2.5 px-2 text-center text-sm font-medium rounded-xl border transition-colors cursor-pointer ${
                       email === DEMO_CREDENTIALS.superAdmin.email
-                        ? 'border-indigo-500 bg-indigo-50 text-indigo-700 shadow-2xs'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-slate-100 hover:border-slate-300'
+                        ? 'bg-[#e6f4ea] border-[#0d5c3a] text-[#0d5c3a] font-semibold'
+                        : 'bg-white border-[#d1d5db] text-[#374151] hover:bg-slate-50 hover:border-slate-400'
                     }`}
-                    title="Super Admin: superadmin@gmail.com"
                   >
-                    <span>👑</span>
-                    <span className="truncate">Admin</span>
+                    Admin
                   </button>
-
                   <button
                     type="button"
                     onClick={() => {
                       setEmail(DEMO_CREDENTIALS.client.email);
                       setPassword(DEMO_CREDENTIALS.client.password);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-1 text-xs font-semibold transition cursor-pointer ${
+                    className={`w-full py-2.5 px-2 text-center text-sm font-medium rounded-xl border transition-colors cursor-pointer ${
                       email === DEMO_CREDENTIALS.client.email
-                        ? 'border-emerald-500 bg-emerald-50 text-emerald-700 shadow-2xs'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-emerald-50 hover:border-emerald-300'
+                        ? 'bg-[#e6f4ea] border-[#0d5c3a] text-[#0d5c3a] font-semibold'
+                        : 'bg-white border-[#d1d5db] text-[#374151] hover:bg-slate-50 hover:border-slate-400'
                     }`}
-                    title="HumanForest: humanforest@gmail.com"
                   >
-                    <span>⚡</span>
-                    <span className="truncate">HumanForest</span>
+                    HumanForest
                   </button>
-
                   <button
                     type="button"
                     onClick={() => {
                       setEmail(DEMO_CREDENTIALS.recycle.email);
                       setPassword(DEMO_CREDENTIALS.recycle.password);
                     }}
-                    className={`flex items-center justify-center gap-1.5 rounded-lg border py-2 px-1 text-xs font-semibold transition cursor-pointer ${
+                    className={`w-full py-2.5 px-2 text-center text-sm font-medium rounded-xl border transition-colors cursor-pointer ${
                       email === DEMO_CREDENTIALS.recycle.email
-                        ? 'border-teal-500 bg-teal-50 text-teal-700 shadow-2xs'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-teal-50 hover:border-teal-300'
+                        ? 'bg-[#e6f4ea] border-[#0d5c3a] text-[#0d5c3a] font-semibold'
+                        : 'bg-white border-[#d1d5db] text-[#374151] hover:bg-slate-50 hover:border-slate-400'
                     }`}
-                    title="Recycle Client: recycle@gmail.com"
                   >
-                    <span>♻️</span>
-                    <span className="truncate">Recycle</span>
+                    Recycle
                   </button>
                 </div>
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+            {/* Form */}
+            <form onSubmit={handleSubmit} className="space-y-4">
               <div>
-                <label className={labelClasses}>Email Address</label>
-                <div className="relative">
-                  <svg viewBox="0 0 20 20" fill="currentColor" className={iconClasses}>
-                    <path d="M3 4a2 2 0 00-2 2v1.161l8.441 4.221a1.25 1.25 0 001.118 0L19 7.162V6a2 2 0 00-2-2H3z" />
-                    <path d="M19 8.839l-7.77 3.885a2.75 2.75 0 01-2.46 0L1 8.839V14a2 2 0 002 2h14a2 2 0 002-2V8.839z" />
-                  </svg>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className={inputClasses}
-                    placeholder="Enter your email"
-                    required
-                  />
-                </div>
+                <label className="block text-sm font-medium text-[#4b5563] mb-2">
+                  Email address
+                </label>
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  className="w-full rounded-xl border border-[#d1d5db] bg-white px-3.5 py-2.5 text-sm sm:text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#0d5c3a] focus:outline-none focus:ring-1 focus:ring-[#0d5c3a] transition"
+                />
               </div>
 
               <div>
-                <label className={labelClasses}>Password</label>
+                <label className="block text-sm font-medium text-[#4b5563] mb-2">
+                  Password
+                </label>
                 <div className="relative">
-                  <svg viewBox="0 0 20 20" fill="currentColor" className={iconClasses}>
-                    <path
-                      fillRule="evenodd"
-                      d="M10 1a4.5 4.5 0 00-4.5 4.5V9H5a2 2 0 00-2 2v6a2 2 0 002 2h10a2 2 0 002-2v-6a2 2 0 00-2-2h-.5V5.5A4.5 4.5 0 0010 1zm3 8V5.5a3 3 0 10-6 0V9h6z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
                   <input
                     type={showPassword ? 'text' : 'password'}
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    className={`${inputClasses} pr-10`}
-                    placeholder="Enter your password"
                     required
+                    className="w-full rounded-xl border border-[#d1d5db] bg-white pl-3.5 pr-11 py-2.5 text-sm sm:text-base text-[#111827] placeholder:text-[#9ca3af] focus:border-[#0d5c3a] focus:outline-none focus:ring-1 focus:ring-[#0d5c3a] transition"
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword((v) => !v)}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#6b7280] hover:text-[#374151] transition cursor-pointer"
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
                   >
-                    {showPassword ? (
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-                        <path d="M3.28 2.22a.75.75 0 00-1.06 1.06l14.5 14.5a.75.75 0 101.06-1.06l-1.745-1.745a10.029 10.029 0 003.3-4.38 1.651 1.651 0 000-1.185A10.004 10.004 0 009.999 3a9.956 9.956 0 00-4.744 1.194L3.28 2.22zM7.752 6.69l1.092 1.092a2.5 2.5 0 013.374 3.373l1.091 1.092a4 4 0 00-5.557-5.557z" />
-                        <path d="M10.748 13.93l2.523 2.523a9.987 9.987 0 01-3.27.547c-4.258 0-7.894-2.66-9.337-6.41a1.651 1.651 0 010-1.186A10.007 10.007 0 012.839 6.02L6.07 9.252a4 4 0 004.678 4.678z" />
-                      </svg>
-                    ) : (
-                      <svg viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
-                        <path d="M10 12.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5z" />
-                        <path
-                          fillRule="evenodd"
-                          d="M.664 10.59a1.651 1.651 0 010-1.186A10.004 10.004 0 0110 3c4.257 0 7.893 2.66 9.336 6.41.147.381.146.804 0 1.186A10.004 10.004 0 0110 17c-4.257 0-7.893-2.66-9.336-6.41zM14 10a4 4 0 11-8 0 4 4 0 018 0z"
-                          clipRule="evenodd"
-                        />
-                      </svg>
-                    )}
+                    {showPassword ? <FiEyeOff className="h-5 w-5" /> : <FiEye className="h-5 w-5" />}
                   </button>
                 </div>
               </div>
 
-              {error && <p className="text-sm text-red-600">{error}</p>}
+              {error && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center text-xs font-semibold text-red-600">
+                  {error}
+                </div>
+              )}
 
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className="mt-6 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-[#61b928] to-[#46a127] py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:from-[#6cc531] hover:to-[#4dae2c] disabled:cursor-not-allowed disabled:opacity-50"
+                className="mt-6 w-full rounded-xl bg-[#0d5c3a] py-3.5 text-center text-sm sm:text-base font-semibold text-white shadow-xs hover:bg-[#0a482e] active:bg-[#083a24] disabled:opacity-60 transition cursor-pointer flex items-center justify-center gap-2"
               >
                 {status === 'loading' && (
                   <svg
@@ -212,34 +192,31 @@ function LoginPage() {
                     />
                   </svg>
                 )}
-                {status === 'loading' ? 'Signing in…' : 'Login'}
+                {status === 'loading' ? 'Signing in…' : 'Sign in'}
               </button>
             </form>
 
-            <div className="mt-5 text-center text-sm text-slate-600">
-              Need a Super Admin account?{' '}
+            {/* Create Super Admin */}
+            <div className="mt-6 text-center text-sm text-[#4b5563]">
+              Need an account?{' '}
               <Link
                 to="/register"
-                className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
+                className="font-semibold text-[#0d5c3a] underline hover:text-[#0a482e] transition cursor-pointer"
               >
                 Create Super Admin
               </Link>
             </div>
 
-            <p className="mt-6 text-center text-xs text-slate-400">
-              © {new Date().getFullYear()} Refurbinics. All rights reserved.
-            </p>
-            <p className="mt-1 text-center text-xs text-slate-500">
-              Developed by{' '}
-              <span className="font-bold text-blue-600">Eswincha</span>{' '}
-              <span className="font-bold text-red-600">Technologies</span>
+            {/* Footer Copyright */}
+            <p className="mt-10 sm:mt-12 text-center text-xs text-[#9ca3af]">
+              © {new Date().getFullYear()} Refurbnics
             </p>
           </div>
         </div>
       </div>
 
       {/* =========================================================================
-          MOBILE VIEW (< lg): Retains the modern centered card design requested by user
+          MOBILE VIEW (< lg): Retains original mobile layout with client/staff portal
           ========================================================================= */}
       <div className="flex lg:hidden min-h-screen bg-[#f8fafc] flex-col justify-between py-10 px-4 sm:px-6 relative selection:bg-emerald-500/20 selection:text-emerald-950">
         <div className="w-full max-w-[430px] mx-auto my-auto">
@@ -470,5 +447,3 @@ function LoginPage() {
     </>
   );
 }
-
-export default LoginPage;
