@@ -82,13 +82,14 @@ async function findBatteries(recycleId) {
             last_issue.reason AS issue_reason,
             last_issue.note AS issue_note,
             last_issue.photo_urls AS issue_photos,
-            last_issue.reported_at AS issue_reported_at
+            last_issue.reported_at AS issue_reported_at,
+            COALESCE(last_issue.failed_testing, false) AS issue_failed_testing
      FROM recycle_batteries rb
      JOIN batteries b ON b.id = rb.battery_id
      LEFT JOIN LATERAL (
-       SELECT ir.label AS reason, bi.note, bi.photo_urls, bi.reported_at
+       SELECT COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason, bi.note, bi.photo_urls, bi.reported_at, bi.failed_testing
        FROM battery_issues bi
-       JOIN issue_reasons ir ON ir.id = bi.reason_id
+       LEFT JOIN issue_reasons ir ON ir.id = bi.reason_id
        WHERE bi.battery_id = b.id
        ORDER BY bi.reported_at DESC
        LIMIT 1

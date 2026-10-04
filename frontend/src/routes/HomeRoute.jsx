@@ -37,7 +37,14 @@ function HomeRoute() {
   }
 
   if (user?.role === 'recycle_client') return <RecycleClientDashboardPage />;
-  if (user?.role === 'technician') return <TechnicianHomePage />;
+  const isStaffRole =
+    user?.role === 'technician' ||
+    user?.role === 'supervisor' ||
+    user?.role === 'staff' ||
+    user?.staff_role === 'technician' ||
+    user?.staff_role === 'supervisor';
+
+  if (isStaffRole) return <TechnicianHomePage />;
   return <DashboardPage />;
 }
 

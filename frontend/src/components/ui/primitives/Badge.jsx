@@ -45,7 +45,12 @@ function Badge({ tone = 'neutral', status, children }) {
 // Convenience wrapper for the battery status enum specifically, since it
 // shows up on the Batteries table, the lookup panel, and the Repair form.
 export function StatusBadge({ status, hasPendingParts, isPassedBack }) {
-  if (isPassedBack || hasPendingParts || status === 'passed_to_remove' || status === 'passed_for_part_removal') {
+  const isPendingRemoval =
+    status === 'passed_to_remove' ||
+    status === 'passed_for_part_removal' ||
+    (['in_repair', 'unserviceable'].includes(status) && (isPassedBack || hasPendingParts));
+
+  if (isPendingRemoval) {
     return (
       <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 shadow-2xs dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-400/30"></span>

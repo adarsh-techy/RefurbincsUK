@@ -124,12 +124,14 @@ function getBatteryStageInfo(battery, isTruckPending) {
       return {
         key: 'unserviceable',
         category: 'unserviceable',
-        label: 'Unserviceable',
-        sublabel: status.includes('parts_removed') ? 'QA Test Failed · Parts restocked' : 'Inspection / QA test failed',
+        label: battery?.failed_testing ? 'Unserviceable · Test Failed' : 'Unserviceable',
+        sublabel: battery?.failed_testing
+          ? status.includes('parts_removed') ? 'QA Test Failed · Parts restocked' : 'QA Test Failed · Marked by tester'
+          : status.includes('parts_removed') ? 'Marked by technician · Parts restocked' : 'Marked by technician',
         icon: FiXCircle,
         badgeClass: 'border-rose-300 bg-rose-50 text-rose-900 dark:border-rose-700/60 dark:bg-rose-950/40 dark:text-rose-200',
         dotClass: 'bg-rose-500 ring-2 ring-rose-400/40',
-        stepText: 'Terminated: Unserviceable',
+        stepText: battery?.failed_testing ? 'Terminated: Test Failed' : 'Terminated: Unserviceable',
       };
 
     case 'recycled':
@@ -160,6 +162,65 @@ function getBatteryStageInfo(battery, isTruckPending) {
       };
   }
 }
+
+const STAGE_THEMES = {
+  blue: {
+    active: 'border-blue-500 bg-blue-50/70 ring-2 ring-blue-500/20 dark:border-blue-400 dark:bg-blue-950/40 dark:ring-blue-500/30',
+    hover: 'hover:border-blue-300 hover:bg-blue-50/20 dark:hover:border-blue-800 dark:hover:bg-blue-950/20',
+    iconBg: 'bg-blue-100 text-blue-600 dark:bg-blue-900/60 dark:text-blue-300',
+    badge: 'bg-blue-50/80 border-blue-200/70 text-blue-700 dark:bg-blue-950/60 dark:border-blue-800 dark:text-blue-300',
+    activeBar: 'bg-blue-500 dark:bg-blue-400',
+    textActive: 'text-blue-700 dark:text-blue-300',
+  },
+  amber: {
+    active: 'border-amber-500 bg-amber-50/70 ring-2 ring-amber-500/20 dark:border-amber-400 dark:bg-amber-950/40 dark:ring-amber-500/30',
+    hover: 'hover:border-amber-300 hover:bg-amber-50/20 dark:hover:border-amber-800 dark:hover:bg-amber-950/20',
+    iconBg: 'bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300',
+    badge: 'bg-amber-50/80 border-amber-200/70 text-amber-700 dark:bg-amber-950/60 dark:border-amber-800 dark:text-amber-300',
+    activeBar: 'bg-amber-500 dark:bg-amber-400',
+    textActive: 'text-amber-700 dark:text-amber-300',
+  },
+  orange: {
+    active: 'border-orange-500 bg-orange-50/70 ring-2 ring-orange-500/20 dark:border-orange-400 dark:bg-orange-950/40 dark:ring-orange-500/30',
+    hover: 'hover:border-orange-300 hover:bg-orange-50/20 dark:hover:border-orange-800 dark:hover:bg-orange-950/20',
+    iconBg: 'bg-orange-100 text-orange-600 dark:bg-orange-900/60 dark:text-orange-300',
+    badge: 'bg-orange-50/80 border-orange-200/70 text-orange-700 dark:bg-orange-950/60 dark:border-orange-800 dark:text-orange-300',
+    activeBar: 'bg-orange-500 dark:bg-orange-400',
+    textActive: 'text-orange-700 dark:text-orange-300',
+  },
+  purple: {
+    active: 'border-purple-500 bg-purple-50/70 ring-2 ring-purple-500/20 dark:border-purple-400 dark:bg-purple-950/40 dark:ring-purple-500/30',
+    hover: 'hover:border-purple-300 hover:bg-purple-50/20 dark:hover:border-purple-800 dark:hover:bg-purple-950/20',
+    iconBg: 'bg-purple-100 text-purple-600 dark:bg-purple-900/60 dark:text-purple-300',
+    badge: 'bg-purple-50/80 border-purple-200/70 text-purple-700 dark:bg-purple-950/60 dark:border-purple-800 dark:text-purple-300',
+    activeBar: 'bg-purple-500 dark:bg-purple-400',
+    textActive: 'text-purple-700 dark:text-purple-300',
+  },
+  emerald: {
+    active: 'border-emerald-500 bg-emerald-50/70 ring-2 ring-emerald-500/20 dark:border-emerald-400 dark:bg-emerald-950/40 dark:ring-emerald-500/30',
+    hover: 'hover:border-emerald-300 hover:bg-emerald-50/20 dark:hover:border-emerald-800 dark:hover:bg-emerald-950/20',
+    iconBg: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300',
+    badge: 'bg-emerald-50/80 border-emerald-200/70 text-emerald-700 dark:bg-emerald-950/60 dark:border-emerald-800 dark:text-emerald-300',
+    activeBar: 'bg-emerald-500 dark:bg-emerald-400',
+    textActive: 'text-emerald-700 dark:text-emerald-300',
+  },
+  sky: {
+    active: 'border-sky-500 bg-sky-50/70 ring-2 ring-sky-500/20 dark:border-sky-400 dark:bg-sky-950/40 dark:ring-sky-500/30',
+    hover: 'hover:border-sky-300 hover:bg-sky-50/20 dark:hover:border-sky-800 dark:hover:bg-sky-950/20',
+    iconBg: 'bg-sky-100 text-sky-600 dark:bg-sky-900/60 dark:text-sky-300',
+    badge: 'bg-sky-50/80 border-sky-200/70 text-sky-700 dark:bg-sky-950/60 dark:border-sky-800 dark:text-sky-300',
+    activeBar: 'bg-sky-500 dark:bg-sky-400',
+    textActive: 'text-sky-700 dark:text-sky-300',
+  },
+  rose: {
+    active: 'border-rose-500 bg-rose-50/70 ring-2 ring-rose-500/20 dark:border-rose-400 dark:bg-rose-950/40 dark:ring-rose-500/30',
+    hover: 'hover:border-rose-300 hover:bg-rose-50/20 dark:hover:border-rose-800 dark:hover:bg-rose-950/20',
+    iconBg: 'bg-rose-100 text-rose-600 dark:bg-rose-900/60 dark:text-rose-300',
+    badge: 'bg-rose-50/80 border-rose-200/70 text-rose-700 dark:bg-rose-950/60 dark:border-rose-800 dark:text-rose-300',
+    activeBar: 'bg-rose-500 dark:bg-rose-400',
+    textActive: 'text-rose-700 dark:text-rose-300',
+  },
+};
 
 function TruckIntakeDetailPage() {
   const { id } = useParams();
@@ -192,6 +253,7 @@ function TruckIntakeDetailPage() {
     let completed = 0;
     let returned = 0;
     let unserviceable = 0;
+    let testFailed = 0;
 
     batteries.forEach((b) => {
       const stage = getBatteryStageInfo(b, isPending);
@@ -203,7 +265,10 @@ function TruckIntakeDetailPage() {
       }
       else if (stage.category === 'repaired') completed++;
       else if (stage.category === 'returned') returned++;
-      else if (stage.category === 'unserviceable') unserviceable++;
+      else if (stage.category === 'unserviceable') {
+        unserviceable++;
+        if (b.failed_testing) testFailed++;
+      }
     });
 
     return {
@@ -217,8 +282,86 @@ function TruckIntakeDetailPage() {
       completed,
       returned,
       unserviceable,
+      testFailed,
     };
   }, [batteries, isPending]);
+
+  // Stage Filter Cards Configuration
+  const stageCards = useMemo(() => {
+    return [
+      {
+        id: 'all',
+        label: 'Total on Truck',
+        count: counts.total,
+        badge: 'Units',
+        icon: FiLayers,
+        color: 'blue',
+      },
+      isPending
+        ? {
+            id: 'pending_arrival',
+            label: 'Pending Arrival',
+            count: counts.pending,
+            badge: 'In Transit',
+            icon: FiClock,
+            iconClass: 'animate-spin',
+            color: 'amber',
+          }
+        : {
+            id: 'queued',
+            label: 'In Queue',
+            count: counts.queued,
+            badge: 'Waiting Bench',
+            icon: FiClock,
+            color: 'amber',
+          },
+      ...(counts.passedToRemove > 0
+        ? [
+            {
+              id: 'passed_to_remove',
+              label: 'Parts Removal',
+              count: counts.passedToRemove,
+              badge: 'Rework',
+              icon: FiTool,
+              iconClass: 'animate-pulse',
+              color: 'orange',
+            },
+          ]
+        : []),
+      {
+        id: 'in_progress',
+        label: 'In Progress & QA',
+        count: counts.activeRepair,
+        badge: 'On Bench',
+        icon: FiShield,
+        color: 'purple',
+      },
+      {
+        id: 'completed',
+        label: 'Completed',
+        count: counts.completed,
+        badge: 'Passed QA',
+        icon: FiCheckCircle,
+        color: 'emerald',
+      },
+      {
+        id: 'returned',
+        label: 'Returned',
+        count: counts.returned,
+        badge: 'Dispatched',
+        icon: FiTruck,
+        color: 'sky',
+      },
+      {
+        id: 'unserviceable',
+        label: 'Unserviceable',
+        count: counts.unserviceable,
+        badge: counts.testFailed > 0 ? `${counts.testFailed} Test Failed` : 'Scrap',
+        icon: FiXCircle,
+        color: 'rose',
+      },
+    ];
+  }, [counts, isPending]);
 
   const filteredBatteries = useMemo(() => {
     if (!batteries) return [];
@@ -391,254 +534,102 @@ function TruckIntakeDetailPage() {
         />
       )}
 
-      {/* Clear KPI / Stage Stat Cards in Single Beautiful Line */}
-      <div className="mb-5 grid grid-cols-2 sm:grid-cols-4 lg:grid-flow-col lg:auto-cols-fr gap-2.5">
-        <button
-          type="button"
-          onClick={() => setStatusFilter('all')}
-          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-            statusFilter === 'all'
-              ? 'border-blue-500 bg-gradient-to-br from-blue-100 via-blue-50 to-indigo-50 shadow-md ring-2 ring-blue-500/80 scale-[1.02] dark:border-blue-400 dark:from-blue-900/50 dark:via-blue-950/40 dark:to-surface-900'
-              : 'border-blue-200/80 bg-gradient-to-br from-blue-50/70 via-white to-indigo-50/40 hover:border-blue-300 hover:shadow-xs hover:scale-[1.01] dark:border-blue-900/40 dark:from-blue-950/20 dark:via-surface-900 dark:to-indigo-950/20'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-1.5">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-blue-900 dark:text-blue-300 truncate">
-              Total on Truck
-            </span>
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-blue-600 dark:bg-blue-900/60 dark:text-blue-300">
-              <FiLayers className="h-3 w-3" />
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-blue-950 dark:text-blue-100">
-              {counts.total}
-            </span>
-            <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 opacity-80">
-              Units
-            </span>
-          </div>
-        </button>
+      {/* Clear KPI / Stage Stat Cards */}
+      <div className={`mb-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 ${counts.passedToRemove > 0 ? 'xl:grid-cols-7' : 'xl:grid-cols-6'} gap-2 sm:gap-2.5`}>
+        {stageCards.map((card) => {
+          const isActive = statusFilter === card.id;
+          const theme = STAGE_THEMES[card.color];
+          const Icon = card.icon;
 
-        {isPending ? (
-          <button
-            type="button"
-            onClick={() => setStatusFilter(statusFilter === 'pending_arrival' ? 'all' : 'pending_arrival')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-              statusFilter === 'pending_arrival'
-                ? 'border-amber-500 bg-gradient-to-br from-amber-100 via-amber-50 to-yellow-50 shadow-md ring-2 ring-amber-500/80 scale-[1.02] dark:border-amber-400 dark:from-amber-900/50 dark:via-amber-950/40 dark:to-surface-900'
-                : 'border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-yellow-50/40 hover:border-amber-300 hover:shadow-xs hover:scale-[1.01] dark:border-amber-900/40 dark:from-amber-950/20 dark:via-surface-900 dark:to-yellow-950/20'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-1.5">
-              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-amber-900 dark:text-amber-300 truncate">
-                Pending Arrival
-              </span>
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300">
-                <FiClock className="h-3 w-3 animate-spin" />
-              </span>
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-amber-950 dark:text-amber-100">
-                {counts.pending}
-              </span>
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 opacity-80">
-                In Transit
-              </span>
-            </div>
-          </button>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setStatusFilter(statusFilter === 'queued' ? 'all' : 'queued')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-              statusFilter === 'queued'
-                ? 'border-amber-500 bg-gradient-to-br from-amber-100 via-amber-50 to-yellow-50 shadow-md ring-2 ring-amber-500/80 scale-[1.02] dark:border-amber-400 dark:from-amber-900/50 dark:via-amber-950/40 dark:to-surface-900'
-                : 'border-amber-200/80 bg-gradient-to-br from-amber-50/70 via-white to-yellow-50/40 hover:border-amber-300 hover:shadow-xs hover:scale-[1.01] dark:border-amber-900/40 dark:from-amber-950/20 dark:via-surface-900 dark:to-yellow-950/20'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-1.5">
-              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-amber-900 dark:text-amber-300 truncate">
-                Queued for Repair
-              </span>
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600 dark:bg-amber-900/60 dark:text-amber-300">
-                <FiClock className="h-3 w-3" />
-              </span>
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-amber-950 dark:text-amber-100">
-                {counts.queued}
-              </span>
-              <span className="text-[10px] font-bold text-amber-700 dark:text-amber-400 opacity-80">
-                In Queue
-              </span>
-            </div>
-          </button>
-        )}
+          return (
+            <button
+              key={card.id}
+              type="button"
+              onClick={() => setStatusFilter(isActive && card.id !== 'all' ? 'all' : card.id)}
+              className={`group relative flex flex-col justify-between rounded-xl border p-2.5 sm:p-3 text-left transition-all duration-150 cursor-pointer focus:outline-hidden hover:-translate-y-0.5 ${
+                isActive
+                  ? theme.active
+                  : `border-slate-200/90 bg-white ${theme.hover} hover:shadow-2xs dark:border-surface-700/80 dark:bg-surface-850`
+              }`}
+            >
+              {/* Top Accent Line when active */}
+              {isActive && (
+                <div className={`absolute -top-px left-3 right-3 h-0.5 rounded-full ${theme.activeBar}`} />
+              )}
 
-        {counts.passedToRemove > 0 && (
-          <button
-            type="button"
-            onClick={() => setStatusFilter(statusFilter === 'passed_to_remove' ? 'all' : 'passed_to_remove')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-              statusFilter === 'passed_to_remove'
-                ? 'border-orange-500 bg-gradient-to-br from-orange-100 via-orange-50 to-amber-50 shadow-md ring-2 ring-orange-500/80 scale-[1.02] dark:border-orange-400 dark:from-orange-900/50 dark:via-orange-950/40 dark:to-surface-900'
-                : 'border-orange-200/80 bg-gradient-to-br from-orange-50/70 via-white to-amber-50/40 hover:border-orange-300 hover:shadow-xs hover:scale-[1.01] dark:border-orange-900/40 dark:from-orange-950/20 dark:via-surface-900 dark:to-amber-950/20'
-            }`}
-          >
-            <div className="flex items-center justify-between gap-1.5">
-              <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-orange-900 dark:text-orange-300 truncate">
-                Passed to Remove
-              </span>
-              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-orange-100 text-orange-600 dark:bg-orange-900/60 dark:text-orange-300">
-                <FiTool className="h-3 w-3 animate-pulse" />
-              </span>
-            </div>
-            <div className="mt-1 flex items-baseline justify-between">
-              <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-orange-950 dark:text-orange-100">
-                {counts.passedToRemove}
-              </span>
-              <span className="text-[10px] font-bold text-orange-700 dark:text-orange-400 opacity-80">
-                Rework
-              </span>
-            </div>
-          </button>
-        )}
+              {/* Label + Icon Squircle */}
+              <div className="flex items-center justify-between gap-1">
+                <span
+                  className={`text-[10px] sm:text-[10.5px] font-bold uppercase tracking-wider truncate transition-colors ${
+                    isActive
+                      ? theme.textActive
+                      : 'text-slate-500 dark:text-neutral-400 group-hover:text-slate-800 dark:group-hover:text-neutral-200'
+                  }`}
+                >
+                  {card.label}
+                </span>
+                <span className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md ${theme.iconBg}`}>
+                  <Icon className={`h-3 w-3 ${card.iconClass || ''}`} />
+                </span>
+              </div>
 
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'in_progress' ? 'all' : 'in_progress')}
-          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-            statusFilter === 'in_progress'
-              ? 'border-purple-500 bg-gradient-to-br from-purple-100 via-purple-50 to-indigo-50 shadow-md ring-2 ring-purple-500/80 scale-[1.02] dark:border-purple-400 dark:from-purple-900/50 dark:via-purple-950/40 dark:to-surface-900'
-              : 'border-purple-200/80 bg-gradient-to-br from-purple-50/70 via-white to-indigo-50/40 hover:border-purple-300 hover:shadow-xs hover:scale-[1.01] dark:border-purple-900/40 dark:from-purple-950/20 dark:via-surface-900 dark:to-indigo-950/20'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-1.5">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-purple-900 dark:text-purple-300 truncate">
-              In Progress & QA
-            </span>
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-purple-100 text-purple-600 dark:bg-purple-900/60 dark:text-purple-300">
-              <FiShield className="h-3 w-3" />
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-purple-950 dark:text-purple-100">
-              {counts.activeRepair}
-            </span>
-            <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 opacity-80">
-              On Bench
-            </span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'completed' ? 'all' : 'completed')}
-          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-            statusFilter === 'completed'
-              ? 'border-emerald-500 bg-gradient-to-br from-emerald-100 via-emerald-50 to-teal-50 shadow-md ring-2 ring-emerald-500/80 scale-[1.02] dark:border-emerald-400 dark:from-emerald-900/50 dark:via-emerald-950/40 dark:to-surface-900'
-              : 'border-emerald-200/80 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/40 hover:border-emerald-300 hover:shadow-xs hover:scale-[1.01] dark:border-emerald-900/40 dark:from-emerald-950/20 dark:via-surface-900 dark:to-teal-950/20'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-1.5">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-emerald-900 dark:text-emerald-300 truncate">
-              Repair Completed
-            </span>
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-emerald-100 text-emerald-600 dark:bg-emerald-900/60 dark:text-emerald-300">
-              <FiCheckCircle className="h-3 w-3" />
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-emerald-950 dark:text-emerald-100">
-              {counts.completed}
-            </span>
-            <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 opacity-80">
-              Passed QA
-            </span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'returned' ? 'all' : 'returned')}
-          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-            statusFilter === 'returned'
-              ? 'border-sky-500 bg-gradient-to-br from-sky-100 via-sky-50 to-cyan-50 shadow-md ring-2 ring-sky-500/80 scale-[1.02] dark:border-sky-400 dark:from-sky-900/50 dark:via-sky-950/40 dark:to-surface-900'
-              : 'border-sky-200/80 bg-gradient-to-br from-sky-50/70 via-white to-cyan-50/40 hover:border-sky-300 hover:shadow-xs hover:scale-[1.01] dark:border-sky-900/40 dark:from-sky-950/20 dark:via-surface-900 dark:to-cyan-950/20'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-1.5">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-sky-900 dark:text-sky-300 truncate">
-              Returned to Client
-            </span>
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-sky-100 text-sky-600 dark:bg-sky-900/60 dark:text-sky-300">
-              <FiTruck className="h-3 w-3" />
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-sky-950 dark:text-sky-100">
-              {counts.returned}
-            </span>
-            <span className="text-[10px] font-bold text-sky-700 dark:text-sky-400 opacity-80">
-              Dispatched
-            </span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setStatusFilter(statusFilter === 'unserviceable' ? 'all' : 'unserviceable')}
-          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-2.5 sm:p-3 text-left transition-all duration-200 cursor-pointer focus:outline-hidden ${
-            statusFilter === 'unserviceable'
-              ? 'border-rose-500 bg-gradient-to-br from-rose-100 via-rose-50 to-red-50 shadow-md ring-2 ring-rose-500/80 scale-[1.02] dark:border-rose-400 dark:from-rose-900/50 dark:via-rose-950/40 dark:to-surface-900'
-              : 'border-rose-200/80 bg-gradient-to-br from-rose-50/70 via-white to-red-50/40 hover:border-rose-300 hover:shadow-xs hover:scale-[1.01] dark:border-rose-900/40 dark:from-rose-950/20 dark:via-surface-900 dark:to-red-950/20'
-          }`}
-        >
-          <div className="flex items-center justify-between gap-1.5">
-            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-tight text-rose-900 dark:text-rose-300 truncate">
-              Unserviceable
-            </span>
-            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-lg bg-rose-100 text-rose-600 dark:bg-rose-900/60 dark:text-rose-300">
-              <FiXCircle className="h-3 w-3" />
-            </span>
-          </div>
-          <div className="mt-1 flex items-baseline justify-between">
-            <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-rose-950 dark:text-rose-100">
-              {counts.unserviceable}
-            </span>
-            <span className="text-[10px] font-bold text-rose-700 dark:text-rose-400 opacity-80">
-              Scrap / Failed
-            </span>
-          </div>
-        </button>
+              {/* Metric Row: Count + Subtitle Badge */}
+              <div className="mt-2 flex items-baseline justify-between gap-1">
+                <span className="text-xl sm:text-2xl font-black font-mono tracking-tight text-slate-900 dark:text-neutral-100">
+                  {card.count}
+                </span>
+                <span className={`rounded-md border px-1.5 py-0.5 text-[9.5px] font-bold shrink-0 ${theme.badge}`}>
+                  {card.badge}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
-      <div className="space-y-3.5">
-        {/* Header & Filter Controls Bar */}
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="space-y-3">
+        {/* Table Header: Title, Active Filter Badge & Search/Reset */}
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="text-xs sm:text-sm font-bold text-slate-800 dark:text-neutral-100 uppercase tracking-wider flex items-center gap-2">
-              <span>Batteries from this Shipment</span>
-              <span className="rounded-md bg-slate-200 px-2 py-0.5 text-xs font-black text-slate-700 dark:bg-surface-700 dark:text-neutral-300">
-                {filteredBatteries.length}
-                {filteredBatteries.length !== batteries.length && ` of ${batteries.length}`}
-              </span>
-            </h2>
-            <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h2 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-neutral-100 uppercase tracking-wider flex items-center gap-2">
+                <span>Batteries from this Shipment</span>
+                <span className="rounded-full bg-slate-200/80 px-2.5 py-0.5 text-xs font-black text-slate-800 dark:bg-surface-700 dark:text-neutral-200">
+                  {filteredBatteries.length}
+                  {filteredBatteries.length !== batteries.length && ` of ${batteries.length}`}
+                </span>
+              </h2>
+
+              {statusFilter !== 'all' && (
+                <div className="inline-flex items-center gap-1.5 rounded-full border border-blue-200 bg-blue-50/90 pl-2.5 pr-1.5 py-0.5 text-xs font-semibold text-blue-700 dark:border-blue-800/80 dark:bg-blue-950/60 dark:text-blue-300">
+                  <span>
+                    Filtered: <strong className="font-bold">{stageCards.find((c) => c.id === statusFilter)?.label || statusFilter}</strong>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setStatusFilter('all')}
+                    className="flex h-4 w-4 items-center justify-center rounded-full hover:bg-blue-200/70 text-blue-600 dark:hover:bg-blue-900 dark:text-blue-300 cursor-pointer transition-colors"
+                    title="Clear stage filter"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+            <p className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
               Live status and workshop pipeline stage of each individual battery delivered on truck {intake.truck_number}.
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-2">
             {/* Search Input */}
-            <div className="relative min-w-[220px] flex-1 sm:flex-initial">
+            <div className="relative w-full sm:w-64 md:w-72">
               <input
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Search battery ID, serial, stage…"
-                className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 pl-8 text-xs font-medium text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200 dark:placeholder-neutral-500"
+                className="w-full rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-7 text-xs font-medium text-slate-800 placeholder-slate-400 shadow-2xs transition-all focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200 dark:placeholder-neutral-500"
               />
               <FiSearch className="pointer-events-none absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-neutral-500" />
               {searchQuery && (
@@ -652,109 +643,6 @@ function TruckIntakeDetailPage() {
               )}
             </div>
 
-            {/* Stage Filter Tabs */}
-            <div className="flex flex-wrap items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-surface-800/80">
-              <button
-                type="button"
-                onClick={() => setStatusFilter('all')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  statusFilter === 'all'
-                    ? 'bg-white text-slate-900 shadow-2xs dark:bg-surface-700 dark:text-white'
-                    : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-neutral-200'
-                }`}
-              >
-                All ({counts.total})
-              </button>
-
-              {isPending ? (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('pending_arrival')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'pending_arrival'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-amber-700 dark:text-neutral-400 dark:hover:text-amber-400'
-                  }`}
-                >
-                  Pending Arrival ({counts.pending})
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('queued')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'queued'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-amber-700 dark:text-neutral-400 dark:hover:text-amber-400'
-                  }`}
-                >
-                  In Queue ({counts.queued})
-                </button>
-              )}
-
-              {counts.passedToRemove > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('passed_to_remove')}
-                  className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                    statusFilter === 'passed_to_remove'
-                      ? 'bg-amber-600 text-white shadow-2xs'
-                      : 'text-slate-600 hover:text-amber-700 dark:text-neutral-400 dark:hover:text-amber-400'
-                  }`}
-                >
-                  Passed to Remove ({counts.passedToRemove})
-                </button>
-              )}
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('in_progress')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  statusFilter === 'in_progress'
-                    ? 'bg-blue-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-blue-700 dark:text-neutral-400 dark:hover:text-blue-400'
-                }`}
-              >
-                In Progress & QA ({counts.activeRepair})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('completed')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  statusFilter === 'completed'
-                    ? 'bg-emerald-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-emerald-700 dark:text-neutral-400 dark:hover:text-emerald-400'
-                }`}
-              >
-                Completed ({counts.completed})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('returned')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  statusFilter === 'returned'
-                    ? 'bg-sky-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-sky-700 dark:text-neutral-400 dark:hover:text-sky-400'
-                }`}
-              >
-                Returned ({counts.returned})
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setStatusFilter('unserviceable')}
-                className={`rounded-lg px-2.5 py-1 text-xs font-bold transition-all cursor-pointer ${
-                  statusFilter === 'unserviceable'
-                    ? 'bg-rose-600 text-white shadow-2xs'
-                    : 'text-slate-600 hover:text-rose-700 dark:text-neutral-400 dark:hover:text-rose-400'
-                }`}
-              >
-                Unserviceable ({counts.unserviceable})
-              </button>
-            </div>
-
             {(statusFilter !== 'all' || searchQuery) && (
               <button
                 type="button"
@@ -762,7 +650,7 @@ function TruckIntakeDetailPage() {
                   setStatusFilter('all');
                   setSearchQuery('');
                 }}
-                className="rounded-xl border border-slate-300 bg-white px-2.5 py-1 text-xs font-bold text-slate-600 shadow-2xs hover:bg-slate-50 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 cursor-pointer"
+                className="shrink-0 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-600 shadow-2xs hover:bg-slate-50 hover:text-slate-900 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 cursor-pointer transition-colors"
               >
                 Reset
               </button>
@@ -823,6 +711,7 @@ function TruckIntakeDetailPage() {
                 render: (b) => {
                   const stage = getBatteryStageInfo(b, isPending);
                   const Icon = stage.icon;
+                  const isUnserviceable = stage.category === 'unserviceable';
                   return (
                     <div className="py-1">
                       <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${stage.badgeClass}`}>
@@ -830,6 +719,11 @@ function TruckIntakeDetailPage() {
                         <Icon className="h-3.5 w-3.5 shrink-0" />
                         <span>{stage.label}</span>
                       </div>
+                      {isUnserviceable && (
+                        <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                          <span>{stage.sublabel || 'QA Test Failed'}</span>
+                        </div>
+                      )}
                     </div>
                   );
                 },

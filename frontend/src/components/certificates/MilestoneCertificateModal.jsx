@@ -25,7 +25,7 @@ function MilestoneCertificateModal({ certificate, clientName, onClose, onAcknowl
     <Modal
       title="🎉 Sustainability Milestone Reached!"
       description={`Congratulations on reaching the ${count.toLocaleString()} Batteries Serviced milestone!`}
-      size="3xl"
+      size="5xl"
       onClose={handleAcknowledgeAndClose}
     >
       <div className="space-y-4">

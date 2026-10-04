@@ -1943,16 +1943,14 @@ function ClientDashboardPage() {
       {selectedPreviewCert && (
         <Modal
           title={selectedPreviewCert.title || 'Official Milestone ESG Certificate'}
-          size="xl"
+          size="5xl"
           onClose={() => setSelectedPreviewCert(null)}
         >
-          <div className="max-h-[82vh] overflow-y-auto pr-1">
-            <CertificateView
-              certificate={selectedPreviewCert}
-              clientName={client?.name}
-              showActions={true}
-            />
-          </div>
+          <CertificateView
+            certificate={selectedPreviewCert}
+            clientName={client?.name}
+            showActions={true}
+          />
         </Modal>
       )}
     </div>

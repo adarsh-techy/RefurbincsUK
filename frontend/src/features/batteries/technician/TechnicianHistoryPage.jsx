@@ -662,12 +662,12 @@ function TechnicianHistoryPage() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-5">
+        <div className="flex flex-col gap-7 sm:gap-8">
           {dateGroups.map((group) => (
-            <div key={group.dateKey} className="flex flex-col gap-2.5">
+            <div key={group.dateKey} className="flex flex-col gap-3.5">
               {/* Date Header Tag */}
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-2">
+              <div className="flex items-center justify-between px-1.5 py-0.5">
+                <div className="flex items-center gap-2.5">
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${
                       group.isToday
@@ -687,13 +687,13 @@ function TechnicianHistoryPage() {
                     {group.label}
                   </span>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-400">
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-400 shadow-2xs">
                   {group.data.length} unit{group.data.length === 1 ? '' : 's'}
                 </span>
               </div>
 
               {/* Cards Grid / Stack */}
-              <div className="flex flex-col gap-2.5">
+              <div className="flex flex-col gap-3.5 sm:gap-4">
                 {group.data.map((item) => {
                   if (item.kind === 'test') {
                     // SUPERVISOR TEST CARD
@@ -702,7 +702,7 @@ function TechnicianHistoryPage() {
                       <Link
                         key={`test-${item.id}`}
                         to={`/batteries/${item.battery_code}`}
-                        className={`group relative overflow-hidden rounded-2xl border bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-surface-900 ${
+                        className={`group relative overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-surface-900 ${
                           isPassedBack
                             ? 'border-amber-200/90 hover:border-amber-400 dark:border-amber-900/40'
                             : 'border-emerald-200/90 hover:border-emerald-400 dark:border-emerald-900/40'
@@ -716,10 +716,10 @@ function TechnicianHistoryPage() {
                         />
 
                         {/* Top row: Battery Code + Status Badge + Time */}
-                        <div className="mb-2.5 flex items-center justify-between gap-2 pl-2">
-                          <div className="flex items-center gap-2">
+                        <div className="flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-slate-100 dark:border-white/5">
+                          <div className="flex items-center gap-2.5">
                             <span
-                              className={`flex h-7 w-7 items-center justify-center rounded-xl text-xs font-black ${
+                              className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-black ${
                                 isPassedBack
                                   ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
                                   : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
@@ -727,7 +727,7 @@ function TechnicianHistoryPage() {
                             >
                               {isPassedBack ? '↩' : '✓'}
                             </span>
-                            <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
+                            <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-violet-600 dark:text-white dark:group-hover:text-violet-400">
                               {item.battery_code}
                             </span>
                             {isPassedBack ? (
@@ -738,7 +738,7 @@ function TechnicianHistoryPage() {
                               <StatusBadge status="repaired" />
                             )}
                           </div>
-                          <span className="text-xs font-semibold text-slate-400">
+                          <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
                             {item.tested_at
                               ? new Date(item.tested_at).toLocaleTimeString([], {
                                   hour: '2-digit',
@@ -748,54 +748,26 @@ function TechnicianHistoryPage() {
                           </span>
                         </div>
 
-                        {/* Details content box */}
-                        <div
-                          className={`rounded-xl p-3 pl-3.5 border ${
-                            isPassedBack
-                              ? 'border-amber-200/60 bg-amber-50/60 dark:border-amber-950 dark:bg-amber-950/20'
-                              : 'border-emerald-100 bg-emerald-50/50 dark:border-emerald-950 dark:bg-emerald-950/20'
-                          }`}
-                        >
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-700 dark:text-neutral-200">
-                              {isPassedBack ? 'Rework Reason:' : 'QA Services Verified:'}
-                            </span>
-                            {item.service_name ? (
-                              item.service_name.split(',').map((srv, sIdx) => (
-                                <span
-                                  key={sIdx}
-                                  className="rounded-md border border-emerald-200/60 bg-white/80 px-2 py-0.5 text-[11px] font-bold text-emerald-800 dark:border-white/10 dark:bg-surface-900 dark:text-emerald-300"
-                                >
-                                  ⚡ {srv.trim()}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs font-semibold text-slate-600 dark:text-neutral-300">
-                                {isPassedBack ? 'Re-repair required' : 'Full QA sign-off'}
-                              </span>
-                            )}
+                        {/* Optional notes if any */}
+                        {item.notes && (
+                          <div className="mt-3 pl-2 sm:pl-3 text-xs text-slate-600 dark:text-neutral-300 line-clamp-2">
+                            <span className="font-semibold text-slate-700 dark:text-neutral-200">Note:</span> {item.notes}
                           </div>
-
-                          {item.notes && (
-                            <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-neutral-300 border-t border-slate-200/40 pt-1.5 dark:border-white/5">
-                              <span className="font-semibold text-slate-800 dark:text-white">Note:</span> {item.notes}
-                            </p>
-                          )}
-                        </div>
+                        )}
 
                         {/* Footer row: duration & action link */}
-                        <div className="mt-3 flex items-center justify-between text-xs pl-2">
+                        <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
                           {typeof item.testing_duration_seconds === 'number' && item.testing_duration_seconds > 0 ? (
                             <span className="inline-flex items-center gap-1 rounded-md border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950 dark:text-violet-300">
                               ⏱️ Testing Time: {formatDuration(item.testing_duration_seconds)}
                             </span>
                           ) : (
                             <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                              Testing Sign-off
+                              {isPassedBack ? 'Rework Pass-Back' : 'QA Testing Sign-off'}
                             </span>
                           )}
-                          <span className="flex items-center gap-1 font-bold text-slate-400 group-hover:text-blue-600 dark:text-neutral-500 dark:group-hover:text-blue-400">
-                            <span>View Battery</span>
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-violet-600 dark:text-neutral-500 dark:group-hover:text-violet-400">
+                            <span>View Battery Details</span>
                             <span className="transition-transform group-hover:translate-x-0.5">›</span>
                           </span>
                         </div>
@@ -809,16 +781,16 @@ function TechnicianHistoryPage() {
                       <Link
                         key={`repair-${item.id}`}
                         to={`/batteries/${item.battery_code}`}
-                        className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+                        className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
                       >
                         {/* Left colored accent bar */}
                         <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-blue-500" />
 
                         {/* Top row */}
-                        <div className="mb-2.5 flex items-center justify-between gap-2 pl-2">
-                          <div className="flex items-center gap-2">
-                            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                        <div className="flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-slate-100 dark:border-white/5">
+                          <div className="flex items-center gap-2.5">
+                            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
                                 <path fillRule="evenodd" d="M14.5 10a4.5 4.5 0 0 0 4.284-5.882c-.105-.324-.51-.391-.752-.15L15.34 6.66a.454.454 0 0 1-.493.11 3.01 3.01 0 0 1-1.618-1.616.455.455 0 0 1 .11-.494l2.694-2.692c.24-.241.174-.647-.15-.752a4.5 4.5 0 0 0-5.873 4.575c.055.873-.128 1.808-.8 2.368l-7.23 6.024a2.724 2.724 0 1 0 3.837 3.837l6.024-7.23c.56-.672 1.495-.855 2.368-.8.096.007.193.01.291.01ZM5 16a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clipRule="evenodd" />
                               </svg>
                             </span>
@@ -827,7 +799,7 @@ function TechnicianHistoryPage() {
                             </span>
                             <StatusBadge status={repairBadgeStatus(item)} />
                           </div>
-                          <span className="text-xs font-semibold text-slate-400">
+                          <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
                             {item.repaired_at
                               ? new Date(item.repaired_at).toLocaleTimeString([], {
                                   hour: '2-digit',
@@ -837,35 +809,15 @@ function TechnicianHistoryPage() {
                           </span>
                         </div>
 
-                        {/* Parts & notes box */}
-                        <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 pl-3.5 dark:border-white/5 dark:bg-surface-950">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="text-xs font-bold text-slate-700 dark:text-neutral-200">
-                              Parts Replaced:
-                            </span>
-                            {item.part_name ? (
-                              item.part_name.split(',').map((part, pIdx) => (
-                                <span
-                                  key={pIdx}
-                                  className="rounded-md border border-blue-200/60 bg-blue-50/60 px-2 py-0.5 text-[11px] font-bold text-blue-800 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-300"
-                                >
-                                  🔧 {part.trim()}
-                                </span>
-                              ))
-                            ) : (
-                              <span className="text-xs font-medium text-slate-500">Service & Inspection</span>
-                            )}
+                        {/* Optional notes if any */}
+                        {item.notes && (
+                          <div className="mt-3 pl-2 sm:pl-3 text-xs text-slate-600 dark:text-neutral-300 line-clamp-2">
+                            <span className="font-semibold text-slate-700 dark:text-neutral-200">Note:</span> {item.notes}
                           </div>
-
-                          {item.notes && (
-                            <p className="mt-2 text-xs leading-relaxed text-slate-600 dark:text-neutral-300 border-t border-slate-200/50 pt-1.5 dark:border-white/5">
-                              <span className="font-semibold text-slate-800 dark:text-white">Note:</span> {item.notes}
-                            </p>
-                          )}
-                        </div>
+                        )}
 
                         {/* Footer row */}
-                        <div className="mt-3 flex items-center justify-between text-xs pl-2">
+                        <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
                           {typeof item.duration_seconds === 'number' && item.duration_seconds > 0 ? (
                             <span className="inline-flex items-center gap-1 rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950 dark:text-blue-300">
                               ⏱️ Repair Time: {formatDuration(item.duration_seconds)}
@@ -875,8 +827,8 @@ function TechnicianHistoryPage() {
                               Completed Repair
                             </span>
                           )}
-                          <span className="flex items-center gap-1 font-bold text-slate-400 group-hover:text-blue-600 dark:text-neutral-500 dark:group-hover:text-blue-400">
-                            <span>View Battery</span>
+                          <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-blue-600 dark:text-neutral-500 dark:group-hover:text-blue-400">
+                            <span>View Battery Details</span>
                             <span className="transition-transform group-hover:translate-x-0.5">›</span>
                           </span>
                         </div>
@@ -888,14 +840,14 @@ function TechnicianHistoryPage() {
                   return (
                     <div
                       key={`issue-${item.id}`}
-                      className="group relative overflow-hidden rounded-2xl border border-rose-200/90 bg-white p-4 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md dark:border-rose-900/40 dark:bg-surface-900"
+                      className="group relative overflow-hidden rounded-2xl border border-rose-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md dark:border-rose-900/40 dark:bg-surface-900"
                     >
                       {/* Left colored accent bar */}
                       <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-rose-500" />
 
                       {/* Top row */}
-                      <div className="mb-2.5 flex items-center justify-between gap-2 pl-2">
-                        <div className="flex items-center gap-2">
+                      <div className="mb-3 flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-rose-100/80 dark:border-rose-900/30">
+                        <div className="flex items-center gap-2.5">
                           <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400 font-bold">
                             ⚠
                           </span>
@@ -907,7 +859,7 @@ function TechnicianHistoryPage() {
                           </Link>
                           <StatusBadge status={item.battery_status || 'unserviceable'} />
                         </div>
-                        <span className="text-xs font-semibold text-slate-400">
+                        <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
                           {item.reported_at
                             ? new Date(item.reported_at).toLocaleTimeString([], {
                                 hour: '2-digit',
@@ -918,8 +870,8 @@ function TechnicianHistoryPage() {
                       </div>
 
                       {/* Issue description box */}
-                      <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3 pl-3.5 dark:border-rose-950 dark:bg-rose-950/20">
-                        <div className="flex items-center gap-1.5">
+                      <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3.5 pl-4 dark:border-rose-950 dark:bg-rose-950/20">
+                        <div className="flex items-center gap-2">
                           <span className="text-xs font-bold text-rose-900 dark:text-rose-300">
                             Unserviceable Reason:
                           </span>
@@ -929,13 +881,13 @@ function TechnicianHistoryPage() {
                         </div>
 
                         {item.note && (
-                          <p className="mt-2 text-xs leading-relaxed text-rose-800 dark:text-rose-300 border-t border-rose-200/50 pt-1.5 dark:border-rose-900/40">
+                          <p className="mt-2.5 text-xs leading-relaxed text-rose-800 dark:text-rose-300 border-t border-rose-200/50 pt-2 dark:border-rose-900/40">
                             <span className="font-semibold">Note:</span> {item.note}
                           </p>
                         )}
 
                         {item.photo_urls && item.photo_urls.length > 0 && (
-                          <div className="mt-2.5 flex items-center gap-2 border-t border-rose-200/50 pt-2 dark:border-rose-900/40">
+                          <div className="mt-3 flex items-center gap-2.5 border-t border-rose-200/50 pt-2.5 dark:border-rose-900/40">
                             {item.photo_urls.map((photo, pIdx) => (
                               <button
                                 key={pIdx}
@@ -965,7 +917,7 @@ function TechnicianHistoryPage() {
                       </div>
 
                       {/* Footer row */}
-                      <div className="mt-3 flex items-center justify-between text-xs pl-2">
+                      <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-rose-100/80 dark:border-rose-900/30">
                         <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
                           Marked Unserviceable
                         </span>

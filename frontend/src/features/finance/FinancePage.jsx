@@ -12,6 +12,9 @@ import {
   FiX,
   FiBarChart2,
   FiClock,
+  FiRotateCcw,
+  FiCpu,
+  FiTarget,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import StatCard from '../../components/ui/primitives/StatCard';
@@ -208,31 +211,54 @@ function FinancePage() {
 
       {!loading && !error && (
         <>
-          {/* KPI Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {/* KPI Stat Cards (6 Balanced Pillars) */}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
             <StatCard
+              icon={<FiTrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
               label="Total Revenue"
               value={formatMoney(totals.totalRevenue)}
               tone="good"
-              sub={`All repairs, services & recycling`}
+              sub="All services & recycling"
             />
             <StatCard
-              label="Repair Cost"
+              icon={<FiTool className="h-3.5 w-3.5 text-slate-600 dark:text-neutral-400" />}
+              label="Parts Service"
               value={formatMoney(totals.repairRevenue)}
               tone="neutral"
-              sub={`Parts: ${formatMoney(totals.partsRevenue)} · Labor: ${formatMoney(totals.laborRevenue)}`}
+              sub="Fitting & part charges"
             />
             <StatCard
-              label="Service & Intake Fees"
+              icon={<FiLayers className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
+              label="Service & Fees"
               value={formatMoney(totals.servicesRevenue)}
               tone="info"
-              sub={`${totals.servicesCount || 0} service / intake fee items`}
+              sub={`${totals.servicesCount || 0} diagnostic & tests`}
             />
             <StatCard
-              label="Recycle Revenue"
+              icon={<FiRotateCcw className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
+              label="Recycle Scrap"
               value={formatMoney(totals.recycleRevenue)}
               tone="warning"
-              sub="Scrap and battery recycling revenue"
+              sub="End-of-life battery payout"
+            />
+            <StatCard
+              icon={<FiCpu className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+              label="Units Serviced"
+              value={`${totals.batteriesCount || 0} units`}
+              tone="good"
+              sub="Unique batteries handled"
+            />
+            <StatCard
+              icon={<FiTarget className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />}
+              label="Avg. per Unit"
+              value={formatMoney(
+                totals.avgRevenuePerBattery ||
+                  (totals.batteriesCount > 0
+                    ? (totals.repairRevenue + totals.servicesRevenue) / totals.batteriesCount
+                    : 0)
+              )}
+              tone="purple"
+              sub="Average revenue per battery"
             />
           </div>
 

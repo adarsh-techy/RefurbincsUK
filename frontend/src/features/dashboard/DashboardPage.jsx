@@ -40,14 +40,6 @@ const QUICK_ACTIONS = [
     badge: 'Logistics',
   },
   {
-    to: '/repairs',
-    label: 'Log Workshop Repair',
-    desc: 'Record diagnostic & replacement',
-    icon: FiTool,
-    permission: 'repairs',
-    badge: 'Workshop',
-  },
-  {
     to: '/parts',
     label: 'Parts & Stock Inventory',
     desc: 'Manage quantities & restock',
@@ -449,12 +441,6 @@ function DashboardPage() {
                 <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-slate-300">
                   {todaysRepairs.length} logged unit{todaysRepairs.length === 1 ? '' : 's'}
                 </span>
-                <Link
-                  to="/repairs"
-                  className="rounded-xl bg-blue-50 px-3 py-1 text-xs font-bold text-blue-600 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50"
-                >
-                  All Repairs →
-                </Link>
               </div>
             </div>
 

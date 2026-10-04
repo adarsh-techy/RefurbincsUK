@@ -165,16 +165,20 @@ async function findRepairs(staffId) {
          MIN(r.notes) AS notes,
          MIN(r.repaired_at) AS repaired_at,
          MIN(r.duration_seconds) AS duration_seconds,
-         bool_and(r.removed_at IS NOT NULL) AS parts_removed
+         bool_and(r.removed_at IS NOT NULL) AS parts_removed,
+         MAX(r.removed_at) AS removed_at,
+         bool_or(r.removed_by_staff_id = $1) AS removed_by_me,
+         bool_or(r.staff_id = $1) AS repaired_by_me
        FROM repairs r
        JOIN batteries b ON b.id = r.battery_id
        JOIN parts p ON p.id = r.part_id
-       WHERE r.staff_id = $1
+       WHERE r.staff_id = $1 OR r.removed_by_staff_id = $1
        GROUP BY r.batch_id, r.battery_id, b.battery_code, b.status
      )
      SELECT
        m.id, m.repair_ids, m.batch_id, m.battery_code, m.battery_status,
-       m.part_name, m.price, m.labor_charge, m.notes, m.repaired_at, m.duration_seconds, m.parts_removed,
+       m.part_name, m.price, m.labor_charge, m.notes, m.repaired_at, m.duration_seconds,
+       m.parts_removed, m.removed_at, m.removed_by_me, m.repaired_by_me,
        CASE
          WHEN m.parts_removed THEN 'failed'
          WHEN EXISTS (
@@ -193,7 +197,7 @@ async function findRepairs(staffId) {
          ELSE 'active'
        END AS outcome
      FROM mine m
-     ORDER BY m.repaired_at DESC`,
+     ORDER BY COALESCE(m.removed_at, m.repaired_at) DESC`,
     [staffId]
   );
   return rows;

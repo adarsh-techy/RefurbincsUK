@@ -116,8 +116,15 @@ function DashboardLayout() {
     );
   }
 
-  // Technicians work mostly from a phone scanning batteries
-  if (user?.role === 'technician') {
+  // Technicians, staff, and supervisors in the workshop
+  const isWorkshopStaff =
+    user?.role === 'technician' ||
+    user?.role === 'supervisor' ||
+    user?.role === 'staff' ||
+    user?.staff_role === 'technician' ||
+    user?.staff_role === 'supervisor';
+
+  if (isWorkshopStaff) {
     return (
       <div
         className="flex min-h-screen flex-col overflow-x-hidden transition-colors"

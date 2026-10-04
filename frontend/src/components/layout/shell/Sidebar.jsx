@@ -235,36 +235,36 @@ const CLIENT_NAV_GROUPS = [
     heading: 'Overview',
     links: [
       { to: '/', label: 'Dashboard', icon: Icons.dashboard, end: true, clientPermission: 'client_dashboard' },
-      { to: '/my/batteries/all', label: 'Fleet Batteries', icon: Icons.battery, clientPermission: 'client_all_batteries' },
-      { to: '/my/history', label: 'History & Activity', icon: Icons.history },
+      { to: '/my/batteries/all', label: 'Fleet Inventory', icon: Icons.battery, clientPermission: 'client_all_batteries' },
+      { to: '/my/history', label: 'Activity History', icon: Icons.history },
     ],
   },
   {
     heading: 'Repair Pipeline',
     links: [
-      { to: '/my/batteries/packed', label: 'Stage 1: Packed', icon: Icons.stage1, clientPermission: 'client_packed' },
-      { to: '/my/batteries/received', label: 'Stage 3: Received', icon: Icons.stage3, clientPermission: 'client_received' },
+      { to: '/my/batteries/packed', label: 'Stage 1: Packed for Pickup', icon: Icons.stage1, clientPermission: 'client_packed' },
+      { to: '/my/batteries/received', label: 'Stage 3: Received Back', icon: Icons.stage3, clientPermission: 'client_received' },
     ],
   },
   {
     heading: 'Fleet Tools',
     links: [
-      { to: '/my/battery-sorting', label: 'Battery Sorting', icon: Icons.sorting, clientPermission: 'client_battery_sorting' },
+      { to: '/my/battery-sorting', label: 'Battery QR Scanner', icon: Icons.sorting, clientPermission: 'client_battery_sorting' },
     ],
   },
   {
     heading: 'Billing & Impact',
     links: [
       { to: '/my/invoices', label: 'Invoices', icon: Icons.invoice, clientPermission: 'client_invoices' },
-      { to: '/my/transactions', label: 'Transactions', icon: Icons.finance, clientPermission: 'client_transactions' },
-      { to: '/my/certificates', label: 'Milestones & Impact', icon: Icons.certificates },
+      { to: '/my/transactions', label: 'Billing Transactions', icon: Icons.finance, clientPermission: 'client_transactions' },
+      { to: '/my/certificates', label: 'Impact Certificates', icon: Icons.certificates },
     ],
   },
   {
     heading: 'Support & Settings',
     links: [
       { to: '/my/support', label: 'Support & Helpdesk', icon: Icons.support, clientPermission: 'client_support' },
-      { to: '/my/notifications', label: 'System Alerts', icon: Icons.notifications, clientPermission: 'client_notifications' },
+      { to: '/my/notifications', label: 'Notifications', icon: Icons.notifications, clientPermission: 'client_notifications' },
       { to: '/my/profile', label: 'Account Profile', icon: Icons.profile },
     ],
   },
@@ -275,7 +275,7 @@ const RECYCLE_CLIENT_NAV_GROUPS = [
     heading: 'Overview',
     links: [
       { to: '/', label: 'Dashboard', icon: Icons.dashboard, end: true },
-      { to: '/my/support', label: 'Support Chat', icon: Icons.support },
+      { to: '/my/support', label: 'Support Helpdesk', icon: Icons.support },
     ],
   },
   {
@@ -306,44 +306,48 @@ const NAV_GROUPS = [
     links: [
       { to: '/truck-intakes', label: 'Truck Intake', icon: Icons.intake, permission: 'truck_intakes' },
       { to: '/batteries', label: 'Battery Fleet', icon: Icons.battery, end: true },
-      { to: '/batteries-qr-code', label: 'QR Codes', icon: Icons.qrcode },
-      { to: '/repairs', label: 'Repairs', icon: Icons.repairs, permission: 'repairs' },
+      { to: '/batteries-qr-code', label: 'Print QR Codes', icon: Icons.qrcode },
       { to: '/returns', label: 'Returns Dispatch', icon: Icons.returns, permission: 'returns' },
     ],
   },
   {
-    heading: 'Workshop & Services',
+    heading: 'Workshop & Inventory',
     links: [
       { to: '/parts', label: 'Parts & Inventory', icon: Icons.inventory, permission: 'parts' },
-      { to: '/services', label: 'Services & Rates', icon: Icons.services, permission: 'services' },
-      { to: '/issue-reasons', label: 'Issue Reasons', icon: Icons.issues, permission: 'issue_reasons' },
+      { to: '/services', label: 'Services & Pricing', icon: Icons.services, permission: 'services' },
+      { to: '/issue-reasons', label: 'Fault & Issue Reasons', icon: Icons.issues, permission: 'issue_reasons' },
     ],
   },
   {
-    heading: 'Recycling',
+    heading: 'Recycling & Scrap',
     links: [
-      { to: '/batteries/unserviceable', label: 'Unserviceable Batteries', icon: Icons.unserviceable },
+      { to: '/batteries/unserviceable', label: 'Unserviceable Units', icon: Icons.unserviceable },
       { to: '/batteries/recycled', label: 'Recycled Batteries', icon: Icons.recycle },
-      { to: '/recycle', label: 'Recycle Shipments', icon: Icons.intake, permission: 'recycle' },
+      { to: '/recycle', label: 'Recycling Shipments', icon: Icons.intake, permission: 'recycle' },
     ],
   },
   {
-    heading: 'Clients & Staff',
+    heading: 'Clients & Team',
     links: [
       { to: '/clients', label: 'Fleet Clients', icon: Icons.clients, permission: 'clients' },
       { to: '/recycle-clients', label: 'Recycling Partners', icon: Icons.clients, permission: 'clients' },
-      { to: '/staff', label: 'Staff Directory', icon: Icons.staff, permission: 'staff' },
+      { to: '/staff', label: 'Staff & Technicians', icon: Icons.staff, permission: 'staff' },
     ],
   },
   {
-    heading: 'Administration',
+    heading: 'Billing & Impact',
     links: [
-      { to: '/invoices', label: 'Invoices', icon: Icons.invoice, superAdminOnly: true },
-      { to: '/finance', label: 'Finance', icon: Icons.finance, superAdminOnly: true },
-      { to: '/ratings', label: 'Ratings & Reviews', icon: Icons.ratings },
-      { to: '/certificates', label: 'Certificates & Impact', icon: Icons.certificates },
+      { to: '/invoices', label: 'Client Invoices', icon: Icons.invoice, superAdminOnly: true },
+      { to: '/finance', label: 'Financial Reports', icon: Icons.finance, superAdminOnly: true },
+      { to: '/certificates', label: 'Impact Certificates', icon: Icons.certificates },
+      { to: '/ratings', label: 'Customer Reviews', icon: Icons.ratings },
+    ],
+  },
+  {
+    heading: 'System & Security',
+    links: [
       { to: '/users', label: 'User Accounts', icon: Icons.users, superAdminOnly: true },
-      { to: '/audit-logs', label: 'Audit Log', icon: Icons.audit, permission: 'audit_logs' },
+      { to: '/audit-logs', label: 'Activity Audit Log', icon: Icons.audit, permission: 'audit_logs' },
       { to: '/trash', label: 'Trash Bin', icon: Icons.trash, adminOnly: true },
     ],
   },
@@ -401,8 +405,8 @@ function SidebarNav({ visibleGroups, user, onLinkClick, onLogout, customTheme })
           <div key={group.heading || `group-${i}`}>
             {group.heading && (
               <p
-                className={`mb-2 px-3 text-xs font-bold uppercase tracking-wider ${
-                  isAccentBg ? 'text-white/80' : 'text-slate-400 dark:text-slate-400'
+                className={`mb-2 px-3 text-[11px] font-extrabold uppercase tracking-wider ${
+                  isAccentBg ? 'text-white/80' : 'text-slate-400 dark:text-neutral-500'
                 }`}
               >
                 {group.heading}
@@ -425,14 +429,14 @@ function SidebarNav({ visibleGroups, user, onLinkClick, onLogout, customTheme })
                         : {}
                   }
                   className={({ isActive }) =>
-                    `group relative flex items-center rounded-xl px-4 py-2.5 text-sm font-semibold transition-all ${
+                    `group relative flex items-center rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
                       isAccentBg
                         ? isActive
                           ? 'text-white shadow-xs font-bold'
                           : 'text-white/85 hover:bg-white/10 hover:text-white'
                         : isActive
                           ? 'text-slate-900 dark:text-white shadow-2xs font-bold'
-                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-200 dark:hover:bg-white/5 dark:hover:text-white'
+                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/5 dark:hover:text-white'
                     }`
                   }
                 >

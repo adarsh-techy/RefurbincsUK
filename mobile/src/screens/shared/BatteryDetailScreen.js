@@ -50,13 +50,17 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   const steps = isUnserviceableFlow ? UNSERVICEABLE_STEPS : PROCESS_STEPS;
   const stepIndex = isUnserviceableFlow ? UNSERVICEABLE_STATUS_STEP_INDEX : STATUS_STEP_INDEX;
 
-  const threshold = isOngoing ? stepIndex[batteryStatus] ?? 0 : steps.length - 1;
+  const currentStep = isOngoing ? stepIndex[batteryStatus] ?? 0 : steps.length - 1;
 
   return (
     <View className="flex-row items-center justify-between py-2">
       {steps.map((label, i) => {
-        const isDone = i <= threshold;
-        const isCurrent = i === threshold + 1;
+        const isDone = isOngoing
+          ? batteryStatus === 'repaired' || batteryStatus === 'returned'
+            ? i <= currentStep
+            : i < currentStep
+          : true;
+        const isCurrent = isOngoing && i === currentStep && !isDone;
         const isDanger = isUnserviceableFlow && i >= 2 && isDone;
 
         return (
@@ -111,17 +115,21 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   );
 }
 
-function buildEvents(visits = [], history = [], returns = [], issues = [], services = []) {
+function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], battery = null) {
   const events = [];
 
   visits.forEach((v) => {
     events.push({
       key: `intake-${v.visit_id || v.id}`,
       type: 'intake',
-      label: 'Intake Received',
+      label: 'Intake Received at Workshop',
       icon: 'truck',
       date: v.intake_at,
       primary: `Truck ${v.truck_number || '—'} · Driver ${v.driver_name || '—'}`,
+      truckNumber: v.truck_number,
+      driverName: v.driver_name,
+      isVerified: v.status === 'verified' || !!v.verified_at,
+      notes: v.verified_at ? 'Verified arrival at workshop' : 'Intake arrival logged',
     });
   });
 
@@ -132,10 +140,13 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
     events.push({
       key: `repair-${h.id}`,
       type: 'repair',
-      label: isRemoved ? 'Part Fitted (Removed)' : 'Repair Logged',
+      label: isRemoved ? 'Part Fitted (Later Removed)' : 'Repair Completed',
       icon: 'wrench',
       date: h.repaired_at,
-      primary: `${h.part_name} · by ${h.staff_name || 'Technician'}${isRemoved ? ' (Removed)' : ''}`,
+      primary: `${h.part_name} · by ${h.staff_name || 'Technician'}`,
+      partName: h.part_name,
+      staffName: h.staff_name,
+      durationSeconds: h.duration_seconds,
       price: isRemoved ? 0 : partCost,
       originalPrice: partCost,
       notes: h.notes,
@@ -160,6 +171,7 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
   });
 
   services.forEach((s) => {
+    const isPassBack = s.service_name === 'Passed back to Technician';
     const isDiagFee =
       !s.service_name ||
       s.service_name.toLowerCase().includes('diagnostic') ||
@@ -168,13 +180,23 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
 
     events.push({
       key: `service-${s.id}`,
-      type: 'service',
-      label: isDiagFee ? 'Diagnostic Fee' : 'Testing Service',
-      icon: 'flask',
+      type: isPassBack ? 'pass_back' : 'service',
+      label: isPassBack
+        ? 'Passed to Technician (Rework Required)'
+        : isDiagFee
+          ? 'Diagnostic Fee'
+          : 'QA Testing Sign-off',
+      icon: isPassBack ? 'alertTriangle' : 'flask',
       date: s.completed_at,
-      primary: `${s.service_name}${s.staff_name ? ` · by ${s.staff_name}` : ''}`,
+      primary: isPassBack
+        ? `Returned for Rework · by ${s.staff_name || 'Supervisor'}`
+        : `${s.service_name}${s.staff_name ? ` · Verified by ${s.staff_name}` : ''}`,
+      serviceName: s.service_name,
+      staffName: s.staff_name,
+      isPassBack,
       price: Number(s.rate || 0),
       notes: s.notes,
+      durationSeconds: isPassBack ? null : (battery?.testing_duration_seconds || null),
     });
   });
 
@@ -186,6 +208,8 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       icon: 'package',
       date: r.returned_at,
       primary: `Truck ${r.truck_number || '—'} · Driver ${r.driver_name || '—'}`,
+      truckNumber: r.truck_number,
+      driverName: r.driver_name,
     });
   });
 
@@ -193,32 +217,72 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
     events.push({
       key: `issue-${iss.id}`,
       type: 'issue',
-      label: 'Reported Issue',
+      label: iss.failed_testing ? 'Marked Unserviceable · Test Failed' : 'Reported Unserviceable',
       icon: 'alertTriangle',
       date: iss.reported_at,
-      primary: `${iss.reason_label || 'Unserviceable'} · by ${iss.staff_name || 'Technician'}`,
+      primary: `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'} · Reported by ${iss.staff_name || 'Workshop Staff'}`,
       notes: iss.note,
       photos: iss.photo_urls || [],
+      staffName: iss.staff_name,
+      reasonLabel: iss.reason_label,
+      failedTesting: !!iss.failed_testing,
     });
   });
+
+  // Guarantee that any unserviceable or parts-removed battery has a "Marked Unserviceable" event in the timeline
+  const isUnserviceableStatus = battery && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status);
+  const hasIssueEvent = (issues || []).length > 0;
+  if (isUnserviceableStatus && !hasIssueEvent) {
+    const isTestFailed = !!battery.failed_testing || (services || []).some((s) => s.service_name === 'Passed back to Technician');
+    const removedDate = (history || []).find((h) => h.removed_at)?.removed_at;
+    const passBackService = (services || []).find((s) => s.service_name === 'Passed back to Technician');
+    const issueDate = passBackService?.completed_at || removedDate || battery.updated_at || new Date().toISOString();
+    const staffName = passBackService?.staff_name || 'Workshop Staff';
+
+    events.push({
+      key: `issue-fallback-${battery.id}`,
+      type: 'issue',
+      label: isTestFailed ? 'Marked Unserviceable · Test Failed' : 'Reported Unserviceable',
+      icon: 'alertTriangle',
+      date: issueDate,
+      primary: `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable · Reported by ${staffName}`,
+      notes: passBackService?.notes || (battery.status === 'tested_parts_removed'
+        ? 'Parts removed and restocked to inventory. Unit declared unserviceable scrap.'
+        : 'Unit declared unserviceable during workshop processing.'),
+      photos: [],
+      staffName,
+      reasonLabel: isTestFailed ? 'Failed Testing / Unserviceable' : 'Unserviceable',
+      failedTesting: isTestFailed,
+    });
+  }
 
   return events.sort((a, b) => new Date(a.date) - new Date(b.date));
 }
 
 function buildCycles(events) {
-  const cycles = [];
+  const rawCycles = [];
   let current = [];
 
   for (const event of events) {
+    if (event.type === 'intake' && current.length > 0 && current.some((e) => e.type === 'intake')) {
+      rawCycles.push(current);
+      current = [];
+    }
     current.push(event);
-    if (event.type === 'return') {
-      cycles.push(current);
+    if (event.type === 'return' || event.type === 'recycle') {
+      rawCycles.push(current);
       current = [];
     }
   }
-  if (current.length > 0) cycles.push(current);
+  if (current.length > 0) rawCycles.push(current);
 
-  return cycles;
+  return rawCycles.map((cycleEvents, idx) => ({
+    cycleNumber: idx + 1,
+    isOngoing: idx === rawCycles.length - 1 && !cycleEvents.some((e) => e.type === 'return' || e.type === 'recycle'),
+    // Events inside cycle sorted LATEST FIRST
+    events: [...cycleEvents].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0)),
+    rawEvents: cycleEvents,
+  }));
 }
 
 export default function BatteryDetailScreen() {
@@ -270,6 +334,7 @@ export default function BatteryDetailScreen() {
   const [unverifiedIntakeData, setUnverifiedIntakeData] = useState(null);
   const [showUnserviceableAlertModal, setShowUnserviceableAlertModal] = useState(false);
   const [unserviceableAlertData, setUnserviceableAlertData] = useState(null);
+  const [showHistoryInScan, setShowHistoryInScan] = useState(false);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -832,6 +897,7 @@ export default function BatteryDetailScreen() {
       await apiClient.patch(`/batteries/${result.battery.id}/pass-to-tech`, {
         note: issueNote || undefined,
       });
+      allowExitRef.current = true;
       setElapsedSeconds(0);
       setTestingElapsedSeconds(0);
       setShowTestingDecisionModal(false);
@@ -839,7 +905,7 @@ export default function BatteryDetailScreen() {
       setSelectedServiceIds([]);
       setIssueNote('');
       setIssuePhotos([]);
-      await load();
+      setShowCantServiceAlertModal(false);
       setShowPassToTechSuccessModal(true);
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
@@ -847,6 +913,20 @@ export default function BatteryDetailScreen() {
       setPassToTechSubmitting(false);
     }
   }
+
+  // Auto-redirect to scan page when passed to tech
+  useEffect(() => {
+    if (!showPassToTechSuccessModal) return undefined;
+    const timer = setTimeout(() => {
+      setShowPassToTechSuccessModal(false);
+      allowExitRef.current = true;
+      navigation.navigate('Main', {
+        screen: 'Service',
+        params: { autoScan: Date.now() },
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [showPassToTechSuccessModal, navigation]);
 
   async function handleConfirmTestingUnserviceable() {
     setShowTestingDecisionModal(false);
@@ -1563,14 +1643,20 @@ export default function BatteryDetailScreen() {
                 </Text>
               </TouchableOpacity>
               <TouchableOpacity
-                onPress={() => setShowPassToTechSuccessModal(false)}
+                onPress={() => {
+                  setShowPassToTechSuccessModal(false);
+                  load();
+                }}
                 className="items-center py-2"
               >
                 <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">
-                  View Battery Details
+                  Stay on Battery Page
                 </Text>
               </TouchableOpacity>
             </View>
+            <Text className="mt-4 text-xs font-semibold text-blue-600 dark:text-blue-400 text-center">
+              Redirecting to scan next battery in 2s…
+            </Text>
           </View>
         </View>
       </SafeAreaView>
@@ -1650,7 +1736,7 @@ export default function BatteryDetailScreen() {
     recycleBatch,
     pendingPartsRemoval = [],
   } = result || {};
-  const cycles = buildCycles(buildEvents(visits, history, returns, issues, services));
+  const cycles = buildCycles(buildEvents(visits, history, returns, issues, services, battery));
   const isClientLocked = battery.serial_number_added_by_role === 'client';
   const totalSpent =
     history.reduce((sum, h) => {
@@ -1678,7 +1764,7 @@ export default function BatteryDetailScreen() {
       </View>
 
       {/* ── Unserviceable Banner (if unserviceable or recycled) ─────────── */}
-      {(battery.status === 'unserviceable' || battery.status === 'recycled') && issues?.[0] && (
+      {!(fromScan && isStaff) && (battery.status === 'unserviceable' || battery.status === 'recycled') && issues?.[0] && (
         <View className="mb-5 rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-sm">
           <View className="flex-row items-center gap-2 mb-1">
             <Icon name="alertTriangle" color="#991b1b" size={16} />
@@ -1769,10 +1855,9 @@ export default function BatteryDetailScreen() {
           );
         })()}
 
-      {/* ── Parts Pending Removal (unserviceable or in_repair battery, parts fitted during
-           repair before it failed testing — technician or
-           supervisor reclaims them here before it can proceed) ────── */}
+      {/* ── Parts Pending Removal (Only active when scanning via camera) ────── */}
       {!isClient &&
+        fromScan &&
         (battery.status === 'unserviceable' || battery.status === 'in_repair') &&
         pendingPartsRemoval.length > 0 && (
           <View className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
@@ -1877,43 +1962,45 @@ export default function BatteryDetailScreen() {
       )}
 
       {/* ── Physical Battery Number Card ─────────────────────────────────── */}
-      <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <View className="flex-1 mr-2">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-            Physical Battery Number
-          </Text>
-          {battery.serial_number ? (
-            <View className="mt-1 flex-row items-center gap-2 flex-wrap">
-              <Text className="text-sm font-bold text-slate-900">{battery.serial_number}</Text>
-              <View
-                className={`rounded-full px-2.5 py-0.5 border ${
-                  isClientLocked
-                    ? 'bg-amber-50 border-amber-200'
-                    : 'bg-slate-100 border-slate-200'
-                }`}
-              >
-                <Text
-                  className={`text-[10px] font-bold ${
-                    isClientLocked ? 'text-amber-700' : 'text-slate-600'
+      {!(fromScan && isStaff) && (
+        <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <View className="flex-1 mr-2">
+            <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+              Physical Battery Number
+            </Text>
+            {battery.serial_number ? (
+              <View className="mt-1 flex-row items-center gap-2 flex-wrap">
+                <Text className="text-sm font-bold text-slate-900">{battery.serial_number}</Text>
+                <View
+                  className={`rounded-full px-2.5 py-0.5 border ${
+                    isClientLocked
+                      ? 'bg-amber-50 border-amber-200'
+                      : 'bg-slate-100 border-slate-200'
                   }`}
                 >
-                  {isClientLocked ? 'Set by you' : 'Admin set'}
-                </Text>
+                  <Text
+                    className={`text-[10px] font-bold ${
+                      isClientLocked ? 'text-amber-700' : 'text-slate-600'
+                    }`}
+                  >
+                    {isClientLocked ? 'Set by you' : 'Admin set'}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ) : (
-            <Text className="mt-1 text-xs text-slate-400 italic">No serial number assigned</Text>
+            ) : (
+              <Text className="mt-1 text-xs text-slate-400 italic">No serial number assigned</Text>
+            )}
+          </View>
+          {isClient && !battery.serial_number && (
+            <TouchableOpacity
+              onPress={openSerialModal}
+              className="rounded-xl bg-blue-50 px-3.5 py-2 border border-blue-200 active:bg-blue-100"
+            >
+              <Text className="text-xs font-bold text-blue-600">+ Assign Number</Text>
+            </TouchableOpacity>
           )}
         </View>
-        {isClient && !battery.serial_number && (
-          <TouchableOpacity
-            onPress={openSerialModal}
-            className="rounded-xl bg-blue-50 px-3.5 py-2 border border-blue-200 active:bg-blue-100"
-          >
-            <Text className="text-xs font-bold text-blue-600">+ Assign Number</Text>
-          </TouchableOpacity>
-        )}
-      </View>
+      )}
 
       {/* ── Workshop Staff Action Panels ─────────────────────────────────── */}
       {isStaff && (
@@ -1977,25 +2064,83 @@ export default function BatteryDetailScreen() {
           )}
 
           {['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status) && pendingPartsRemoval.length === 0 && (
-            <View className="mb-5 rounded-2xl border border-rose-200 dark:border-rose-900/60 bg-rose-50/80 dark:bg-rose-950/20 p-4 shadow-sm">
-              <View className="flex-row items-center gap-2.5 mb-2">
-                <View className="h-8 w-8 rounded-xl bg-rose-100 dark:bg-rose-900/50 border border-rose-200 dark:border-rose-800 items-center justify-center">
-                  <Icon name="slash" color="#e11d48" size={16} />
+            <View className="mb-5 rounded-3xl border border-rose-200 bg-rose-50/70 p-5 shadow-sm">
+              <View className="flex-row items-start gap-3 mb-3 pb-3 border-b border-rose-100">
+                <View className="h-11 w-11 rounded-2xl bg-rose-100 border border-rose-200 items-center justify-center">
+                  <Icon name="slash" color="#e11d48" size={18} strokeWidth={2.5} />
                 </View>
                 <View className="flex-1">
-                  <Text className="text-sm font-bold text-rose-900 dark:text-rose-200">
-                    Unserviceable Unit · Work Closed
-                  </Text>
-                  <Text className="text-[11px] text-rose-700 dark:text-rose-400">
-                    {battery.status === 'tested_parts_removed'
-                      ? 'All fitted parts have been reclaimed into inventory.'
-                      : 'This unit has been marked unserviceable.'}
+                  <View className="flex-row items-center gap-1.5 flex-wrap">
+                    <View className="rounded-full bg-rose-100 px-2.5 py-0.5">
+                      <Text className="text-[10px] font-black uppercase text-rose-700 tracking-wider">
+                        {battery.status === 'tested_parts_removed'
+                          ? 'Unserviceable · Test Failed'
+                          : battery.status === 'recycled'
+                            ? 'Decommissioned & Recycled'
+                            : 'Unserviceable Unit'}
+                      </Text>
+                    </View>
+                    <Text className="text-[10px] font-bold text-slate-400">Work Closed</Text>
+                  </View>
+                  <Text className="text-base font-extrabold text-slate-900 mt-1">
+                    {issues?.[0]?.reason_label || 'Marked Unserviceable'}
                   </Text>
                 </View>
               </View>
-              <Text className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-3">
-                No further repair or rework can be performed on this battery.
+
+              {issues?.[0] && (
+                <View className="mb-3">
+                  <Text className="text-xs text-slate-600 mb-1">
+                    Reported by <Text className="font-bold text-slate-900">{issues[0].staff_name || 'Technician'}</Text>
+                    {issues[0].reported_at ? ` · ${new Date(issues[0].reported_at).toLocaleString()}` : ''}
+                  </Text>
+                  {issues[0].note ? (
+                    <View className="mt-1.5 rounded-xl bg-white/80 border border-rose-200/80 p-3">
+                      <Text className="text-xs text-rose-950 italic font-medium">"{issues[0].note}"</Text>
+                    </View>
+                  ) : null}
+
+                  {issues[0].photo_urls && issues[0].photo_urls.length > 0 && (
+                    <View className="mt-3 pt-2.5 border-t border-rose-200/60">
+                      <View className="flex-row items-center justify-between mb-2">
+                        <Text className="text-[11px] font-bold text-rose-900">
+                          Inspection Photos ({issues[0].photo_urls.length})
+                        </Text>
+                        <Text className="text-[10px] text-rose-600 font-semibold">Tap to enlarge</Text>
+                      </View>
+                      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                        {issues[0].photo_urls.map((photo, pIdx) => {
+                          const imgUri = resolveImageUrl(photo);
+                          return (
+                            <TouchableOpacity
+                              key={pIdx}
+                              activeOpacity={0.8}
+                              onPress={() =>
+                                openPhotoViewer(
+                                  issues[0].photo_urls,
+                                  pIdx,
+                                  `${battery.battery_code} · Issue Photo ${pIdx + 1}`
+                                )
+                              }
+                              className="h-16 w-16 rounded-xl border border-rose-200 overflow-hidden bg-slate-900 relative active:scale-95"
+                            >
+                              <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
+                              <View className="absolute bottom-1 right-1 rounded-md bg-black/60 px-1 py-0.5">
+                                <Icon name="zoomIn" color="#ffffff" size={8} />
+                              </View>
+                            </TouchableOpacity>
+                          );
+                        })}
+                      </ScrollView>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              <Text className="text-[11px] text-slate-500 leading-relaxed mb-4">
+                This battery has been retired from workshop repair. No further parts or rework can be logged on this unit.
               </Text>
+
               <TouchableOpacity
                 onPress={() => {
                   allowExitRef.current = true;
@@ -2004,9 +2149,9 @@ export default function BatteryDetailScreen() {
                     params: { autoScan: Date.now() },
                   });
                 }}
-                className="flex-row items-center justify-center gap-2 rounded-xl bg-slate-900 dark:bg-slate-800 py-3 shadow-md active:bg-slate-800"
+                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md shadow-blue-600/30 active:bg-blue-700"
               >
-                <Icon name="camera" color="#ffffff" size={15} />
+                <Icon name="camera" color="#ffffff" size={16} />
                 <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
               </TouchableOpacity>
             </View>
@@ -2231,8 +2376,37 @@ export default function BatteryDetailScreen() {
         </>
       )}
 
-      {/* ── Summary Stats ────────────────────────────────────────────────── */}
-      <View className="mb-5 flex-row gap-3">
+      {/* If scanned for service by staff/technician, keep view clean & action-oriented */}
+      {fromScan && isStaff && !showHistoryInScan ? (
+        <View className="mt-4 pt-4 border-t border-slate-200">
+          <TouchableOpacity
+            onPress={() => setShowHistoryInScan(true)}
+            className="flex-row items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3.5 px-4 shadow-xs active:bg-slate-50"
+          >
+            <Icon name="chevronDown" color="#64748b" size={16} />
+            <Text className="text-xs font-bold text-slate-700">
+              View Past Battery History &amp; Cycles (Optional)
+            </Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <>
+          {fromScan && isStaff && (
+            <View className="mt-4 mb-4 pt-4 border-t border-slate-200">
+              <TouchableOpacity
+                onPress={() => setShowHistoryInScan(false)}
+                className="flex-row items-center justify-center gap-2 rounded-2xl border border-slate-200 bg-white py-3 px-4 shadow-xs active:bg-slate-50"
+              >
+                <Icon name="chevronUp" color="#64748b" size={16} />
+                <Text className="text-xs font-bold text-slate-700">
+                  Hide Battery History
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+
+          {/* ── Summary Stats ────────────────────────────────────────────────── */}
+          <View className="mb-5 flex-row gap-3">
         <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
           <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Repairs</Text>
           <Text className="mt-0.5 text-lg font-black text-slate-900">{history.length}</Text>
@@ -2249,153 +2423,248 @@ export default function BatteryDetailScreen() {
         )}
       </View>
 
-      {/* ── Complete Lifecycle Cycles (Client only) ────────────────────────── */}
-      {isClient && (
-        <>
-          <Text className="mb-3 text-xs font-bold uppercase tracking-wider text-slate-400">
-            Lifecycle & Repair Timeline
-          </Text>
+      {/* ── Complete Lifecycle & Repair Timeline (Cycle-Wise, Latest First) ──────── */}
+      <View className="mb-3 flex-row items-center justify-between">
+        <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
+          Lifecycle & Repair Timeline ({cycles.length} {cycles.length === 1 ? 'Cycle' : 'Cycles'})
+        </Text>
+        <Text className="text-[10px] font-semibold text-slate-400">Latest Cycle First</Text>
+      </View>
 
-          {cycles.length === 0 ? (
-            <View className="rounded-3xl border border-slate-200 bg-white p-8 items-center shadow-xs">
-              <Text className="text-xs text-slate-500 font-medium">No events recorded for this battery yet.</Text>
-            </View>
-          ) : (
-            <View className="gap-4">
-              {cycles.map((cycle, i) => {
-                const isOngoing = i === cycles.length - 1 && !cycle.some((e) => e.type === 'return');
-                const isUnserviceableCycle =
-                  cycle.some((e) => e.type === 'issue' || e.type === 'recycle') ||
-                  (isOngoing && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status));
+      {cycles.length === 0 ? (
+        <View className="rounded-3xl border border-slate-200 bg-white p-8 items-center shadow-xs">
+          <Text className="text-xs text-slate-500 font-medium">No events recorded for this battery yet.</Text>
+        </View>
+      ) : (
+        <View className="gap-4">
+          {[...cycles].reverse().map((cycle) => {
+            const isOngoing = cycle.isOngoing;
+            const cycleEvents = cycle.events || [];
+            const hasReturn = cycleEvents.some((e) => e.type === 'return');
+            const hasRecycle = cycleEvents.some((e) => e.type === 'recycle');
+            const hasIssue = cycleEvents.some((e) => e.type === 'issue');
+            const isUnserviceableCycle =
+              hasIssue ||
+              hasRecycle ||
+              (isOngoing && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status));
 
-                const cycleRepairs = cycle.filter((e) => e.type === 'repair');
-                const cycleServices = cycle.filter((e) => e.type === 'service');
-                const cyclePartsTotal = cycleRepairs
-                  .filter((r) => !r.isRemoved)
-                  .reduce((sum, r) => sum + (Number(r.price) || 0), 0);
-                const cycleServicesTotal = cycleServices.reduce(
-                  (sum, s) => sum + (Number(s.price) || 0),
-                  0
-                );
-                const cycleTotal = Math.max(0, cyclePartsTotal + cycleServicesTotal);
+            const cycleRepairs = cycleEvents.filter((e) => e.type === 'repair');
+            const cycleServices = cycleEvents.filter((e) => e.type === 'service');
+            const cyclePartsTotal = cycleRepairs
+              .filter((r) => !r.isRemoved)
+              .reduce((sum, r) => sum + (Number(r.price) || 0), 0);
+            const cycleServicesTotal = cycleServices.reduce(
+              (sum, s) => sum + (Number(s.price) || 0),
+              0
+            );
+            const cycleTotal = Math.max(0, cyclePartsTotal + cycleServicesTotal);
 
-                return (
-                  <View
-                    key={`cycle-${i}`}
-                    className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
-                  >
-                    <View className="flex-row items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
-                      <Text className="text-xs font-black tracking-widest text-slate-700">CYCLE {i + 1}</Text>
-                      <View className="flex-row items-center gap-2">
-                        {cycleTotal > 0 ? (
-                          <View className="flex-row items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
-                            <Text className="text-[10px] font-extrabold text-blue-700">
-                              Total: £{cycleTotal.toFixed(2)}
-                            </Text>
-                            {isUnserviceableCycle && cycleServicesTotal > 0 && cyclePartsTotal === 0 && (
-                              <Text className="text-[9px] font-bold text-red-600">
-                                (Diagnostic)
-                              </Text>
-                            )}
-                          </View>
-                        ) : (
-                          <View className="rounded-full border border-slate-200 bg-slate-100 px-2.5 py-0.5">
-                            <Text className="text-[10px] font-medium text-slate-500">
-                              No Charge
-                            </Text>
-                          </View>
-                        )}
-                        <View className={`rounded-full px-2.5 py-0.5 border ${
-                          isUnserviceableCycle
-                            ? 'bg-rose-50 border-rose-200'
-                            : isOngoing
-                              ? 'bg-amber-50 border-amber-200'
-                              : 'bg-emerald-50 border-emerald-200'
-                        }`}>
-                          <Text className={`text-[10px] font-extrabold ${
-                            isUnserviceableCycle
-                              ? 'text-rose-700'
-                              : isOngoing
-                                ? 'text-amber-700'
-                                : 'text-emerald-700'
-                          }`}>
-                            {isUnserviceableCycle ? 'Unserviceable' : isOngoing ? 'With Shop' : 'Completed'}
-                          </Text>
-                        </View>
+            return (
+              <View
+                key={`cycle-${cycle.cycleNumber}`}
+                className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+              >
+                {/* Cycle Header */}
+                <View className="flex-row items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-xs font-black tracking-widest text-slate-800">
+                      CYCLE {cycle.cycleNumber}
+                    </Text>
+                    {isOngoing && (
+                      <View className="rounded-full bg-blue-100 px-2 py-0.5">
+                        <Text className="text-[9px] font-black uppercase text-blue-700 tracking-wider">
+                          Active / Latest
+                        </Text>
                       </View>
-                    </View>
-
-                    <View className="border-b border-slate-100 p-3.5 bg-slate-50/50">
-                      <ProcessStepper isOngoing={isOngoing} batteryStatus={battery.status} />
-                    </View>
-
-                    <View className="p-4 gap-4">
-                      {cycle.map((event) => (
-                        <View key={event.key} className="flex-row gap-3">
-                          <View className="h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 border border-slate-200">
-                            <Icon name={event.icon} color="#475569" size={16} />
-                          </View>
-                          <View className="flex-1">
-                            <View className="flex-row items-center justify-between">
-                              <Text className="text-xs font-bold text-slate-900">{event.label}</Text>
-                              <Text className="text-[10px] text-slate-400 font-medium">
-                                {event.date ? new Date(event.date).toLocaleDateString() : ''}
-                              </Text>
-                            </View>
-                            <Text className="mt-0.5 text-xs text-slate-600">{event.primary}</Text>
-                            {event.notes && (
-                              <Text className="mt-1 text-[11px] text-slate-500 italic">
-                                "{event.notes}"
-                              </Text>
-                            )}
-                            {event.photos && event.photos.length > 0 && (
-                              <View className="mt-2.5 pt-2 border-t border-slate-100">
-                                <View className="flex-row items-center justify-between mb-1.5">
-                                  <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                                    Defect Photos ({event.photos.length})
-                                  </Text>
-                                  <Text className="text-[9px] text-sky-600 font-semibold">Tap to enlarge</Text>
-                                </View>
-                                <View className="flex-row flex-wrap gap-2">
-                                  {event.photos.map((photo, pIdx) => {
-                                    const imgUri = resolveImageUrl(photo);
-                                    return (
-                                      <TouchableOpacity
-                                        key={pIdx}
-                                        activeOpacity={0.8}
-                                        onPress={() =>
-                                          openPhotoViewer(
-                                            event.photos,
-                                            pIdx,
-                                            `${battery.battery_code} · Issue Photo ${pIdx + 1}`
-                                          )
-                                        }
-                                        className="h-16 w-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 shadow-2xs relative active:scale-95"
-                                      >
-                                        <Image source={{ uri: imgUri }} className="h-full w-full" resizeMode="cover" />
-                                        <View className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5">
-                                          <Icon name="zoomIn" color="#ffffff" size={8} />
-                                        </View>
-                                      </TouchableOpacity>
-                                    );
-                                  })}
-                                </View>
-                              </View>
-                            )}
-                            {event.price !== undefined && event.price > 0 && (
-                              <Text className="mt-1 text-[10px] font-bold text-emerald-600">
-                                Service Cost: £{Number(event.price).toFixed(2)}
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      ))}
+                    )}
+                  </View>
+                  <View className="flex-row items-center gap-2">
+                    {(isClient || canTest) && cycleTotal > 0 ? (
+                      <View className="flex-row items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
+                        <Text className="text-[10px] font-extrabold text-blue-700">
+                          Total: £{cycleTotal.toFixed(2)}
+                        </Text>
+                        {isUnserviceableCycle && cycleServicesTotal > 0 && cyclePartsTotal === 0 && (
+                          <Text className="text-[9px] font-bold text-red-600">
+                            (Diagnostic)
+                          </Text>
+                        )}
+                      </View>
+                    ) : null}
+                    <View
+                      className={`rounded-full px-2.5 py-0.5 border ${
+                        isUnserviceableCycle
+                          ? 'bg-rose-50 border-rose-200'
+                          : isOngoing
+                            ? 'bg-amber-50 border-amber-200'
+                            : 'bg-emerald-50 border-emerald-200'
+                      }`}
+                    >
+                      <Text
+                        className={`text-[10px] font-extrabold ${
+                          isUnserviceableCycle
+                            ? 'text-rose-700'
+                            : isOngoing
+                              ? 'text-amber-700'
+                              : 'text-emerald-700'
+                        }`}
+                      >
+                        {isUnserviceableCycle
+                          ? 'Unserviceable'
+                          : isOngoing
+                            ? 'With Workshop'
+                            : 'Completed'}
+                      </Text>
                     </View>
                   </View>
-                );
-              })}
-            </View>
-          )}
+                </View>
+
+                {/* Stepper Progress */}
+                <View className="border-b border-slate-100 p-3.5 bg-slate-50/50">
+                  <ProcessStepper isOngoing={isOngoing} batteryStatus={battery.status} />
+                </View>
+
+                {/* Events List (Latest First) */}
+                <View className="p-4 gap-4">
+                  {cycleEvents.map((event) => {
+                    const isPassBack = event.type === 'pass_back';
+                    const isRepair = event.type === 'repair';
+                    const isService = event.type === 'service';
+                    const isIssue = event.type === 'issue';
+
+                    return (
+                      <View key={event.key} className="flex-row gap-3">
+                        <View
+                          className={`h-9 w-9 items-center justify-center rounded-2xl border ${
+                            isPassBack
+                              ? 'bg-amber-100 border-amber-200'
+                              : isIssue
+                                ? 'bg-rose-100 border-rose-200'
+                                : isService
+                                  ? 'bg-violet-100 border-violet-200'
+                                  : isRepair
+                                    ? 'bg-blue-100 border-blue-200'
+                                    : 'bg-slate-100 border-slate-200'
+                          }`}
+                        >
+                          <Icon
+                            name={event.icon}
+                            color={
+                              isPassBack
+                                ? '#b45309'
+                                : isIssue
+                                  ? '#e11d48'
+                                  : isService
+                                    ? '#7c3aed'
+                                    : isRepair
+                                      ? '#2563eb'
+                                      : '#475569'
+                            }
+                            size={16}
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <View className="flex-row items-center justify-between">
+                            <Text
+                              className={`text-xs font-bold ${
+                                isPassBack
+                                  ? 'text-amber-900'
+                                  : isIssue
+                                    ? 'text-rose-900'
+                                    : 'text-slate-900'
+                              }`}
+                            >
+                              {event.label}
+                            </Text>
+                            <Text className="text-[10px] text-slate-400 font-medium">
+                              {event.date ? new Date(event.date).toLocaleDateString() : ''}
+                            </Text>
+                          </View>
+                          <Text className="mt-0.5 text-xs text-slate-600">{event.primary}</Text>
+
+                          {/* Duration Badge if available */}
+                          {typeof event.durationSeconds === 'number' && event.durationSeconds > 0 && (
+                            <View className="mt-1 flex-row items-center">
+                              <View
+                                className={`rounded-md px-1.5 py-0.5 border ${
+                                  isService
+                                    ? 'bg-violet-50 border-violet-100'
+                                    : 'bg-blue-50 border-blue-100'
+                                }`}
+                              >
+                                <Text
+                                  className={`text-[9px] font-bold ${
+                                    isService ? 'text-violet-700' : 'text-blue-700'
+                                  }`}
+                                >
+                                  ⏱️ Duration: {formatDuration(event.durationSeconds)}
+                                </Text>
+                              </View>
+                            </View>
+                          )}
+
+                          {event.notes && (
+                            <Text className="mt-1 text-[11px] text-slate-500 italic">
+                              "{event.notes}"
+                            </Text>
+                          )}
+
+                          {event.photos && event.photos.length > 0 && (
+                            <View className="mt-2.5 pt-2 border-t border-slate-100">
+                              <View className="flex-row items-center justify-between mb-1.5">
+                                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
+                                  Defect Photos ({event.photos.length})
+                                </Text>
+                                <Text className="text-[9px] text-sky-600 font-semibold">
+                                  Tap to enlarge
+                                </Text>
+                              </View>
+                              <View className="flex-row flex-wrap gap-2">
+                                {event.photos.map((photo, pIdx) => {
+                                  const imgUri = resolveImageUrl(photo);
+                                  return (
+                                    <TouchableOpacity
+                                      key={pIdx}
+                                      activeOpacity={0.8}
+                                      onPress={() =>
+                                        openPhotoViewer(
+                                          event.photos,
+                                          pIdx,
+                                          `${battery.battery_code} · Issue Photo ${pIdx + 1}`
+                                        )
+                                      }
+                                      className="h-16 w-16 rounded-xl border border-slate-200 overflow-hidden bg-slate-900 shadow-2xs relative active:scale-95"
+                                    >
+                                      <Image
+                                        source={{ uri: imgUri }}
+                                        className="h-full w-full"
+                                        resizeMode="cover"
+                                      />
+                                      <View className="absolute bottom-1 right-1 rounded bg-black/60 px-1 py-0.5">
+                                        <Icon name="zoomIn" color="#ffffff" size={8} />
+                                      </View>
+                                    </TouchableOpacity>
+                                  );
+                                })}
+                              </View>
+                            </View>
+                          )}
+
+                          {(isClient || canTest) && event.price !== undefined && event.price > 0 && (
+                            <Text className="mt-1 text-[10px] font-bold text-emerald-600">
+                              Service Cost: £{Number(event.price).toFixed(2)}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                    );
+                  })}
+                </View>
+              </View>
+            );
+          })}
+        </View>
+      )}
         </>
       )}
 
@@ -2622,10 +2891,18 @@ export default function BatteryDetailScreen() {
                   {canTest ? (
                     <>
                       <TouchableOpacity
-                        onPress={() => setShowRepairedByModal(false)}
-                        className="items-center rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+                        disabled={submitting}
+                        onPress={async () => {
+                          setShowRepairedByModal(false);
+                          if (!result?.battery?.testing_started_at) {
+                            await handleStartTesting();
+                          }
+                        }}
+                        className="items-center rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700 disabled:opacity-50"
                       >
-                        <Text className="text-sm font-bold text-white">Start Testing &amp; QA</Text>
+                        <Text className="text-sm font-bold text-white">
+                          {submitting ? 'Starting Testing…' : 'Start Testing & QA'}
+                        </Text>
                       </TouchableOpacity>
                       <TouchableOpacity
                         onPress={() => {

@@ -150,6 +150,12 @@ const PATHS = {
       <Rect width="7" height="5" x="3" y="16" rx="1" />
     </>
   ),
+  rotateCcw: (
+    <>
+      <Path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+      <Path d="M3 3v5h5" />
+    </>
+  ),
 };
 
 export default function Icon({ name, color = '#0f172a', size = 20, strokeWidth = 2 }) {

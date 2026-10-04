@@ -17,7 +17,6 @@ const UnserviceableBatteriesPage = lazy(() => import('../features/batteries/page
 const RecycledBatteriesPage = lazy(() => import('../features/batteries/pages/RecycledBatteriesPage'));
 const BatteryDetailPage = lazy(() => import('../features/batteries/pages/BatteryDetailPage'));
 const GenerateQrPage = lazy(() => import('../features/batteries/pages/GenerateQrPage'));
-const RepairsPage = lazy(() => import('../features/repairs/RepairsPage'));
 const StaffPage = lazy(() => import('../features/staff/StaffPage'));
 const StaffDetailPage = lazy(() => import('../features/staff/StaffDetailPage'));
 const PartsPage = lazy(() => import('../features/parts/PartsPage'));
@@ -127,9 +126,6 @@ function AppRoutes() {
             <Route path="/truck-intakes" element={<TruckIntakePage />} />
             <Route path="/truck-intakes/:id" element={<TruckIntakeDetailPage />} />
           </Route>
-          <Route element={<ProtectedRoute permission="repairs" />}>
-            <Route path="/repairs" element={<RepairsPage />} />
-          </Route>
           <Route element={<ProtectedRoute permission="staff" />}>
             <Route path="/staff" element={<StaffPage />} />
             <Route path="/staff/:id" element={<StaffDetailPage />} />
@@ -176,7 +172,7 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['client']} clientPermission="client_battery_sorting" />}>
             <Route path="/my/battery-sorting" element={<ClientBatterySortPage />} />
           </Route>
-          <Route element={<ProtectedRoute roles={['client', 'technician', 'recycle_client']} />}>
+          <Route element={<ProtectedRoute roles={['client', 'technician', 'supervisor', 'staff', 'recycle_client']} />}>
             <Route path="/my/profile" element={<ProfileRouter />} />
           </Route>
           <Route element={<ProtectedRoute roles={['recycle_client']} />}>
@@ -185,10 +181,10 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['super_admin', 'admin', 'staff', 'recycle_client']} />}>
             <Route path="/recycle/:id" element={<RecycleDetailPage />} />
           </Route>
-          <Route element={<ProtectedRoute roles={['client', 'technician']} />}>
+          <Route element={<ProtectedRoute roles={['client', 'technician', 'supervisor', 'staff']} />}>
             <Route path="/my/history" element={<HistoryRouter />} />
           </Route>
-          <Route element={<ProtectedRoute roles={['technician']} />}>
+          <Route element={<ProtectedRoute roles={['technician', 'supervisor', 'staff']} />}>
             <Route path="/my/dashboard" element={<TechnicianDashboardPage />} />
           </Route>
           <Route element={<ProtectedRoute permission="returns" />}>

@@ -40,6 +40,8 @@ import {
   FiTrash2,
   FiCamera,
   FiRefreshCw,
+  FiClock,
+  FiZoomIn,
 } from 'react-icons/fi';
 import RatingModal from '../../../components/feedback/RatingModal';
 
@@ -104,7 +106,7 @@ const EVENT_META = {
     ),
   },
   issue: {
-    label: 'Reported Unserviceable',
+    label: 'Marked Unserviceable',
     dot: 'bg-critical-100 text-critical-700 dark:bg-red-500/15 dark:text-red-300',
     icon: (
       <path
@@ -254,13 +256,41 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       key: `issue-${iss.id}`,
       type: 'issue',
       date: iss.reported_at,
-      primary: `Issue: ${iss.reason_label || 'Unserviceable'} · by ${iss.staff_name || 'Workshop Staff'}`,
+      label: iss.failed_testing ? 'Marked Unserviceable · Test Failed' : 'Marked Unserviceable',
+      primary: `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'} · by ${iss.staff_name || 'Workshop Staff'}`,
+      failedTesting: !!iss.failed_testing,
       reasonLabel: iss.reason_label,
       staffName: iss.staff_name,
       notes: iss.note,
       photos: iss.photo_urls || [],
     });
   });
+
+  // Guarantee that any unserviceable or parts-removed battery has a "Marked Unserviceable" event in the timeline
+  const isUnserviceableStatus = battery && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status);
+  const hasIssueEvent = (issues || []).length > 0;
+  if (isUnserviceableStatus && !hasIssueEvent) {
+    const isTestFailed = !!battery.failed_testing || (services || []).some((s) => s.service_name === 'Passed back to Technician');
+    const removedDate = (history || []).find((h) => h.removed_at)?.removed_at;
+    const passBackService = (services || []).find((s) => s.service_name === 'Passed back to Technician');
+    const issueDate = passBackService?.completed_at || removedDate || battery.updated_at || new Date().toISOString();
+    const staffName = passBackService?.staff_name || 'Workshop Staff';
+
+    events.push({
+      key: `issue-fallback-${battery.id}`,
+      type: 'issue',
+      date: issueDate,
+      label: isTestFailed ? 'Marked Unserviceable · Test Failed' : 'Marked Unserviceable',
+      primary: `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable · by ${staffName}`,
+      failedTesting: isTestFailed,
+      reasonLabel: isTestFailed ? 'Failed Testing / Unserviceable' : 'Unserviceable',
+      staffName,
+      notes: passBackService?.notes || (battery.status === 'tested_parts_removed'
+        ? 'Parts removed and restocked to inventory. Unit declared unserviceable scrap.'
+        : 'Unit declared unserviceable during workshop processing.'),
+      photos: [],
+    });
+  }
 
   if (recycleBatch) {
     events.push({
@@ -299,10 +329,11 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
     (isOngoing && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(batteryStatus));
 
   if (isUnserviceableFlow) {
+    const testFailed = cycle.some((e) => e.type === 'issue' && e.failedTesting);
     const steps = [
       'Intake',
       'Diagnostic & Work',
-      'Reported Unserviceable',
+      testFailed ? 'Unserviceable · Test Failed' : 'Marked Unserviceable',
       'Parts Restocked',
       'Sent for Recycling',
     ];
@@ -323,31 +354,59 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
     ];
 
     return (
-      <div className="flex items-center overflow-x-auto pb-1">
+      <div className="flex items-start overflow-x-auto pb-1 scrollbar-none">
         {steps.map((label, i) => {
           const state = stepStates[i];
           const isDangerStep = i === 2; // Reported Unserviceable
           const isWarningStep = i === 3 && state === 1; // Pending parts removal
+          const isDonePrevious = i > 0 && stepStates[i - 1] === 2;
+          const isDoneCurrent = state === 2;
+
           return (
-            <div key={label} className="flex flex-1 items-center last:flex-none min-w-[120px]">
-              <div className="flex flex-col items-center gap-1.5 text-center w-full">
+            <div key={label} className="flex-1 min-w-[110px] sm:min-w-[130px] flex flex-col items-center">
+              {/* Node and Connectors Track */}
+              <div className="relative flex items-center justify-center w-full">
+                <div
+                  className={`h-0.5 w-1/2 transition-colors ${
+                    i === 0
+                      ? 'opacity-0'
+                      : isDonePrevious
+                        ? 'bg-critical-500 dark:bg-red-500'
+                        : 'bg-slate-200 dark:bg-white/10'
+                  }`}
+                />
                 <span
-                  className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                  className={`relative z-10 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full text-xs font-black shadow-2xs transition-all ${
                     isDangerStep
-                      ? 'bg-critical-600 text-white dark:bg-red-500 shadow-xs'
+                      ? 'bg-critical-600 text-white dark:bg-red-500 ring-2 ring-red-400/30'
                       : isWarningStep
-                        ? 'border-2 border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
+                        ? 'border-2 border-amber-500 bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 ring-2 ring-amber-400/20'
                         : state === 2
-                          ? 'bg-brand-600 text-white dark:bg-emerald-500'
+                          ? 'bg-brand-600 text-white dark:bg-emerald-500 ring-2 ring-emerald-400/20'
                           : state === 1
-                            ? 'border-2 border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/40 dark:text-blue-300 animate-pulse'
+                            ? 'border-2 border-blue-600 bg-blue-50 text-blue-700 dark:border-blue-500 dark:bg-blue-950/60 dark:text-blue-300 animate-pulse ring-2 ring-blue-400/20'
                             : 'bg-slate-100 text-slate-400 dark:bg-surface-700 dark:text-neutral-500'
                   }`}
                 >
                   {state === 2 ? (isDangerStep ? '✕' : '✓') : i + 1}
                 </span>
+                <div
+                  className={`h-0.5 w-1/2 transition-colors ${
+                    i === steps.length - 1
+                      ? 'opacity-0'
+                      : isDoneCurrent
+                        ? isRecycled
+                          ? 'bg-critical-500 dark:bg-red-500'
+                          : 'bg-brand-600 dark:bg-emerald-500'
+                        : 'bg-slate-200 dark:bg-white/10'
+                  }`}
+                />
+              </div>
+
+              {/* Step Label */}
+              <div className="mt-2 text-center px-1">
                 <span
-                  className={`text-xs font-medium whitespace-nowrap ${
+                  className={`text-[11px] sm:text-xs font-semibold block leading-tight ${
                     isDangerStep
                       ? 'font-bold text-critical-700 dark:text-red-400'
                       : isWarningStep
@@ -355,26 +414,13 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
                         : state === 2
                           ? 'text-slate-800 dark:text-neutral-200'
                           : state === 1
-                            ? 'font-semibold text-blue-700 dark:text-blue-400'
+                            ? 'font-bold text-blue-700 dark:text-blue-400'
                             : 'text-slate-400 dark:text-neutral-500'
                   }`}
                 >
                   {label}
                 </span>
               </div>
-              {i < steps.length - 1 && (
-                <span
-                  className={`mx-2 mb-5 h-0.5 flex-1 rounded ${
-                    i < 2
-                      ? 'bg-brand-600 dark:bg-emerald-500'
-                      : i === 2
-                        ? 'bg-critical-600 dark:bg-red-500'
-                        : isRecycled
-                          ? 'bg-critical-600 dark:bg-red-500'
-                          : 'bg-slate-200 dark:bg-surface-700'
-                  }`}
-                />
-              )}
             </div>
           );
         })}
@@ -384,42 +430,71 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
 
   // Normal Repair Lifecycle
   const steps = ['Intake', 'Repair In Progress', 'Testing & QA', 'Repair Completed', 'Returned to Client'];
-  let threshold = steps.length - 1;
+  let currentStepIdx = steps.length - 1;
 
   if (isOngoing) {
-    if (batteryStatus === 'in_repair') threshold = 0;
-    else if (batteryStatus === 'in_progress') threshold = 1;
-    else if (['in_testing', 'testing', 'repair_testing'].includes(batteryStatus)) threshold = 2;
-    else if (batteryStatus === 'repaired') threshold = 3;
-    else if (batteryStatus === 'returned' || hasReturn) threshold = 4;
+    if (batteryStatus === 'in_repair') currentStepIdx = 0; // Intake done, Repair is next
+    else if (batteryStatus === 'in_progress') currentStepIdx = 1; // Repair currently in progress
+    else if (['in_testing', 'testing', 'repair_testing'].includes(batteryStatus)) currentStepIdx = 2; // Testing in progress
+    else if (batteryStatus === 'repaired') currentStepIdx = 3; // Repair complete, QA passed
+    else if (batteryStatus === 'returned' || hasReturn) currentStepIdx = 4;
   }
 
   const stepStates = steps.map((_, i) => {
-    if (i <= threshold) return 2; // done
-    if (i === threshold + 1) return 1; // current / next action
+    if (i < currentStepIdx) return 2; // done
+    if (i === currentStepIdx) {
+      if (batteryStatus === 'repaired' || batteryStatus === 'returned' || hasReturn) return 2;
+      return 1; // current / in progress
+    }
     return 0; // pending
   });
 
   return (
-    <div className="flex items-center overflow-x-auto pb-1">
+    <div className="flex items-start overflow-x-auto pb-1 scrollbar-none">
       {steps.map((label, i) => {
         const state = stepStates[i];
+        const isDonePrevious = i > 0 && stepStates[i - 1] === 2;
+        const isDoneCurrent = state === 2;
+
         return (
-          <div key={label} className="flex flex-1 items-center last:flex-none min-w-[120px]">
-            <div className="flex flex-col items-center gap-1.5 text-center w-full">
+          <div key={label} className="flex-1 min-w-[110px] sm:min-w-[130px] flex flex-col items-center">
+            {/* Node and Connectors Track */}
+            <div className="relative flex items-center justify-center w-full">
+              <div
+                className={`h-0.5 w-1/2 transition-colors ${
+                  i === 0
+                    ? 'opacity-0'
+                    : isDonePrevious
+                      ? 'bg-brand-600 dark:bg-emerald-500'
+                      : 'bg-slate-200 dark:bg-white/10'
+                }`}
+              />
               <span
-                className={`flex h-7 w-7 items-center justify-center rounded-full text-xs font-bold transition-all ${
+                className={`relative z-10 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full text-xs font-black shadow-2xs transition-all ${
                   state === 2
-                    ? 'bg-brand-600 text-white dark:bg-emerald-500'
+                    ? 'bg-brand-600 text-white dark:bg-emerald-500 ring-2 ring-emerald-400/20'
                     : state === 1
-                      ? 'border-2 border-brand-600 bg-brand-50 text-brand-700 dark:border-emerald-500 dark:bg-emerald-950/40 dark:text-emerald-300 animate-pulse'
+                      ? 'border-2 border-brand-600 bg-brand-50 text-brand-700 dark:border-emerald-500 dark:bg-emerald-950/60 dark:text-emerald-300 animate-pulse ring-2 ring-emerald-400/30'
                       : 'bg-slate-100 text-slate-400 dark:bg-surface-700 dark:text-neutral-500'
                 }`}
               >
                 {state === 2 ? '✓' : i + 1}
               </span>
+              <div
+                className={`h-0.5 w-1/2 transition-colors ${
+                  i === steps.length - 1
+                    ? 'opacity-0'
+                    : isDoneCurrent && stepStates[i + 1] > 0
+                      ? 'bg-brand-600 dark:bg-emerald-500'
+                      : 'bg-slate-200 dark:bg-white/10'
+                }`}
+              />
+            </div>
+
+            {/* Step Label */}
+            <div className="mt-2 text-center px-1">
               <span
-                className={`text-xs font-medium whitespace-nowrap ${
+                className={`text-[11px] sm:text-xs font-semibold block leading-tight ${
                   state === 2
                     ? 'text-slate-800 dark:text-neutral-200'
                     : state === 1
@@ -430,15 +505,6 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
                 {label}
               </span>
             </div>
-            {i < steps.length - 1 && (
-              <span
-                className={`mx-2 mb-5 h-0.5 flex-1 rounded ${
-                  state === 2 && stepStates[i + 1] > 0
-                    ? 'bg-brand-600 dark:bg-emerald-500'
-                    : 'bg-slate-200 dark:bg-surface-700'
-                }`}
-              />
-            )}
           </div>
         );
       })}
@@ -593,11 +659,24 @@ function ClientBatteryDetailView({
   ];
 
   // Unserviceable Stepper Configuration
+  const isTesterFailed = !!issues?.[0]?.failed_testing || !!battery?.failed_testing;
   const UNSERVICEABLE_STEPS = [
     { key: 'intake', label: 'Intake & Logging', desc: 'Received at workshop facility', icon: FiPackage, state: 'done' },
     { key: 'inspection', label: 'Workshop Diagnostics', desc: 'Multi-point safety assessment', icon: FiActivity, state: 'done' },
-    { key: 'bench_test', label: 'Safety & Load Testing', desc: 'Critical electrical defect identified', icon: FiXCircle, state: 'failed' },
-    { key: 'unserviceable', label: 'Decommissioned Unit', desc: 'Fitted parts reclaimed to stock', icon: FiAlertTriangle, state: 'warning' },
+    {
+      key: 'bench_test',
+      label: isTesterFailed ? 'Safety & Load Testing' : 'Technician Inspection',
+      desc: isTesterFailed ? 'Critical electrical defect identified in QA test' : 'Irreparable issue identified during repair',
+      icon: FiXCircle,
+      state: 'failed',
+    },
+    {
+      key: 'unserviceable',
+      label: isTesterFailed ? 'Marked Unserviceable · Test Failed' : 'Marked Unserviceable',
+      desc: isTesterFailed ? 'QA Test Failed · Parts reclaimed to stock' : 'Marked by technician · Parts reclaimed to stock',
+      icon: FiAlertTriangle,
+      state: 'warning',
+    },
     {
       key: 'recycle',
       label: 'Quarantine / Recycling',
@@ -958,11 +1037,11 @@ function ClientBatteryDetailView({
                 <div className="flex items-center gap-2">
                   <span className="h-3 w-3 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50" />
                   <span className="text-base font-extrabold text-slate-900 dark:text-white">
-                    Unserviceable
+                    {isTesterFailed ? 'Unserviceable · Test Failed' : 'Unserviceable'}
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-                  Test Failed · Safety threshold exceeded
+                  {isTesterFailed ? 'QA Test Failed · Safety threshold exceeded' : 'Declared unserviceable by technician'}
                 </p>
               </div>
             </div>
@@ -1956,6 +2035,10 @@ function BatteryDetailPage() {
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
   const isSuperAdmin = user?.role === 'super_admin';
 
+  const searchParams = new URLSearchParams(location.search);
+  const fromScan = searchParams.get('fromScan') === 'true';
+  const [showHistoryInScan, setShowHistoryInScan] = useState(false);
+
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -2229,12 +2312,30 @@ function BatteryDetailPage() {
   }
 
   // ── ADMIN & TECHNICIAN INTERNAL VIEW ──────────────────────────────────────
-  const passBackService = (services || []).find((s) => s.service_name === 'Passed back to Technician');
+  const latestVisitTime = (visits || []).reduce(
+    (max, v) => (v.created_at && new Date(v.created_at) > new Date(max) ? v.created_at : max),
+    battery?.created_at || '1970-01-01'
+  );
+  const cycleStartedAt = new Date(new Date(latestVisitTime).getTime() - 60000);
+  const passBackService = (services || []).find(
+    (s) =>
+      s.service_name === 'Passed back to Technician' &&
+      (!s.completed_at || new Date(s.completed_at) >= cycleStartedAt)
+  );
   const isPassedBack = Boolean(passBackService && battery?.status === 'in_repair');
-  const hasPendingPartsToRemove = (pendingPartsRemoval && pendingPartsRemoval.length > 0) || isPassedBack;
+  const isPendingStatus = ['in_repair', 'unserviceable', 'passed_to_remove', 'passed_for_part_removal'].includes(
+    battery?.status
+  );
+  const hasPendingPartsToRemove = Boolean(
+    isPendingStatus &&
+      ((pendingPartsRemoval && pendingPartsRemoval.length > 0) ||
+        isPassedBack ||
+        battery?.status === 'passed_to_remove' ||
+        battery?.status === 'passed_for_part_removal')
+  );
   const isIntakeUnverified = intakeIsUnverified(battery);
 
-  const cycles = buildCycles(
+  const rawCycles = buildCycles(
     buildEvents(
       visits || [],
       history || [],
@@ -2245,6 +2346,12 @@ function BatteryDetailPage() {
       battery
     )
   );
+  const cycles = rawCycles.map((c, idx) => ({
+    cycle: c,
+    cycleNumber: idx + 1,
+    isOngoing: idx === rawCycles.length - 1 && !c.some((e) => e.type === 'return' || e.type === 'recycle'),
+  }));
+  const reversedCycles = [...cycles].reverse();
   const totalSpent =
     (history || []).reduce(
       (sum, h) => (h.removed_at ? sum : sum + Number(h.price) + Number(h.labor_charge || 0)),
@@ -2273,10 +2380,10 @@ function BatteryDetailPage() {
         <button
           type="button"
           onClick={handleBack}
-          className="mb-4 inline-flex items-center gap-1 text-sm font-medium text-brand-700 hover:underline dark:text-emerald-400 cursor-pointer"
+          className="group mb-3 inline-flex items-center gap-1.5 rounded-lg py-1 px-2.5 -ml-2 text-xs font-semibold text-slate-600 hover:text-slate-900 hover:bg-slate-100 transition-colors dark:text-neutral-400 dark:hover:text-white dark:hover:bg-surface-800 cursor-pointer"
         >
-          <FiArrowLeft className="h-4 w-4" />
-          Back
+          <FiArrowLeft className="h-3.5 w-3.5 transition-transform group-hover:-translate-x-0.5" />
+          <span>Back</span>
         </button>
       ) : (
         <div className="mb-4 flex items-center justify-between">
@@ -2331,7 +2438,23 @@ function BatteryDetailPage() {
         </div>
       )}
 
-      <PageHeader title={battery.battery_code} description="Full intake-to-return history." />
+      <PageHeader
+        title={
+          <div className="flex flex-wrap items-center gap-2.5">
+            <span>{battery.battery_code}</span>
+            <StatusBadge
+              status={battery.status}
+              isPassedBack={isPassedBack}
+              hasPendingParts={hasPendingPartsToRemove}
+            />
+          </div>
+        }
+        description={
+          fromScan && (isTechnician || isStaff)
+            ? 'Workshop Service & Repair'
+            : 'Full intake-to-return history.'
+        }
+      />
 
       {showQrModal && (
         <Modal title={battery.battery_code} onClose={() => setShowQrModal(false)}>
@@ -2464,41 +2587,62 @@ function BatteryDetailPage() {
         </div>
       )}
 
-      {(battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && result.issues?.[0] && (
-        <div className="mb-6 rounded-xl border border-critical-200 bg-critical-50 p-5 dark:border-red-500/30 dark:bg-red-500/10 shadow-xs">
+      {!(isTechnician || isStaff) && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && result.issues?.[0] && (
+        <div className="mb-6 overflow-hidden rounded-2xl sm:rounded-3xl border border-rose-200 bg-gradient-to-b from-rose-50/80 via-white to-rose-50/30 p-5 sm:p-6 shadow-sm dark:border-rose-900/50 dark:from-rose-950/20 dark:via-surface-900 dark:to-surface-950">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="flex-1">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="px-2 py-0.5 rounded text-[11px] font-bold bg-critical-100 text-critical-800 dark:bg-red-950/60 dark:text-red-300">
-                  {battery.status === 'tested_parts_removed' ? 'Unserviceable · Test Failed' : 'Unserviceable'}
+              <div className="flex items-center gap-2 mb-1.5">
+                <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] sm:text-[11px] font-extrabold uppercase tracking-wider text-rose-700 dark:bg-rose-900/60 dark:text-rose-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  {battery.status === 'recycled'
+                    ? 'Decommissioned & Recycled'
+                    : (result.issues[0]?.failed_testing || battery.failed_testing)
+                      ? 'Unserviceable · Test Failed'
+                      : 'Unserviceable Unit'}
                 </span>
-                <h2 className="text-sm font-semibold text-critical-700 dark:text-red-300">
-                  {result.issues[0].reason_label}
-                </h2>
+                <span className="text-[11px] font-semibold text-slate-400 dark:text-neutral-500">
+                  Work Closed
+                </span>
               </div>
+              <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                {result.issues[0].reason_label}
+              </h2>
               {result.issues[0].note && (
-                <p className="mb-1 text-sm text-slate-600 dark:text-neutral-300">{result.issues[0].note}</p>
+                <div className="my-2 rounded-xl border border-rose-200/70 bg-rose-50/60 p-3 text-xs italic text-rose-950 dark:border-rose-900/50 dark:bg-rose-950/30 dark:text-rose-200">
+                  "{result.issues[0].note}"
+                </div>
               )}
-              <p className="text-xs text-slate-500 dark:text-neutral-500">
-                Reported by {result.issues[0].staff_name} on{' '}
-                {new Date(result.issues[0].reported_at).toLocaleString()}
-              </p>
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-neutral-400">
+                <span className="font-medium text-slate-700 dark:text-neutral-300">
+                  Reported by <span className="font-bold text-slate-900 dark:text-white">{result.issues[0].staff_name}</span>
+                </span>
+                <span>•</span>
+                <span>
+                  {new Date(result.issues[0].reported_at).toLocaleString('en-GB', {
+                    day: '2-digit',
+                    month: 'short',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </span>
+              </div>
 
               {/* Full Audit Trail: Fitted parts & Removed parts */}
               {history.some((h) => h.removed_at) && (
-                <div className="mt-3 pt-3 border-t border-red-200/80 dark:border-red-800/40">
-                  <span className="text-xs font-bold text-red-900 dark:text-red-200 block mb-1">
-                    Fitted Parts Removed &amp; Restocked:
+                <div className="mt-3.5 pt-3 border-t border-rose-100 dark:border-rose-900/30">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 block mb-1">
+                    Restocked Components:
                   </span>
                   <div className="space-y-1">
                     {history
                       .filter((h) => h.removed_at)
                       .map((h, hIdx) => (
-                        <p key={hIdx} className="text-xs text-red-800 dark:text-red-300">
-                          • <span className="font-semibold">{h.part_name}</span> (Qty {h.quantity_used}) — fitted by{' '}
+                        <p key={hIdx} className="text-xs text-slate-600 dark:text-neutral-300">
+                          • <span className="font-semibold text-slate-900 dark:text-white">{h.part_name}</span> (Qty {h.quantity_used}) — fitted by{' '}
                           <span className="font-semibold">{h.staff_name}</span> and removed by{' '}
                           <span className="font-semibold">{h.removed_by_staff_name || 'Technician'}</span> on{' '}
-                          {new Date(h.removed_at).toLocaleString()}
+                          {new Date(h.removed_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
                       ))}
                   </div>
@@ -2508,9 +2652,12 @@ function BatteryDetailPage() {
 
             {result.issues[0].photo_urls && result.issues[0].photo_urls.length > 0 && (
               <div className="shrink-0 flex flex-col gap-1.5">
-                <span className="text-xs font-semibold text-critical-700 dark:text-red-300">
-                  Photos ({result.issues[0].photo_urls.length})
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold uppercase tracking-wider text-rose-900 dark:text-rose-300">
+                    Photos ({result.issues[0].photo_urls.length})
+                  </span>
+                  <span className="text-[10px] font-semibold text-rose-600 dark:text-rose-400 ml-2">Tap to enlarge</span>
+                </div>
                 <div className="flex items-center gap-2">
                   {result.issues[0].photo_urls.map((photo, pIdx) => (
                     <button
@@ -2524,7 +2671,7 @@ function BatteryDetailPage() {
                           title: `Issue Photos — ${result.battery.battery_code}`,
                         })
                       }
-                      className="group relative h-14 w-14 overflow-hidden rounded-lg border border-red-200 bg-white dark:bg-surface-800 dark:border-red-800/60 shadow-xs transition hover:scale-105 hover:border-red-500"
+                      className="group relative h-16 w-16 overflow-hidden rounded-xl border border-rose-200 bg-white dark:bg-surface-800 dark:border-white/10 shadow-2xs transition hover:scale-105 hover:border-rose-500 cursor-pointer"
                     >
                       <img
                         src={resolveImageUrl(photo)}
@@ -2532,7 +2679,7 @@ function BatteryDetailPage() {
                         className="h-full w-full object-cover"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                        <span className="opacity-0 group-hover:opacity-100 text-white text-xs">🔍</span>
+                        <FiZoomIn className="opacity-0 group-hover:opacity-100 text-white h-5 w-5" />
                       </div>
                     </button>
                   ))}
@@ -2672,30 +2819,71 @@ function BatteryDetailPage() {
             )}
           </div>
         </div>
+      ) : fromScan && (isTechnician || isStaff) && !showHistoryInScan ? (
+        <div className="mt-8 border-t border-slate-200/80 pt-6 dark:border-white/10">
+          <div className="flex justify-center">
+            <button
+              type="button"
+              onClick={() => setShowHistoryInScan(true)}
+              className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors cursor-pointer"
+            >
+              <FiChevronDown className="h-4 w-4" />
+              <span>View Past Battery History &amp; Cycles (Optional)</span>
+            </button>
+          </div>
+        </div>
       ) : (
         <>
-          <div className={`mb-6 grid grid-cols-1 gap-4 ${isSuperAdmin ? (isTechnician ? 'sm:grid-cols-3' : 'sm:grid-cols-4') : 'sm:grid-cols-2'}`}>
-            <StatCard label="Repairs Logged" value={repairVisits} tone="good" />
-            <StatCard label="Return Shipments" value={returns.length} tone="info" />
+          {fromScan && (isTechnician || isStaff) && (
+            <div className="mt-8 mb-6 border-t border-slate-200/80 pt-6 flex justify-center dark:border-white/10">
+              <button
+                type="button"
+                onClick={() => setShowHistoryInScan(false)}
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors cursor-pointer"
+              >
+                <FiChevronUp className="h-4 w-4" />
+                <span>Hide Battery History</span>
+              </button>
+            </div>
+          )}
+
+          <div className={`mb-6 grid grid-cols-1 gap-3 sm:gap-4 ${isSuperAdmin ? (isTechnician ? 'sm:grid-cols-3' : 'sm:grid-cols-4') : 'sm:grid-cols-2'}`}>
+            <StatCard
+              icon={<FiTool className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+              label="Repairs Logged"
+              value={repairVisits}
+              tone="good"
+            />
+            <StatCard
+              icon={<FiTruck className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
+              label="Return Shipments"
+              value={returns.length}
+              tone="info"
+            />
             {isSuperAdmin && (
               <StatCard
+                icon={<FiClock className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />}
                 label="Total Repair Time"
                 value={totalRepairDurationSeconds > 0 ? formatDuration(totalRepairDurationSeconds) : '—'}
-                tone="info"
+                tone="purple"
               />
             )}
             {isSuperAdmin && !isTechnician && (
-              <StatCard label="Total Price" value={`£${totalSpent.toFixed(2)}`} tone="warning" />
+              <StatCard
+                icon={<FiActivity className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
+                label="Total Price"
+                value={`£${totalSpent.toFixed(2)}`}
+                tone="warning"
+              />
             )}
           </div>
 
-          {!isTechnician && (
-            cycles.length === 0 ? (
-              <TableState>No history recorded for this battery yet.</TableState>
-            ) : (
+          {reversedCycles.length === 0 ? (
+            <TableState>No history recorded for this battery yet.</TableState>
+          ) : (
           <div className="flex flex-col gap-6">
-            {cycles.map((cycle, i) => {
-              const isOngoing = i === cycles.length - 1 && !cycle.some((e) => e.type === 'return' || e.type === 'recycle');
+            {reversedCycles.map((cycleItem) => {
+              const { cycle, cycleNumber, isOngoing } = cycleItem;
               const hasReturn = cycle.some((e) => e.type === 'return');
               const hasRecycle = cycle.some((e) => e.type === 'recycle');
               const hasIssue = cycle.some((e) => e.type === 'issue');
@@ -2709,14 +2897,18 @@ function BatteryDetailPage() {
 
               if (isUnserviceableCycle) {
                 cardTone = 'red';
+                const cycleTestFailed =
+                  cycle.some((e) => e.type === 'issue' && e.failedTesting) ||
+                  (isOngoing && (!!battery.failed_testing || !!issues?.[0]?.failed_testing));
+                const baseLabel = cycleTestFailed ? 'Unserviceable · Test Failed' : 'Unserviceable';
                 if (hasRecycle || battery.status === 'recycled') {
                   cardLabel = 'Sent for Recycling';
                 } else if ((pendingPartsRemoval?.length || 0) > 0) {
-                  cardLabel = 'Unserviceable (Parts Removal Required)';
+                  cardLabel = `${baseLabel} (Parts Removal Required)`;
                 } else if (cycle.some((e) => e.type === 'part_removed')) {
-                  cardLabel = 'Unserviceable (Parts Restocked)';
+                  cardLabel = `${baseLabel} (Parts Restocked)`;
                 } else {
-                  cardLabel = 'Reported Unserviceable';
+                  cardLabel = baseLabel;
                 }
               } else if (isOngoing) {
                 if (battery.status === 'repaired') {
@@ -2739,40 +2931,52 @@ function BatteryDetailPage() {
 
               const TONE_CLASSES = {
                 amber: {
-                  border: 'border-amber-500',
-                  bg: 'bg-amber-50 dark:bg-amber-500/15',
+                  stripe: 'bg-gradient-to-r from-amber-500 to-amber-400',
+                  headerBg: 'from-amber-500/10 via-amber-500/5 to-transparent dark:from-amber-500/20 dark:via-amber-500/10 dark:to-transparent',
+                  border: 'border-amber-300 dark:border-amber-800/50',
                   text: 'text-amber-800 dark:text-amber-300',
-                  badge: 'bg-amber-100 text-amber-900 dark:bg-amber-950/40 dark:text-amber-300',
+                  badge: 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300 ring-1 ring-amber-400/30',
+                  dot: 'bg-amber-500 ring-2 ring-amber-400/30',
                 },
                 green: {
-                  border: 'border-emerald-500',
-                  bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+                  stripe: 'bg-gradient-to-r from-emerald-500 to-emerald-400',
+                  headerBg: 'from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/10 dark:to-transparent',
+                  border: 'border-emerald-300 dark:border-emerald-800/50',
                   text: 'text-emerald-800 dark:text-emerald-300',
-                  badge: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
+                  badge: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-400/30',
+                  dot: 'bg-emerald-500 ring-2 ring-emerald-400/30',
                 },
                 emerald: {
-                  border: 'border-emerald-500',
-                  bg: 'bg-emerald-50 dark:bg-emerald-500/15',
+                  stripe: 'bg-gradient-to-r from-emerald-500 to-teal-400',
+                  headerBg: 'from-emerald-500/10 via-emerald-500/5 to-transparent dark:from-emerald-500/20 dark:via-emerald-500/10 dark:to-transparent',
+                  border: 'border-emerald-300 dark:border-emerald-800/50',
                   text: 'text-emerald-800 dark:text-emerald-300',
-                  badge: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/40 dark:text-emerald-300',
+                  badge: 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300 ring-1 ring-emerald-400/30',
+                  dot: 'bg-emerald-500 ring-2 ring-emerald-400/30',
                 },
                 blue: {
-                  border: 'border-blue-500',
-                  bg: 'bg-blue-50 dark:bg-sky-500/15',
+                  stripe: 'bg-gradient-to-r from-blue-500 to-sky-400',
+                  headerBg: 'from-blue-500/10 via-blue-500/5 to-transparent dark:from-blue-500/20 dark:via-blue-500/10 dark:to-transparent',
+                  border: 'border-blue-300 dark:border-blue-800/50',
                   text: 'text-blue-800 dark:text-sky-300',
-                  badge: 'bg-blue-100 text-blue-900 dark:bg-blue-950/40 dark:text-sky-300',
+                  badge: 'bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-sky-300 ring-1 ring-blue-400/30',
+                  dot: 'bg-blue-500 ring-2 ring-blue-400/30',
                 },
                 purple: {
-                  border: 'border-purple-500',
-                  bg: 'bg-purple-50 dark:bg-purple-500/15',
+                  stripe: 'bg-gradient-to-r from-purple-500 to-indigo-400',
+                  headerBg: 'from-purple-500/10 via-purple-500/5 to-transparent dark:from-purple-500/20 dark:via-purple-500/10 dark:to-transparent',
+                  border: 'border-purple-300 dark:border-purple-800/50',
                   text: 'text-purple-800 dark:text-purple-300',
-                  badge: 'bg-purple-100 text-purple-900 dark:bg-purple-950/40 dark:text-purple-300',
+                  badge: 'bg-purple-100 text-purple-900 dark:bg-purple-950/60 dark:text-purple-300 ring-1 ring-purple-400/30',
+                  dot: 'bg-purple-500 ring-2 ring-purple-400/30',
                 },
                 red: {
-                  border: 'border-rose-500',
-                  bg: 'bg-rose-50 dark:bg-rose-500/15',
+                  stripe: 'bg-gradient-to-r from-rose-500 to-red-400',
+                  headerBg: 'from-rose-500/10 via-rose-500/5 to-transparent dark:from-rose-500/20 dark:via-rose-500/10 dark:to-transparent',
+                  border: 'border-rose-300 dark:border-rose-800/50',
                   text: 'text-rose-800 dark:text-rose-300',
-                  badge: 'bg-rose-100 text-rose-900 dark:bg-rose-950/40 dark:text-rose-300',
+                  badge: 'bg-rose-100 text-rose-900 dark:bg-rose-950/60 dark:text-rose-300 ring-1 ring-rose-400/30',
+                  dot: 'bg-rose-500 ring-2 ring-rose-400/30',
                 },
               };
               const tone = TONE_CLASSES[cardTone] || TONE_CLASSES.blue;
@@ -2781,51 +2985,77 @@ function BatteryDetailPage() {
               const returnEvent = cycle.find((e) => e.type === 'return');
               const recycleEvent = cycle.find((e) => e.type === 'recycle');
               const latestIssue = [...cycle].reverse().find((e) => e.type === 'issue');
+              const isDiagFee = (e) =>
+                e.label === 'Diagnostic Fee' ||
+                e.serviceName?.toLowerCase().includes('diagnostic') ||
+                e.serviceName?.toLowerCase().includes('fee');
+
               const cycleRepairs = cycle.filter((e) => e.type === 'repair');
               const cycleServices = cycle.filter((e) => e.type === 'service');
+              const cycleQaServices = cycleServices.filter((e) => !isDiagFee(e));
               const cycleRemovedParts = cycle.filter((e) => e.type === 'part_removed');
               const totalRepairTimeSec = cycleRepairs.reduce((sum, r) => sum + (r.durationSeconds || 0), 0);
 
               const cyclePartsTotal = cycleRepairs
                 .filter((r) => !r.isRemoved)
                 .reduce((sum, r) => sum + (Number(r.price) || 0), 0);
+              const cycleQaServicesTotal = cycleQaServices.reduce(
+                (sum, s) => sum + (Number(s.price) || 0),
+                0
+              );
               const cycleServicesTotal = cycleServices.reduce(
                 (sum, s) => sum + (Number(s.price) || 0),
                 0
               );
               const cycleTotal = Math.max(0, cyclePartsTotal + cycleServicesTotal);
 
-              const startDateStr = cycle[0]?.date ? new Date(cycle[0].date).toLocaleDateString() : null;
+              const startDateStr = cycle[0]?.date ? new Date(cycle[0].date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : null;
               const endDateStr = (returnEvent?.date || recycleEvent?.date)
-                ? new Date(returnEvent?.date || recycleEvent?.date).toLocaleDateString()
+                ? new Date(returnEvent?.date || recycleEvent?.date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
                 : null;
 
               return (
                 <div
                   key={cycle[0].key}
-                  className={`overflow-hidden rounded-2xl border-l-4 border-y border-r border-slate-200 bg-white shadow-sm dark:border-y-white/10 dark:border-r-white/10 dark:bg-surface-900 ${tone.border}`}
+                  className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-xs dark:border-white/10 dark:bg-surface-900 transition-all hover:shadow-md"
                 >
+                  {/* Modern top accent line */}
+                  <div className={`h-1.5 w-full ${tone.stripe}`} />
+
                   {/* Cycle Header */}
-                  <div className={`flex flex-wrap items-center justify-between gap-3 px-6 py-4 border-b border-slate-200/80 dark:border-white/10 ${tone.bg}`}>
+                  <div className={`flex flex-wrap items-center justify-between gap-4 px-5 sm:px-7 py-4 bg-gradient-to-r ${tone.headerBg} border-b border-slate-200/80 dark:border-white/10`}>
                     <div>
-                      <div className="flex items-center gap-2.5">
-                        <h2 className={`text-sm font-bold uppercase tracking-wider ${tone.text}`}>
-                          Cycle #{i + 1}
-                        </h2>
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-bold shadow-2xs ${tone.badge}`}>
-                          {cardLabel}
+                      <div className="flex flex-wrap items-center gap-2.5">
+                        <span className={`px-2.5 py-0.5 rounded-lg bg-white/95 dark:bg-surface-800 border border-slate-200/80 dark:border-white/10 shadow-2xs text-xs font-black tracking-wider uppercase ${tone.text}`}>
+                          Cycle #{cycleNumber}
+                        </span>
+                        <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-0.5 text-xs font-bold shadow-2xs ${tone.badge}`}>
+                          <span className={`h-1.5 w-1.5 rounded-full ${tone.dot}`} />
+                          <span>{cardLabel}</span>
+                        </span>
+                        {isOngoing && (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-100/90 dark:bg-blue-950/70 border border-blue-200/80 dark:border-blue-800/40 px-2.5 py-0.5 text-[11px] font-black uppercase tracking-wide text-blue-700 dark:text-blue-300">
+                            <span className="relative flex h-2 w-2">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-500 opacity-75"></span>
+                              <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-600 dark:bg-blue-400"></span>
+                            </span>
+                            <span>Active Workshop Cycle</span>
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-1 flex items-center gap-1.5 text-xs text-slate-500 dark:text-neutral-400">
+                        <FiCalendar className="w-3.5 h-3.5 shrink-0 opacity-70" />
+                        <span>
+                          {startDateStr ? `Started ${startDateStr}` : ''}
+                          {endDateStr ? ` · Completed ${endDateStr}` : isOngoing ? ' · In Progress' : ''}
                         </span>
                       </div>
-                      <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
-                        {startDateStr ? `Started ${startDateStr}` : ''}
-                        {endDateStr ? ` · Completed ${endDateStr}` : isOngoing ? ' · Active Workshop Cycle' : ''}
-                      </p>
                     </div>
 
                     {isSuperAdmin && (
                       <div className="flex items-center gap-2">
                         {cycleTotal > 0 ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/95 px-3 py-1 text-xs font-extrabold text-slate-900 shadow-2xs dark:bg-surface-800 dark:text-white border border-slate-200/80 dark:border-white/10">
+                          <span className="inline-flex items-center gap-2 rounded-xl bg-white/95 px-3.5 py-1.5 text-xs font-black text-slate-900 shadow-2xs dark:bg-surface-800 dark:text-white border border-slate-200/80 dark:border-white/10">
                             <span>Total: £{cycleTotal.toFixed(2)}</span>
                             {isUnserviceableCycle && cycleServicesTotal > 0 && cyclePartsTotal === 0 && (
                               <span className="rounded-md bg-rose-100/90 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 border border-rose-200/60 dark:border-rose-900/40">
@@ -2834,7 +3064,7 @@ function BatteryDetailPage() {
                             )}
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 rounded-xl bg-white/90 px-3 py-1 text-xs font-semibold text-slate-500 dark:bg-surface-800 dark:text-neutral-400 border border-slate-200/60 dark:border-white/10">
+                          <span className="inline-flex items-center gap-1.5 rounded-xl bg-white/90 px-3.5 py-1.5 text-xs font-semibold text-slate-500 dark:bg-surface-800 dark:text-neutral-400 border border-slate-200/60 dark:border-white/10 shadow-2xs">
                             No Charge
                           </span>
                         )}
@@ -2842,45 +3072,83 @@ function BatteryDetailPage() {
                     )}
                   </div>
 
-                  {/* Cycle at a Glance Summary Pills */}
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 px-6 py-3 bg-slate-50/70 border-b border-slate-100 dark:bg-surface-950/40 dark:border-white/5 text-xs">
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-neutral-500 block">Intake Truck</span>
-                      <span className="font-semibold text-slate-700 dark:text-neutral-200">
-                        {intakeEvent?.truckNumber ? `Truck #${intakeEvent.truckNumber}` : battery?.intake_truck_number ? `Truck #${battery.intake_truck_number}` : '—'}
-                        {intakeEvent?.isVerified ? ' (Verified)' : ''}
-                      </span>
+                  {/* Cycle at a Glance Summary Cards */}
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 p-4 sm:p-5 bg-slate-50/60 dark:bg-surface-950/40 border-b border-slate-100 dark:border-white/5">
+                    {/* Intake Logistics */}
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-surface-800/80 border border-slate-200/60 dark:border-white/5 shadow-2xs">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                        <FiTruck className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">Intake Logistics</span>
+                        <span className="font-extrabold text-xs text-slate-800 dark:text-white truncate block">
+                          {intakeEvent?.truckNumber ? `Truck #${intakeEvent.truckNumber}` : battery?.intake_truck_number ? `Truck #${battery.intake_truck_number}` : '—'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate block">
+                          {intakeEvent?.isVerified ? '✓ Verified arrival' : 'Pending verification'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-neutral-500 block">Parts Fitted</span>
-                      <span className="font-semibold text-slate-700 dark:text-neutral-200">
-                        {cycleRepairs.length} {cycleRepairs.length === 1 ? 'part' : 'parts'}
-                        {isSuperAdmin && totalRepairTimeSec > 0 ? ` (${formatDuration(totalRepairTimeSec)})` : ''}
-                      </span>
+
+                    {/* Parts Installed */}
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-surface-800/80 border border-slate-200/60 dark:border-white/5 shadow-2xs">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 dark:bg-amber-950/50 dark:text-amber-400">
+                        <FiTool className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">Parts Installed</span>
+                        <span className="font-extrabold text-xs text-slate-800 dark:text-white truncate block">
+                          {cycleRepairs.length} {cycleRepairs.length === 1 ? 'part fitted' : 'parts fitted'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate block">
+                          {totalRepairTimeSec > 0 ? `${formatDuration(totalRepairTimeSec)} repair time` : 'No parts replaced'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-neutral-500 block">QA & Services</span>
-                      <span className="font-semibold text-slate-700 dark:text-neutral-200">
-                        {cycleServices.length} {cycleServices.length === 1 ? 'service' : 'services'}
-                        {isSuperAdmin && cycleServicesTotal > 0 ? ` (£${cycleServicesTotal.toFixed(2)})` : ''}
-                      </span>
+
+                    {/* QA & Services */}
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-surface-800/80 border border-slate-200/60 dark:border-white/5 shadow-2xs">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+                        <FiCheckCircle className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">QA & Services</span>
+                        <span className="font-extrabold text-xs text-slate-800 dark:text-white truncate block">
+                          {cycleQaServices.length} {cycleQaServices.length === 1 ? 'service logged' : 'services logged'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate block">
+                          {cycleQaServicesTotal > 0 ? `£${cycleQaServicesTotal.toFixed(2)} total QA` : 'Quality checks passed'}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <span className="text-[10px] font-bold uppercase text-slate-400 dark:text-neutral-500 block">Outcome / Delivery</span>
-                      <span className="font-semibold text-slate-700 dark:text-neutral-200">
-                        {returnEvent?.truckNumber
-                          ? `Returned (Truck #${returnEvent.truckNumber})`
-                          : recycleEvent
-                            ? `Recycled (Vehicle #${recycleEvent.vehicleNumber})`
-                            : isUnserviceableCycle
-                              ? 'Unserviceable'
-                              : 'In Workshop'}
-                      </span>
+
+                    {/* Outcome / Delivery */}
+                    <div className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-surface-800/80 border border-slate-200/60 dark:border-white/5 shadow-2xs">
+                      <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/50 dark:text-emerald-400">
+                        <FiPackage className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">Cycle Outcome</span>
+                        <span className="font-extrabold text-xs text-slate-800 dark:text-white truncate block">
+                          {returnEvent?.truckNumber
+                            ? `Returned (Truck #${returnEvent.truckNumber})`
+                            : recycleEvent
+                              ? `Recycled (Vehicle #${recycleEvent.vehicleNumber})`
+                              : isUnserviceableCycle
+                                ? (cycle.some((e) => e.type === 'issue' && e.failedTesting) || (isOngoing && (!!battery.failed_testing || !!issues?.[0]?.failed_testing)))
+                                  ? 'Unserviceable · Test Failed'
+                                  : 'Unserviceable'
+                                : 'In Workshop'}
+                        </span>
+                        <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate block">
+                          {endDateStr ? `Completed ${endDateStr}` : isOngoing ? 'Active in workshop' : 'Completed'}
+                        </span>
+                      </div>
                     </div>
                   </div>
 
                   {/* Stepper */}
-                  <div className="border-b border-slate-100 px-6 py-5 dark:border-white/10">
+                  <div className="border-b border-slate-100 px-5 sm:px-7 py-5 dark:border-white/10">
                     <ProcessStepper
                       isOngoing={isOngoing}
                       batteryStatus={battery.status}
@@ -2891,9 +3159,9 @@ function BatteryDetailPage() {
 
                   {/* Unserviceable Diagnostic Highlights (If unserviceable cycle) */}
                   {isUnserviceableCycle && latestIssue && (
-                    <div className="m-5 rounded-2xl border border-rose-200 bg-rose-50/80 p-4 dark:border-rose-900/50 dark:bg-rose-950/20">
-                      <div className="flex items-center gap-2 mb-2">
-                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-200 text-rose-800 text-xs font-bold dark:bg-rose-900/60 dark:text-rose-200">
+                    <div className="m-4 sm:m-6 rounded-2xl border border-rose-200/90 bg-rose-50/70 p-4 sm:p-5 dark:border-rose-900/50 dark:bg-rose-950/20 shadow-2xs">
+                      <div className="flex items-center gap-2.5 mb-2.5">
+                        <span className="flex h-6 w-6 items-center justify-center rounded-full bg-rose-200 text-rose-800 text-xs font-black dark:bg-rose-900/80 dark:text-rose-200">
                           ⚠
                         </span>
                         <h4 className="text-xs font-bold text-rose-900 dark:text-rose-200 uppercase tracking-wider">
@@ -2902,15 +3170,15 @@ function BatteryDetailPage() {
                       </div>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs text-rose-800 dark:text-rose-300">
                         <p>
-                          <span className="font-semibold text-rose-950 dark:text-rose-100">Failure Reason:</span> {latestIssue.reasonLabel || 'Unserviceable'}
+                          <span className="font-bold text-rose-950 dark:text-rose-100">Failure Reason:</span> {latestIssue.reasonLabel || 'Unserviceable'}
                         </p>
                         <p>
-                          <span className="font-semibold text-rose-950 dark:text-rose-100">Reported By:</span> {latestIssue.staffName || 'Workshop Staff'}
-                          {latestIssue.date ? ` on ${new Date(latestIssue.date).toLocaleString()}` : ''}
+                          <span className="font-bold text-rose-950 dark:text-rose-100">Reported By:</span> {latestIssue.staffName || 'Workshop Staff'}
+                          {latestIssue.date ? ` on ${new Date(latestIssue.date).toLocaleString('en-GB')}` : ''}
                         </p>
                       </div>
                       {latestIssue.notes && (
-                        <div className="mt-2 rounded-xl border border-rose-200/60 bg-white/80 p-2.5 dark:border-rose-900/40 dark:bg-surface-900">
+                        <div className="mt-2.5 rounded-xl border border-rose-200/70 bg-white/90 p-3 dark:border-rose-900/40 dark:bg-surface-900 shadow-2xs">
                           <p className="text-xs italic text-rose-900 dark:text-rose-200">"{latestIssue.notes}"</p>
                         </div>
                       )}
@@ -2919,7 +3187,7 @@ function BatteryDetailPage() {
                           <span className="text-[11px] font-bold text-rose-900 dark:text-rose-200 block mb-1.5">
                             Diagnostic Photos ({latestIssue.photos.length})
                           </span>
-                          <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-2.5">
                             {latestIssue.photos.map((src, idx) => (
                               <button
                                 key={idx}
@@ -2954,17 +3222,17 @@ function BatteryDetailPage() {
 
                   {/* Recycling Shipment Details (If recycled) */}
                   {recycleEvent && (
-                    <div className="mx-5 mb-3 rounded-2xl border border-rose-200 bg-rose-50/50 p-3.5 dark:border-rose-900/40 dark:bg-rose-950/10 flex items-center justify-between text-xs">
+                    <div className="mx-4 sm:mx-6 mb-3 rounded-2xl border border-rose-200/80 bg-rose-50/50 p-4 dark:border-rose-900/40 dark:bg-rose-950/15 flex items-center justify-between text-xs shadow-2xs">
                       <div>
                         <span className="font-bold text-rose-900 dark:text-rose-200">Sent for Material Recycling</span>
-                        <p className="text-rose-700 dark:text-rose-300 text-[11px]">
-                          Vehicle {recycleEvent.vehicleNumber} · Driver {recycleEvent.driverName} on {new Date(recycleEvent.date).toLocaleString()}
+                        <p className="text-rose-700 dark:text-rose-300 text-[11px] mt-0.5">
+                          Vehicle {recycleEvent.vehicleNumber} · Driver {recycleEvent.driverName} on {new Date(recycleEvent.date).toLocaleString('en-GB')}
                         </p>
                       </div>
                       {recycleEvent.recycleBatchId && (
                         <Link
                           to={`/recycle/${recycleEvent.recycleBatchId}`}
-                          className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition-colors"
+                          className="rounded-xl bg-rose-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-rose-700 transition-colors"
                         >
                           View Shipment
                         </Link>
@@ -2972,65 +3240,108 @@ function BatteryDetailPage() {
                     </div>
                   )}
 
-                  {/* Event Timeline */}
-                  <div className="p-5">
-                    <ol>
-                      {cycle.map((event, idx) => {
-                        const meta = EVENT_META[event.type] || EVENT_META.repair;
-                        const isLast = idx === cycle.length - 1;
-                        return (
-                          <li key={event.key} className="relative flex gap-4">
-                            {!isLast && (
-                              <span className="absolute left-4 top-9 bottom-0 w-px -translate-x-1/2 bg-slate-200 dark:bg-white/10" />
-                            )}
-                            <span
-                              className={`relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${meta.dot}`}
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                viewBox="0 0 20 20"
-                                fill="currentColor"
-                                className="h-4 w-4"
-                              >
-                                {meta.icon}
-                              </svg>
-                            </span>
-                            <div className={`min-w-0 flex-1 ${isLast ? 'pb-0' : 'pb-6'}`}>
-                              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-                                  {event.label || meta.label}
-                                </span>
-                                <span className="text-xs text-slate-400 dark:text-neutral-500">
-                                  {new Date(event.date).toLocaleString()}
-                                </span>
+                  {/* Event Timeline (Latest First) */}
+                  <div className="p-4 sm:p-7">
+                    <div className="relative pl-6 sm:pl-8">
+                      {/* Continuous vertical line track */}
+                      <div className="absolute left-3 sm:left-4 top-3 bottom-3 w-0.5 bg-slate-200/80 dark:bg-white/10" />
+
+                      <div className="space-y-4">
+                        {([...cycle].sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0))).map((event, idx) => {
+                          const meta = EVENT_META[event.type] || EVENT_META.repair;
+                          return (
+                            <div key={event.key || idx} className="relative flex items-start gap-3 sm:gap-4">
+                              {/* Node icon bubble */}
+                              <div className={`relative z-10 -ml-6 sm:-ml-8 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-xl shadow-2xs ring-4 ring-white dark:ring-surface-900 ${meta.dot}`}>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  viewBox="0 0 20 20"
+                                  fill="currentColor"
+                                  className="h-3.5 w-3.5 sm:h-4 sm:w-4"
+                                >
+                                  {meta.icon}
+                                </svg>
                               </div>
-                              <p className="text-sm text-slate-600 dark:text-neutral-300">{event.primary}</p>
-                              <div className="mt-1 flex flex-wrap items-center gap-2">
-                                {isSuperAdmin && event.durationSeconds != null && (
-                                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 dark:bg-white/5 dark:text-neutral-300">
-                                    Time taken: {formatDuration(event.durationSeconds)}
+
+                              {/* Event Content Card */}
+                              <div className={`flex-1 rounded-2xl border p-3.5 sm:p-4 transition-all shadow-2xs ${
+                                event.type === 'issue'
+                                  ? 'border-rose-300/80 bg-rose-50/60 hover:bg-rose-50/90 dark:border-rose-900/50 dark:bg-rose-950/25 dark:hover:bg-rose-950/35 ring-1 ring-rose-500/10'
+                                  : 'border-slate-200/80 bg-slate-50/50 hover:bg-slate-50/90 dark:border-white/5 dark:bg-surface-800/40 dark:hover:bg-surface-800/70'
+                              }`}>
+                                <div className="flex flex-wrap items-center justify-between gap-2 mb-1.5">
+                                  <div className="flex items-center gap-2">
+                                    <span className={`text-xs font-bold ${
+                                      event.type === 'issue'
+                                        ? 'text-rose-950 dark:text-rose-200'
+                                        : 'text-slate-900 dark:text-white'
+                                    }`}>
+                                      {event.label || meta.label}
+                                    </span>
+                                    {event.staffName && (
+                                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
+                                        event.type === 'issue'
+                                          ? 'text-rose-800 bg-rose-100/80 border-rose-200 dark:bg-rose-900/60 dark:text-rose-200 dark:border-rose-800'
+                                          : 'text-slate-500 bg-white/80 border-slate-200/60 dark:bg-surface-700 dark:text-neutral-400 dark:border-white/10'
+                                      }`}>
+                                        by {event.staffName}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+                                    {event.date ? new Date(event.date).toLocaleString('en-GB') : '—'}
                                   </span>
-                                )}
-                                {isSuperAdmin && event.price !== undefined && (
-                                  <span
-                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                                      event.isDeduction
-                                        ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
-                                        : event.isRemoved
-                                          ? 'bg-slate-100 text-slate-500 line-through dark:bg-white/10 dark:text-neutral-400'
-                                          : 'bg-brand-50 text-brand-700 dark:bg-emerald-500/10 dark:text-emerald-300'
-                                    }`}
-                                  >
-                                    {event.isDeduction
-                                      ? `-£${Math.abs(Number(event.price)).toFixed(2)}`
-                                      : `£${Number(event.price || event.originalPrice || 0).toFixed(2)}`}
-                                  </span>
-                                )}
+                                </div>
+
+                                <p className={`text-xs leading-relaxed ${
+                                  event.type === 'issue'
+                                    ? 'text-rose-900 dark:text-rose-200 font-medium'
+                                    : 'text-slate-700 dark:text-neutral-200'
+                                }`}>
+                                  {event.primary}
+                                </p>
+
+                                <div className="mt-2.5 flex flex-wrap items-center gap-2">
+                                  {event.durationSeconds != null && event.durationSeconds > 0 && (
+                                    <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/5 dark:text-neutral-300">
+                                      <FiClock className="w-3 h-3 opacity-60" />
+                                      <span>{formatDuration(event.durationSeconds)}</span>
+                                    </span>
+                                  )}
+                                  {isSuperAdmin && event.price !== undefined && (
+                                    <span
+                                      className={`rounded-lg px-2.5 py-1 text-[11px] font-bold ${
+                                        event.isDeduction
+                                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300'
+                                          : event.isRemoved
+                                            ? 'bg-slate-100 text-slate-500 line-through dark:bg-white/10 dark:text-neutral-400'
+                                            : 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300'
+                                      }`}
+                                    >
+                                      {event.isDeduction
+                                        ? `-£${Math.abs(Number(event.price)).toFixed(2)}`
+                                        : `£${Number(event.price || event.originalPrice || 0).toFixed(2)}`}
+                                    </span>
+                                  )}
+                                  {event.isVerified && (
+                                    <span className="rounded-lg bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:bg-blue-950/40 dark:text-blue-300 border border-blue-200/50 dark:border-blue-900/30">
+                                      ✓ Verified
+                                    </span>
+                                  )}
+                                </div>
+
                                 {event.notes && (
-                                  <span className="text-xs text-slate-400 dark:text-neutral-500">{event.notes}</span>
+                                  <div className={`mt-2 rounded-xl p-2.5 text-xs italic border ${
+                                    event.type === 'issue'
+                                      ? 'bg-white/95 dark:bg-surface-900/80 text-rose-900 dark:text-rose-200 border-rose-200/80 dark:border-rose-900/50'
+                                      : 'bg-white/70 dark:bg-surface-900/60 text-slate-600 dark:text-neutral-400 border-slate-200/60 dark:border-white/5'
+                                  }`}>
+                                    "{event.notes}"
+                                  </div>
                                 )}
+
                                 {event.photos && event.photos.length > 0 && (
-                                  <div className="mt-2 flex items-center gap-2">
+                                  <div className="mt-3 flex items-center gap-2">
                                     {event.photos.map((photo, pIdx) => (
                                       <button
                                         key={pIdx}
@@ -3043,7 +3354,7 @@ function BatteryDetailPage() {
                                             title: `Issue Photos — ${battery.battery_code}`,
                                           })
                                         }
-                                        className="group relative h-12 w-12 overflow-hidden rounded-lg border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-800 shadow-2xs transition hover:scale-105 hover:border-blue-500 cursor-pointer"
+                                        className="group relative h-12 w-12 overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-800 shadow-2xs transition hover:scale-105 hover:border-blue-500 cursor-pointer"
                                       >
                                         <img
                                           src={resolveImageUrl(photo)}
@@ -3056,17 +3367,17 @@ function BatteryDetailPage() {
                                 )}
                               </div>
                             </div>
-                          </li>
-                        );
-                      })}
-                    </ol>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               );
             })}
           </div>
         )
-      )}
+      }
       </>
     )}
 

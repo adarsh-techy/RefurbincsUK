@@ -154,6 +154,7 @@ async function findPage({
             last_issue.note AS issue_note,
             last_issue.reported_at AS issue_reported_at,
             last_issue.photo_urls AS issue_photos,
+            COALESCE(last_issue.failed_testing, false) AS failed_testing,
             COALESCE(pending_parts.pending_count, 0)::int AS pending_parts_count,
             COALESCE(pass_back.is_passed_back, false) AS is_passed_back,
             last_recycle.recycled_at AS recycled_at,
@@ -212,9 +213,9 @@ async function findPage({
          AND date_trunc('month', r3.repaired_at) = date_trunc('month', now())
      ) month_stats ON true
      LEFT JOIN LATERAL (
-       SELECT ir.label AS reason, bi.note, bi.reported_at, bi.photo_urls
+       SELECT COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason, bi.note, bi.reported_at, bi.photo_urls, bi.failed_testing
        FROM battery_issues bi
-       JOIN issue_reasons ir ON ir.id = bi.reason_id
+       LEFT JOIN issue_reasons ir ON ir.id = bi.reason_id
        WHERE bi.battery_id = b.id
        ORDER BY bi.reported_at DESC
        LIMIT 1
@@ -265,7 +266,12 @@ async function findByCode(batteryCode) {
             ti.status AS intake_status,
             ti.verified_at AS intake_verified_at,
             u.name AS started_by_name,
-            EXISTS (SELECT 1 FROM battery_ratings br WHERE br.battery_code = b.battery_code) AS already_rated
+            EXISTS (SELECT 1 FROM battery_ratings br WHERE br.battery_code = b.battery_code) AS already_rated,
+            COALESCE((
+              SELECT bi_ft.failed_testing FROM battery_issues bi_ft
+              WHERE bi_ft.battery_id = b.id
+              ORDER BY bi_ft.reported_at DESC LIMIT 1
+            ), false) AS failed_testing
      FROM batteries b
      LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
      LEFT JOIN users u ON u.id = b.started_by_user_id
@@ -304,7 +310,12 @@ async function findByTruckIntakeId(truckIntakeId) {
             COALESCE(monthly_visits.intake_count_this_month, 0)::int AS intake_count_this_month,
             COALESCE(monthly_visits.visits_this_month, '[]'::jsonb) AS visits_this_month,
             COALESCE(monthly_repairs.repair_count_this_month, 0)::int AS repair_count_this_month,
-            COALESCE(monthly_repairs.repairs_this_month, '[]'::jsonb) AS repairs_this_month
+            COALESCE(monthly_repairs.repairs_this_month, '[]'::jsonb) AS repairs_this_month,
+            COALESCE((
+              SELECT bi_ft.failed_testing FROM battery_issues bi_ft
+              WHERE bi_ft.battery_id = b.id
+              ORDER BY bi_ft.reported_at DESC LIMIT 1
+            ), false) AS failed_testing
      FROM batteries b
      -- The current workshop cycle starts at the battery's latest visit (or its
      -- creation for legacy rows). Parts-pending-removal and passed-back flags
@@ -520,7 +531,7 @@ async function findVisitHistory(batteryId) {
 // unserviceable.
 async function findIssueHistory(batteryId) {
   const { rows } = await db.query(
-    `SELECT bi.id, bi.note, bi.reported_at, bi.photo_urls, COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason_label, s.name AS staff_name
+    `SELECT bi.id, bi.note, bi.reported_at, bi.photo_urls, bi.failed_testing, COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason_label, s.name AS staff_name
      FROM battery_issues bi
      LEFT JOIN issue_reasons ir ON ir.id = bi.reason_id
      LEFT JOIN staff s ON s.id = bi.staff_id
@@ -557,7 +568,27 @@ async function findPendingPartsRemoval(batteryId) {
     `SELECT r.id, r.part_id, r.quantity_used, p.name AS part_name, r.repaired_at
      FROM repairs r
      JOIN parts p ON p.id = r.part_id
-     WHERE r.battery_id = $1 AND r.removed_at IS NULL
+     JOIN batteries b ON b.id = r.battery_id
+     LEFT JOIN LATERAL (
+       SELECT COALESCE(MAX(bv.created_at), b.created_at) AS started_at
+       FROM battery_visits bv
+       WHERE bv.battery_id = b.id
+     ) cycle ON true
+     WHERE r.battery_id = $1
+       AND r.removed_at IS NULL
+       AND (
+         b.status = 'unserviceable'
+         OR (
+           b.status IN ('in_repair', 'passed_to_remove', 'passed_for_part_removal')
+           AND EXISTS (
+             SELECT 1 FROM battery_services bs_pb
+             WHERE bs_pb.battery_id = b.id
+               AND bs_pb.service_name = 'Passed back to Technician'
+               AND bs_pb.completed_at >= cycle.started_at - INTERVAL '1 minute'
+           )
+         )
+       )
+       AND r.repaired_at >= cycle.started_at - INTERVAL '1 minute'
      ORDER BY r.repaired_at ASC`,
     [batteryId]
   );
@@ -623,6 +654,23 @@ async function removeParts(batteryId, repairIds = [], staffId) {
        RETURNING *`,
       [batteryId]
     );
+
+    // If no issue record exists yet for this battery, record that it failed testing / was marked unserviceable with parts removed
+    const { rows: existingIssue } = await client.query(
+      'SELECT id FROM battery_issues WHERE battery_id = $1 LIMIT 1',
+      [batteryId]
+    );
+    if (existingIssue.length === 0) {
+      await client.query(
+        `INSERT INTO battery_issues (battery_id, staff_id, reason_id, note, photo_urls, failed_testing, reported_at)
+         VALUES ($1, $2, NULL, $3, '{}', true, now())`,
+        [
+          batteryId,
+          staffId,
+          'Fitted parts removed & restocked to inventory. Unit declared unserviceable scrap.',
+        ]
+      );
+    }
 
     await client.query('COMMIT');
     return { removedCount: targets.length, battery: batteryRows[0] };
@@ -788,6 +836,13 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+    // Was the battery on the tester's bench? Then this is a QA "Test Failed",
+    // not a technician marking it unserviceable mid-repair.
+    const { rows: prev } = await client.query(
+      'SELECT status FROM batteries WHERE id = $1 FOR UPDATE',
+      [id]
+    );
+    const failedTesting = prev[0]?.status === 'in_testing';
     const { rows } = await client.query(
       `UPDATE batteries
        SET status = 'unserviceable',
@@ -806,9 +861,9 @@ async function reportIssue(id, { staffId, reasonId, note, photoUrls = [] }) {
       return undefined;
     }
     await client.query(
-      `INSERT INTO battery_issues (battery_id, staff_id, reason_id, note, photo_urls)
-       VALUES ($1, $2, $3, $4, $5)`,
-      [id, staffId, reasonId, note || null, Array.isArray(photoUrls) ? photoUrls : []]
+      `INSERT INTO battery_issues (battery_id, staff_id, reason_id, note, photo_urls, failed_testing)
+       VALUES ($1, $2, $3, $4, $5, $6)`,
+      [id, staffId, reasonId, note || null, Array.isArray(photoUrls) ? photoUrls : [], failedTesting]
     );
     await client.query('COMMIT');
     return rows[0];
@@ -1041,9 +1096,9 @@ async function findTimeline(batteryId) {
       [batteryId]
     ),
     db.query(
-      `SELECT bi.id, bi.note, bi.reported_at, ir.label AS reason
+      `SELECT bi.id, bi.note, bi.reported_at, bi.failed_testing, COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason
        FROM battery_issues bi
-       JOIN issue_reasons ir ON ir.id = bi.reason_id
+       LEFT JOIN issue_reasons ir ON ir.id = bi.reason_id
        WHERE bi.battery_id = $1
        ORDER BY bi.reported_at DESC`,
       [batteryId]

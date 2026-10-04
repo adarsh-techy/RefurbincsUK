@@ -611,7 +611,7 @@ function ClientCertificatesPage() {
         <Modal
           title="Sustainability Milestone Certificate"
           description={selectedCert.title}
-          size="4xl"
+          size="5xl"
           onClose={() => setSelectedCert(null)}
         >
           <CertificateView

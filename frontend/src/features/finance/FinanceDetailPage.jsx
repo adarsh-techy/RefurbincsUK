@@ -16,6 +16,9 @@ import {
   FiChevronUp,
   FiClock,
   FiDownload,
+  FiRotateCcw,
+  FiCpu,
+  FiTarget,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import PageHeader from '../../components/ui/primitives/PageHeader';
@@ -25,6 +28,24 @@ import { StatusBadge } from '../../components/ui/primitives/Badge';
 
 function formatMoney(value) {
   return `£${Number(value || 0).toFixed(2)}`;
+}
+
+const UNSERVICEABLE_STATUSES = [
+  'unserviceable',
+  'tested_parts_removed',
+  'unserviceable_parts_removed',
+  'recycled',
+];
+
+function isBatteryUnserviceable(status) {
+  if (!status) return false;
+  const s = String(status).toLowerCase().trim();
+  return (
+    UNSERVICEABLE_STATUSES.includes(s) ||
+    s.includes('unserviceable') ||
+    s.includes('parts_removed') ||
+    s.includes('test failed')
+  );
 }
 
 function formatDuration(seconds) {
@@ -253,13 +274,46 @@ function FinanceDetailPage() {
       }
     });
 
-    const list = Array.from(map.values()).map((g) => ({
-      ...g,
-      services: Array.from(g.services),
-      parts: Array.from(g.parts),
-      chargeTypes: Array.from(g.chargeTypes),
-      items: g.items.sort((a, b) => new Date(b.repairedAt || b.charge_date || 0) - new Date(a.repairedAt || a.charge_date || 0)),
-    }));
+    const list = Array.from(map.values()).map((g) => {
+      const isUnserviceable =
+        isBatteryUnserviceable(g.batteryStatus) ||
+        Boolean(g.items.some((it) => it.partsRemoved || it.parts_removed));
+
+      const adjustedPartsCharge = isUnserviceable ? 0 : g.partsCharge;
+      const adjustedLaborCharge = isUnserviceable ? 0 : g.laborCharge;
+      const adjustedTotalCharge = adjustedPartsCharge + adjustedLaborCharge + g.serviceFee;
+
+      const items = g.items
+        .map((it) => {
+          const isItemRepair =
+            it.chargeType === 'repair' ||
+            (!it.serviceFee && (it.partsCharge > 0 || it.laborCharge > 0 || it.partName));
+          const itPartsCh = isUnserviceable && isItemRepair ? 0 : Number(it.partsCharge || 0);
+          const itLaborCh = isUnserviceable && isItemRepair ? 0 : Number(it.laborCharge || 0);
+          const itSrvFee = Number(it.serviceFee || 0);
+          return {
+            ...it,
+            partsRemoved: (isUnserviceable && isItemRepair) || it.partsRemoved || it.parts_removed,
+            partsCharge: itPartsCh,
+            laborCharge: itLaborCh,
+            serviceFee: itSrvFee,
+            totalCharge: itPartsCh + itLaborCh + itSrvFee,
+          };
+        })
+        .sort((a, b) => new Date(b.repairedAt || b.charge_date || 0) - new Date(a.repairedAt || a.charge_date || 0));
+
+      return {
+        ...g,
+        isUnserviceable,
+        partsCharge: adjustedPartsCharge,
+        laborCharge: adjustedLaborCharge,
+        totalCharge: adjustedTotalCharge,
+        services: Array.from(g.services),
+        parts: Array.from(g.parts),
+        chargeTypes: Array.from(g.chargeTypes),
+        items,
+      };
+    });
 
     list.sort((a, b) => new Date(b.latestDate || 0) - new Date(a.latestDate || 0));
 
@@ -274,11 +328,11 @@ function FinanceDetailPage() {
     return groupedBatteries.filter((b) => {
       const code = (b.batteryCode || '').toLowerCase();
       const client = (b.clientName || '').toLowerCase();
-      const staffMatches = b.staffList.some((s) => (s.name || '').toLowerCase().includes(q));
-      const serviceMatches = b.services.some((s) => s.toLowerCase().includes(q));
-      const partMatches = b.parts.some((p) => p.toLowerCase().includes(q));
-      const noteMatches = b.notes.some((n) => n.toLowerCase().includes(q));
-      const typeMatches = b.chargeTypes.some((t) => t.toLowerCase().includes(q));
+      const staffMatches = (b.staffList || []).some((s) => (s?.name || '').toLowerCase().includes(q));
+      const serviceMatches = (b.services || []).some((s) => (s || '').toLowerCase().includes(q));
+      const partMatches = (b.parts || []).some((p) => (p || '').toLowerCase().includes(q));
+      const noteMatches = (b.notes || []).some((n) => (n || '').toLowerCase().includes(q));
+      const typeMatches = (b.chargeTypes || []).some((t) => (t || '').toLowerCase().includes(q));
       const statusMatches = (b.batteryStatus || '').toLowerCase().includes(q);
 
       return (
@@ -384,37 +438,54 @@ function FinanceDetailPage() {
         </div>
       </div>
 
-      {/* KPI Cards Grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {/* KPI Cards Grid (6 Balanced Pillars) */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5 sm:gap-3">
         <StatCard
+          icon={<FiTrendingUp className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
           label="Total Revenue"
           value={formatMoney(totals.totalRevenue)}
           tone="good"
-          sub="Repairs, Fees & Recycling"
+          sub="All services & recycling"
         />
         <StatCard
-          label="Repair Cost"
+          icon={<FiTool className="h-3.5 w-3.5 text-slate-600 dark:text-neutral-400" />}
+          label="Parts Service"
           value={formatMoney(totals.repairRevenue)}
           tone="neutral"
-          sub={`Parts: ${formatMoney(totals.partsRevenue)} · Labor: ${formatMoney(totals.laborRevenue)}`}
+          sub="Fitting & part charges"
         />
         <StatCard
-          label="Service & Intake Fees"
+          icon={<FiLayers className="h-3.5 w-3.5 text-sky-600 dark:text-sky-400" />}
+          label="Service & Fees"
           value={formatMoney(totals.servicesRevenue)}
           tone="info"
-          sub={`${totals.servicesCount || 0} service / intake fee items`}
+          sub={`${totals.servicesCount || 0} diagnostic & tests`}
         />
         <StatCard
-          label="Recycle Revenue"
+          icon={<FiRotateCcw className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
+          label="Recycle Scrap"
           value={formatMoney(totals.recycleRevenue)}
           tone="warning"
-          sub="Scrap & battery recycling payout"
+          sub="End-of-life battery payout"
         />
         <StatCard
-          label="Batteries Serviced"
+          icon={<FiCpu className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
+          label="Units Serviced"
           value={`${totals.batteriesCount || 0} units`}
           tone="good"
-          sub={`${(totals.repairsCount || 0) + (totals.servicesCount || 0)} total logged actions`}
+          sub="Unique batteries handled"
+        />
+        <StatCard
+          icon={<FiTarget className="h-3.5 w-3.5 text-purple-600 dark:text-purple-400" />}
+          label="Avg. per Unit"
+          value={formatMoney(
+            totals.avgRevenuePerBattery ||
+              (totals.batteriesCount > 0
+                ? (totals.repairRevenue + totals.servicesRevenue) / totals.batteriesCount
+                : 0)
+          )}
+          tone="purple"
+          sub="Average revenue per battery"
         />
       </div>
 
@@ -591,374 +662,420 @@ function FinanceDetailPage() {
       </div>
 
       {/* Itemized Battery Fee & Service Transaction Log */}
-      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-850 space-y-4">
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-sm dark:border-white/10 dark:bg-surface-850 space-y-4">
+        {/* Table Header & Search Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4 dark:border-white/5">
           <div>
-            <h2 className="text-sm font-black text-slate-900 dark:text-white">
-              Itemized Battery Charges & Fee Ledger ({filteredBatteries.length})
-            </h2>
-            <p className="text-xs text-slate-500 dark:text-neutral-400">
-              Complete breakdown of every billable repair, mandatory intake fee, and diagnostic service consolidated per battery.
+            <div className="flex items-center gap-2.5">
+              <h2 className="text-base font-black text-slate-900 dark:text-white tracking-tight">
+                Itemized Battery Charges & Fee Ledger
+              </h2>
+              <span className="rounded-full bg-slate-100 dark:bg-surface-800 px-2.5 py-0.5 text-xs font-bold text-slate-700 dark:text-neutral-300">
+                {filteredBatteries.length} {filteredBatteries.length === 1 ? 'Battery' : 'Batteries'}
+              </span>
+            </div>
+            <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
+              Clear breakdown of repair parts, labor charges, and diagnostic testing fees per battery.
             </p>
           </div>
 
-          <div className="relative min-w-[240px]">
-            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
-            <input
-              type="text"
-              placeholder="Search battery, client, service, part, fee…"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-8 pr-7 py-1.5 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-800"
-            />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => setSearchQuery('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200"
-              >
-                <FiX className="w-3.5 h-3.5" />
-              </button>
-            )}
+          <div className="flex items-center gap-3">
+            <div className="relative min-w-[260px]">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5" />
+              <input
+                type="text"
+                placeholder="Search battery, client, service, part…"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-8 pr-7 py-2 text-xs rounded-xl border border-slate-200 bg-slate-50 text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-800 transition-all shadow-2xs"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+                >
+                  <FiX className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Scrollable Data Table */}
-        <div className="rounded-xl border border-slate-200/80 dark:border-white/10 overflow-hidden shadow-2xs">
-          <div className="max-h-[560px] overflow-y-auto overflow-x-auto">
+        {/* Scrollable Modern Data Table */}
+        <div className="rounded-2xl border border-slate-200 dark:border-surface-700 overflow-hidden shadow-2xs bg-white dark:bg-surface-850">
+          <div className="overflow-x-auto">
             <table className="w-full text-left text-xs border-collapse">
-              <thead className="sticky top-0 z-10 bg-slate-100/95 dark:bg-surface-900/95 backdrop-blur-xs border-b border-slate-200 dark:border-white/10">
-                <tr className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">
-                  <th className="py-3 px-3.5 w-12 text-center">#</th>
-                  <th className="py-3 px-3.5 min-w-[130px]">Date & Time</th>
-                  <th className="py-3 px-3.5 min-w-[140px]">Battery Code</th>
-                  <th className="py-3 px-3.5 min-w-[130px]">Client</th>
-                  <th className="py-3 px-3.5 min-w-[120px]">Type</th>
-                  <th className="py-3 px-3.5 min-w-[130px]">Staff / System</th>
-                  <th className="py-3 px-3.5 min-w-[180px]">Service / Parts</th>
-                  <th className="py-3 px-3.5 min-w-[90px]">Labor</th>
-                  <th className="py-3 px-3.5 min-w-[90px]">Parts</th>
-                  <th className="py-3 px-3.5 min-w-[90px]">Fee</th>
-                  <th className="py-3 px-3.5 min-w-[100px]">Total Charge</th>
-                  <th className="py-3 px-3.5 min-w-[100px]">Status</th>
-                  <th className="py-3 px-2 w-10 text-center"></th>
+              <thead className="bg-slate-50/90 dark:bg-surface-900/90 backdrop-blur-xs border-b border-slate-200 dark:border-surface-700">
+                <tr className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+                  <th className="py-3.5 px-4 w-12 text-center">#</th>
+                  <th className="py-3.5 px-4 min-w-[170px]">Battery & Status</th>
+                  <th className="py-3.5 px-4 min-w-[150px]">Client & Date</th>
+                  <th className="py-3.5 px-4 min-w-[230px]">Work Performed & Staff</th>
+                  <th className="py-3.5 px-4 min-w-[130px] text-right">Part Service Charge</th>
+                  <th className="py-3.5 px-4 min-w-[120px] text-right">Service Fees</th>
+                  <th className="py-3.5 px-4 min-w-[120px] text-right">Total Billed</th>
+                  <th className="py-3.5 px-4 w-28 text-center">Breakdown</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-white/5 bg-white dark:bg-surface-850">
+              <tbody className="divide-y divide-slate-200 dark:divide-surface-700">
                 {filteredBatteries.length === 0 ? (
                   <tr>
-                    <td colSpan={13} className="py-12 text-center text-slate-400 dark:text-neutral-500">
+                    <td colSpan={8} className="py-16 text-center text-slate-400 dark:text-neutral-500">
                       <div className="flex flex-col items-center justify-center gap-2">
-                        <FiTool className="w-8 h-8 text-slate-300 dark:text-neutral-600" />
-                        <p className="font-semibold">
+                        <div className="h-12 w-12 rounded-2xl bg-slate-100 dark:bg-surface-800 flex items-center justify-center text-slate-400">
+                          <FiTool className="w-6 h-6" />
+                        </div>
+                        <p className="font-bold text-slate-700 dark:text-neutral-300">
                           {searchQuery
                             ? 'No batteries match your search query.'
                             : 'No battery fees or repair charges found for this period.'}
+                        </p>
+                        <p className="text-xs text-slate-400">
+                          {searchQuery ? 'Try clearing your search filters' : 'Charges will automatically log here as batteries are processed'}
                         </p>
                       </div>
                     </td>
                   </tr>
                 ) : (
                   filteredBatteries.map((b, index) => {
+                    const chargeTypesList = Array.isArray(b.chargeTypes)
+                      ? b.chargeTypes
+                      : Array.from(b.chargeTypes || []);
+                    const partsList = Array.isArray(b.parts)
+                      ? b.parts
+                      : Array.from(b.parts || []);
+                    const servicesList = Array.isArray(b.services)
+                      ? b.services
+                      : Array.from(b.services || []);
+
+                    const isUnserviceable =
+                      b.isUnserviceable ||
+                      isBatteryUnserviceable(b.batteryStatus) ||
+                      Boolean(b.items?.some((it) => it.partsRemoved || it.parts_removed));
+
                     const hasRepair =
-                      b.chargeTypes.includes('repair') || b.partsCharge > 0 || b.laborCharge > 0 || (b.parts && b.parts.length > 0);
-                    const testingServices = (b.services || []).filter(
+                      chargeTypesList.includes('repair') || b.partsCharge > 0 || b.laborCharge > 0 || partsList.length > 0;
+                    const testingServices = servicesList.filter(
                       (s) => s && s.toLowerCase() !== 'passed back to technician'
                     );
                     const hasTesting =
-                      b.chargeTypes.includes('service_fee') || b.serviceFee > 0 || testingServices.length > 0;
-                    const hasBoth = hasRepair && hasTesting;
+                      chargeTypesList.includes('service_fee') || b.serviceFee > 0 || testingServices.length > 0;
 
-                    // Separate repair staff and testing staff
-                    const repairItems = (b.items || []).filter(
-                      (it) => it.chargeType === 'repair' || (it.partsCharge > 0 || it.laborCharge > 0)
-                    );
-                    const testingItems = (b.items || []).filter(
-                      (it) =>
-                        (it.chargeType === 'service_fee' || it.serviceFee > 0) &&
-                        (it.itemDescription || it.partName || '').toLowerCase() !== 'passed back to technician'
-                    );
-
-                    const repairStaff = Array.from(
-                      new Set(
-                        repairItems
-                          .map((it) => it.staffName)
-                          .filter((n) => n && !n.toLowerCase().includes('system') && !n.toLowerCase().includes('auto'))
-                      )
-                    );
-                    const testingStaff = Array.from(
-                      new Set(
-                        testingItems
-                          .map((it) => it.staffName)
-                          .filter((n) => n && !n.toLowerCase().includes('system') && !n.toLowerCase().includes('auto'))
-                      )
-                    );
-
-                    const allRealStaff = b.staffList.filter(
-                      (s) => s.name && !s.name.toLowerCase().includes('system') && !s.name.toLowerCase().includes('auto')
-                    );
-
+                    const repairCharge = isUnserviceable ? 0 : (b.partsCharge + b.laborCharge);
                     const isExpanded = expandedBatteries.has(b.key);
+
+                    // Real staff names
+                    const realStaffNames = (b.staffList || [])
+                      .map((s) => s?.name)
+                      .filter((n) => n && !n.toLowerCase().includes('system') && !n.toLowerCase().includes('auto'));
 
                     return (
                       <Fragment key={b.key}>
-                        <tr className="hover:bg-slate-50/80 dark:hover:bg-surface-800/60 transition-colors">
-                          <td className="py-3 px-3.5 text-center font-mono text-slate-400 dark:text-neutral-500">
+                        <tr className={`transition-colors hover:bg-slate-50/80 dark:hover:bg-surface-800/40 ${isExpanded ? 'bg-blue-50/20 dark:bg-blue-950/10' : ''}`}>
+                          {/* 1. Index # */}
+                          <td className="py-3.5 px-4 text-center font-mono text-[11px] text-slate-400 dark:text-neutral-500">
                             {index + 1}
                           </td>
-                          <td className="py-3 px-3.5">
-                            <div className="flex flex-col">
-                              <span className="font-bold text-slate-800 dark:text-neutral-200">
-                                {b.latestDate ? new Date(b.latestDate).toLocaleDateString([], {
-                                  day: '2-digit',
-                                  month: 'short',
-                                }) : '—'}
-                              </span>
-                              <span className="text-[10px] text-slate-400 dark:text-neutral-500">
-                                {b.latestDate ? new Date(b.latestDate).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                }) : ''}
-                              </span>
-                            </div>
-                          </td>
-                          <td className="py-3 px-3.5 font-medium">
-                            <div className="flex items-center gap-1.5 flex-wrap">
+
+                          {/* 2. Battery & Status */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-col gap-1.5">
                               {b.batteryCode ? (
                                 <Link
                                   to={`/batteries/${b.batteryCode}`}
-                                  className="inline-flex items-center gap-1 font-mono font-bold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-md hover:underline dark:bg-blue-950/60 dark:text-blue-300"
+                                  className="inline-flex items-center gap-1 font-mono font-bold text-sm text-blue-600 hover:text-blue-700 hover:underline dark:text-blue-400"
                                 >
                                   {b.batteryCode}
                                 </Link>
                               ) : (
-                                <span className="text-slate-400">—</span>
+                                <span className="font-mono text-sm text-slate-400">—</span>
                               )}
-                              {b.items.length > 1 && (
-                                <button
-                                  type="button"
-                                  onClick={() => toggleExpand(b.key)}
-                                  className="inline-flex items-center text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-600 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 px-1.5 py-0.5 rounded-full transition-colors cursor-pointer"
-                                  title="Toggle charge breakdown"
-                                >
-                                  {b.items.length} charges
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                          <td className="py-3 px-3.5 font-semibold text-slate-800 dark:text-neutral-200">
-                            {b.clientName}
-                          </td>
-
-                          {/* Type Column with Light Gray Divider if both Repair & Testing */}
-                          <td className="py-3 px-3.5">
-                            <div className="flex flex-col gap-1.5 justify-center">
-                              {hasRepair && (
-                                <div>
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                    Repair Job
-                                  </span>
-                                </div>
-                              )}
-                              {hasBoth && (
-                                <div className="border-t border-slate-200 dark:border-white/10 w-full" />
-                              )}
-                              {hasTesting && (
-                                <div>
-                                  <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300">
-                                    Testing & Fee
-                                  </span>
-                                </div>
-                              )}
-                              {!hasRepair && !hasTesting && <span className="text-slate-400">—</span>}
+                              <div>
+                                {b.batteryStatus ? (
+                                  <StatusBadge status={b.batteryStatus} />
+                                ) : (
+                                  <span className="text-[11px] text-slate-400">—</span>
+                                )}
+                              </div>
                             </div>
                           </td>
 
-                          {/* Staff / System Column with Light Gray Divider */}
-                          <td className="py-3 px-3.5">
-                            <div className="flex flex-col gap-1.5 justify-center">
-                              {hasRepair && (
-                                <div className="text-xs">
-                                  {repairStaff.length > 0 ? (
-                                    repairStaff.map((st, i) => (
-                                      <span key={i} className="font-semibold text-slate-800 dark:text-neutral-200 block truncate max-w-[130px]" title={st}>
-                                        {st}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-slate-400 text-xs">—</span>
-                                  )}
-                                </div>
-                              )}
-                              {hasBoth && (
-                                <div className="border-t border-slate-200 dark:border-white/10 w-full" />
-                              )}
-                              {hasTesting && (
-                                <div className="text-xs">
-                                  {testingStaff.length > 0 ? (
-                                    testingStaff.map((st, i) => (
-                                      <span key={i} className="font-semibold text-slate-800 dark:text-neutral-200 block truncate max-w-[130px]" title={st}>
-                                        {st}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-slate-400 text-xs">
-                                      {allRealStaff.length > 0 ? allRealStaff[0].name : 'System Auto'}
+                          {/* 3. Client & Date */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-col gap-1">
+                              <span className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[160px]" title={b.clientName}>
+                                {b.clientName}
+                              </span>
+                              <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+                                {b.latestDate ? new Date(b.latestDate).toLocaleDateString('en-GB', {
+                                  day: '2-digit',
+                                  month: 'short',
+                                  year: 'numeric',
+                                }) : '—'}
+                              </span>
+                            </div>
+                          </td>
+
+                          {/* 4. Work Performed & Staff */}
+                          <td className="py-3.5 px-4">
+                            <div className="flex flex-col gap-1.5 max-w-[280px]">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                {partsList.length > 0 && isUnserviceable ? (
+                                  <span
+                                    className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[9.5px] font-semibold text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 border border-amber-200/70 dark:border-amber-800/40"
+                                    title="Fitted parts were removed after test failure — client is not charged"
+                                  >
+                                    <FiTool className="w-2.5 h-2.5 shrink-0 text-amber-600 dark:text-amber-400" />
+                                    <span className="line-through opacity-80">
+                                      {partsList.slice(0, 2).join(', ')}{partsList.length > 2 ? ` +${partsList.length - 2}` : ''}
                                     </span>
-                                  )}
-                                </div>
-                              )}
-                              {!hasRepair && !hasTesting && (
-                                <span className="text-slate-400">{allRealStaff[0]?.name || '—'}</span>
+                                    <span className="ml-0.5 text-[8.5px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                                      (Removed)
+                                    </span>
+                                  </span>
+                                ) : partsList.length > 0 ? (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-50 px-1.5 py-0.5 text-[9.5px] font-semibold text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
+                                    <FiTool className="w-2.5 h-2.5 shrink-0" />
+                                    <span>Fitted: {partsList.slice(0, 2).join(', ')}{partsList.length > 2 ? ` +${partsList.length - 2}` : ''}</span>
+                                  </span>
+                                ) : null}
+
+                                {hasTesting && (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-1.5 py-0.5 text-[9.5px] font-semibold text-sky-800 dark:bg-sky-950/60 dark:text-sky-300 border border-sky-200/60 dark:border-sky-800/40">
+                                    <FiLayers className="w-2.5 h-2.5 shrink-0" />
+                                    <span>{testingServices[0] || 'Diagnostic Fee'}</span>
+                                  </span>
+                                )}
+
+                                {!hasRepair && !hasTesting && (
+                                  <span className="text-[11px] text-slate-400">Standard Intake Inspection</span>
+                                )}
+                              </div>
+
+                              {realStaffNames.length > 0 ? (
+                                <span className="text-[11px] text-slate-500 dark:text-neutral-400 truncate" title={realStaffNames.join(', ')}>
+                                  Staff: <span className="font-semibold text-slate-700 dark:text-neutral-300">{realStaffNames.join(', ')}</span>
+                                </span>
+                              ) : (
+                                <span className="text-[10px] text-slate-400">Automated intake scan</span>
                               )}
                             </div>
                           </td>
 
-                          {/* Service / Parts Column with Light Gray Divider */}
-                          <td className="py-3 px-3.5">
-                            <div className="flex flex-col gap-1.5 max-w-[340px] justify-center">
-                              {hasRepair && (
-                                <div className="flex flex-wrap gap-1 items-center">
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80 dark:text-emerald-400 mr-1 shrink-0">
-                                    Parts:
-                                  </span>
-                                  {b.parts.length > 0 ? (
-                                    b.parts.map((p, pIdx) => (
-                                      <span
-                                        key={`prt-${pIdx}`}
-                                        className="inline-flex items-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300"
-                                      >
-                                        {p}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-slate-400 text-[11px]">No parts replaced</span>
-                                  )}
-                                </div>
-                              )}
-                              {hasBoth && (
-                                <div className="border-t border-slate-200 dark:border-white/10 w-full" />
-                              )}
-                              {hasTesting && (
-                                <div className="flex flex-wrap gap-1 items-center">
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-purple-700/80 dark:text-purple-400 mr-1 shrink-0">
-                                    Testing:
-                                  </span>
-                                  {testingServices.length > 0 ? (
-                                    testingServices.map((s, sIdx) => (
-                                      <span
-                                        key={`srv-${sIdx}`}
-                                        className="inline-flex items-center rounded-md bg-purple-50 px-1.5 py-0.5 text-[11px] font-semibold text-purple-700 dark:bg-purple-950/60 dark:text-purple-300"
-                                      >
-                                        {s}
-                                      </span>
-                                    ))
-                                  ) : (
-                                    <span className="text-slate-400 text-[11px]">Diagnostic / Intake Fee</span>
-                                  )}
-                                </div>
-                              )}
-                              {!hasRepair && !hasTesting && (
-                                <span className="text-slate-400">—</span>
-                              )}
-                            </div>
+                          {/* 5. Part Service Charge */}
+                          <td className="py-3.5 px-4 text-right">
+                            {isUnserviceable && (partsList.length > 0 || chargeTypesList.includes('repair')) ? (
+                              <div className="flex flex-col items-end gap-0.5">
+                                <span className="font-mono font-bold text-xs text-slate-400 line-through dark:text-neutral-500">
+                                  £0.00
+                                </span>
+                                <span className="inline-flex items-center text-[9.5px] font-bold text-amber-700 dark:text-amber-300 bg-amber-50 dark:bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-200/60 dark:border-amber-800/40">
+                                  Parts Removed
+                                </span>
+                              </div>
+                            ) : repairCharge > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="font-mono font-bold text-xs text-slate-900 dark:text-white">
+                                  {formatMoney(repairCharge)}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  Part service fee
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="font-mono text-xs text-slate-300 dark:text-neutral-600">—</span>
+                            )}
                           </td>
-                          <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
-                            {b.laborCharge > 0 ? formatMoney(b.laborCharge) : '—'}
+
+                          {/* 6. Service Fees */}
+                          <td className="py-3.5 px-4 text-right">
+                            {b.serviceFee > 0 ? (
+                              <div className="flex flex-col items-end">
+                                <span className="font-mono font-bold text-xs text-sky-700 dark:text-sky-300">
+                                  {formatMoney(b.serviceFee)}
+                                </span>
+                                <span className="text-[10px] text-slate-400">
+                                  Fee item
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="font-mono text-xs text-slate-300 dark:text-neutral-600">—</span>
+                            )}
                           </td>
-                          <td className="py-3 px-3.5 font-mono text-slate-600 dark:text-neutral-300">
-                            {b.partsCharge > 0 ? formatMoney(b.partsCharge) : '—'}
+
+                          {/* 7. Total Billed (Hero Column) */}
+                          <td className="py-3.5 px-4 text-right">
+                            <span className={`inline-flex items-center font-mono font-black text-xs sm:text-sm px-2.5 py-1 rounded-lg border ${
+                              b.totalCharge > 0
+                                ? 'text-emerald-700 bg-emerald-50 border-emerald-200/70 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/40'
+                                : 'text-slate-500 bg-slate-100 border-slate-200 dark:bg-surface-800 dark:text-neutral-400 dark:border-surface-700'
+                            }`}>
+                              {formatMoney(b.totalCharge)}
+                            </span>
                           </td>
-                          <td className="py-3 px-3.5 font-mono text-purple-600 dark:text-purple-400 font-bold">
-                            {b.serviceFee > 0 ? formatMoney(b.serviceFee) : '—'}
-                          </td>
-                          <td className="py-3 px-3.5 font-mono font-black text-emerald-600 dark:text-emerald-400">
-                            {formatMoney(b.totalCharge)}
-                          </td>
-                          <td className="py-3 px-3.5">
-                            {b.batteryStatus ? <StatusBadge status={b.batteryStatus} /> : '—'}
-                          </td>
-                          <td className="py-3 px-2 text-center">
+
+                          {/* 8. Breakdown Toggle */}
+                          <td className="py-3.5 px-4 text-center">
                             {b.items.length > 1 ? (
                               <button
                                 type="button"
                                 onClick={() => toggleExpand(b.key)}
-                                title={isExpanded ? 'Collapse charge details' : 'Expand charge details'}
-                                className="p-1 rounded-lg hover:bg-slate-100 dark:hover:bg-surface-800 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                                className={`inline-flex items-center gap-1 text-[11px] font-bold px-2.5 py-1 rounded-lg transition-all cursor-pointer ${
+                                  isExpanded
+                                    ? 'bg-blue-600 text-white shadow-xs'
+                                    : 'bg-slate-100 hover:bg-slate-200 text-slate-700 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700'
+                                }`}
                               >
+                                <span>{b.items.length} items</span>
                                 {isExpanded ? (
-                                  <FiChevronUp className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                                  <FiChevronUp className="w-3.5 h-3.5" />
                                 ) : (
-                                  <FiChevronDown className="w-4 h-4" />
+                                  <FiChevronDown className="w-3.5 h-3.5 text-slate-400" />
                                 )}
                               </button>
-                            ) : null}
+                            ) : (
+                              <span className="text-[11px] font-medium text-slate-400">1 item</span>
+                            )}
                           </td>
                         </tr>
 
                         {/* Expandable itemized sub-row */}
                         {isExpanded && (
-                          <tr className="bg-slate-50/80 dark:bg-surface-900/60 border-y border-slate-200/70 dark:border-white/5">
-                            <td colSpan={13} className="py-3 px-4 pl-10 pr-6">
-                              <div className="rounded-xl border border-slate-200/80 bg-white p-3 dark:border-white/10 dark:bg-surface-850 shadow-2xs space-y-2">
-                                <div className="flex items-center justify-between text-xs font-bold text-slate-700 dark:text-neutral-200 border-b border-slate-100 dark:border-white/5 pb-2">
-                                  <span>Itemized Individual Charges ({b.items.length})</span>
-                                  <span className="text-[11px] font-normal text-slate-400">
-                                    Battery: <span className="font-mono font-bold text-blue-600 dark:text-blue-400">{b.batteryCode || '—'}</span>
-                                  </span>
+                          <tr className="bg-slate-50/70 dark:bg-surface-900/90 border-y border-slate-200/90 dark:border-white/10">
+                            <td colSpan={8} className="py-4 px-4 sm:px-6">
+                              <div className="rounded-2xl border border-slate-200/90 dark:border-white/10 bg-white dark:bg-surface-850 p-4 sm:p-5 shadow-xs space-y-3">
+                                {/* Sub-row Header */}
+                                <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-white/5 pb-3">
+                                  <div className="flex flex-wrap items-center gap-2.5">
+                                    <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400">
+                                      <FiLayers className="h-3.5 w-3.5" />
+                                    </span>
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-xs font-black uppercase tracking-wider text-slate-800 dark:text-white">
+                                        Individual Charge Items
+                                      </span>
+                                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200/80 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-900/40">
+                                        {b.batteryCode}
+                                      </span>
+                                    </div>
+                                    <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-0.5 text-[11px] font-semibold text-slate-600 dark:bg-surface-800 dark:text-neutral-400">
+                                      {b.items.length} logged {b.items.length === 1 ? 'action' : 'actions'}
+                                    </span>
+                                  </div>
+
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                                      Battery Total:
+                                    </span>
+                                    <span className="inline-flex items-center font-mono font-black text-sm px-3 py-1 rounded-xl bg-emerald-50 text-emerald-700 border border-emerald-200/80 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/40 shadow-2xs">
+                                      {formatMoney(b.totalCharge)}
+                                    </span>
+                                  </div>
                                 </div>
-                                <div className="space-y-1.5">
+
+                                {/* Itemized List */}
+                                <div className="space-y-2">
                                   {b.items.map((item, itemIdx) => {
                                     const isItemSrv =
                                       item.chargeType === 'service_fee' ||
                                       (item.serviceFee > 0 && !item.partsCharge && !item.laborCharge);
+                                    const isItemPartsRemoved =
+                                      item.partsRemoved || Boolean(item.parts_removed) || (isUnserviceable && !isItemSrv);
+                                    const hasBreakdown =
+                                      !isItemSrv &&
+                                      !isItemPartsRemoved &&
+                                      item.partsCharge > 0 &&
+                                      item.laborCharge > 0;
+
                                     return (
                                       <div
                                         key={item.id || itemIdx}
-                                        className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-lg bg-slate-50 dark:bg-surface-900/80 text-xs border border-slate-100 dark:border-white/5"
+                                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 p-3 rounded-xl bg-slate-50/80 dark:bg-surface-900 border border-slate-200/70 dark:border-white/5 hover:bg-slate-100/60 dark:hover:bg-surface-800/60 hover:border-slate-300/80 dark:hover:border-white/10 transition-all shadow-2xs"
                                       >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <span className="font-mono text-[11px] text-slate-400 w-5">#{itemIdx + 1}</span>
+                                        {/* Left: Index + Badge + Title + Sub-notes */}
+                                        <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
+                                          <span className="font-mono text-[11px] font-bold text-slate-400 dark:text-neutral-500 bg-white dark:bg-surface-800 px-1.5 py-0.5 rounded border border-slate-200/60 dark:border-white/5 shrink-0">
+                                            #{itemIdx + 1}
+                                          </span>
+
                                           <span
-                                            className={`inline-flex px-1.5 py-0.5 rounded text-[10px] font-bold ${
+                                            className={`inline-flex items-center px-2 py-0.5 rounded-md text-[10px] font-extrabold uppercase tracking-wider shrink-0 border ${
                                               isItemSrv
-                                                ? 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
-                                                : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                                ? 'bg-sky-50 text-sky-800 border-sky-200/80 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-800/40'
+                                                : isItemPartsRemoved
+                                                ? 'bg-amber-50 text-amber-800 border-amber-200/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/40'
+                                                : 'bg-emerald-50 text-emerald-800 border-emerald-200/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/40'
                                             }`}
                                           >
-                                            {isItemSrv ? 'Service Fee' : 'Repair Job'}
+                                            {isItemSrv ? 'Service Fee' : isItemPartsRemoved ? 'Parts Removed' : 'Repair Job'}
                                           </span>
-                                          <span className="font-semibold text-slate-800 dark:text-neutral-200">
-                                            {item.itemDescription || item.partName || (isItemSrv ? 'Service Fee' : 'Repair')}
-                                          </span>
-                                          {item.notes && (
-                                            <span className="text-[11px] text-slate-500 italic truncate max-w-xs">
-                                              — "{item.notes}"
+
+                                          <div className="min-w-0 flex-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+                                            <span
+                                              className={`text-xs font-bold truncate ${
+                                                isItemPartsRemoved
+                                                  ? 'line-through text-slate-400 dark:text-neutral-500'
+                                                  : 'text-slate-900 dark:text-white'
+                                              }`}
+                                            >
+                                              {item.itemDescription || item.partName || (isItemSrv ? 'Service Fee' : 'Workshop Repair')}
                                             </span>
-                                          )}
+
+                                            {isItemPartsRemoved && (
+                                              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300 bg-rose-50 dark:bg-rose-950/60 px-1.5 py-0.5 rounded border border-rose-200/60 dark:border-rose-800/40">
+                                                Unserviceable · Restocked
+                                              </span>
+                                            )}
+
+                                            {item.notes && (
+                                              <span
+                                                className="text-[11px] text-slate-500 dark:text-neutral-400 italic truncate max-w-xs"
+                                                title={item.notes}
+                                              >
+                                                — "{item.notes}"
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
 
-                                        <div className="flex items-center gap-4 text-right shrink-0">
-                                          <span className="text-[11px] text-slate-400">
-                                            {item.repairedAt
-                                              ? new Date(item.repairedAt).toLocaleString([], {
-                                                  day: '2-digit',
-                                                  month: 'short',
-                                                  hour: '2-digit',
-                                                  minute: '2-digit',
-                                                })
-                                              : '—'}
-                                          </span>
-                                          <span className="text-[11px] text-slate-500">
-                                            by {item.staffName || 'System'}
-                                          </span>
-                                          <div className="text-[11px] text-slate-500 flex items-center gap-2">
-                                            {item.laborCharge > 0 && <span>Labor: {formatMoney(item.laborCharge)}</span>}
-                                            {item.partsCharge > 0 && <span>Parts: {formatMoney(item.partsCharge)}</span>}
-                                            {item.serviceFee > 0 && <span>Fee: {formatMoney(item.serviceFee)}</span>}
+                                        {/* Right: Date, Staff, Breakdown & Price */}
+                                        <div className="flex items-center justify-between sm:justify-end gap-3 sm:gap-4 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100 dark:border-white/5">
+                                          <div className="flex items-center gap-1 text-[11px] text-slate-400 dark:text-neutral-500 whitespace-nowrap">
+                                            <FiClock className="w-3 h-3 opacity-70" />
+                                            <span>
+                                              {item.repairedAt
+                                                ? new Date(item.repairedAt).toLocaleString('en-GB', {
+                                                    day: '2-digit',
+                                                    month: 'short',
+                                                    hour: '2-digit',
+                                                    minute: '2-digit',
+                                                  })
+                                                : '—'}
+                                            </span>
                                           </div>
-                                          <div className="font-mono font-bold text-xs text-emerald-600 dark:text-emerald-400 min-w-[70px]">
-                                            {formatMoney(item.totalCharge)}
+
+                                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-white dark:bg-surface-800 border border-slate-200/60 dark:border-white/10 text-[11px] font-semibold text-slate-700 dark:text-neutral-300 whitespace-nowrap">
+                                            <span className="text-slate-400 dark:text-neutral-500 font-normal">by</span>
+                                            <span className="font-bold">{item.staffName || 'System Auto'}</span>
+                                          </span>
+
+                                          {hasBreakdown && (
+                                            <div className="hidden md:flex items-center gap-1.5 text-[10px] text-slate-400 dark:text-neutral-500 font-medium whitespace-nowrap">
+                                              <span>Parts: {formatMoney(item.partsCharge)}</span>
+                                              <span>·</span>
+                                              <span>Labor: {formatMoney(item.laborCharge)}</span>
+                                            </div>
+                                          )}
+
+                                          <div
+                                            className={`font-mono font-black text-xs sm:text-sm min-w-[65px] text-right ${
+                                              isItemPartsRemoved
+                                                ? 'text-slate-400 line-through dark:text-neutral-500'
+                                                : 'text-emerald-600 dark:text-emerald-400'
+                                            }`}
+                                          >
+                                            {isItemPartsRemoved ? '£0.00' : formatMoney(item.totalCharge)}
                                           </div>
                                         </div>
                                       </div>

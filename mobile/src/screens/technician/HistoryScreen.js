@@ -684,7 +684,7 @@ export default function HistoryScreen() {
       {/* ── Date-Wise Grouped Feed ─────────────────────────────────────── */}
       <ScrollView
         className="flex-1"
-        contentContainerClassName="p-4 gap-4 pb-16"
+        contentContainerClassName="p-4 gap-6 pb-16"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -732,7 +732,7 @@ export default function HistoryScreen() {
           )
         ) : (
           dateGroups.map((group) => (
-            <View key={group.dateKey} className="gap-2">
+            <View key={group.dateKey} className="gap-3 mb-2">
               {/* Date Header Tag */}
               <View className="flex-row items-center justify-between px-1">
                 <View className="flex-row items-center gap-1.5">
@@ -763,7 +763,7 @@ export default function HistoryScreen() {
               </View>
 
               {/* Items for this date */}
-              <View className="gap-2.5">
+              <View className="gap-3.5">
                 {group.data.map((item) => {
                   if (item.kind === 'test') {
                     // SUPERVISOR TEST CARD
@@ -775,7 +775,7 @@ export default function HistoryScreen() {
                         onPress={() =>
                           navigation.navigate('BatteryDetail', { code: item.battery_code })
                         }
-                        className={`rounded-2xl border bg-white p-3.5 shadow-2xs overflow-hidden ${
+                        className={`rounded-2xl border bg-white p-4 shadow-2xs overflow-hidden ${
                           isPassedBack ? 'border-amber-200' : 'border-emerald-200'
                         }`}
                       >
@@ -819,36 +819,17 @@ export default function HistoryScreen() {
                           </Text>
                         </View>
 
-                        {/* Details Box */}
-                        <View
-                          className={`rounded-xl p-2.5 border ${
-                            isPassedBack
-                              ? 'bg-amber-50/70 border-amber-100'
-                              : 'bg-emerald-50/70 border-emerald-100'
-                          }`}
-                        >
-                          <Text
-                            className={`text-xs font-bold ${
-                              isPassedBack ? 'text-amber-900' : 'text-emerald-900'
-                            }`}
-                          >
-                            {isPassedBack
-                              ? 'Passed back for technician rework'
-                              : `Verified: ${item.service_name || 'Full QA Sign-off'}`}
-                          </Text>
-                          {item.notes ? (
-                            <Text
-                              className={`mt-1 text-xs leading-relaxed ${
-                                isPassedBack ? 'text-amber-800' : 'text-emerald-800'
-                              }`}
-                            >
-                              {item.notes}
+                        {/* Optional notes if any */}
+                        {item.notes ? (
+                          <View className="mt-1 pl-1">
+                            <Text className="text-xs text-slate-600 italic" numberOfLines={2}>
+                              "{item.notes}"
                             </Text>
-                          ) : null}
-                        </View>
+                          </View>
+                        ) : null}
 
                         {/* Footer row */}
-                        <View className="mt-2.5 flex-row items-center justify-between">
+                        <View className="mt-2.5 flex-row items-center justify-between border-t border-slate-100 pt-2">
                           {typeof item.testing_duration_seconds === 'number' &&
                           item.testing_duration_seconds > 0 ? (
                             <View className="rounded-md bg-violet-50 px-2 py-0.5 border border-violet-100">
@@ -858,10 +839,10 @@ export default function HistoryScreen() {
                             </View>
                           ) : (
                             <Text className="text-[10px] font-bold uppercase text-slate-400">
-                              QA Sign-off
+                              {isPassedBack ? 'Rework Pass-Back' : 'QA Sign-off'}
                             </Text>
                           )}
-                          <Text className="text-xs font-bold text-blue-600">Details ›</Text>
+                          <Text className="text-xs font-bold text-violet-600">View Details ›</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -876,9 +857,9 @@ export default function HistoryScreen() {
                         onPress={() =>
                           navigation.navigate('BatteryDetail', { code: item.battery_code })
                         }
-                        className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs"
+                        className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs"
                       >
-                        <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
+                        <View className="mb-2.5 flex-row flex-wrap items-center justify-between gap-2">
                           <View className="flex-row items-center gap-2">
                             <View className="h-6 w-6 items-center justify-center rounded-full bg-blue-100">
                               <Icon name="wrench" color="#1d4ed8" size={12} />
@@ -898,18 +879,16 @@ export default function HistoryScreen() {
                           </Text>
                         </View>
 
-                        <View className="rounded-xl bg-slate-50 p-2.5 border border-slate-100">
-                          <Text className="text-xs font-bold text-slate-700" numberOfLines={2}>
-                            {item.part_name ? `Parts: ${item.part_name}` : 'Completed service & inspection'}
-                          </Text>
-                          {item.notes ? (
-                            <Text className="mt-1 text-xs text-slate-500 leading-relaxed">
-                              {item.notes}
+                        {/* Optional notes */}
+                        {item.notes ? (
+                          <View className="mt-1 pl-1">
+                            <Text className="text-xs text-slate-600 italic" numberOfLines={2}>
+                              "{item.notes}"
                             </Text>
-                          ) : null}
-                        </View>
+                          </View>
+                        ) : null}
 
-                        <View className="mt-2.5 flex-row items-center justify-between">
+                        <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
                           {typeof item.duration_seconds === 'number' &&
                           item.duration_seconds > 0 ? (
                             <View className="rounded-md bg-blue-50 px-2 py-0.5 border border-blue-100">
@@ -922,7 +901,7 @@ export default function HistoryScreen() {
                               Completed Repair
                             </Text>
                           )}
-                          <Text className="text-xs font-bold text-blue-600">Details ›</Text>
+                          <Text className="text-xs font-bold text-blue-600">View Details ›</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -936,7 +915,7 @@ export default function HistoryScreen() {
                       onPress={() =>
                         navigation.navigate('BatteryDetail', { code: item.battery_code })
                       }
-                      className="rounded-2xl border border-rose-200/90 bg-white p-3.5 shadow-2xs"
+                      className="rounded-2xl border border-rose-200/90 bg-white p-4 shadow-2xs"
                     >
                       <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
                         <View className="flex-row items-center gap-2">

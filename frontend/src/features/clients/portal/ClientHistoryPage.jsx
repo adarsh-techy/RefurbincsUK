@@ -655,12 +655,12 @@ function ClientHistoryPage() {
 
       {/* ── Truck-Wise Cards Timeline View ──────────────────────────── */}
       {!loading && !error && filteredEvents.length > 0 && viewMode === 'timeline' && (
-        <div className="space-y-8">
+        <div className="space-y-10">
           {groupedTimeline.map((group) => (
             <div key={group.date} className="relative">
               {/* Day Header Pill */}
-              <div className="sticky top-20 z-10 mb-4 flex items-center gap-3">
-                <span className="px-3.5 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider bg-slate-900 text-white dark:bg-surface-800 dark:text-white dark:border dark:border-white/10 shadow-sm flex items-center gap-1.5">
+              <div className="sticky top-20 z-10 mb-5 flex items-center gap-3">
+                <span className="px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider bg-slate-900 text-white dark:bg-surface-800 dark:text-white dark:border dark:border-white/10 shadow-sm flex items-center gap-2">
                   <FiCalendar className="w-3.5 h-3.5 opacity-70" />
                   <span>{group.date}</span>
                 </span>
@@ -671,7 +671,7 @@ function ClientHistoryPage() {
               </div>
 
               {/* Day Items Vertical Track */}
-              <div className="relative pl-6 sm:pl-8 space-y-4 before:absolute before:left-2.5 sm:before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-white/10">
+              <div className="relative pl-6 sm:pl-8 space-y-6 sm:space-y-7 before:absolute before:left-2.5 sm:before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-white/10">
                 {group.items.map((event) => {
                   const conf = EVENT_CONFIG[event.type] || EVENT_CONFIG.intake;
                   const Icon = conf.icon;
@@ -682,7 +682,7 @@ function ClientHistoryPage() {
                     <div
                       key={event.id}
                       onClick={() => navigate(`/my/history/${event.id}`)}
-                      className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20 cursor-pointer pl-6 sm:pl-7"
+                      className="group relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20 cursor-pointer pl-6 sm:pl-8"
                     >
                       {/* Left Classic Colored Accent Stripe */}
                       <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${conf.stripe || 'bg-slate-400'}`} />

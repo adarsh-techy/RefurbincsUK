@@ -92,15 +92,31 @@ async function getTotals({ from, to } = {}) {
     recycleRows,
     { rows: allBatteriesRows },
   ] = await Promise.all([
-    // 1. Repair revenue (parts + labor)
+    // 1. Repair revenue (parts + labor) - excludes unserviceable/test-failed batteries whose parts were removed
     db.query(
       `SELECT
-         COALESCE(SUM(r.price + r.labor_charge), 0) AS repair_revenue,
-         COALESCE(SUM(r.price), 0) AS parts_revenue,
-         COALESCE(SUM(r.labor_charge), 0) AS labor_revenue,
+         COALESCE(SUM(
+           CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE (r.price + r.labor_charge)
+           END
+         ), 0) AS repair_revenue,
+         COALESCE(SUM(
+           CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE r.price
+           END
+         ), 0) AS parts_revenue,
+         COALESCE(SUM(
+           CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE r.labor_charge
+           END
+         ), 0) AS labor_revenue,
          COUNT(DISTINCT r.batch_id) AS repairs_count,
          COUNT(DISTINCT r.battery_id) AS repair_batteries_count
        FROM repairs r
+       JOIN batteries b ON b.id = r.battery_id
        ${repairWhere}`,
       rangeParams
     ),
@@ -174,18 +190,34 @@ async function getBreakdown({ from, to, breakdownType = 'month', limit = 60 } = 
     recycleBreakdown,
     { rows: batteryBreakdown },
   ] = await Promise.all([
-    // 1. Repair breakdown
+    // 1. Repair breakdown - excludes unserviceable/test-failed batteries whose parts were removed
     db.query(
       `SELECT
          to_char(r.repaired_at, '${timeFormat}') AS period_key,
          date_trunc('${dateTrunc}', r.repaired_at) AS period_date,
          to_char(r.repaired_at, '${labelFormat}') AS label,
-         COALESCE(SUM(r.price + r.labor_charge), 0) AS repair_revenue,
-         COALESCE(SUM(r.price), 0) AS parts_revenue,
-         COALESCE(SUM(r.labor_charge), 0) AS labor_revenue,
+         COALESCE(SUM(
+           CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE (r.price + r.labor_charge)
+           END
+         ), 0) AS repair_revenue,
+         COALESCE(SUM(
+           CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE r.price
+           END
+         ), 0) AS parts_revenue,
+         COALESCE(SUM(
+           CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE r.labor_charge
+           END
+         ), 0) AS labor_revenue,
          COUNT(DISTINCT r.batch_id) AS repairs_count,
          COUNT(DISTINCT r.battery_id) AS repair_batteries_count
        FROM repairs r
+       JOIN batteries b ON b.id = r.battery_id
        ${repairWhere}
        GROUP BY period_key, period_date, label
        ORDER BY period_date DESC`,
@@ -322,9 +354,24 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
            b.id AS battery_id,
            r.batch_id AS repair_batch_id,
            NULL::int AS service_id,
-           COALESCE(r.price + r.labor_charge, 0) AS repair_revenue,
-           COALESCE(r.price, 0) AS parts_revenue,
-           COALESCE(r.labor_charge, 0) AS labor_revenue,
+           COALESCE(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE (r.price + r.labor_charge)
+             END, 0
+           ) AS repair_revenue,
+           COALESCE(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE r.price
+             END, 0
+           ) AS parts_revenue,
+           COALESCE(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE r.labor_charge
+             END, 0
+           ) AS labor_revenue,
            0::numeric AS service_revenue
          FROM repairs r
          JOIN batteries b ON b.id = r.battery_id
@@ -390,11 +437,27 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
            s.role AS staff_role,
            r.batch_id AS repair_batch_id,
            NULL::int AS service_id,
-           COALESCE(r.price + r.labor_charge, 0) AS revenue,
-           COALESCE(r.labor_charge, 0) AS labor_revenue,
-           COALESCE(r.price, 0) AS parts_revenue,
+           COALESCE(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE (r.price + r.labor_charge)
+             END, 0
+           ) AS revenue,
+           COALESCE(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE r.labor_charge
+             END, 0
+           ) AS labor_revenue,
+           COALESCE(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE r.price
+             END, 0
+           ) AS parts_revenue,
            r.duration_seconds
          FROM repairs r
+         JOIN batteries b ON b.id = r.battery_id
          JOIN staff s ON s.id = r.staff_id
          ${repairWhere}
 
@@ -436,9 +499,10 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
          p.id AS part_id,
          p.name AS part_name,
          p.sku AS part_sku,
-         SUM(r.quantity_used) AS quantity_used,
-         COALESCE(SUM(r.price), 0) AS total_revenue
+         SUM(CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL THEN 0 ELSE r.quantity_used END) AS quantity_used,
+         COALESCE(SUM(CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL THEN 0 ELSE r.price END), 0) AS total_revenue
        FROM repairs r
+       JOIN batteries b ON b.id = r.battery_id
        JOIN parts p ON p.id = r.part_id
        ${repairWhere}
        GROUP BY p.id, p.name, p.sku
@@ -478,13 +542,20 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
            MAX(s.id) AS staff_id,
            MAX(s.name) AS staff_name,
            string_agg(p.name, ', ' ORDER BY p.name) AS item_description,
-           COALESCE(SUM(r.price), 0) AS parts_charge,
-           COALESCE(SUM(r.labor_charge), 0) AS labor_charge,
+           COALESCE(SUM(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL THEN 0 ELSE r.price END
+           ), 0) AS parts_charge,
+           COALESCE(SUM(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL THEN 0 ELSE r.labor_charge END
+           ), 0) AS labor_charge,
            0::numeric AS service_fee,
-           COALESCE(SUM(r.price + r.labor_charge), 0) AS total_charge,
+           COALESCE(SUM(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL THEN 0 ELSE (r.price + r.labor_charge) END
+           ), 0) AS total_charge,
            MIN(r.notes) AS notes,
            MIN(r.repaired_at) AS charge_date,
-           MIN(r.duration_seconds) AS duration_seconds
+           MIN(r.duration_seconds) AS duration_seconds,
+           bool_or(r.removed_at IS NOT NULL OR b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled')) AS parts_removed
          FROM repairs r
          JOIN batteries b ON b.id = r.battery_id
          LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
@@ -521,7 +592,8 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
            COALESCE(bs.rate, 0) AS total_charge,
            bs.notes,
            bs.completed_at AS charge_date,
-           NULL::int AS duration_seconds
+           NULL::int AS duration_seconds,
+           false AS parts_removed
          FROM battery_services bs
          JOIN batteries b ON b.id = bs.battery_id
          LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
@@ -624,10 +696,18 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
 
         const group = batteryMap.get(key);
 
-        group.partsCharge += Number(r.parts_charge || 0);
-        group.laborCharge += Number(r.labor_charge || 0);
-        group.serviceFee += Number(r.service_fee || 0);
-        group.totalCharge += Number(r.total_charge || 0);
+        const isRowUnserviceable = ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(
+          (r.battery_status || '').toLowerCase()
+        ) || Boolean(r.parts_removed);
+        const partsCh = isRowUnserviceable && r.charge_type === 'repair' ? 0 : Number(r.parts_charge || 0);
+        const laborCh = isRowUnserviceable && r.charge_type === 'repair' ? 0 : Number(r.labor_charge || 0);
+        const srvFee = Number(r.service_fee || 0);
+        const totCh = isRowUnserviceable && r.charge_type === 'repair' ? 0 : Number(r.total_charge || 0);
+
+        group.partsCharge += partsCh;
+        group.laborCharge += laborCh;
+        group.serviceFee += srvFee;
+        group.totalCharge += (partsCh + laborCh + srvFee);
 
         if (r.duration_seconds) {
           group.durationSeconds += Number(r.duration_seconds);
@@ -678,10 +758,11 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
             staffName: r.staff_name || 'System / Auto',
             itemDescription: r.item_description,
             partName: r.item_description,
-            partsCharge: Number(r.parts_charge || 0),
-            laborCharge: Number(r.labor_charge || 0),
-            serviceFee: Number(r.service_fee || 0),
-            totalCharge: Number(r.total_charge || 0),
+            partsCharge: partsCh,
+            laborCharge: laborCh,
+            serviceFee: srvFee,
+            totalCharge: partsCh + laborCh + srvFee,
+            partsRemoved: isRowUnserviceable && r.charge_type === 'repair',
             notes: r.notes,
             repairedAt: r.charge_date,
           });
@@ -689,9 +770,30 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
       });
 
       const consolidated = Array.from(batteryMap.values()).map((e) => {
+        const isUnserviceable = ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(
+          (e.batteryStatus || '').toLowerCase()
+        ) || e.items.some((it) => it.partsRemoved);
+
+        const adjustedPartsCharge = isUnserviceable ? 0 : e.partsCharge;
+        const adjustedLaborCharge = isUnserviceable ? 0 : e.laborCharge;
+        const adjustedTotalCharge = adjustedPartsCharge + adjustedLaborCharge + e.serviceFee;
+
         const services = Array.from(e.serviceNames);
         const parts = Array.from(e.partNames);
         const allDescriptions = [...services, ...parts];
+
+        const updatedItems = e.items.map((it) => {
+          if (isUnserviceable && it.chargeType === 'repair') {
+            return {
+              ...it,
+              partsRemoved: true,
+              partsCharge: 0,
+              laborCharge: 0,
+              totalCharge: Number(it.serviceFee || 0),
+            };
+          }
+          return it;
+        });
 
         return {
           id: e.id,
@@ -701,6 +803,7 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
           batteryId: e.batteryId,
           batteryCode: e.batteryCode,
           batteryStatus: e.batteryStatus,
+          isUnserviceable,
           clientId: e.clientId,
           clientName: e.clientName,
           staffId: e.staffId,
@@ -710,14 +813,14 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
           itemDescription: allDescriptions.join(', '),
           services,
           parts,
-          partsCharge: e.partsCharge,
-          laborCharge: e.laborCharge,
+          partsCharge: adjustedPartsCharge,
+          laborCharge: adjustedLaborCharge,
           serviceFee: e.serviceFee,
-          totalCharge: e.totalCharge,
+          totalCharge: adjustedTotalCharge,
           notes: e.notes.join('; '),
           repairedAt: e.repairedAt,
           durationSeconds: e.durationSeconds || null,
-          items: e.items.sort((a, b) => new Date(b.repairedAt || 0) - new Date(a.repairedAt || 0)),
+          items: updatedItems.sort((a, b) => new Date(b.repairedAt || 0) - new Date(a.repairedAt || 0)),
         };
       });
 

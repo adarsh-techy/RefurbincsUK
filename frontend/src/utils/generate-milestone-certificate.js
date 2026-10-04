@@ -376,163 +376,50 @@ export function generateMilestoneCertificatePDF(certificate, clientName) {
   doc.text(certClient, width / 2, y + 28, { align: 'center', charSpace: 1 });
 
   // 8. Formal Citation Body
-  y += 60;
+  y += 68;
   doc.setTextColor(...SLATE_BODY);
   doc.setFont('times', 'normal');
-  doc.setFontSize(11);
+  doc.setFontSize(12);
   const citationText =
-    `For exceptional dedication to decarbonized urban mobility, industrial zero-waste standards, and circular lifecycle excellence. ` +
-    `Through reaching the ${tier.badge} tier and restoring, testing, and recertifying ${count.toLocaleString()} high-voltage battery packs, ` +
-    `your enterprise has successfully prevented hazardous landfill contamination and significantly minimized global greenhouse emissions.`;
+    `For exceptional leadership in decarbonized urban mobility and zero-waste battery lifecycle governance. ` +
+    `By reaching the ${tier.badge} milestone threshold and restoring, testing, and re-commissioning ${count.toLocaleString()} high-voltage battery modules, ` +
+    `your enterprise has directly mitigated hazardous lithium contamination, extended valuable cell life, and significantly reduced global greenhouse emissions.`;
 
-  const splitText = doc.splitTextToSize(citationText, 660);
-  doc.text(splitText, width / 2, y, { align: 'center', lineHeightFactor: 1.4 });
+  const splitText = doc.splitTextToSize(citationText, 680);
+  doc.text(splitText, width / 2, y, { align: 'center', lineHeightFactor: 1.5 });
 
-  // 9. Metric Impact Plaques (4 Tier Beveled Boxes with Full ESG Data)
-  y += 38;
-  const cardW = 176;
-  const cardH = 46;
-  const gap = 12;
-  const startX = (width - (cardW * 4 + gap * 3)) / 2;
+  // 10. Footer Section: Left CEO Signature, Center Conferral Badge, Right Tier Foil Seal
+  y += 75;
 
-  // Plaque 1: CO2 Saved
-  const b1X = startX;
-  doc.setFillColor(236, 253, 245);
-  doc.setDrawColor(16, 149, 93);
-  doc.setLineWidth(1.2);
-  doc.roundedRect(b1X, y, cardW, cardH, 5, 5, 'FD');
-
-  doc.setTextColor(10, 68, 42);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('CO₂ EMISSIONS SAVED', b1X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(13);
-  doc.text(`~${co2Tons} Metric Tons`, b1X + cardW / 2, y + 27, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text('Decarbonization Abatement', b1X + cardW / 2, y + 39, { align: 'center' });
-
-  // Plaque 2: E-Waste Diverted
-  const b2X = startX + cardW + gap;
-  doc.setFillColor(239, 246, 255);
-  doc.setDrawColor(37, 99, 235);
-  doc.setLineWidth(1.2);
-  doc.roundedRect(b2X, y, cardW, cardH, 5, 5, 'FD');
-
-  doc.setTextColor(30, 64, 175);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('E-WASTE DIVERTED', b2X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(13);
-  doc.text(`${ewasteKg} kg`, b2X + cardW / 2, y + 27, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text('Toxic Landfill Avoidance', b2X + cardW / 2, y + 39, { align: 'center' });
-
-  // Plaque 3: Batteries Restored
-  const b3X = startX + (cardW + gap) * 2;
-  doc.setFillColor(254, 252, 232);
-  doc.setDrawColor(...PRIMARY);
-  doc.setLineWidth(1.2);
-  doc.roundedRect(b3X, y, cardW, cardH, 5, 5, 'FD');
-
-  doc.setTextColor(...DARK);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text(`${tier.badge.toUpperCase()} MILESTONE`, b3X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(13);
-  doc.text(`${count.toLocaleString()} Packs`, b3X + cardW / 2, y + 27, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text('Circular Fleet Extended', b3X + cardW / 2, y + 39, { align: 'center' });
-
-  // Plaque 4: Material Recovery Rate
-  const b4X = startX + (cardW + gap) * 3;
-  doc.setFillColor(243, 232, 255);
-  doc.setDrawColor(147, 51, 234);
-  doc.setLineWidth(1.2);
-  doc.roundedRect(b4X, y, cardW, cardH, 5, 5, 'FD');
-
-  doc.setTextColor(88, 28, 135);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.5);
-  doc.text('MATERIAL RECOVERY', b4X + cardW / 2, y + 12, { align: 'center', charSpace: 0.5 });
-  doc.setFontSize(13);
-  doc.text('100% Closed-Loop', b4X + cardW / 2, y + 27, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text('Zero Municipal Landfill', b4X + cardW / 2, y + 39, { align: 'center' });
-
-  // 10. Audited Chemical & Material Composition Summary Banner (Dynamic for this battery count)
-  y += 54;
-  const chemW = width - 100;
-  const chemX = 50;
-  const chemH = 28;
-  doc.setFillColor(255, 255, 255);
-  doc.setDrawColor(...PRIMARY);
-  doc.setLineWidth(0.8);
-  doc.roundedRect(chemX, y, chemW, chemH, 4, 4, 'FD');
-
-  const breakdown = calculateMaterialBreakdown(count);
-  const cathodeAmount = breakdown[0]?.formattedAmount || '—';
-  const graphiteAmount = breakdown[4]?.formattedAmount || '—';
-  const cuAmount = breakdown[12]?.formattedAmount || '—';
-  const niAmount = breakdown[11]?.formattedAmount || '—';
-  const feAmount = breakdown[13]?.formattedAmount || '—';
-
-  doc.setTextColor(...DARK);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  doc.text(`AUDITED MATERIAL RECOVERY FOR ${count.toLocaleString()} PACKS (SECTION 2 STANDARDS):`, chemX + 10, y + 10);
-
-  doc.setFont('courier', 'bold');
-  doc.setFontSize(6.5);
-  doc.setTextColor(...SLATE_BODY);
-  doc.text(
-    `Cathode NMC: ~${cathodeAmount}  •  Anode Graphite: ~${graphiteAmount}  •  Copper Foil: ~${cuAmount}  •  Nickel: ~${niAmount}  •  Shell Iron: ~${feAmount}`,
-    chemX + 10,
-    y + 20
-  );
-
-  // 11. Standards Compliance Badges
-  y += 34;
-  doc.setTextColor(...SLATE_MUTED);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(6.5);
-  doc.text('ISO 14001:2015 ESG REGISTRY   •   RoHS 2011/65/EU COMPLIANT   •   UN 38.3 SAFE TRANSPORT CERTIFIED   •   EU BATTERY PASSPORT 2026', width / 2, y, { align: 'center', charSpace: 0.8 });
-
-  // 12. Footer Section: Left Signature, Center Tier Foil Seal with Ribbons, Right Signature
-  y += 16;
-
-  // Left Executive Signature Block
-  const sig1X = 64;
+  // Left: Chief Executive Officer Signature Block
+  const sigX = 110;
   doc.setTextColor(...SLATE_DEEP);
   doc.setFont('times', 'italic');
-  doc.setFontSize(15);
-  doc.text('Dr. Richard Thorne', sig1X + 80, y + 2, { align: 'center' });
+  doc.setFontSize(16);
+  doc.text('Chief Executive Officer', sigX + 80, y + 2, { align: 'center' });
 
   doc.setDrawColor(...SLATE_MUTED);
   doc.setLineWidth(0.75);
-  doc.line(sig1X, y + 7, sig1X + 160, y + 7);
+  doc.line(sigX, y + 7, sigX + 160, y + 7);
 
   doc.setTextColor(...SLATE_MUTED);
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('HEAD OF CIRCULAR ENGINEERING', sig1X + 80, y + 16, { align: 'center' });
+  doc.setFontSize(7.5);
+  doc.text('CHIEF EXECUTIVE OFFICER', sigX + 80, y + 16, { align: 'center' });
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(6.5);
-  doc.text(`Refurbnics Technical Directorate`, sig1X + 80, y + 24, { align: 'center' });
+  doc.text('Refurbnics International Ltd', sigX + 80, y + 24, { align: 'center' });
 
-  // Center Tier Embossed Foil Seal with Silk Ribbon Tails
-  const sealX = width / 2;
+  // Right: Tier Embossed Foil Seal with Silk Ribbon Tails
+  const sealX = width - 110 - 80;
   const sealY = y + 2;
 
   // Ribbon Tails
   doc.setFillColor(...RIBBON);
   doc.setDrawColor(...RIBBON_DARK);
   doc.setLineWidth(0.5);
-  doc.triangle(sealX - 16, sealY + 10, sealX - 7, sealY + 38, sealX - 23, sealY + 34, 'FD');
-  doc.triangle(sealX + 16, sealY + 10, sealX + 7, sealY + 38, sealX + 23, sealY + 34, 'FD');
+  doc.triangle(sealX - 14, sealY + 8, sealX - 6, sealY + 30, sealX - 20, sealY + 27, 'FD');
+  doc.triangle(sealX + 14, sealY + 8, sealX + 6, sealY + 30, sealX + 20, sealY + 27, 'FD');
 
   // Starburst Rosette
   doc.setFillColor(...PRIMARY);
@@ -564,25 +451,6 @@ export function generateMilestoneCertificatePDF(certificate, clientName) {
   doc.text('★ VERIFIED ★', sealX, sealY + 1, { align: 'center' });
   doc.setFontSize(4.5);
   doc.text('CIRCULAR ESG', sealX, sealY + 7, { align: 'center', charSpace: 0.5 });
-
-  // Right Executive Signature & Verification Block
-  const sig2X = width - 64 - 160;
-  doc.setTextColor(...SLATE_DEEP);
-  doc.setFont('times', 'italic');
-  doc.setFontSize(15);
-  doc.text('Eleanor Sterling-Ward', sig2X + 80, y + 2, { align: 'center' });
-
-  doc.setDrawColor(...SLATE_MUTED);
-  doc.setLineWidth(0.75);
-  doc.line(sig2X, y + 7, sig2X + 160, y + 7);
-
-  doc.setTextColor(...SLATE_MUTED);
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7);
-  doc.text('MANAGING DIRECTOR & CHAIR', sig2X + 80, y + 16, { align: 'center' });
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(6.5);
-  doc.text(`Issued: ${issueDate}`, sig2X + 80, y + 24, { align: 'center' });
 
   // Bottom Central Registry & Verification Line
   doc.setTextColor(...SLATE_MUTED);

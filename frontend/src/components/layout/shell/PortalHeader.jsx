@@ -56,7 +56,12 @@ function PortalHeader() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
   const { theme } = useTheme();
-  const isTechnician = user?.role === 'technician';
+  const isTechnician =
+    user?.role === 'technician' ||
+    user?.role === 'supervisor' ||
+    user?.role === 'staff' ||
+    user?.staff_role === 'technician' ||
+    user?.staff_role === 'supervisor';
   const isDark = theme === 'dark';
   const brandLogo = isDark ? refurbnicsDarkLogo : refurbnicsLightLogo;
 

@@ -103,8 +103,14 @@ async function getDashboardStats(clientId, clientName) {
        COUNT(DISTINCT r.batch_id) AS repair_visit_count,
        (
          COALESCE((
-           SELECT SUM(r.price + r.labor_charge)
+           SELECT SUM(
+             CASE WHEN b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+             THEN 0
+             ELSE (r.price + r.labor_charge)
+             END
+           )
            FROM billable bb
+           JOIN batteries b ON b.id = bb.id
            JOIN repairs r ON r.battery_id = bb.id
            WHERE bb.first_verified_at IS NULL
               OR r.repaired_at >= bb.first_verified_at - INTERVAL '1 minute'
@@ -480,7 +486,12 @@ async function findMyTransactions(clientId, clientName) {
          string_agg(p.name, ', ' ORDER BY p.name) AS part_name,
          string_agg(p.name, ', ' ORDER BY p.name) AS description,
          MAX(s.name) AS staff_name,
-         SUM(r.price + r.labor_charge) AS amount,
+         SUM(
+           CASE WHEN vb.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') OR r.removed_at IS NOT NULL
+           THEN 0
+           ELSE (r.price + r.labor_charge)
+           END
+         ) AS amount,
          MIN(r.repaired_at) AS repaired_at,
          MAX(r.notes) AS notes
        FROM verified_batteries vb
