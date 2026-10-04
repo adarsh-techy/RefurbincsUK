@@ -94,12 +94,28 @@ async function getDashboardStats(clientId, clientName) {
      ${BILLABLE_BATTERIES_CTE}
      SELECT
        COUNT(DISTINCT b.id) AS battery_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE ti.id IS NOT NULL AND (ti.status = 'pending_arrival' OR (ti.verified_at IS NULL AND ti.status != 'verified'))) AS awaiting_intake_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.truck_intake_id IS NOT NULL) AS total_packed_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.truck_intake_id IS NOT NULL AND (ti.status = 'verified' OR ti.verified_at IS NOT NULL)) AS verified_intake_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_repair' AND (ti.status = 'verified' OR ti.verified_at IS NOT NULL)) AS workshop_queue_count,
+       COUNT(DISTINCT b.id) FILTER (
+         WHERE (ti.status = 'verified' OR ti.verified_at IS NOT NULL)
+           AND b.status IN ('in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired')
+       ) AS in_workshop_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_repair') AS in_repair_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_progress') AS in_progress_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'in_testing') AS in_testing_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'repaired') AS repaired_count,
-       COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'unserviceable') AS unserviceable_count,
-       COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'returned' AND EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = b.id)) AS returned_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled')) AS unserviceable_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'returned') AS returned_count,
+       (
+         SELECT COUNT(DISTINCT rb.battery_id)
+         FROM returns ret
+         JOIN return_batteries rb ON rb.return_id = ret.id
+         JOIN batteries b2 ON b2.id = rb.battery_id
+         WHERE ret.client_id = $1
+           AND (b2.client_name IS NULL OR lower(b2.client_name) = lower($2))
+       ) AS returned_from_workshop_count,
        COUNT(DISTINCT r.batch_id) AS repair_visit_count,
        (
          COALESCE((
@@ -126,6 +142,7 @@ async function getDashboardStats(clientId, clientName) {
        ) AS balance
      FROM client_battery_ids cb
      JOIN batteries b ON b.id = cb.id
+     LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
      LEFT JOIN repairs r ON r.battery_id = b.id`,
     [clientId, clientName]
   );
@@ -440,7 +457,7 @@ async function findMyBatteries(clientId, clientName, bucket) {
        LIMIT 1
      ) last_return ON true
      ${whereClause}
-     ORDER BY b.created_at DESC`,
+     ORDER BY b.battery_code ASC, b.id ASC`,
     params
   );
   return rows;

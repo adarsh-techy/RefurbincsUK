@@ -17,10 +17,16 @@ async function findById(id) {
 async function findUsageHistory(partId) {
   const { rows } = await db.query(
     `SELECT r.id, r.batch_id, r.quantity_used, r.notes, r.repaired_at, r.price, r.labor_charge,
-            r.duration_seconds, b.battery_code, b.status AS battery_status, s.name AS staff_name
+            r.duration_seconds, r.removed_at, r.removed_by_staff_id,
+            b.id AS battery_id, b.battery_code, b.serial_number, b.client_name,
+            b.status AS battery_status, s.name AS staff_name, s.role AS staff_role,
+            rem_s.name AS removed_by_staff_name,
+            ti.truck_number
      FROM repairs r
      JOIN batteries b ON b.id = r.battery_id
      JOIN staff s ON s.id = r.staff_id
+     LEFT JOIN staff rem_s ON rem_s.id = r.removed_by_staff_id
+     LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
      WHERE r.part_id = $1
      ORDER BY r.repaired_at DESC`,
     [partId]
@@ -94,7 +100,7 @@ async function addStock(id, { quantityAdded, note, adjustedByUserId }) {
 // page's restock history and monthly restocked-vs-used breakdown.
 async function findStockHistory(partId) {
   const { rows } = await db.query(
-    `SELECT a.id, a.quantity_added, a.note, a.adjusted_at, u.name AS adjusted_by_name
+    `SELECT a.id, a.quantity_added, a.note, a.adjusted_at, u.name AS adjusted_by_name, u.email AS adjusted_by_email, u.role AS adjusted_by_role
      FROM part_stock_adjustments a
      LEFT JOIN users u ON u.id = a.adjusted_by_user_id
      WHERE a.part_id = $1

@@ -41,9 +41,8 @@ router.get('/', requireRole('super_admin', 'admin', 'staff'), staffController.li
 router.get('/me', staffController.myProfile);
 router.get('/:id', requireRole('super_admin', 'admin', 'staff'), staffController.getById);
 router.post('/', requirePermission('staff'), uploadDoc.single('docFile'), staffController.create);
-// Editing/removing staff records is super_admin only, distinct from the
-// 'staff' permission (which only covers adding new staff).
-router.patch('/:id', requireRole('super_admin'), uploadDoc.single('docFile'), staffController.update);
+// Editing staff records is allowed for super_admin and admin
+router.patch('/:id', requireRole('super_admin', 'admin'), uploadDoc.single('docFile'), staffController.update);
 router.delete('/:id', requireRole('super_admin'), staffController.remove);
 
 module.exports = router;

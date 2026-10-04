@@ -35,7 +35,15 @@ export const CLIENT_PERMISSIONS = [
 export function canTestBatteries(user) {
   if (!user) return false;
   if (user.role === 'super_admin' || user.role === 'admin') return true;
-  return (user.staff_role || '').toLowerCase() === 'supervisor';
+  const role = (
+    user.staff_role ||
+    user.staffRole ||
+    user.staff?.role ||
+    user.staff?.staff_role ||
+    user.role ||
+    ''
+  ).trim().toLowerCase();
+  return role === 'supervisor';
 }
 
 // A battery that arrived on a truck intake the workshop hasn't verified yet

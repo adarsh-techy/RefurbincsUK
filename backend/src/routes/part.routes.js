@@ -5,8 +5,8 @@ const { requireAuth, requirePermission, requireRole } = require('../middlewares/
 router.use(requireAuth);
 // Read is open to workshop logins (the Repairs form and technician panel
 // need part names and stock levels) but not clients — rows carry pricing.
-router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician'), partController.list);
-router.get('/:id', requireRole('super_admin', 'admin', 'staff', 'technician'), partController.getById);
+router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), partController.list);
+router.get('/:id', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), partController.getById);
 router.post('/', requirePermission('parts'), partController.create);
 // Full edit/delete (renaming, re-pricing, deleting) is super_admin only.
 // Restocking is looser — anyone with the 'parts' permission can top up a

@@ -713,14 +713,14 @@ function TruckIntakeDetailPage() {
                   const Icon = stage.icon;
                   const isUnserviceable = stage.category === 'unserviceable';
                   return (
-                    <div className="py-1">
-                      <div className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-xs font-bold ${stage.badgeClass}`}>
-                        <span className={`h-2 w-2 shrink-0 rounded-full ${stage.dotClass}`} />
-                        <Icon className="h-3.5 w-3.5 shrink-0" />
+                    <div className="py-0.5">
+                      <div className={`inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[11px] font-medium leading-normal ${stage.badgeClass}`}>
+                        <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${stage.dotClass}`} />
+                        <Icon className="h-3 w-3 shrink-0" />
                         <span>{stage.label}</span>
                       </div>
                       {isUnserviceable && (
-                        <div className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                        <div className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-rose-600 dark:text-rose-400">
                           <span>{stage.sublabel || 'QA Test Failed'}</span>
                         </div>
                       )}

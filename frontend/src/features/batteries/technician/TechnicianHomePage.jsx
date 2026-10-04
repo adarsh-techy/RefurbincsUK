@@ -17,7 +17,30 @@ const DEBOUNCE_MS = 250;
 function TechnicianHomePage() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
-  const canTest = canTestBatteries(user);
+  const [liveStaffRole, setLiveStaffRole] = useState(user?.staff_role || user?.staffRole || null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (user && user.role !== 'client' && user.role !== 'recycle_client') {
+      apiClient
+        .get('/auth/me')
+        .then((res) => {
+          if (!cancelled && res.data?.user?.staff_role) {
+            setLiveStaffRole(res.data.user.staff_role);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const effectiveUser = {
+    ...user,
+    staff_role: liveStaffRole || user?.staff_role,
+  };
+  const canTest = canTestBatteries(effectiveUser);
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');

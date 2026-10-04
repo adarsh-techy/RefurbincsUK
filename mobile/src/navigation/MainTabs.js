@@ -114,20 +114,20 @@ function Header({ isClient, onMenuPress }) {
         paddingLeft: 16,
         paddingRight: 14,
         paddingBottom: 12,
-        backgroundColor: '#000000',
+        backgroundColor: '#ffffff',
         borderBottomWidth: StyleSheet.hairlineWidth,
-        borderBottomColor: 'rgba(255, 255, 255, 0.12)',
+        borderBottomColor: '#e2e8f0',
       }}
     >
       <Image
-        source={require('../../assets/REFURBNICSmobile.png')}
+        source={require('../../assets/LogoREFURBNICSBlack.png')}
         style={{ width: 140, height: 38 }}
         resizeMode="contain"
       />
 
       {isClient && (
         <TouchableOpacity onPress={onMenuPress} hitSlop={10} style={{ padding: 8 }}>
-          <MenuIcon color="#ffffff" />
+          <MenuIcon color="#0f172a" />
         </TouchableOpacity>
       )}
     </View>

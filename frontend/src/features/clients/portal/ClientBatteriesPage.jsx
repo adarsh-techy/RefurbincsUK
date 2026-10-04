@@ -147,10 +147,22 @@ function ClientBatteriesPage() {
     returnId: null,
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
+  const location = useLocation();
+  const batchParam = searchParams.get('batch');
+  const statusParam = searchParams.get('status');
+
   // Search, date, and status filters
   const [search, setSearch] = useState('');
   const [date, setDate] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState(() => searchParams.get('status') || '');
+
+  useEffect(() => {
+    const s = searchParams.get('status');
+    if (s !== null && s !== undefined) {
+      setStatusFilter(s);
+    }
+  }, [searchParams]);
 
   // Lazy loading on scroll for All Batteries (20 per page/scroll)
   const [visibleCount, setVisibleCount] = useState(20);
@@ -160,9 +172,6 @@ function ClientBatteriesPage() {
   }, [effectiveBucket, search, date, statusFilter]);
 
   // Selected Truck Batch for Dedicated Detail Page (NOT a popup!)
-  const [searchParams, setSearchParams] = useSearchParams();
-  const location = useLocation();
-  const batchParam = searchParams.get('batch');
   const [activeBatchKey, setActiveBatchKeyState] = useState(batchParam || null);
 
   useEffect(() => {
@@ -1275,6 +1284,7 @@ function ClientBatteriesPage() {
       key: 'serial_number',
       label: 'Physical Serial Number',
       width: '220px',
+      sortValue: (row) => row.serial_number || '',
       render: (row) => {
         if (!row.serial_number) {
           return (
@@ -1389,7 +1399,7 @@ function ClientBatteriesPage() {
   // ── All Batteries Filtered Data & Infinite Scroll (20 per scroll) ──
   const filteredAllData = useMemo(() => {
     if (effectiveBucket !== 'all') return [];
-    return data.filter((item) => {
+    const filtered = data.filter((item) => {
       const q = search.trim().toLowerCase();
       const matchesSearch =
         !q ||
@@ -1409,10 +1419,16 @@ function ClientBatteriesPage() {
         (statusFilter === 'in_service'
           ? ['in_progress', 'in_testing', 'testing', 'repair_testing', 'in_repair', 'repaired'].includes(item.status)
           : statusFilter === 'unserviceable'
-          ? ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(item.status)
+          ? ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(item.status)
           : item.status === statusFilter);
       const matchesDate = !date || toLocalDateValue(getRelevantDate(item)) === date;
       return matchesSearch && matchesStatus && matchesDate;
+    });
+
+    return [...filtered].sort((a, b) => {
+      const codeA = a.battery_code || '';
+      const codeB = b.battery_code || '';
+      return codeA.localeCompare(codeB, undefined, { numeric: true, sensitivity: 'base' });
     });
   }, [data, effectiveBucket, search, statusFilter, date]);
 
@@ -2360,6 +2376,8 @@ function ClientBatteriesPage() {
                 rows={visibleAllRows}
                 showRowNumber
                 emptyMessage={meta.empty}
+                defaultSortKey="battery_code"
+                defaultSortDirection="asc"
                 maxHeight="calc(100vh - 270px)"
                 onScrollBottom={hasMoreAll ? loadMoreAll : null}
                 tableLayout="fixed"

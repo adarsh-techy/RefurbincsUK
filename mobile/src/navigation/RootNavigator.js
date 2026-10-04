@@ -17,9 +17,9 @@ const Stack = createNativeStackNavigator();
 
 const clientScreenOptions = {
   headerShown: true,
-  headerStyle: { backgroundColor: '#000000' },
-  headerTintColor: '#ffffff',
-  headerTitleStyle: { color: '#ffffff', fontWeight: 'bold' },
+  headerStyle: { backgroundColor: '#ffffff' },
+  headerTintColor: '#0f172a',
+  headerTitleStyle: { color: '#0f172a', fontWeight: 'bold' },
   headerShadowVisible: false,
 };
 
@@ -28,8 +28,8 @@ const navTheme = {
   colors: {
     ...DefaultTheme.colors,
     background: '#f8fafc',
-    card: '#000000',
-    border: 'rgba(255, 255, 255, 0.1)',
+    card: '#ffffff',
+    border: '#e2e8f0',
     primary: '#2563eb',
     text: '#0f172a',
   },
@@ -64,7 +64,7 @@ export default function RootNavigator() {
             <Stack.Screen
               name="BatteryDetail"
               component={BatteryDetailScreen}
-              options={{ headerShown: true, headerStyle: { backgroundColor: '#000000' }, headerTintColor: '#ffffff', headerTitleStyle: { color: '#ffffff', fontWeight: 'bold' }, headerShadowVisible: false, title: 'Battery Details' }}
+              options={{ headerShown: true, headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a', headerTitleStyle: { color: '#0f172a', fontWeight: 'bold' }, headerShadowVisible: false, title: 'Battery Details' }}
             />
             <Stack.Screen
               name="BatterySorting"

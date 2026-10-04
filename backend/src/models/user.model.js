@@ -28,7 +28,9 @@ async function findById(id) {
 }
 
 async function findByEmail(email) {
-  const { rows } = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+  if (!email) return null;
+  const clean = String(email).trim().toLowerCase();
+  const { rows } = await db.query('SELECT * FROM users WHERE LOWER(TRIM(email)) = $1', [clean]);
   return rows[0];
 }
 

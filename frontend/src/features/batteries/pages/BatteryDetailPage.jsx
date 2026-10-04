@@ -162,7 +162,7 @@ const EVENT_META = {
   },
 };
 
-function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], recycleBatch = null, battery = null) {
+function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], recycleBatch = null, battery = null, isClient = false, isStaffRole = false) {
   const events = [];
 
   const allVisits = [...(visits || [])];
@@ -201,16 +201,18 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       key: `repair-${h.id}`,
       type: 'repair',
       date: h.repaired_at,
-      primary: `${h.part_name} (Qty ${h.quantity_used || 1}) · by ${h.staff_name || 'Technician'}${isRemoved ? ' (Removed & Restocked)' : ''}`,
+      primary: isClient
+        ? (h.part_name || 'Component Restored')
+        : `${h.part_name} (Qty ${h.quantity_used || 1}) · by ${h.staff_name || 'Technician'}${isRemoved ? ' (Removed & Restocked)' : ''}`,
       partName: h.part_name,
       quantityUsed: h.quantity_used || 1,
-      staffName: h.staff_name,
+      staffName: isClient ? null : h.staff_name,
       price: isRemoved ? 0 : partCost,
       originalPrice: partCost,
       partPrice: Number(h.price || 0),
       laborCharge: Number(h.labor_charge || 0),
       notes: h.notes,
-      durationSeconds: h.duration_seconds != null ? Number(h.duration_seconds) : null,
+      durationSeconds: isClient ? null : (h.duration_seconds != null ? Number(h.duration_seconds) : null),
       isRemoved,
     });
 
@@ -219,13 +221,15 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
         key: `removed-${h.id}`,
         type: 'part_removed',
         date: h.removed_at,
-        primary: `${h.part_name} · Restocked by ${h.removed_by_staff_name || 'Workshop Staff'}`,
+        primary: isClient
+          ? `Removed: ${h.part_name}`
+          : `${h.part_name} · Restocked by ${h.removed_by_staff_name || 'Workshop Staff'}`,
         partName: h.part_name,
-        notes: `Restocked to inventory (-£${partCost.toFixed(2)})`,
+        notes: isStaffRole ? 'Restocked to inventory' : `Restocked to inventory (-£${partCost.toFixed(2)})`,
         price: 0,
         deductedPrice: partCost,
         isDeduction: true,
-        removedByStaffName: h.removed_by_staff_name,
+        removedByStaffName: isClient ? null : h.removed_by_staff_name,
       });
     }
   });
@@ -243,9 +247,11 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       type: isPassBack ? 'pass_back' : 'service',
       label: isPassBack ? 'Passed to Technician (Rework)' : isDiagFee ? 'Diagnostic Fee' : 'Testing Service',
       date: s.completed_at,
-      primary: `${s.service_name}${s.staff_name ? ` · by ${s.staff_name}` : ''}`,
+      primary: isPassBack
+        ? (isClient ? 'Returned for Rework' : 'Passed to Technician (Rework)')
+        : `${s.service_name}${(!isClient && s.staff_name) ? ` · by ${s.staff_name}` : ''}`,
       serviceName: s.service_name,
-      staffName: s.staff_name,
+      staffName: isClient ? null : s.staff_name,
       price: Number(s.rate || 0),
       notes: s.notes,
     });
@@ -257,12 +263,14 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       type: 'issue',
       date: iss.reported_at,
       label: iss.failed_testing ? 'Marked Unserviceable · Test Failed' : 'Marked Unserviceable',
-      primary: `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'} · by ${iss.staff_name || 'Workshop Staff'}`,
+      primary: isClient
+        ? `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'}`
+        : `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'} · by ${iss.staff_name || 'Workshop Staff'}`,
       failedTesting: !!iss.failed_testing,
       reasonLabel: iss.reason_label,
-      staffName: iss.staff_name,
+      staffName: isClient ? null : iss.staff_name,
       notes: iss.note,
-      photos: iss.photo_urls || [],
+      photos: isClient ? [] : (iss.photo_urls || []),
     });
   });
 
@@ -281,10 +289,12 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       type: 'issue',
       date: issueDate,
       label: isTestFailed ? 'Marked Unserviceable · Test Failed' : 'Marked Unserviceable',
-      primary: `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable · by ${staffName}`,
+      primary: isClient
+        ? `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable`
+        : `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable · by ${staffName}`,
       failedTesting: isTestFailed,
       reasonLabel: isTestFailed ? 'Failed Testing / Unserviceable' : 'Unserviceable',
-      staffName,
+      staffName: isClient ? null : staffName,
       notes: passBackService?.notes || (battery.status === 'tested_parts_removed'
         ? 'Parts removed and restocked to inventory. Unit declared unserviceable scrap.'
         : 'Unit declared unserviceable during workshop processing.'),
@@ -329,14 +339,7 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
     (isOngoing && ['unserviceable', 'tested_parts_removed', 'recycled'].includes(batteryStatus));
 
   if (isUnserviceableFlow) {
-    const testFailed = cycle.some((e) => e.type === 'issue' && e.failedTesting);
-    const steps = [
-      'Intake',
-      'Diagnostic & Work',
-      testFailed ? 'Unserviceable · Test Failed' : 'Marked Unserviceable',
-      'Parts Restocked',
-      'Sent for Recycling',
-    ];
+    const steps = ['Intake', 'In Repair', 'Unserv.', 'Restocked', 'Recycled'];
     const hadPartsFitted = cycle.some((e) => e.type === 'repair');
     const partsRemoved = cycle.some((e) => e.type === 'part_removed');
     const isRecycled = hasRecycle || (isOngoing && batteryStatus === 'recycled');
@@ -354,7 +357,7 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
     ];
 
     return (
-      <div className="flex items-start overflow-x-auto pb-1 scrollbar-none">
+      <div className="w-full flex items-start justify-between py-1">
         {steps.map((label, i) => {
           const state = stepStates[i];
           const isDangerStep = i === 2; // Reported Unserviceable
@@ -363,7 +366,7 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
           const isDoneCurrent = state === 2;
 
           return (
-            <div key={label} className="flex-1 min-w-[110px] sm:min-w-[130px] flex flex-col items-center">
+            <div key={label} className="flex-1 min-w-0 flex flex-col items-center px-0.5 text-center">
               {/* Node and Connectors Track */}
               <div className="relative flex items-center justify-center w-full">
                 <div
@@ -376,7 +379,7 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
                   }`}
                 />
                 <span
-                  className={`relative z-10 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full text-xs font-black shadow-2xs transition-all ${
+                  className={`relative z-10 flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full text-[10px] sm:text-xs font-black shadow-2xs transition-all ${
                     isDangerStep
                       ? 'bg-critical-600 text-white dark:bg-red-500 ring-2 ring-red-400/30'
                       : isWarningStep
@@ -404,9 +407,9 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
               </div>
 
               {/* Step Label */}
-              <div className="mt-2 text-center px-1">
+              <div className="mt-1.5 text-center px-0.5 w-full">
                 <span
-                  className={`text-[11px] sm:text-xs font-semibold block leading-tight ${
+                  className={`text-[9px] sm:text-[10.5px] truncate max-w-full font-semibold block leading-tight ${
                     isDangerStep
                       ? 'font-bold text-critical-700 dark:text-red-400'
                       : isWarningStep
@@ -429,7 +432,7 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
   }
 
   // Normal Repair Lifecycle
-  const steps = ['Intake', 'Repair In Progress', 'Testing & QA', 'Repair Completed', 'Returned to Client'];
+  const steps = ['Intake', 'In Repair', 'Testing', 'Repaired', 'Returned'];
   let currentStepIdx = steps.length - 1;
 
   if (isOngoing) {
@@ -450,14 +453,14 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
   });
 
   return (
-    <div className="flex items-start overflow-x-auto pb-1 scrollbar-none">
+    <div className="w-full flex items-start justify-between py-1">
       {steps.map((label, i) => {
         const state = stepStates[i];
         const isDonePrevious = i > 0 && stepStates[i - 1] === 2;
         const isDoneCurrent = state === 2;
 
         return (
-          <div key={label} className="flex-1 min-w-[110px] sm:min-w-[130px] flex flex-col items-center">
+          <div key={label} className="flex-1 min-w-0 flex flex-col items-center px-0.5 text-center">
             {/* Node and Connectors Track */}
             <div className="relative flex items-center justify-center w-full">
               <div
@@ -470,7 +473,7 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
                 }`}
               />
               <span
-                className={`relative z-10 flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-full text-xs font-black shadow-2xs transition-all ${
+                className={`relative z-10 flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-full text-[10px] sm:text-xs font-black shadow-2xs transition-all ${
                   state === 2
                     ? 'bg-brand-600 text-white dark:bg-emerald-500 ring-2 ring-emerald-400/20'
                     : state === 1
@@ -492,9 +495,9 @@ function ProcessStepper({ isOngoing, batteryStatus, cycle, pendingPartsCount = 0
             </div>
 
             {/* Step Label */}
-            <div className="mt-2 text-center px-1">
+            <div className="mt-1.5 text-center px-0.5 w-full">
               <span
-                className={`text-[11px] sm:text-xs font-semibold block leading-tight ${
+                className={`text-[9px] sm:text-[10.5px] truncate max-w-full font-semibold block leading-tight ${
                   state === 2
                     ? 'text-slate-800 dark:text-neutral-200'
                     : state === 1
@@ -665,7 +668,7 @@ function ClientBatteryDetailView({
     { key: 'inspection', label: 'Workshop Diagnostics', desc: 'Multi-point safety assessment', icon: FiActivity, state: 'done' },
     {
       key: 'bench_test',
-      label: isTesterFailed ? 'Safety & Load Testing' : 'Technician Inspection',
+      label: isTesterFailed ? 'Safety & Load Testing' : 'Workshop Inspection',
       desc: isTesterFailed ? 'Critical electrical defect identified in QA test' : 'Irreparable issue identified during repair',
       icon: FiXCircle,
       state: 'failed',
@@ -673,7 +676,7 @@ function ClientBatteryDetailView({
     {
       key: 'unserviceable',
       label: isTesterFailed ? 'Marked Unserviceable · Test Failed' : 'Marked Unserviceable',
-      desc: isTesterFailed ? 'QA Test Failed · Parts reclaimed to stock' : 'Marked by technician · Parts reclaimed to stock',
+      desc: isTesterFailed ? 'QA Test Failed · Parts reclaimed to stock' : 'Workshop Inspection · Parts reclaimed to stock',
       icon: FiAlertTriangle,
       state: 'warning',
     },
@@ -872,12 +875,6 @@ function ClientBatteryDetailView({
                 <FiCalendar className="w-3.5 h-3.5 text-emerald-500" />
                 <span>Enrolled in Fleet: <strong className="text-slate-700 dark:text-neutral-200">{battery.created_at ? new Date(battery.created_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}</strong></span>
               </span>
-              {battery.last_service_date && !isRecycled && (
-                <span className="inline-flex items-center gap-1.5">
-                  <FiTool className="w-3.5 h-3.5 text-blue-500" />
-                  <span>Last Service: <strong>{new Date(battery.last_service_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
-                </span>
-              )}
               {recycleBatch?.recycled_at && (
                 <span className="inline-flex items-center gap-1.5">
                   <FiRefreshCw className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
@@ -1041,7 +1038,7 @@ function ClientBatteryDetailView({
                   </span>
                 </div>
                 <p className="text-[11px] text-slate-500 dark:text-neutral-400 mt-1">
-                  {isTesterFailed ? 'QA Test Failed · Safety threshold exceeded' : 'Declared unserviceable by technician'}
+                  {isTesterFailed ? 'QA Test Failed · Safety threshold exceeded' : 'Declared unserviceable upon inspection'}
                 </p>
               </div>
             </div>
@@ -1439,9 +1436,8 @@ function ClientBatteryDetailView({
                 <span>{latestIssue?.reason_label || 'Physical / Electrical Cell Defect'}</span>
               </p>
               <div className="pt-2 border-t border-slate-100 dark:border-white/10 flex items-center justify-between text-xs text-slate-500 dark:text-neutral-400">
-                <span>Inspector: <strong>{latestIssue?.staff_name || 'Workshop Technical Team'}</strong></span>
                 <span>
-                  Date:{' '}
+                  Inspection Date:{' '}
                   <strong>
                     {latestIssue?.reported_at
                       ? new Date(latestIssue.reported_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
@@ -1480,48 +1476,6 @@ function ClientBatteryDetailView({
                 <span className="text-xl font-black font-mono text-indigo-900 dark:text-indigo-200">
                   {diagnosticFeeLabel}
                 </span>
-              </div>
-            </div>
-          )}
-
-          {/* Workshop Diagnostic Evidence Photos */}
-          {latestIssue?.photo_urls && latestIssue.photo_urls.length > 0 && (
-            <div className="space-y-3">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-600 dark:text-neutral-300 flex items-center gap-2">
-                <FiCamera className="w-3.5 h-3.5 text-rose-500" />
-                <span>Inspection Photo Evidence ({latestIssue.photo_urls.length})</span>
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                {latestIssue.photo_urls.map((photo, pIdx) => {
-                  const resolvedUrl = resolveImageUrl(photo);
-                  return (
-                    <button
-                      key={pIdx}
-                      type="button"
-                      onClick={() =>
-                        setLightboxState({
-                          isOpen: true,
-                          images: latestIssue.photo_urls.map(resolveImageUrl),
-                          initialIndex: pIdx,
-                          title: `Inspection Evidence - ${battery.battery_code}`,
-                        })
-                      }
-                      className="group relative aspect-square rounded-2xl overflow-hidden border border-slate-200 dark:border-white/10 bg-slate-100 hover:ring-2 hover:ring-rose-500/50 transition-all cursor-pointer"
-                    >
-                      <img
-                        src={resolvedUrl}
-                        alt={`Diagnostic inspection ${pIdx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="px-2 py-1 rounded-lg bg-black/60 text-white text-[10px] font-bold">
-                          Zoom
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
               </div>
             </div>
           )}
@@ -1647,47 +1601,6 @@ function ClientBatteryDetailView({
             </div>
           </div>
 
-          {/* Photo evidence if any */}
-          {latestIssue?.photo_urls && latestIssue.photo_urls.length > 0 && (
-            <div className="space-y-3 pt-2">
-              <h4 className="text-xs font-extrabold uppercase tracking-wider text-slate-700 dark:text-neutral-300 flex items-center gap-2">
-                <FiCamera className="w-3.5 h-3.5 text-slate-500" />
-                <span>Inspection Photo Evidence ({latestIssue.photo_urls.length})</span>
-              </h4>
-              <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                {latestIssue.photo_urls.map((photo, pIdx) => {
-                  const resolvedUrl = resolveImageUrl(photo);
-                  return (
-                    <button
-                      key={pIdx}
-                      type="button"
-                      onClick={() =>
-                        setLightboxState({
-                          isOpen: true,
-                          images: latestIssue.photo_urls.map(resolveImageUrl),
-                          initialIndex: pIdx,
-                          title: `Inspection Evidence - ${battery.battery_code}`,
-                        })
-                      }
-                      className="group relative aspect-square rounded-2xl overflow-hidden border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-800 hover:ring-2 hover:ring-emerald-500/50 transition-all cursor-pointer shadow-xs"
-                    >
-                      <img
-                        src={resolvedUrl}
-                        alt={`Diagnostic inspection ${pIdx + 1}`}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                        loading="lazy"
-                      />
-                      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <span className="px-2 py-1 rounded-lg bg-black/70 text-white text-[10px] font-bold">
-                          Zoom
-                        </span>
-                      </div>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -1914,9 +1827,6 @@ function ClientBatteryDetailView({
                               )}
                             </span>
                           </div>
-                          <span className="text-[11px] font-mono font-bold text-emerald-700 dark:text-emerald-400">
-                            Refurbishment ID: {visit.batchId.slice(0, 16)}
-                          </span>
                         </div>
                       </div>
                     )}
@@ -2029,7 +1939,12 @@ function BatteryDetailPage() {
   const user = useSelector((state) => state.auth.user);
   const isTechnician = user?.role === 'technician';
   const isStaff = user?.role === 'staff';
-  const isStaffRole = isStaff || isTechnician || user?.role === 'supervisor';
+  const isSupervisor =
+    user?.role === 'supervisor' ||
+    (user?.staff_role || '').toLowerCase() === 'supervisor' ||
+    (user?.staffRole || '').toLowerCase() === 'supervisor' ||
+    (user?.staff?.role || '').toLowerCase() === 'supervisor';
+  const isStaffRole = isStaff || isTechnician || isSupervisor;
   const isClient = user?.role === 'client';
   const isRecycleClient = user?.role === 'recycle_client';
   const isAdmin = user?.role === 'super_admin' || user?.role === 'admin';
@@ -2134,7 +2049,7 @@ function BatteryDetailPage() {
     }
   }
 
-  const fallbackBackTo = isClient ? '/my/batteries/all' : isTechnician ? '/my/dashboard' : isAdmin ? '/batteries' : null;
+  const fallbackBackTo = isClient ? '/my/batteries/all' : (isTechnician || isSupervisor) ? '/my/dashboard' : isAdmin ? '/batteries' : null;
   const canShowBack = fallbackBackTo !== null;
 
   function handleBack() {
@@ -2343,7 +2258,9 @@ function BatteryDetailPage() {
       issues || [],
       services || [],
       recycleBatch,
-      battery
+      battery,
+      isClient,
+      isStaffRole
     )
   );
   const cycles = rawCycles.map((c, idx) => ({
@@ -2450,7 +2367,7 @@ function BatteryDetailPage() {
           </div>
         }
         description={
-          fromScan && (isTechnician || isStaff)
+          fromScan && isStaffRole
             ? 'Workshop Service & Repair'
             : 'Full intake-to-return history.'
         }
@@ -2470,7 +2387,7 @@ function BatteryDetailPage() {
                 Generating…
               </div>
             )}
-            {!isTechnician && battery.client_name && (
+            {!isStaffRole && !isTechnician && battery.client_name && (
               <p className="mt-4 text-sm text-slate-500 dark:text-neutral-400">Client: {battery.client_name}</p>
             )}
             {battery.serial_number && (
@@ -2512,7 +2429,7 @@ function BatteryDetailPage() {
                 isPassedBack={isPassedBack}
                 hasPendingParts={hasPendingPartsToRemove}
               />
-              {!isTechnician && battery.client_name && (
+              {!isStaffRole && !isTechnician && battery.client_name && (
                 <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-medium text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
                   Client: {battery.client_name}
                 </span>
@@ -2587,7 +2504,7 @@ function BatteryDetailPage() {
         </div>
       )}
 
-      {!(isTechnician || isStaff) && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && result.issues?.[0] && (
+      {!isStaffRole && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && result.issues?.[0] && (
         <div className="mb-6 overflow-hidden rounded-2xl sm:rounded-3xl border border-rose-200 bg-gradient-to-b from-rose-50/80 via-white to-rose-50/30 p-5 sm:p-6 shadow-sm dark:border-rose-900/50 dark:from-rose-950/20 dark:via-surface-900 dark:to-surface-950">
           <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
             <div className="flex-1">
@@ -2613,10 +2530,14 @@ function BatteryDetailPage() {
                 </div>
               )}
               <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-slate-500 dark:text-neutral-400">
-                <span className="font-medium text-slate-700 dark:text-neutral-300">
-                  Reported by <span className="font-bold text-slate-900 dark:text-white">{result.issues[0].staff_name}</span>
-                </span>
-                <span>•</span>
+                {!isClient && (
+                  <>
+                    <span className="font-medium text-slate-700 dark:text-neutral-300">
+                      Reported by <span className="font-bold text-slate-900 dark:text-white">{result.issues[0].staff_name}</span>
+                    </span>
+                    <span>•</span>
+                  </>
+                )}
                 <span>
                   {new Date(result.issues[0].reported_at).toLocaleString('en-GB', {
                     day: '2-digit',
@@ -2639,9 +2560,14 @@ function BatteryDetailPage() {
                       .filter((h) => h.removed_at)
                       .map((h, hIdx) => (
                         <p key={hIdx} className="text-xs text-slate-600 dark:text-neutral-300">
-                          • <span className="font-semibold text-slate-900 dark:text-white">{h.part_name}</span> (Qty {h.quantity_used}) — fitted by{' '}
-                          <span className="font-semibold">{h.staff_name}</span> and removed by{' '}
-                          <span className="font-semibold">{h.removed_by_staff_name || 'Technician'}</span> on{' '}
+                          • <span className="font-semibold text-slate-900 dark:text-white">{h.part_name}</span> (Qty {h.quantity_used})
+                          {!isClient && (
+                            <>
+                              {' '}— fitted by <span className="font-semibold">{h.staff_name}</span> and removed by{' '}
+                              <span className="font-semibold">{h.removed_by_staff_name || 'Technician'}</span>
+                            </>
+                          )}
+                          {' '}on{' '}
                           {new Date(h.removed_at).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
                         </p>
                       ))}
@@ -2650,7 +2576,7 @@ function BatteryDetailPage() {
               )}
             </div>
 
-            {result.issues[0].photo_urls && result.issues[0].photo_urls.length > 0 && (
+            {!isClient && result.issues[0].photo_urls && result.issues[0].photo_urls.length > 0 && (
               <div className="shrink-0 flex flex-col gap-1.5">
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold uppercase tracking-wider text-rose-900 dark:text-rose-300">
@@ -2738,7 +2664,7 @@ function BatteryDetailPage() {
         </div>
       )}
 
-      {!isRecycleClient && !isAdmin && (isTechnician || isStaff) && (
+      {!isRecycleClient && !isClient && (isStaffRole || (isAdmin && fromScan)) && (
         <TechnicianRepairPanel
           battery={battery}
           services={services}
@@ -2819,7 +2745,7 @@ function BatteryDetailPage() {
             )}
           </div>
         </div>
-      ) : fromScan && (isTechnician || isStaff) && !showHistoryInScan ? (
+      ) : fromScan && isStaffRole && !showHistoryInScan ? (
         <div className="mt-8 border-t border-slate-200/80 pt-6 dark:border-white/10">
           <div className="flex justify-center">
             <button
@@ -2834,7 +2760,7 @@ function BatteryDetailPage() {
         </div>
       ) : (
         <>
-          {fromScan && (isTechnician || isStaff) && (
+          {fromScan && isStaffRole && (
             <div className="mt-8 mb-6 border-t border-slate-200/80 pt-6 flex justify-center dark:border-white/10">
               <button
                 type="button"
@@ -2847,7 +2773,7 @@ function BatteryDetailPage() {
             </div>
           )}
 
-          <div className={`mb-6 grid grid-cols-1 gap-3 sm:gap-4 ${isSuperAdmin ? (isTechnician ? 'sm:grid-cols-3' : 'sm:grid-cols-4') : 'sm:grid-cols-2'}`}>
+          <div className={`mb-6 grid grid-cols-1 gap-3 sm:gap-4 ${isSuperAdmin ? ((isTechnician || isSupervisor) ? 'sm:grid-cols-3' : 'sm:grid-cols-4') : 'sm:grid-cols-2'}`}>
             <StatCard
               icon={<FiTool className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />}
               label="Repairs Logged"
@@ -2868,7 +2794,7 @@ function BatteryDetailPage() {
                 tone="purple"
               />
             )}
-            {isSuperAdmin && !isTechnician && (
+            {isSuperAdmin && !(isTechnician || isSupervisor) && (
               <StatCard
                 icon={<FiActivity className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />}
                 label="Total Price"
@@ -3101,7 +3027,9 @@ function BatteryDetailPage() {
                           {cycleRepairs.length} {cycleRepairs.length === 1 ? 'part fitted' : 'parts fitted'}
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate block">
-                          {totalRepairTimeSec > 0 ? `${formatDuration(totalRepairTimeSec)} repair time` : 'No parts replaced'}
+                          {!isClient && totalRepairTimeSec > 0
+                            ? `${formatDuration(totalRepairTimeSec)} repair time`
+                            : (cycleRepairs.length > 0 ? 'Restoration completed' : 'No parts replaced')}
                         </span>
                       </div>
                     </div>
@@ -3117,7 +3045,7 @@ function BatteryDetailPage() {
                           {cycleQaServices.length} {cycleQaServices.length === 1 ? 'service logged' : 'services logged'}
                         </span>
                         <span className="text-[10px] text-slate-500 dark:text-neutral-400 truncate block">
-                          {cycleQaServicesTotal > 0 ? `£${cycleQaServicesTotal.toFixed(2)} total QA` : 'Quality checks passed'}
+                          {!isStaffRole && cycleQaServicesTotal > 0 ? `£${cycleQaServicesTotal.toFixed(2)} total QA` : 'Quality checks passed'}
                         </span>
                       </div>
                     </div>
@@ -3172,17 +3100,19 @@ function BatteryDetailPage() {
                         <p>
                           <span className="font-bold text-rose-950 dark:text-rose-100">Failure Reason:</span> {latestIssue.reasonLabel || 'Unserviceable'}
                         </p>
-                        <p>
-                          <span className="font-bold text-rose-950 dark:text-rose-100">Reported By:</span> {latestIssue.staffName || 'Workshop Staff'}
-                          {latestIssue.date ? ` on ${new Date(latestIssue.date).toLocaleString('en-GB')}` : ''}
-                        </p>
+                        {!isClient && (
+                          <p>
+                            <span className="font-bold text-rose-950 dark:text-rose-100">Reported By:</span> {latestIssue.staffName || 'Workshop Staff'}
+                            {latestIssue.date ? ` on ${new Date(latestIssue.date).toLocaleString('en-GB')}` : ''}
+                          </p>
+                        )}
                       </div>
                       {latestIssue.notes && (
                         <div className="mt-2.5 rounded-xl border border-rose-200/70 bg-white/90 p-3 dark:border-rose-900/40 dark:bg-surface-900 shadow-2xs">
                           <p className="text-xs italic text-rose-900 dark:text-rose-200">"{latestIssue.notes}"</p>
                         </div>
                       )}
-                      {latestIssue.photos && latestIssue.photos.length > 0 && (
+                      {!isClient && latestIssue.photos && latestIssue.photos.length > 0 && (
                         <div className="mt-3">
                           <span className="text-[11px] font-bold text-rose-900 dark:text-rose-200 block mb-1.5">
                             Diagnostic Photos ({latestIssue.photos.length})
@@ -3278,7 +3208,7 @@ function BatteryDetailPage() {
                                     }`}>
                                       {event.label || meta.label}
                                     </span>
-                                    {event.staffName && (
+                                    {!isClient && event.staffName && (
                                       <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md border ${
                                         event.type === 'issue'
                                           ? 'text-rose-800 bg-rose-100/80 border-rose-200 dark:bg-rose-900/60 dark:text-rose-200 dark:border-rose-800'
@@ -3302,7 +3232,7 @@ function BatteryDetailPage() {
                                 </p>
 
                                 <div className="mt-2.5 flex flex-wrap items-center gap-2">
-                                  {event.durationSeconds != null && event.durationSeconds > 0 && (
+                                  {!isClient && event.durationSeconds != null && event.durationSeconds > 0 && (
                                     <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:bg-white/5 dark:text-neutral-300">
                                       <FiClock className="w-3 h-3 opacity-60" />
                                       <span>{formatDuration(event.durationSeconds)}</span>
@@ -3340,7 +3270,7 @@ function BatteryDetailPage() {
                                   </div>
                                 )}
 
-                                {event.photos && event.photos.length > 0 && (
+                                {!isClient && event.photos && event.photos.length > 0 && (
                                   <div className="mt-3 flex items-center gap-2">
                                     {event.photos.map((photo, pIdx) => (
                                       <button

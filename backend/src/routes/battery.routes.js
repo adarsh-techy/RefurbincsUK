@@ -10,10 +10,10 @@ const uploadIssuePhotos = multer({
 
 // Must precede '/:code' below, or these would be swallowed as battery code
 // lookups.
-router.get('/count-by-client', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.countByClient);
-router.get('/serial-numbers', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.listSerialNumbers);
-router.get('/repeat-intakes-this-month', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.repeatIntakesThisMonth);
-router.get('/unserviceable-count', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.unserviceableCount);
+router.get('/count-by-client', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.countByClient);
+router.get('/serial-numbers', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.listSerialNumbers);
+router.get('/repeat-intakes-this-month', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.repeatIntakesThisMonth);
+router.get('/unserviceable-count', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.unserviceableCount);
 
 // Public / client QR code tracking endpoint — anyone scanning a QR code can see
 // full battery details and history, while authenticated users are also identified.
@@ -22,7 +22,7 @@ router.get('/:code', optionalAuth, batteryController.getByCode);
 router.use(requireAuth);
 // The full fleet list spans every client, so it's workshop logins only —
 // clients read their own batteries through /clients/me/batteries.
-router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician'), batteryController.list);
+router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.list);
 
 // Registering a battery from the Generate QR Code page is a routine
 // front-desk action, open to office logins (not clients/technicians).
@@ -36,34 +36,34 @@ router.patch('/:id/client', requireRole('super_admin', 'admin', 'staff'), batter
 // client sets it; ownership is enforced in the controller).
 router.patch(
   '/:id/serial-number',
-  requireRole('client', 'super_admin', 'admin', 'staff', 'technician'),
+  requireRole('client', 'super_admin', 'admin', 'staff', 'technician', 'supervisor'),
   batteryController.updateSerialNumber
 );
 // A technician or staff claiming a battery to start work on — before any part is
 // logged, so it shows as actively being worked on rather than just queued.
 router.patch(
   '/:id/start-work',
-  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  requireRole('technician', 'supervisor', 'staff', 'admin', 'super_admin'),
   batteryController.startWork
 );
 // A supervisor or admin starting the test timer when scanning/opening an in_testing battery.
 router.patch(
   '/:id/start-testing',
-  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  requireRole('technician', 'supervisor', 'staff', 'admin', 'super_admin'),
   batteryController.startTesting
 );
 // A technician (Supervisor only, enforced in the controller), staff
 // member, or admin confirming a battery works after its parts were replaced.
 router.patch(
   '/:id/complete-testing',
-  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  requireRole('technician', 'supervisor', 'staff', 'admin', 'super_admin'),
   batteryController.completeTesting
 );
 // A technician (mid-repair) or a supervisor, during
 // testing — reporting that a battery can't be serviced, with up to 3 photos.
 router.patch(
   '/:id/report-issue',
-  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  requireRole('technician', 'supervisor', 'staff', 'admin', 'super_admin'),
   uploadIssuePhotos.array('photos', 3),
   batteryController.reportIssue
 );
@@ -71,13 +71,13 @@ router.patch(
 // open to the same workshop logins as report-issue/complete-testing.
 router.patch(
   '/:id/remove-parts',
-  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  requireRole('technician', 'supervisor', 'staff', 'admin', 'super_admin'),
   batteryController.removeParts
 );
 // A supervisor passing a battery back to the technician pool
 router.patch(
   '/:id/pass-to-tech',
-  requireRole('technician', 'staff', 'admin', 'super_admin'),
+  requireRole('technician', 'supervisor', 'staff', 'admin', 'super_admin'),
   batteryController.passToTech
 );
 // Editing/removing batteries (manual status correction) is super_admin only.

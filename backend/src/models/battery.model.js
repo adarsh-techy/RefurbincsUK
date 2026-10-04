@@ -25,7 +25,7 @@ async function findPage({
   activeOnly,
   intakedOnly,
   includeTesting,
-  sortOrder = 'desc',
+  sortOrder = 'asc',
 }) {
   const conditions = [];
   const params = [];
@@ -230,7 +230,7 @@ async function findPage({
        LIMIT 1
      ) last_recycle ON true
      ${whereClause}
-     ORDER BY ${qrGenerated ? 'b.qr_generated_at ASC, b.id ASC' : (sortOrder === 'asc' ? 'b.created_at ASC, b.id ASC' : 'b.created_at DESC, b.id DESC')}
+     ORDER BY ${qrGenerated ? 'b.qr_generated_at ASC, b.id ASC' : (sortOrder === 'asc' ? 'b.battery_code ASC, b.id ASC' : 'b.battery_code DESC, b.id DESC')}
      LIMIT $${params.length - 1} OFFSET $${params.length}`,
     params
   );
@@ -661,13 +661,25 @@ async function removeParts(batteryId, repairIds = [], staffId) {
       [batteryId]
     );
     if (existingIssue.length === 0) {
+      // Find who tested and passed back the battery from testing
+      const { rows: passBack } = await client.query(
+        `SELECT staff_id, notes, completed_at FROM battery_services
+         WHERE battery_id = $1 AND service_name = 'Passed back to Technician'
+         ORDER BY completed_at DESC LIMIT 1`,
+        [batteryId]
+      );
+      const reportedStaffId = passBack[0]?.staff_id || staffId;
+      const reportedNote = passBack[0]?.notes || 'Fitted parts removed & restocked to inventory. Unit declared unserviceable scrap.';
+      const reportedDate = passBack[0]?.completed_at || new Date();
+
       await client.query(
         `INSERT INTO battery_issues (battery_id, staff_id, reason_id, note, photo_urls, failed_testing, reported_at)
-         VALUES ($1, $2, NULL, $3, '{}', true, now())`,
+         VALUES ($1, $2, NULL, $3, '{}', true, $4)`,
         [
           batteryId,
-          staffId,
-          'Fitted parts removed & restocked to inventory. Unit declared unserviceable scrap.',
+          reportedStaffId,
+          reportedNote,
+          reportedDate,
         ]
       );
     }
@@ -813,6 +825,13 @@ async function completeTesting(id, { serviceIds = [], staffId = null, notes = nu
           [id, s.id, s.name, s.rate, staffId, notes]
         );
       }
+    } else if (staffId) {
+      // Record QA Testing & Verification Passed so the supervisor's work is always preserved in history
+      await client.query(
+        `INSERT INTO battery_services (battery_id, service_id, service_name, rate, staff_id, notes, completed_at)
+         VALUES ($1, NULL, 'QA Testing & Verification Passed', 0, $2, $3, now())`,
+        [id, staffId, notes]
+      );
     }
 
     await client.query('COMMIT');

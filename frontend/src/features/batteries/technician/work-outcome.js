@@ -19,9 +19,8 @@ const FAILED_STATUSES = [
 
 export function isCompletedRepair(r) {
   if (!r) return false;
-  // If explicitly failed or parts were removed, it's not a successful repair
-  if (r.outcome === 'failed' || r.parts_removed) return false;
-  if (FAILED_STATUSES.includes(r.battery_status)) return false;
+  // If explicitly parts were removed, it was restocked
+  if (r.parts_removed) return false;
   // If repaired_at or id exists, technician finished this repair
   return Boolean(r.repaired_at || r.id);
 }

@@ -16,14 +16,14 @@ export function getBaseUrl() {
   if (hostUri) {
     const host = hostUri.split(':')[0];
     if (IPV4_REGEX.test(host) && host !== '127.0.0.1' && host !== 'localhost') {
-      return `http://${host}:5000/api`;
+      return `http://${host}:5001/api`;
     }
   }
 
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl && !envUrl.includes('exp.direct')) return envUrl;
 
-  return 'https://refurbincsuk.onrender.com/api';
+  return 'http://192.168.31.154:5001/api';
 }
 
 const apiClient = axios.create({

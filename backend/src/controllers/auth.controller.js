@@ -26,10 +26,19 @@ async function attachClientLogo(userRow) {
 
 async function login(req, res, next) {
   try {
-    const { email, password } = req.body;
-    const user = await userModel.findByEmail(email);
+    const rawEmail = req.body.email ? String(req.body.email).trim().toLowerCase() : '';
+    const rawPassword = req.body.password != null ? String(req.body.password) : '';
+    const user = await userModel.findByEmail(rawEmail);
 
-    if (!user || !(await bcrypt.compare(password, user.password_hash))) {
+    let passwordMatch = false;
+    if (user && rawPassword) {
+      passwordMatch = await bcrypt.compare(rawPassword, user.password_hash);
+      if (!passwordMatch && rawPassword.trim() !== rawPassword) {
+        passwordMatch = await bcrypt.compare(rawPassword.trim(), user.password_hash);
+      }
+    }
+
+    if (!user || !passwordMatch) {
       return res.status(401).json({ message: 'Invalid email or password' });
     }
     if (!user.active) {
@@ -40,6 +49,8 @@ async function login(req, res, next) {
     const staff = await staffModel.findByUserId(user.id);
     if (staff?.role) {
       staffRole = staff.role;
+    } else if ((user.role || '').toLowerCase() === 'supervisor') {
+      staffRole = 'supervisor';
     } else if (user.role === 'technician') {
       staffRole = 'technician';
     }
@@ -53,6 +64,8 @@ async function login(req, res, next) {
         email: user.email,
         role: user.role,
         staff_role: staffRole,
+        staffRole: staffRole,
+        staff_id: staff?.id || null,
         permissions: user.permissions,
         must_change_password: user.must_change_password,
         client_logo_path: clientLogoPath,
@@ -109,11 +122,21 @@ async function me(req, res, next) {
     const staff = await staffModel.findByUserId(req.user.id);
     if (staff?.role) {
       staffRole = staff.role;
+    } else if ((req.user.role || '').toLowerCase() === 'supervisor') {
+      staffRole = 'supervisor';
     } else if (req.user.role === 'technician') {
       staffRole = 'technician';
     }
     const clientLogoPath = await attachClientLogo(req.user);
-    res.json({ user: { ...req.user, staff_role: staffRole, client_logo_path: clientLogoPath } });
+    res.json({
+      user: {
+        ...req.user,
+        staff_role: staffRole,
+        staffRole: staffRole,
+        staff_id: staff?.id || null,
+        client_logo_path: clientLogoPath,
+      },
+    });
   } catch (err) {
     // Without this a DB hiccup here was an unhandled rejection, which kills
     // the whole Node process (Express 4 doesn't catch async handler errors).

@@ -127,12 +127,10 @@ function DashboardLayout() {
   if (isWorkshopStaff) {
     return (
       <div
-        className="flex min-h-screen flex-col overflow-x-hidden transition-colors"
+        className={`${isDark ? 'dark' : ''} flex min-h-screen flex-col overflow-x-hidden text-slate-900 dark:text-neutral-100 transition-colors`}
         style={{ backgroundColor: pageBgColor }}
       >
-        <div className="dark">
-          <PortalHeader />
-        </div>
+        <PortalHeader />
         <main className="flex-1 p-2.5 pb-16 sm:p-6 md:pb-8">
           <Suspense fallback={<PageFallback />}>
             <Outlet />

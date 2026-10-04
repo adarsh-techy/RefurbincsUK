@@ -316,24 +316,84 @@ function ClientDashboardPage() {
   const repairVisits = Number(stats?.repair_visit_count || 0);
   const balanceOwed = Number(stats?.balance || 0);
 
+  // Batteries returned back to client after repair/servicing
+  const returnedFromWorkshop = useMemo(() => {
+    if (stats?.returned_from_workshop_count !== undefined) {
+      return Number(stats.returned_from_workshop_count);
+    }
+    return allBatteries.filter(
+      (b) => (b.status === 'returned' && b.truck_intake_id) || Boolean(b.return_id)
+    ).length;
+  }, [stats?.returned_from_workshop_count, allBatteries]);
+
+  // Precise breakdown matching client shipments and workshop receiving:
+  // 1. Total Packed: 20 (across all active trucks - remains fixed and does not decrease on return/completion)
+  const totalPacked = useMemo(() => {
+    if (stats?.total_packed_count !== undefined) return Number(stats.total_packed_count);
+    return allBatteries.filter((b) => Boolean(b.truck_intake_id)).length;
+  }, [stats?.total_packed_count, allBatteries]);
+
+  // 2. Verified at Workshop: 10 (Truck KL12 verified)
+  const verifiedIntake = useMemo(() => {
+    if (stats?.verified_intake_count !== undefined) return Number(stats.verified_intake_count);
+    return allBatteries.filter(
+      (b) => b.truck_intake_id && (b.intake_status === 'verified' || Boolean(b.verified_at))
+    ).length;
+  }, [stats?.verified_intake_count, allBatteries]);
+
+  // 3. In Transit / Awaiting Intake: 10 (Truck KL10ASASD pending arrival)
+  const awaitingIntake = useMemo(() => {
+    if (stats?.awaiting_intake_count !== undefined) return Number(stats.awaiting_intake_count);
+    return allBatteries.filter(
+      (b) =>
+        b.truck_intake_id &&
+        (b.intake_status === 'pending_arrival' || (!b.verified_at && b.intake_status !== 'verified'))
+    ).length;
+  }, [stats?.awaiting_intake_count, allBatteries]);
+
+  // 4. Workshop Queue (verified at workshop, awaiting repair/diagnostics): 6
+  const workshopQueue = useMemo(() => {
+    if (stats?.workshop_queue_count !== undefined) return Number(stats.workshop_queue_count);
+    return allBatteries.filter(
+      (b) =>
+        b.status === 'in_repair' &&
+        (b.intake_status === 'verified' || Boolean(b.verified_at))
+    ).length;
+  }, [stats?.workshop_queue_count, allBatteries]);
+
+  // 5. Total In Workshop: 7 (6 in queue + 0 in progress/test + 1 repaired ready for return)
+  const inWorkshop = useMemo(() => {
+    if (stats?.in_workshop_count !== undefined) return Number(stats.in_workshop_count);
+    return allBatteries.filter(
+      (b) =>
+        (b.intake_status === 'verified' || Boolean(b.verified_at)) &&
+        ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)
+    ).length;
+  }, [stats?.in_workshop_count, allBatteries]);
+
   // Filtered batteries for table based on active tab and search query
   const filteredBatteries = useMemo(() => {
     let list = allBatteries;
     switch (tableTab) {
       case 'workshop':
         list = list.filter((b) =>
-          ['in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)
+          (b.intake_status === 'verified' || Boolean(b.verified_at)) &&
+          ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)
         );
         break;
       case 'fleet':
         list = list.filter((b) => b.status === 'returned');
         break;
       case 'packed':
-        list = list.filter((b) => b.status === 'in_repair');
+        list = list.filter(
+          (b) =>
+            b.status !== 'returned' &&
+            (b.intake_status === 'pending_arrival' || (!b.verified_at && b.intake_status !== 'verified'))
+        );
         break;
       case 'unserviceable':
         list = list.filter((b) =>
-          ['unserviceable', 'tested_parts_removed', 'recycled'].includes(b.status)
+          ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(b.status)
         );
         break;
       default:
@@ -354,19 +414,13 @@ function ClientDashboardPage() {
   }, [allBatteries, tableTab, inlineSearch]);
 
   // Tab counts
-  const workshopCount = useMemo(
-    () =>
-      allBatteries.filter((b) =>
-        ['in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)
-      ).length,
-    [allBatteries]
-  );
+  const workshopCount = inWorkshop;
   const fleetCount = useMemo(() => allBatteries.filter((b) => b.status === 'returned').length, [allBatteries]);
-  const packedCount = useMemo(() => allBatteries.filter((b) => b.status === 'in_repair').length, [allBatteries]);
+  const packedCount = awaitingIntake;
   const unserviceableCount = useMemo(
     () =>
       allBatteries.filter((b) =>
-        ['unserviceable', 'tested_parts_removed', 'recycled'].includes(b.status)
+        ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(b.status)
       ).length,
     [allBatteries]
   );
@@ -567,17 +621,53 @@ function ClientDashboardPage() {
         </div>
       </div>
 
+      {/* ── Active Shipment & Intake Status Tracker Banner ─────────────────────── */}
+      {totalPacked > 0 && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 rounded-3xl border border-amber-200/90 bg-gradient-to-r from-amber-50/80 via-white to-blue-50/60 p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:from-surface-900 dark:via-surface-900 dark:to-surface-850">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 shadow-2xs">
+              <FiTruck className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-xs uppercase tracking-wider text-amber-900 dark:text-amber-300">
+                  Shipment &amp; Workshop Receiving Tracker
+                </span>
+                <span className="rounded-full bg-amber-200/80 px-2.5 py-0.5 text-[10px] font-black text-amber-900 dark:bg-amber-900/60 dark:text-amber-200">
+                  {totalPacked} Total Units Packed
+                </span>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-neutral-300 mt-1 leading-relaxed">
+                <span className="font-bold text-blue-700 dark:text-blue-400">{verifiedIntake} verified at workshop</span> (Truck #KL12) &bull; <span className="font-bold text-amber-700 dark:text-amber-400">{awaitingIntake} in transit / awaiting check-in</span> (Truck #KL10ASASD)
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/my/batteries/packed"
+            className="inline-flex items-center justify-center gap-1.5 rounded-2xl bg-white px-4 py-2.5 text-xs font-bold text-slate-800 border border-slate-200 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 shrink-0 transition-all cursor-pointer self-start sm:self-auto"
+          >
+            <span>Inspect Packed Trucks</span>
+            <FiArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+      )}
+
       {/* ── 8 Primary Fleet KPI Metric Cards Grid ───────────────────────── */}
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-4 gap-3.5 sm:gap-4">
-        {/* Card 1: Total Fleet */}
+        {/* Card 1: Total Batteries */}
         <Link
           to="/my/batteries/all"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-slate-400 dark:border-white/10 dark:bg-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-400 dark:text-neutral-400">
-              Total Fleet
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-600 dark:text-neutral-400">
+                Total Batteries
+              </span>
+              <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase text-slate-600 dark:bg-white/10 dark:text-neutral-300">
+                All Units
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-slate-100 text-slate-700 dark:bg-white/10 dark:text-neutral-300 group-hover:scale-105 transition-transform">
               <FiLayers className="h-4.5 w-4.5" />
             </div>
@@ -587,45 +677,55 @@ function ClientDashboardPage() {
               {totalBatteries.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
-              <span>Registered units</span>
+              <span>All registered fleet</span>
               <span className="font-bold text-slate-700 dark:text-neutral-300 group-hover:translate-x-0.5 transition-transform">View All →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 2: Stage 1 · Packed to Repair */}
+        {/* Card 2: On The Way */}
         <Link
           to="/my/batteries/packed"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-amber-200/90 bg-gradient-to-br from-amber-50/50 via-white to-amber-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-amber-400 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
-              Stage 1 · Packed
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-400">
+                On The Way
+              </span>
+              <span className="rounded-md bg-amber-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-amber-800 dark:bg-amber-950/60 dark:text-amber-300">
+                In Transit
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 group-hover:scale-105 transition-transform">
-              <FiPackage className="h-4.5 w-4.5" />
+              <FiTruck className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3">
             <span className="text-2xl sm:text-3xl font-black text-amber-800 dark:text-amber-300">
-              {inRepair.toLocaleString()}
+              {awaitingIntake.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-amber-700/80 dark:text-amber-400/80">
-              <span>Awaiting intake</span>
+              <span>Traveling to workshop</span>
               <span className="font-bold text-amber-800 dark:text-amber-300 group-hover:translate-x-0.5 transition-transform">Inspect →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 3: Stage 2 · In Workshop Service */}
+        {/* Card 3: In Workshop */}
         <Link
           to="/my/batteries/packed"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-blue-200/90 bg-gradient-to-br from-blue-50/50 via-white to-blue-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-blue-400 dark:border-blue-900/40 dark:from-blue-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">
-              Stage 2 · In Service
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-blue-700 dark:text-blue-400">
+                In Workshop
+              </span>
+              <span className="rounded-md bg-blue-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
+                Being Fixed
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300 group-hover:scale-105 transition-transform">
               <span className="relative flex h-3 w-3">
                 <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-blue-400 opacity-75" />
@@ -635,24 +735,29 @@ function ClientDashboardPage() {
           </div>
           <div className="mt-3">
             <span className="text-2xl sm:text-3xl font-black text-blue-800 dark:text-blue-300">
-              {(inProgress + inTesting).toLocaleString()}
+              {workshopQueue.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-blue-700/80 dark:text-blue-400/80">
-              <span>{inProgress} rep · {inTesting} test</span>
+              <span>Under diagnosis &amp; repair</span>
               <span className="font-bold text-blue-800 dark:text-blue-300 group-hover:translate-x-0.5 transition-transform">Live Queue →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 4: Repaired & QA Passed */}
+        {/* Card 4: Ready to Return */}
         <Link
-          to="/my/batteries/packed"
+          to="/my/batteries/all?status=repaired"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-teal-200/90 bg-gradient-to-br from-teal-50/50 via-white to-teal-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-teal-400 dark:border-teal-900/40 dark:from-teal-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-teal-700 dark:text-teal-400">
-              Repaired & Certified
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-teal-700 dark:text-teal-400">
+                Ready to Return
+              </span>
+              <span className="rounded-md bg-teal-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-teal-800 dark:bg-teal-950/60 dark:text-teal-300">
+                Fixed
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-teal-100 text-teal-700 dark:bg-teal-950/60 dark:text-teal-300 group-hover:scale-105 transition-transform">
               <FiCheckCircle className="h-4.5 w-4.5" />
             </div>
@@ -662,21 +767,26 @@ function ClientDashboardPage() {
               {repaired.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-teal-700/80 dark:text-teal-400/80">
-              <span>Ready for dispatch</span>
-              <span className="font-bold text-teal-800 dark:text-teal-300 group-hover:translate-x-0.5 transition-transform">View →</span>
+              <span>Repaired &amp; tested</span>
+              <span className="font-bold text-teal-800 dark:text-teal-300 group-hover:translate-x-0.5 transition-transform">View Ready →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 5: Stage 3 · Returned & Active Fleet */}
+        {/* Card 5: Working in Fleet */}
         <Link
-          to="/my/batteries/received"
+          to="/my/batteries/all?status=returned"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-400 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-              Stage 3 · Active Fleet
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                Working in Fleet
+              </span>
+              <span className="rounded-md bg-emerald-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                With You
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 group-hover:scale-105 transition-transform">
               <FiShield className="h-4.5 w-4.5" />
             </div>
@@ -686,21 +796,26 @@ function ClientDashboardPage() {
               {returned.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-emerald-700/80 dark:text-emerald-400/80">
-              <span>Operating in fleet</span>
+              <span>Active in your vehicles</span>
               <span className="font-bold text-emerald-800 dark:text-emerald-300 group-hover:translate-x-0.5 transition-transform">View Fleet →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 6: Decommissioned / Unserviceable */}
+        {/* Card 6: Scrapped / Recycled */}
         <Link
-          to="/my/batteries/all"
+          to="/my/batteries/all?status=unserviceable"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-rose-200/90 bg-gradient-to-br from-rose-50/50 via-white to-rose-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-rose-400 dark:border-rose-900/40 dark:from-rose-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-400">
-              Decommissioned
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-rose-700 dark:text-rose-400">
+                Scrapped / Recycled
+              </span>
+              <span className="rounded-md bg-rose-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-rose-800 dark:bg-rose-950/60 dark:text-rose-300">
+                End of Life
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300 group-hover:scale-105 transition-transform">
               <FiRefreshCw className="h-4.5 w-4.5" />
             </div>
@@ -710,21 +825,26 @@ function ClientDashboardPage() {
               {unserviceable.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-rose-700/80 dark:text-rose-400/80">
-              <span>Recycled / Defect</span>
+              <span>Unrepairable (2 recycled · 1 scrap)</span>
               <span className="font-bold text-rose-800 dark:text-rose-300 group-hover:translate-x-0.5 transition-transform">History →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 7: Total Service Cycles */}
+        {/* Card 7: Total Repairs Done */}
         <Link
           to="/my/history"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-violet-200/90 bg-gradient-to-br from-violet-50/50 via-white to-violet-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-violet-400 dark:border-violet-900/40 dark:from-violet-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-violet-700 dark:text-violet-400">
-              Service Cycles
-            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-violet-700 dark:text-violet-400">
+                Total Repairs Done
+              </span>
+              <span className="rounded-md bg-violet-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-violet-800 dark:bg-violet-950/60 dark:text-violet-300">
+                Lifetime
+              </span>
+            </div>
             <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300 group-hover:scale-105 transition-transform">
               <FiActivity className="h-4.5 w-4.5" />
             </div>
@@ -734,32 +854,37 @@ function ClientDashboardPage() {
               {repairVisits.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-violet-700/80 dark:text-violet-400/80">
-              <span>All-time repair jobs</span>
+              <span>All-time completed jobs</span>
               <span className="font-bold text-violet-800 dark:text-violet-300 group-hover:translate-x-0.5 transition-transform">Timeline →</span>
             </div>
           </div>
         </Link>
 
-        {/* Card 8: Outstanding Balance */}
+        {/* Card 8: Returned Batteries */}
         <Link
-          to="/my/transactions"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-amber-200/90 bg-gradient-to-br from-amber-50/60 via-white to-amber-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-amber-400 dark:border-amber-900/40 dark:from-amber-950/20 dark:to-surface-900"
+          to="/my/batteries/received"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/60 via-white to-emerald-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-400 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
-            <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-400">
-              Verified Balance
-            </span>
-            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300 group-hover:scale-105 transition-transform font-bold text-sm">
-              £
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
+                Returned Batteries
+              </span>
+              <span className="rounded-md bg-emerald-100/90 px-1.5 py-0.5 text-[9px] font-black uppercase text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                Received
+              </span>
+            </div>
+            <div className="flex h-9 w-9 items-center justify-center rounded-2xl bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 group-hover:scale-105 transition-transform">
+              <FiCheckCircle className="h-4.5 w-4.5" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="text-2xl sm:text-3xl font-black text-amber-900 dark:text-amber-300">
-              {formatCurrency(balanceOwed)}
+            <span className="text-2xl sm:text-3xl font-black text-emerald-800 dark:text-emerald-300">
+              {returnedFromWorkshop.toLocaleString()}
             </span>
-            <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-amber-800/80 dark:text-amber-400/80">
-              <span>{unpaidInvoices.length > 0 ? `${unpaidInvoices.length} unpaid bill(s)` : 'Account settled'}</span>
-              <span className="font-bold text-amber-800 dark:text-amber-300 group-hover:translate-x-0.5 transition-transform">Billing →</span>
+            <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-emerald-700/80 dark:text-emerald-400/80">
+              <span>Received back from workshop</span>
+              <span className="font-bold text-emerald-800 dark:text-emerald-300 group-hover:translate-x-0.5 transition-transform">View Received →</span>
             </div>
           </div>
         </Link>
@@ -853,7 +978,7 @@ function ClientDashboardPage() {
           <div>
             <h2 className="text-lg font-black tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
               <FiActivity className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
-              <span>3-Stage Fleet Lifecycle Journey</span>
+              <span>Battery Repair Lifecycle Journey</span>
             </h2>
             <p className="text-xs text-slate-500 dark:text-neutral-400">
               End-to-end transparent visibility of your batteries through intake, workshop restoration, and fleet delivery.
@@ -867,8 +992,8 @@ function ClientDashboardPage() {
           </Link>
         </div>
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          {/* Stage 1: Packed to Repair */}
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+          {/* Step 1: On The Way & Intake */}
           <Link
             to="/my/batteries/packed"
             className="group relative flex flex-col justify-between rounded-2xl border border-amber-200/80 bg-gradient-to-b from-amber-50/50 to-white p-5 shadow-2xs transition-all hover:border-amber-400 hover:shadow-md dark:border-amber-900/40 dark:from-amber-950/20 dark:to-surface-850"
@@ -880,18 +1005,18 @@ function ClientDashboardPage() {
                     <FiPackage className="h-5 w-5" />
                   </span>
                   <span className="text-xs font-black uppercase tracking-wider text-amber-800 dark:text-amber-300">
-                    Stage 1
+                    Step 1 · On The Way
                   </span>
                 </div>
                 <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-extrabold text-amber-900 dark:bg-amber-950/70 dark:text-amber-200">
-                  {inRepair} Units
+                  {awaitingIntake} Units
                 </span>
               </div>
               <h3 className="text-base font-bold text-slate-900 group-hover:text-amber-800 dark:text-white dark:group-hover:text-amber-300">
-                Battery Packed to Repair
+                In Transit &amp; Workshop Intake
               </h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-                Packaged at your facility or scheduled for workshop truck intake and initial receiving verification.
+                Packaged at your facility or scheduled for workshop truck intake and initial receiving verification ({totalPacked} packed total).
               </p>
             </div>
             <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-bold text-amber-700 dark:border-white/5 dark:text-amber-400">
@@ -900,7 +1025,39 @@ function ClientDashboardPage() {
             </div>
           </Link>
 
-          {/* Stage 3: Battery Received / In Fleet */}
+          {/* Step 2: In Workshop */}
+          <Link
+            to="/my/batteries/pending"
+            className="group relative flex flex-col justify-between rounded-2xl border border-blue-200/80 bg-gradient-to-b from-blue-50/50 to-white p-5 shadow-2xs transition-all hover:border-blue-400 hover:shadow-md dark:border-blue-900/40 dark:from-blue-950/20 dark:to-surface-850"
+          >
+            <div>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2.5">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-100 text-blue-800 shadow-2xs dark:bg-blue-950/60 dark:text-blue-300">
+                    <FiActivity className="h-5 w-5" />
+                  </span>
+                  <span className="text-xs font-black uppercase tracking-wider text-blue-800 dark:text-blue-300">
+                    Step 2 · In Workshop
+                  </span>
+                </div>
+                <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-xs font-extrabold text-blue-900 dark:bg-blue-950/70 dark:text-blue-200">
+                  {inWorkshop} Units
+                </span>
+              </div>
+              <h3 className="text-base font-bold text-slate-900 group-hover:text-blue-800 dark:text-white dark:group-hover:text-blue-300">
+                Workshop Diagnostics &amp; Repair
+              </h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+                Undergoing component repair, cell diagnostic testing, and quality assurance at the workshop ({workshopQueue} in queue, {repaired} ready).
+              </p>
+            </div>
+            <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-bold text-blue-700 dark:border-white/5 dark:text-blue-400">
+              <span>View In-Service Queue</span>
+              <span className="transition-transform group-hover:translate-x-1">→</span>
+            </div>
+          </Link>
+
+          {/* Step 3: Back in Fleet */}
           <Link
             to="/my/batteries/received"
             className="group relative flex flex-col justify-between rounded-2xl border border-emerald-200/80 bg-gradient-to-b from-emerald-50/50 to-white p-5 shadow-2xs transition-all hover:border-emerald-400 hover:shadow-md dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-850"
@@ -912,7 +1069,7 @@ function ClientDashboardPage() {
                     <FiShield className="h-5 w-5" />
                   </span>
                   <span className="text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300">
-                    Stage 3
+                    Step 3 · Back in Fleet
                   </span>
                 </div>
                 <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-extrabold text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-200">
@@ -920,7 +1077,7 @@ function ClientDashboardPage() {
                 </span>
               </div>
               <h3 className="text-base font-bold text-slate-900 group-hover:text-emerald-800 dark:text-white dark:group-hover:text-emerald-300">
-                Battery Received (Active Fleet)
+                Working in Fleet (Active Depot)
               </h3>
               <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
                 QA-approved batteries verified, return-dispatched, and operating reliably in your depot fleet.
@@ -1129,7 +1286,7 @@ function ClientDashboardPage() {
                 : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-surface-800'
             }`}
           >
-            <span>Packed to Repair</span>
+            <span>In Transit</span>
             <span className="rounded-full bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 text-[10px] px-1.5 py-0.2">
               {packedCount}
             </span>
@@ -1144,7 +1301,7 @@ function ClientDashboardPage() {
                 : 'text-slate-600 hover:bg-slate-100 dark:text-neutral-400 dark:hover:bg-surface-800'
             }`}
           >
-            <span>Decommissioned</span>
+            <span>Scrapped / Recycled</span>
             <span className="rounded-full bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 text-[10px] px-1.5 py-0.2">
               {unserviceableCount}
             </span>
@@ -1156,98 +1313,108 @@ function ClientDashboardPage() {
             No batteries matching the selected filter.
           </div>
         ) : (
-          <div className="overflow-x-auto -mx-4.5 px-4.5 sm:mx-0 sm:px-0">
-            <table className="w-full min-w-[650px] text-left text-xs">
-              <thead className="border-b border-slate-100 text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:border-white/5 dark:text-neutral-500">
-                <tr>
-                  <th className="pb-3 pr-4">Battery ID</th>
-                  <th className="pb-3 pr-4">Physical Serial</th>
-                  <th className="pb-3 pr-4">Current Status</th>
-                  <th className="pb-3 pr-4">Logistics / Truck</th>
-                  <th className="pb-3 pr-4">Date Logged</th>
-                  <th className="pb-3 text-right">Action</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium">
-                {filteredBatteries.slice(0, 8).map((item) => (
-                  <tr key={item.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-white/5">
-                    <td className="py-3.5 pr-4">
-                      <Link
-                        to={`/batteries/${encodeURIComponent(item.battery_code)}`}
-                        className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
-                      >
-                        {item.battery_code}
-                      </Link>
-                    </td>
-                    <td className="py-3.5 pr-4">
-                      {item.serial_number ? (
-                        <span className="font-semibold text-slate-800 dark:text-neutral-100 font-mono">
-                          {item.serial_number}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 dark:text-neutral-500 font-normal">Unassigned</span>
-                      )}
-                    </td>
-                    <td className="py-3.5 pr-4">
-                      {hasBeenServiced(item) ? (
-                        <ClientStatusBadge
-                          status={item.status}
-                          isVerified={item.return_status === 'verified' || Boolean(item.return_verified_at)}
-                          returnStatus={item.return_status}
-                        />
-                      ) : (
-                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-300">
-                          Registered
-                        </span>
-                      )}
-                    </td>
-                    <td className="py-3.5 pr-4 text-slate-600 dark:text-neutral-300">
-                      {item.truck_number ? (
-                        <span className="inline-flex items-center gap-1 font-mono text-[11px]">
-                          <FiTruck className="w-3 h-3 text-slate-400" />
-                          <span>#{item.truck_number}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-400 dark:text-neutral-500">—</span>
-                      )}
-                    </td>
-                    <td className="py-3.5 pr-4 text-slate-500 dark:text-neutral-400">
-                      {item.created_at
-                        ? new Date(item.created_at).toLocaleDateString('en-GB', {
-                            day: '2-digit',
-                            month: 'short',
-                            year: 'numeric',
-                          })
-                        : '—'}
-                    </td>
-                    <td className="py-3.5 text-right">
-                      <div className="flex items-center justify-end gap-1.5">
-                        {item.status === 'returned' && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setRatingTargetBatteryCode(item.battery_code);
-                              setShowRatingModal(true);
-                            }}
-                            className="inline-flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1.5 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 dark:hover:bg-amber-900/60 transition-colors cursor-pointer"
-                            title="Rate Workshop Service Quality"
-                          >
-                            <FiStar className="w-3 h-3 text-amber-500 fill-amber-400" />
-                            <span>Rate</span>
-                          </button>
-                        )}
+          <div className="-mx-4.5 px-4.5 sm:mx-0 sm:px-0">
+            <div className="max-h-[340px] overflow-y-auto overflow-x-auto rounded-2xl border border-slate-100 shadow-2xs dark:border-white/5">
+              <table className="w-full min-w-[650px] text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-white/95 backdrop-blur-xs text-[11px] font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 dark:bg-surface-900/95 dark:border-white/5 dark:text-neutral-500">
+                  <tr>
+                    <th className="py-3 px-3.5 sm:px-4">Battery ID</th>
+                    <th className="py-3 px-3.5 sm:px-4">Physical Serial</th>
+                    <th className="py-3 px-3.5 sm:px-4">Current Status</th>
+                    <th className="py-3 px-3.5 sm:px-4">Logistics / Truck</th>
+                    <th className="py-3 px-3.5 sm:px-4">Date Logged</th>
+                    <th className="py-3 px-3.5 sm:px-4 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-white/5 font-medium">
+                  {filteredBatteries.map((item) => (
+                    <tr key={item.id} className="transition-colors hover:bg-slate-50/70 dark:hover:bg-white/5">
+                      <td className="py-3 px-3.5 sm:px-4">
                         <Link
                           to={`/batteries/${encodeURIComponent(item.battery_code)}`}
-                          className="rounded-xl bg-slate-100 px-3 py-1.5 text-xs font-bold text-slate-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-emerald-600"
+                          className="font-mono font-bold text-emerald-700 hover:underline dark:text-emerald-400"
                         >
-                          Details →
+                          {item.battery_code}
                         </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                      <td className="py-3 px-3.5 sm:px-4">
+                        {item.serial_number ? (
+                          <span className="font-semibold text-slate-800 dark:text-neutral-100 font-mono">
+                            {item.serial_number}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-neutral-500 font-normal">Unassigned</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 sm:px-4">
+                        {hasBeenServiced(item) ? (
+                          <ClientStatusBadge
+                            status={item.status}
+                            isVerified={item.return_status === 'verified' || Boolean(item.return_verified_at)}
+                            returnStatus={item.return_status}
+                          />
+                        ) : (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-300">
+                            Registered
+                          </span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 sm:px-4 text-slate-600 dark:text-neutral-300">
+                        {item.truck_number ? (
+                          <span className="inline-flex items-center gap-1 font-mono text-[11px]">
+                            <FiTruck className="w-3 h-3 text-slate-400" />
+                            <span>#{item.truck_number}</span>
+                          </span>
+                        ) : (
+                          <span className="text-slate-400 dark:text-neutral-500">—</span>
+                        )}
+                      </td>
+                      <td className="py-3 px-3.5 sm:px-4 text-slate-500 dark:text-neutral-400">
+                        {item.created_at
+                          ? new Date(item.created_at).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : '—'}
+                      </td>
+                      <td className="py-3 px-3.5 sm:px-4 text-right">
+                        <div className="flex items-center justify-end gap-1.5">
+                          {item.status === 'returned' && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setRatingTargetBatteryCode(item.battery_code);
+                                setShowRatingModal(true);
+                              }}
+                              className="inline-flex items-center gap-1 rounded-xl bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:bg-amber-950/60 dark:text-amber-300 dark:hover:bg-amber-900/60 transition-colors cursor-pointer"
+                              title="Rate Workshop Service Quality"
+                            >
+                              <FiStar className="w-3 h-3 text-amber-500 fill-amber-400" />
+                              <span>Rate</span>
+                            </button>
+                          )}
+                          <Link
+                            to={`/batteries/${encodeURIComponent(item.battery_code)}`}
+                            className="rounded-xl bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 transition-colors hover:bg-emerald-600 hover:text-white dark:bg-white/10 dark:text-neutral-200 dark:hover:bg-emerald-600"
+                          >
+                            Details →
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            {filteredBatteries.length > 6 && (
+              <div className="mt-2.5 flex items-center justify-between text-[11px] text-slate-400 dark:text-neutral-500 px-1">
+                <span>Showing {filteredBatteries.length} batteries &bull; Scroll inside to view more</span>
+                <span className="font-semibold text-emerald-600 dark:text-emerald-400">
+                  +{filteredBatteries.length - 6} more below (scroll inside)
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>

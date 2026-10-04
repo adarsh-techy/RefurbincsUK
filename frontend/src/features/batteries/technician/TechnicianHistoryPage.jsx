@@ -241,7 +241,7 @@ function TechnicianHistoryPage() {
     } else {
       const repairs = data.repairs || [];
       const issues = data.issues || [];
-      const completed = repairs.filter((r) => r.outcome !== 'failed');
+      const completed = repairs.filter((r) => !r.parts_removed && (r.repaired_at || r.id));
       const timedRepairs = repairs.filter((r) => typeof r.duration_seconds === 'number' && r.duration_seconds > 0);
       const avgDuration = timedRepairs.length
         ? Math.round(timedRepairs.reduce((s, r) => s + r.duration_seconds, 0) / timedRepairs.length)
@@ -701,7 +701,7 @@ function TechnicianHistoryPage() {
                     return (
                       <Link
                         key={`test-${item.id}`}
-                        to={`/batteries/${item.battery_code}`}
+                        to={`/batteries/${item.battery_code}?fromHistory=true`}
                         className={`group relative overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-surface-900 ${
                           isPassedBack
                             ? 'border-amber-200/90 hover:border-amber-400 dark:border-amber-900/40'
@@ -748,13 +748,6 @@ function TechnicianHistoryPage() {
                           </span>
                         </div>
 
-                        {/* Optional notes if any */}
-                        {item.notes && (
-                          <div className="mt-3 pl-2 sm:pl-3 text-xs text-slate-600 dark:text-neutral-300 line-clamp-2">
-                            <span className="font-semibold text-slate-700 dark:text-neutral-200">Note:</span> {item.notes}
-                          </div>
-                        )}
-
                         {/* Footer row: duration & action link */}
                         <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
                           {typeof item.testing_duration_seconds === 'number' && item.testing_duration_seconds > 0 ? (
@@ -780,7 +773,7 @@ function TechnicianHistoryPage() {
                     return (
                       <Link
                         key={`repair-${item.id}`}
-                        to={`/batteries/${item.battery_code}`}
+                        to={`/batteries/${item.battery_code}?fromHistory=true`}
                         className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
                       >
                         {/* Left colored accent bar */}
@@ -809,13 +802,6 @@ function TechnicianHistoryPage() {
                           </span>
                         </div>
 
-                        {/* Optional notes if any */}
-                        {item.notes && (
-                          <div className="mt-3 pl-2 sm:pl-3 text-xs text-slate-600 dark:text-neutral-300 line-clamp-2">
-                            <span className="font-semibold text-slate-700 dark:text-neutral-200">Note:</span> {item.notes}
-                          </div>
-                        )}
-
                         {/* Footer row */}
                         <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
                           {typeof item.duration_seconds === 'number' && item.duration_seconds > 0 ? (
@@ -838,25 +824,23 @@ function TechnicianHistoryPage() {
 
                   // ISSUE CARD (UNSERVICEABLE)
                   return (
-                    <div
+                    <Link
                       key={`issue-${item.id}`}
+                      to={`/batteries/${item.battery_code}?fromHistory=true`}
                       className="group relative overflow-hidden rounded-2xl border border-rose-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md dark:border-rose-900/40 dark:bg-surface-900"
                     >
                       {/* Left colored accent bar */}
                       <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-rose-500" />
 
                       {/* Top row */}
-                      <div className="mb-3 flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-rose-100/80 dark:border-rose-900/30">
+                      <div className="flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-slate-100 dark:border-white/5">
                         <div className="flex items-center gap-2.5">
-                          <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400 font-bold">
+                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400 font-bold text-xs">
                             ⚠
                           </span>
-                          <Link
-                            to={`/batteries/${item.battery_code}`}
-                            className="font-mono text-sm sm:text-base font-extrabold text-rose-700 hover:underline dark:text-rose-400"
-                          >
+                          <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-rose-600 dark:text-white dark:group-hover:text-rose-400">
                             {item.battery_code}
-                          </Link>
+                          </span>
                           <StatusBadge status={item.battery_status || 'unserviceable'} />
                         </div>
                         <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
@@ -869,67 +853,17 @@ function TechnicianHistoryPage() {
                         </span>
                       </div>
 
-                      {/* Issue description box */}
-                      <div className="rounded-xl border border-rose-100 bg-rose-50/60 p-3.5 pl-4 dark:border-rose-950 dark:bg-rose-950/20">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-bold text-rose-900 dark:text-rose-300">
-                            Unserviceable Reason:
-                          </span>
-                          <span className="rounded-md border border-rose-200 bg-white/80 px-2 py-0.5 text-[11px] font-bold text-rose-800 dark:border-rose-900 dark:bg-surface-900 dark:text-rose-300">
-                            {item.reason_label || item.reason_code}
-                          </span>
-                        </div>
-
-                        {item.note && (
-                          <p className="mt-2.5 text-xs leading-relaxed text-rose-800 dark:text-rose-300 border-t border-rose-200/50 pt-2 dark:border-rose-900/40">
-                            <span className="font-semibold">Note:</span> {item.note}
-                          </p>
-                        )}
-
-                        {item.photo_urls && item.photo_urls.length > 0 && (
-                          <div className="mt-3 flex items-center gap-2.5 border-t border-rose-200/50 pt-2.5 dark:border-rose-900/40">
-                            {item.photo_urls.map((photo, pIdx) => (
-                              <button
-                                key={pIdx}
-                                type="button"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  setLightbox({
-                                    images: item.photo_urls.map((p) => resolveImageUrl(p)),
-                                    index: pIdx,
-                                    title: `${item.battery_code} Issue Photos`,
-                                  });
-                                }}
-                                className="group/img relative h-14 w-14 overflow-hidden rounded-xl border border-rose-200 bg-white shadow-2xs hover:scale-105 transition-transform dark:border-rose-900"
-                              >
-                                <img
-                                  src={resolveImageUrl(photo)}
-                                  alt=""
-                                  className="h-full w-full object-cover"
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover/img:bg-black/20 transition-colors flex items-center justify-center">
-                                  <span className="text-white opacity-0 group-hover/img:opacity-100 text-xs font-bold">🔍</span>
-                                </div>
-                              </button>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-
                       {/* Footer row */}
-                      <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-rose-100/80 dark:border-rose-900/30">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                      <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
+                        <span className="inline-flex items-center gap-1 rounded-md border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950 dark:text-rose-300">
                           Marked Unserviceable
                         </span>
-                        <Link
-                          to={`/batteries/${item.battery_code}`}
-                          className="flex items-center gap-1 font-bold text-slate-400 hover:text-rose-600 dark:text-neutral-500 dark:hover:text-rose-400"
-                        >
-                          <span>View Battery</span>
-                          <span>›</span>
-                        </Link>
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-rose-600 dark:text-neutral-500 dark:group-hover:text-rose-400">
+                          <span>View Battery Details</span>
+                          <span className="transition-transform group-hover:translate-x-0.5">›</span>
+                        </span>
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>

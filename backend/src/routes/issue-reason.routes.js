@@ -5,7 +5,7 @@ const { requireAuth, requirePermission, requireRole } = require('../middlewares/
 router.use(requireAuth);
 // Read is open to workshop logins: the mobile app's Report Issue picker
 // needs the active reason list regardless of who can manage it.
-router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician'), issueReasonController.list);
+router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), issueReasonController.list);
 router.post('/', requirePermission('issue_reasons'), issueReasonController.create);
 router.patch('/:id', requirePermission('issue_reasons'), issueReasonController.update);
 // Deleting a reason outright (rather than just deactivating it) is

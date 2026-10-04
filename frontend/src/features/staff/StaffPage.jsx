@@ -12,12 +12,14 @@ import Badge from '../../components/ui/primitives/Badge';
 import RowActions from '../../components/ui/table/RowActions';
 import apiClient from '../../services/api-client';
 import { resolveImageUrl } from '../../utils/image-url';
+import { hasPermission } from '../../utils/permissions';
 import StaffForm from './StaffForm';
 
 function StaffPage() {
   const { data, loading, error, refetch } = useFetchList('/staff');
   const user = useSelector((state) => state.auth.user);
   const isSuperAdmin = user?.role === 'super_admin';
+  const canManageStaff = isSuperAdmin || user?.role === 'admin' || hasPermission(user, 'staff');
 
   // null = closed, 'new' = create form, a staff object = edit form
   const [formTarget, setFormTarget] = useState(null);
@@ -120,7 +122,7 @@ function StaffPage() {
       label: 'Status',
       render: (row) => <Badge tone={row.active ? 'good' : 'neutral'}>{row.active ? 'Active' : 'Inactive'}</Badge>,
     },
-    ...(isSuperAdmin
+    ...(canManageStaff
       ? [
           {
             key: 'actions',

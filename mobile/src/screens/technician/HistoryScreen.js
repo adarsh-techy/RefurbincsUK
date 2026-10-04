@@ -219,9 +219,13 @@ export default function HistoryScreen() {
   const [viewYear, setViewYear] = useState(new Date().getFullYear());
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
 
+  const currentUser = useSelector((state) => state.auth?.user);
   const isSupervisor = useMemo(() => {
-    return (staffInfo?.role || '').toLowerCase() === 'supervisor';
-  }, [staffInfo?.role]);
+    return (
+      (staffInfo?.role || currentUser?.staff_role || currentUser?.staffRole || currentUser?.role || '')
+        .toLowerCase() === 'supervisor'
+    );
+  }, [staffInfo?.role, currentUser?.staff_role, currentUser?.staffRole, currentUser?.role]);
 
   const typeFilters = isSupervisor ? SUPERVISOR_TYPE_FILTERS : TECHNICIAN_TYPE_FILTERS;
 
@@ -241,7 +245,7 @@ export default function HistoryScreen() {
           const passed = tests.filter((t) => !t.passed_back);
           const passedBack = tests.filter((t) => t.passed_back);
           setSummaryStats({
-            total: tests.length,
+            total: tests.length + issues.length,
             passed: passed.length,
             passedBack: passedBack.length,
             issues: issues.length,
@@ -250,10 +254,10 @@ export default function HistoryScreen() {
           const repairs = data.repairs || [];
           const issues = data.issues || [];
           const completed = repairs.filter(
-            (r) => r.battery_status === 'repaired' || r.outcome !== 'failed'
+            (r) => !r.parts_removed && (r.repaired_at || r.id)
           );
           setSummaryStats({
-            total: repairs.length,
+            total: repairs.length + issues.length,
             completed: completed.length,
             issues: issues.length,
           });
@@ -773,7 +777,7 @@ export default function HistoryScreen() {
                         key={`test-${item.id}`}
                         activeOpacity={0.7}
                         onPress={() =>
-                          navigation.navigate('BatteryDetail', { code: item.battery_code })
+                          navigation.navigate('BatteryDetail', { code: item.battery_code, fromHistory: true, fromScan: false })
                         }
                         className={`rounded-2xl border bg-white p-4 shadow-2xs overflow-hidden ${
                           isPassedBack ? 'border-amber-200' : 'border-emerald-200'
@@ -819,17 +823,8 @@ export default function HistoryScreen() {
                           </Text>
                         </View>
 
-                        {/* Optional notes if any */}
-                        {item.notes ? (
-                          <View className="mt-1 pl-1">
-                            <Text className="text-xs text-slate-600 italic" numberOfLines={2}>
-                              "{item.notes}"
-                            </Text>
-                          </View>
-                        ) : null}
-
                         {/* Footer row */}
-                        <View className="mt-2.5 flex-row items-center justify-between border-t border-slate-100 pt-2">
+                        <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
                           {typeof item.testing_duration_seconds === 'number' &&
                           item.testing_duration_seconds > 0 ? (
                             <View className="rounded-md bg-violet-50 px-2 py-0.5 border border-violet-100">
@@ -842,7 +837,7 @@ export default function HistoryScreen() {
                               {isPassedBack ? 'Rework Pass-Back' : 'QA Sign-off'}
                             </Text>
                           )}
-                          <Text className="text-xs font-bold text-violet-600">View Details ›</Text>
+                          <Text className="text-xs font-bold text-violet-600">View Battery Details ›</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -855,11 +850,11 @@ export default function HistoryScreen() {
                         key={`repair-${item.id}`}
                         activeOpacity={0.7}
                         onPress={() =>
-                          navigation.navigate('BatteryDetail', { code: item.battery_code })
+                          navigation.navigate('BatteryDetail', { code: item.battery_code, fromHistory: true, fromScan: false })
                         }
                         className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs"
                       >
-                        <View className="mb-2.5 flex-row flex-wrap items-center justify-between gap-2">
+                        <View className="flex-row flex-wrap items-center justify-between gap-2">
                           <View className="flex-row items-center gap-2">
                             <View className="h-6 w-6 items-center justify-center rounded-full bg-blue-100">
                               <Icon name="wrench" color="#1d4ed8" size={12} />
@@ -879,15 +874,6 @@ export default function HistoryScreen() {
                           </Text>
                         </View>
 
-                        {/* Optional notes */}
-                        {item.notes ? (
-                          <View className="mt-1 pl-1">
-                            <Text className="text-xs text-slate-600 italic" numberOfLines={2}>
-                              "{item.notes}"
-                            </Text>
-                          </View>
-                        ) : null}
-
                         <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
                           {typeof item.duration_seconds === 'number' &&
                           item.duration_seconds > 0 ? (
@@ -901,7 +887,7 @@ export default function HistoryScreen() {
                               Completed Repair
                             </Text>
                           )}
-                          <Text className="text-xs font-bold text-blue-600">View Details ›</Text>
+                          <Text className="text-xs font-bold text-blue-600">View Battery Details ›</Text>
                         </View>
                       </TouchableOpacity>
                     );
@@ -913,11 +899,11 @@ export default function HistoryScreen() {
                       key={`issue-${item.id}`}
                       activeOpacity={0.7}
                       onPress={() =>
-                        navigation.navigate('BatteryDetail', { code: item.battery_code })
+                        navigation.navigate('BatteryDetail', { code: item.battery_code, fromHistory: true, fromScan: false })
                       }
                       className="rounded-2xl border border-rose-200/90 bg-white p-4 shadow-2xs"
                     >
-                      <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
+                      <View className="flex-row flex-wrap items-center justify-between gap-2">
                         <View className="flex-row items-center gap-2">
                           <View className="h-6 w-6 items-center justify-center rounded-full bg-rose-100">
                             <Icon name="alertTriangle" color="#be123c" size={12} />
@@ -937,47 +923,13 @@ export default function HistoryScreen() {
                         </Text>
                       </View>
 
-                      <View className="rounded-xl bg-rose-50/80 p-2.5 border border-rose-100">
-                        <Text className="text-xs font-bold text-rose-800">
-                          Issue: {item.reason_label || item.reason_code}
-                        </Text>
-                        {item.note ? (
-                          <Text className="mt-1 text-xs text-rose-600 leading-relaxed">
-                            {item.note}
+                      <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
+                        <View className="rounded-md bg-rose-50 px-2 py-0.5 border border-rose-100">
+                          <Text className="text-[10px] font-bold text-rose-700">
+                            Marked Unserviceable
                           </Text>
-                        ) : null}
-                        {item.photo_urls && item.photo_urls.length > 0 && (
-                          <View className="mt-2 pt-2 border-t border-rose-200/60">
-                            <View className="flex-row items-center gap-1.5 mb-1.5">
-                              <Icon name="photo" color="#be123c" size={12} />
-                              <Text className="text-[10px] font-bold text-rose-800">
-                                {item.photo_urls.length} Attached Photo
-                                {item.photo_urls.length > 1 ? 's' : ''}
-                              </Text>
-                            </View>
-                            <View className="flex-row items-center gap-2">
-                              {item.photo_urls.map((photo, pIdx) => (
-                                <View
-                                  key={pIdx}
-                                  className="h-12 w-12 rounded-lg border border-rose-200 overflow-hidden bg-white"
-                                >
-                                  <Image
-                                    source={{ uri: resolveImageUrl(photo) }}
-                                    className="h-full w-full"
-                                    resizeMode="cover"
-                                  />
-                                </View>
-                              ))}
-                            </View>
-                          </View>
-                        )}
-                      </View>
-
-                      <View className="mt-2.5 flex-row items-center justify-between">
-                        <Text className="text-[10px] font-semibold text-rose-600 uppercase">
-                          Marked Unserviceable
-                        </Text>
-                        <Text className="text-xs font-bold text-slate-400">Details ›</Text>
+                        </View>
+                        <Text className="text-xs font-bold text-rose-600">View Battery Details ›</Text>
                       </View>
                     </TouchableOpacity>
                   );

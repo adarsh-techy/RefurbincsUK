@@ -13,8 +13,23 @@ async function findAll() {
 }
 
 async function findByUserId(userId) {
-  const { rows } = await db.query('SELECT * FROM staff WHERE user_id = $1', [userId]);
-  return rows[0];
+  let { rows } = await db.query('SELECT * FROM staff WHERE user_id = $1', [userId]);
+  if (rows[0]) return rows[0];
+
+  // If not linked yet, search for staff record with the same email and auto-link user_id
+  const userRes = await db.query('SELECT email FROM users WHERE id = $1', [userId]);
+  const userEmail = userRes.rows[0]?.email;
+  if (userEmail) {
+    const staffRes = await db.query(
+      'SELECT * FROM staff WHERE LOWER(email) = LOWER($1) LIMIT 1',
+      [userEmail]
+    );
+    if (staffRes.rows[0]) {
+      await db.query('UPDATE staff SET user_id = $1 WHERE id = $2', [userId, staffRes.rows[0].id]);
+      return { ...staffRes.rows[0], user_id: userId };
+    }
+  }
+  return undefined;
 }
 
 // email/passwordHash are optional — when given, also creates a linked
@@ -158,6 +173,8 @@ async function findRepairs(staffId) {
          r.batch_id,
          r.battery_id,
          b.battery_code,
+         b.serial_number,
+         b.client_name,
          b.status AS battery_status,
          string_agg(p.name, ', ' ORDER BY p.name) AS part_name,
          SUM(r.price) AS price,
@@ -173,31 +190,31 @@ async function findRepairs(staffId) {
        JOIN batteries b ON b.id = r.battery_id
        JOIN parts p ON p.id = r.part_id
        WHERE r.staff_id = $1 OR r.removed_by_staff_id = $1
-       GROUP BY r.batch_id, r.battery_id, b.battery_code, b.status
+       GROUP BY r.batch_id, r.battery_id, b.battery_code, b.serial_number, b.client_name, b.status
      )
      SELECT
-       m.id, m.repair_ids, m.batch_id, m.battery_code, m.battery_status,
+       m.id, m.repair_ids, m.batch_id, m.battery_code, m.serial_number, m.client_name, m.battery_status,
        m.part_name, m.price, m.labor_charge, m.notes, m.repaired_at, m.duration_seconds,
        m.parts_removed, m.removed_at, m.removed_by_me, m.repaired_by_me,
        CASE
-         WHEN m.parts_removed THEN 'failed'
+         WHEN m.parts_removed THEN 'parts_removed'
          WHEN EXISTS (
-           SELECT 1 FROM repairs later
-           WHERE later.battery_id = m.battery_id
-             AND later.batch_id <> m.batch_id
-             AND later.repaired_at > m.repaired_at
-         ) THEN 'completed'
-         WHEN EXISTS (
-           SELECT 1 FROM return_batteries rb
-           JOIN returns ret ON ret.id = rb.return_id
-           WHERE rb.battery_id = m.battery_id AND ret.returned_at > m.repaired_at
-         ) THEN 'completed'
-         WHEN m.battery_status IN ('repaired', 'returned') THEN 'completed'
-         WHEN m.battery_status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') THEN 'failed'
-         ELSE 'active'
-       END AS outcome
-     FROM mine m
-     ORDER BY COALESCE(m.removed_at, m.repaired_at) DESC`,
+          SELECT 1 FROM repairs later
+          WHERE later.battery_id = m.battery_id
+            AND later.batch_id <> m.batch_id
+            AND later.repaired_at > m.repaired_at
+        ) THEN 'completed'
+        WHEN EXISTS (
+          SELECT 1 FROM return_batteries rb
+          JOIN returns ret ON ret.id = rb.return_id
+          WHERE rb.battery_id = m.battery_id AND ret.returned_at > m.repaired_at
+        ) THEN 'completed'
+        WHEN m.battery_status IN ('repaired', 'returned') THEN 'completed'
+        WHEN m.battery_status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled') THEN 'completed'
+        ELSE 'active'
+      END AS outcome
+    FROM mine m
+    ORDER BY COALESCE(m.removed_at, m.repaired_at) DESC`,
     [staffId]
   );
   return rows;
@@ -211,6 +228,8 @@ async function findIssues(staffId) {
     `SELECT
        bi.id,
        b.battery_code,
+       b.serial_number,
+       b.client_name,
        b.status AS battery_status,
        COALESCE(ir.label, 'Failed Testing / Unserviceable') AS reason_label,
        bi.note,
@@ -240,17 +259,22 @@ async function findTests(staffId) {
        MIN(bs.id) AS id,
        b.id AS battery_id,
        b.battery_code,
+       b.serial_number,
+       b.client_name,
        b.status AS battery_status,
        b.testing_duration_seconds,
-       string_agg(bs.service_name, ', ' ORDER BY bs.service_name)
-         FILTER (WHERE bs.service_name <> 'Passed back to Technician') AS service_name,
+       COALESCE(
+         string_agg(bs.service_name, ', ' ORDER BY bs.service_name)
+           FILTER (WHERE bs.service_name <> 'Passed back to Technician'),
+         'QA Testing & Verification Passed'
+       ) AS service_name,
        bool_or(bs.service_name = 'Passed back to Technician') AS passed_back,
        MIN(bs.notes) AS notes,
        bs.completed_at AS tested_at
      FROM battery_services bs
      JOIN batteries b ON b.id = bs.battery_id
      WHERE bs.staff_id = $1
-     GROUP BY bs.battery_id, b.id, b.battery_code, b.status, b.testing_duration_seconds, bs.completed_at
+     GROUP BY bs.battery_id, b.id, b.battery_code, b.serial_number, b.client_name, b.status, b.testing_duration_seconds, bs.completed_at
      ORDER BY bs.completed_at DESC`,
     [staffId]
   );

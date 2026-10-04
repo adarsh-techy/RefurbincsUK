@@ -94,7 +94,7 @@ async function list(req, res, next) {
         }
       }
     }
-    const sortOrder = req.query.sortOrder === 'asc' ? 'asc' : 'desc';
+    const sortOrder = req.query.sortOrder === 'desc' ? 'desc' : 'asc';
 
     const { rows, hasMore, total } = await batteryModel.findPage({
       limit,
@@ -472,10 +472,8 @@ async function resolveTestingStaff(user) {
     return { staffId: staff ? staff.id : null };
   }
   const staff = await staffModel.findByUserId(user.id);
-  if (!staff) {
-    return { error: { status: 409, message: 'Your account is not linked to a staff record.' } };
-  }
-  if ((staff.role || '').toLowerCase() !== 'supervisor') {
+  const staffRole = (staff?.role || user.staff_role || user.staffRole || user.role || '').toLowerCase();
+  if (staffRole !== 'supervisor') {
     return {
       error: {
         status: 403,
@@ -483,7 +481,7 @@ async function resolveTestingStaff(user) {
       },
     };
   }
-  return { staffId: staff.id };
+  return { staffId: staff ? staff.id : null };
 }
 
 // Sets testing_started_at = now() when a Supervisor or Admin scans/opens the battery for testing.

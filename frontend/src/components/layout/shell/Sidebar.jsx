@@ -235,37 +235,32 @@ const CLIENT_NAV_GROUPS = [
     heading: 'Overview',
     links: [
       { to: '/', label: 'Dashboard', icon: Icons.dashboard, end: true, clientPermission: 'client_dashboard' },
-      { to: '/my/batteries/all', label: 'Fleet Inventory', icon: Icons.battery, clientPermission: 'client_all_batteries' },
-      { to: '/my/history', label: 'Activity History', icon: Icons.history },
+      { to: '/my/batteries/all', label: 'All Batteries', icon: Icons.battery, clientPermission: 'client_all_batteries' },
+      { to: '/my/history', label: 'Service History', icon: Icons.history },
     ],
   },
   {
-    heading: 'Repair Pipeline',
+    heading: 'Repairs & Sorting',
     links: [
-      { to: '/my/batteries/packed', label: 'Stage 1: Packed for Pickup', icon: Icons.stage1, clientPermission: 'client_packed' },
-      { to: '/my/batteries/received', label: 'Stage 3: Received Back', icon: Icons.stage3, clientPermission: 'client_received' },
-    ],
-  },
-  {
-    heading: 'Fleet Tools',
-    links: [
-      { to: '/my/battery-sorting', label: 'Battery QR Scanner', icon: Icons.sorting, clientPermission: 'client_battery_sorting' },
+      { to: '/my/batteries/packed', label: 'Packed for Pickup', icon: Icons.stage1, clientPermission: 'client_packed' },
+      { to: '/my/batteries/received', label: 'Received Batteries', icon: Icons.stage3, clientPermission: 'client_received' },
+      { to: '/my/battery-sorting', label: 'Sort Batteries', icon: Icons.sorting, clientPermission: 'client_battery_sorting' },
     ],
   },
   {
     heading: 'Billing & Impact',
     links: [
       { to: '/my/invoices', label: 'Invoices', icon: Icons.invoice, clientPermission: 'client_invoices' },
-      { to: '/my/transactions', label: 'Billing Transactions', icon: Icons.finance, clientPermission: 'client_transactions' },
-      { to: '/my/certificates', label: 'Impact Certificates', icon: Icons.certificates },
+      { to: '/my/transactions', label: 'Transactions', icon: Icons.finance, clientPermission: 'client_transactions' },
+      { to: '/my/certificates', label: 'Certificates', icon: Icons.certificates },
     ],
   },
   {
-    heading: 'Support & Settings',
+    heading: 'Help & Account',
     links: [
-      { to: '/my/support', label: 'Support & Helpdesk', icon: Icons.support, clientPermission: 'client_support' },
+      { to: '/my/support', label: 'Support Chat', icon: Icons.support, clientPermission: 'client_support' },
       { to: '/my/notifications', label: 'Notifications', icon: Icons.notifications, clientPermission: 'client_notifications' },
-      { to: '/my/profile', label: 'Account Profile', icon: Icons.profile },
+      { to: '/my/profile', label: 'My Profile', icon: Icons.profile },
     ],
   },
 ];

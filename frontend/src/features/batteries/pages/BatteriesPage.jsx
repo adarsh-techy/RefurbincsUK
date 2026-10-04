@@ -397,8 +397,8 @@ function BatteriesPage() {
             emptyMessage="No batteries match these filters."
             showRowNumber
             headerColor="blue"
-            defaultSortKey="created_at"
-            defaultSortDirection="desc"
+            defaultSortKey="battery_code"
+            defaultSortDirection="asc"
             maxHeight="calc(100vh - 270px)"
             onScrollBottom={hasMore && !loading ? loadMore : null}
           />

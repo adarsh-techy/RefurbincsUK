@@ -35,10 +35,10 @@ const BLOCKED_STATUS_MESSAGES = {
   recycled: 'This battery has been marked recycled.',
 };
 
-const PROCESS_STEPS = ['Intake', 'Started', 'Tested', 'Repaired', 'Returned'];
+const PROCESS_STEPS = ['Intake', 'Repair', 'Testing', 'Repaired', 'Returned'];
 const STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, in_testing: 2, repaired: 3, returned: 4 };
 
-const UNSERVICEABLE_STEPS = ['Intake', 'Started', 'Unserviceable', 'Recycled'];
+const UNSERVICEABLE_STEPS = ['Intake', 'Repair', 'Unserv.', 'Recycled'];
 const UNSERVICEABLE_STATUS_STEP_INDEX = { in_repair: 0, in_progress: 1, unserviceable: 2, tested_parts_removed: 2, recycled: 3 };
 
 function ProcessStepper({ isOngoing, batteryStatus }) {
@@ -53,7 +53,7 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   const currentStep = isOngoing ? stepIndex[batteryStatus] ?? 0 : steps.length - 1;
 
   return (
-    <View className="flex-row items-center justify-between py-2">
+    <View className="flex-row items-center justify-between py-1.5">
       {steps.map((label, i) => {
         const isDone = isOngoing
           ? batteryStatus === 'repaired' || batteryStatus === 'returned'
@@ -64,7 +64,7 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
         const isDanger = isUnserviceableFlow && i >= 2 && isDone;
 
         return (
-          <View key={label} className="flex-1 items-center">
+          <View key={label} className="flex-1 items-center px-0.5">
             <View className="flex-row items-center w-full">
               {i > 0 && (
                 <View
@@ -74,7 +74,7 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
                 />
               )}
               <View
-                className={`h-6 w-6 items-center justify-center rounded-full ${
+                className={`h-5 w-5 items-center justify-center rounded-full ${
                   isDanger
                     ? 'bg-red-600'
                     : isDone
@@ -85,9 +85,9 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
                 }`}
               >
                 {isDone ? (
-                  <Icon name="check" color="#ffffff" size={12} strokeWidth={3} />
+                  <Icon name="check" color="#ffffff" size={9} strokeWidth={3} />
                 ) : (
-                  <Text className={`text-[10px] font-bold ${isCurrent || isDanger ? 'text-white' : 'text-slate-500'}`}>
+                  <Text className={`text-[8.5px] font-bold ${isCurrent || isDanger ? 'text-white' : 'text-slate-500'}`}>
                     {i + 1}
                   </Text>
                 )}
@@ -95,14 +95,14 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
               {i < steps.length - 1 && (
                 <View
                   className={`h-0.5 flex-1 ${
-                    i < threshold ? (isDanger ? 'bg-red-500' : 'bg-emerald-500') : 'bg-slate-200'
+                    i < currentStep ? (isDanger ? 'bg-red-500' : 'bg-emerald-500') : 'bg-slate-200'
                   }`}
                 />
               )}
             </View>
             <Text
               numberOfLines={1}
-              className={`mt-1 text-[10px] font-semibold ${
+              className={`mt-1 text-[8.5px] font-semibold ${
                 isDone || isCurrent ? 'text-slate-800 font-bold' : 'text-slate-400'
               }`}
             >
@@ -115,7 +115,7 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   );
 }
 
-function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], battery = null) {
+function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], battery = null, isClient = false) {
   const events = [];
 
   visits.forEach((v) => {
@@ -143,10 +143,12 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       label: isRemoved ? 'Part Fitted (Later Removed)' : 'Repair Completed',
       icon: 'wrench',
       date: h.repaired_at,
-      primary: `${h.part_name} · by ${h.staff_name || 'Technician'}`,
+      primary: isClient
+        ? (h.part_name || 'Component Restored')
+        : `${h.part_name} · by ${h.staff_name || 'Technician'}`,
       partName: h.part_name,
-      staffName: h.staff_name,
-      durationSeconds: h.duration_seconds,
+      staffName: isClient ? null : h.staff_name,
+      durationSeconds: isClient ? null : h.duration_seconds,
       price: isRemoved ? 0 : partCost,
       originalPrice: partCost,
       notes: h.notes,
@@ -160,12 +162,14 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
         label: 'Part Removed & Restocked',
         icon: 'package',
         date: h.removed_at,
-        primary: `Removed: ${h.part_name} · by ${h.removed_by_staff_name || 'Workshop Staff'}`,
-        notes: `Restocked to inventory (-£${partCost.toFixed(2)})`,
+        primary: isClient
+          ? `Removed: ${h.part_name}`
+          : `Removed: ${h.part_name} · by ${h.removed_by_staff_name || 'Workshop Staff'}`,
+        notes: isStaff ? 'Restocked to inventory' : `Restocked to inventory (-£${partCost.toFixed(2)})`,
         price: 0,
         deductedPrice: partCost,
         isDeduction: true,
-        removedByStaffName: h.removed_by_staff_name,
+        removedByStaffName: isClient ? null : h.removed_by_staff_name,
       });
     }
   });
@@ -189,14 +193,14 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       icon: isPassBack ? 'alertTriangle' : 'flask',
       date: s.completed_at,
       primary: isPassBack
-        ? `Returned for Rework · by ${s.staff_name || 'Supervisor'}`
-        : `${s.service_name}${s.staff_name ? ` · Verified by ${s.staff_name}` : ''}`,
+        ? (isClient ? 'Returned for Rework' : `Returned for Rework · by ${s.staff_name || 'Supervisor'}`)
+        : (isClient ? s.service_name : `${s.service_name}${s.staff_name ? ` · Verified by ${s.staff_name}` : ''}`),
       serviceName: s.service_name,
-      staffName: s.staff_name,
+      staffName: isClient ? null : s.staff_name,
       isPassBack,
       price: Number(s.rate || 0),
       notes: s.notes,
-      durationSeconds: isPassBack ? null : (battery?.testing_duration_seconds || null),
+      durationSeconds: (isClient || isPassBack) ? null : (battery?.testing_duration_seconds || null),
     });
   });
 
@@ -220,10 +224,12 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       label: iss.failed_testing ? 'Marked Unserviceable · Test Failed' : 'Reported Unserviceable',
       icon: 'alertTriangle',
       date: iss.reported_at,
-      primary: `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'} · Reported by ${iss.staff_name || 'Workshop Staff'}`,
+      primary: isClient
+        ? `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'}`
+        : `${iss.failed_testing ? 'Test Failed' : 'Issue'}: ${iss.reason_label || 'Unserviceable'} · Reported by ${iss.staff_name || 'Workshop Staff'}`,
       notes: iss.note,
-      photos: iss.photo_urls || [],
-      staffName: iss.staff_name,
+      photos: isClient ? [] : (iss.photo_urls || []),
+      staffName: isClient ? null : iss.staff_name,
       reasonLabel: iss.reason_label,
       failedTesting: !!iss.failed_testing,
     });
@@ -245,12 +251,14 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       label: isTestFailed ? 'Marked Unserviceable · Test Failed' : 'Reported Unserviceable',
       icon: 'alertTriangle',
       date: issueDate,
-      primary: `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable · Reported by ${staffName}`,
+      primary: isClient
+        ? `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable`
+        : `${isTestFailed ? 'Test Failed' : 'Issue'}: Declared Unserviceable · Reported by ${staffName}`,
       notes: passBackService?.notes || (battery.status === 'tested_parts_removed'
         ? 'Parts removed and restocked to inventory. Unit declared unserviceable scrap.'
         : 'Unit declared unserviceable during workshop processing.'),
       photos: [],
-      staffName,
+      staffName: isClient ? null : staffName,
       reasonLabel: isTestFailed ? 'Failed Testing / Unserviceable' : 'Unserviceable',
       failedTesting: isTestFailed,
     });
@@ -286,13 +294,13 @@ function buildCycles(events) {
 }
 
 export default function BatteryDetailScreen() {
-  const { code, fromScan } = useRoute().params || {};
+  const { code, fromScan, fromHistory } = useRoute().params || {};
   const navigation = useNavigation();
   const currentUser = useSelector((state) => state.auth.user);
   const currentUserId = currentUser?.id;
   const isClient = currentUser?.role === 'client';
   const isStaff = !isClient;
-  const staffRole = (currentUser?.staff_role || currentUser?.role || '').toLowerCase();
+  const staffRole = (currentUser?.staff_role || currentUser?.staffRole || currentUser?.role || '').trim().toLowerCase();
   const canTest =
     currentUser?.role === 'super_admin' ||
     currentUser?.role === 'admin' ||
@@ -1736,7 +1744,7 @@ export default function BatteryDetailScreen() {
     recycleBatch,
     pendingPartsRemoval = [],
   } = result || {};
-  const cycles = buildCycles(buildEvents(visits, history, returns, issues, services, battery));
+  const cycles = buildCycles(buildEvents(visits, history, returns, issues, services, battery, isClient, isStaff));
   const isClientLocked = battery.serial_number_added_by_role === 'client';
   const totalSpent =
     history.reduce((sum, h) => {
@@ -1763,8 +1771,8 @@ export default function BatteryDetailScreen() {
         </Text>
       </View>
 
-      {/* ── Unserviceable Banner (if unserviceable or recycled) ─────────── */}
-      {!(fromScan && isStaff) && (battery.status === 'unserviceable' || battery.status === 'recycled') && issues?.[0] && (
+      {/* ── Unserviceable Banner (if unserviceable, tested_parts_removed, or recycled) ─── */}
+      {!(fromScan && isStaff) && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && issues?.[0] && (
         <View className="mb-5 rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-sm">
           <View className="flex-row items-center gap-2 mb-1">
             <Icon name="alertTriangle" color="#991b1b" size={16} />
@@ -1776,11 +1784,12 @@ export default function BatteryDetailScreen() {
             <Text className="text-xs text-slate-700 mt-1 mb-2 leading-relaxed">{issues[0].note}</Text>
           ) : null}
           <Text className="text-[10px] text-slate-500">
-            Reported by {issues[0].staff_name || 'Technician'} on{' '}
-            {issues[0].reported_at ? new Date(issues[0].reported_at).toLocaleString() : '—'}
+            {isClient
+              ? `Reported on ${issues[0].reported_at ? new Date(issues[0].reported_at).toLocaleString() : '—'}`
+              : `Reported by ${issues[0].staff_name || 'Technician'} on ${issues[0].reported_at ? new Date(issues[0].reported_at).toLocaleString() : '—'}`}
           </Text>
 
-          {issues[0].photo_urls && issues[0].photo_urls.length > 0 && (
+          {!isClient && issues[0].photo_urls && issues[0].photo_urls.length > 0 && (
             <View className="mt-3 border-t border-red-200/60 pt-2.5">
               <View className="flex-row items-center justify-between mb-2">
                 <Text className="text-[11px] font-bold text-red-800">
@@ -2141,19 +2150,21 @@ export default function BatteryDetailScreen() {
                 This battery has been retired from workshop repair. No further parts or rework can be logged on this unit.
               </Text>
 
-              <TouchableOpacity
-                onPress={() => {
-                  allowExitRef.current = true;
-                  navigation.navigate('Main', {
-                    screen: 'Service',
-                    params: { autoScan: Date.now() },
-                  });
-                }}
-                className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md shadow-blue-600/30 active:bg-blue-700"
-              >
-                <Icon name="camera" color="#ffffff" size={16} />
-                <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
-              </TouchableOpacity>
+              {fromScan && !fromHistory && (
+                <TouchableOpacity
+                  onPress={() => {
+                    allowExitRef.current = true;
+                    navigation.navigate('Main', {
+                      screen: 'Service',
+                      params: { autoScan: Date.now() },
+                    });
+                  }}
+                  className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 shadow-md shadow-blue-600/30 active:bg-blue-700"
+                >
+                  <Icon name="camera" color="#ffffff" size={16} />
+                  <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -2256,17 +2267,6 @@ export default function BatteryDetailScreen() {
                                 <Text className="text-xs font-bold text-slate-900">
                                   Services Performed ({selectedServiceIds.length})
                                 </Text>
-                                {availableServices
-                                  .filter((s) => selectedServiceIds.includes(s.id))
-                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0 && (
-                                  <Text className="text-xs font-extrabold text-emerald-600">
-                                    +£
-                                    {availableServices
-                                      .filter((s) => selectedServiceIds.includes(s.id))
-                                      .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                                      .toFixed(2)}
-                                  </Text>
-                                )}
                               </View>
                               <View className="gap-2">
                                 {availableServices.map((s) => {
@@ -2300,9 +2300,6 @@ export default function BatteryDetailScreen() {
                                           ) : null}
                                         </View>
                                       </View>
-                                      <Text className="text-xs font-bold text-emerald-600">
-                                        +£{Number(s.rate || 0).toFixed(2)}
-                                      </Text>
                                     </TouchableOpacity>
                                   );
                                 })}
@@ -2327,15 +2324,7 @@ export default function BatteryDetailScreen() {
                               <ActivityIndicator color="#fff" />
                             ) : (
                               <Text className="text-sm font-bold text-white">
-                                Complete Testing{' '}
-                                {availableServices
-                                  .filter((s) => selectedServiceIds.includes(s.id))
-                                  .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0
-                                  ? `(+£${availableServices
-                                      .filter((s) => selectedServiceIds.includes(s.id))
-                                      .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                                      .toFixed(2)})`
-                                  : ''}
+                                Complete Testing
                               </Text>
                             )}
                           </TouchableOpacity>
@@ -2357,18 +2346,20 @@ export default function BatteryDetailScreen() {
                   <Text className="text-[11px] text-slate-600 mb-3 leading-relaxed">
                     Your repair work on this battery is finished. QA / Supervisors will test and approve.
                   </Text>
-                  <TouchableOpacity
-                    onPress={() =>
-                      navigation.navigate('Main', {
-                        screen: 'Service',
-                        params: { autoScan: Date.now() },
-                      })
-                    }
-                    className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 shadow-md shadow-blue-600/30"
-                  >
-                    <Icon name="camera" color="#ffffff" size={16} />
-                    <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
-                  </TouchableOpacity>
+                  {fromScan && !fromHistory && (
+                    <TouchableOpacity
+                      onPress={() =>
+                        navigation.navigate('Main', {
+                          screen: 'Service',
+                          params: { autoScan: Date.now() },
+                        })
+                      }
+                      className="flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 shadow-md shadow-blue-600/30"
+                    >
+                      <Icon name="camera" color="#ffffff" size={16} />
+                      <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
+                    </TouchableOpacity>
+                  )}
                 </View>
               )}
             </View>
@@ -2479,7 +2470,7 @@ export default function BatteryDetailScreen() {
                     )}
                   </View>
                   <View className="flex-row items-center gap-2">
-                    {(isClient || canTest) && cycleTotal > 0 ? (
+                    {isClient && cycleTotal > 0 ? (
                       <View className="flex-row items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
                         <Text className="text-[10px] font-extrabold text-blue-700">
                           Total: £{cycleTotal.toFixed(2)}
@@ -2582,8 +2573,8 @@ export default function BatteryDetailScreen() {
                           </View>
                           <Text className="mt-0.5 text-xs text-slate-600">{event.primary}</Text>
 
-                          {/* Duration Badge if available */}
-                          {typeof event.durationSeconds === 'number' && event.durationSeconds > 0 && (
+                          {/* Duration Badge if available (internal only, hidden from client) */}
+                          {!isClient && typeof event.durationSeconds === 'number' && event.durationSeconds > 0 && (
                             <View className="mt-1 flex-row items-center">
                               <View
                                 className={`rounded-md px-1.5 py-0.5 border ${
@@ -2609,7 +2600,7 @@ export default function BatteryDetailScreen() {
                             </Text>
                           )}
 
-                          {event.photos && event.photos.length > 0 && (
+                          {!isClient && event.photos && event.photos.length > 0 && (
                             <View className="mt-2.5 pt-2 border-t border-slate-100">
                               <View className="flex-row items-center justify-between mb-1.5">
                                 <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -2650,7 +2641,7 @@ export default function BatteryDetailScreen() {
                             </View>
                           )}
 
-                          {(isClient || canTest) && event.price !== undefined && event.price > 0 && (
+                          {isClient && event.price !== undefined && event.price > 0 && (
                             <Text className="mt-1 text-[10px] font-bold text-emerald-600">
                               Service Cost: £{Number(event.price).toFixed(2)}
                             </Text>
@@ -2922,7 +2913,7 @@ export default function BatteryDetailScreen() {
                     <>
                       <View className="rounded-xl bg-purple-50 dark:bg-purple-950/40 p-2.5 border border-purple-200 dark:border-purple-800/60">
                         <Text className="text-[11px] text-purple-800 dark:text-purple-300 leading-relaxed text-center font-medium">
-                          This battery is awaiting testing sign-off by a supervisor or tester.
+                          This battery is awaiting testing sign-off by a supervisor.
                         </Text>
                       </View>
                       <TouchableOpacity

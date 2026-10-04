@@ -52,7 +52,30 @@ function TechnicianRepairPanel({
 }) {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
-  const canTest = canTestBatteries(user);
+  const [liveStaffRole, setLiveStaffRole] = useState(user?.staff_role || user?.staffRole || null);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (user && user.role !== 'client' && user.role !== 'recycle_client') {
+      apiClient
+        .get('/auth/me')
+        .then((res) => {
+          if (!cancelled && res.data?.user?.staff_role) {
+            setLiveStaffRole(res.data.user.staff_role);
+          }
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const effectiveUser = {
+    ...user,
+    staff_role: liveStaffRole || user?.staff_role,
+  };
+  const canTest = canTestBatteries(effectiveUser);
 
   const { data: partsList } = useFetchList('/parts');
   const parts = partsList || [];
@@ -87,6 +110,8 @@ function TechnicianRepairPanel({
 
   const [searchParams] = useSearchParams();
   const fromScan = searchParams.get('fromScan') === 'true';
+  const fromHistory = searchParams.get('fromHistory') === 'true';
+  const showScanNext = fromScan && !fromHistory;
   const isIntakeUnverified = intakeIsUnverified(battery);
   const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
   const [showPassedBackScanModal, setShowPassedBackScanModal] = useState(false);
@@ -789,16 +814,18 @@ function TechnicianRepairPanel({
           </div>
 
           {/* Primary Action Button */}
-          <div className="mt-5">
-            <button
-              type="button"
-              onClick={handleScanNext}
-              className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99] transition-all cursor-pointer"
-            >
-              <FiCamera className="h-5 w-5" />
-              <span>Scan Next Battery</span>
-            </button>
-          </div>
+          {showScanNext && (
+            <div className="mt-5">
+              <button
+                type="button"
+                onClick={handleScanNext}
+                className="flex w-full items-center justify-center gap-2.5 rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-bold text-white shadow-md shadow-blue-600/25 hover:bg-blue-700 active:scale-[0.99] transition-all cursor-pointer"
+              >
+                <FiCamera className="h-5 w-5" />
+                <span>Scan Next Battery</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1136,17 +1163,6 @@ function TechnicianRepairPanel({
                         <span className="text-xs font-bold text-slate-900 dark:text-white">
                           Services Performed ({selectedServiceIds.length})
                         </span>
-                        {availableServices
-                          .filter((s) => selectedServiceIds.includes(s.id))
-                          .reduce((sum, s) => sum + Number(s.rate || 0), 0) > 0 && (
-                          <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400">
-                            +£
-                            {availableServices
-                              .filter((s) => selectedServiceIds.includes(s.id))
-                              .reduce((sum, s) => sum + Number(s.rate || 0), 0)
-                              .toFixed(2)}
-                          </span>
-                        )}
                       </div>
 
                       <div className="flex flex-col gap-1.5 sm:gap-2">
@@ -1175,9 +1191,6 @@ function TechnicianRepairPanel({
                                 </div>
                                 <span className="text-xs font-bold text-slate-900 dark:text-white">{s.name}</span>
                               </div>
-                              <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-                                +£{Number(s.rate || 0).toFixed(2)}
-                              </span>
                             </button>
                           );
                         })}
@@ -1300,13 +1313,15 @@ function TechnicianRepairPanel({
               <p className="mt-1 mb-4 text-xs text-slate-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
                 Your repair work on <span className="font-semibold text-slate-800 dark:text-neutral-200">{battery.battery_code}</span> is done and your repair timer has stopped. This battery is awaiting verification by a Supervisor.
               </p>
-              <button
-                type="button"
-                onClick={handleScanNext}
-                className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors"
-              >
-                <span>📷 Scan Next Battery</span>
-              </button>
+              {showScanNext && (
+                <button
+                  type="button"
+                  onClick={handleScanNext}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors"
+                >
+                  <span>📷 Scan Next Battery</span>
+                </button>
+              )}
             </div>
           )}
         </div>
