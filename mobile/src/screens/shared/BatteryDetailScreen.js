@@ -343,6 +343,7 @@ export default function BatteryDetailScreen() {
   const [showUnserviceableAlertModal, setShowUnserviceableAlertModal] = useState(false);
   const [unserviceableAlertData, setUnserviceableAlertData] = useState(null);
   const [showHistoryInScan, setShowHistoryInScan] = useState(false);
+  const scanAlertHandledRef = useRef(false);
 
   const [availableServices, setAvailableServices] = useState([]);
   const [selectedServiceIds, setSelectedServiceIds] = useState([]);
@@ -479,19 +480,20 @@ export default function BatteryDetailScreen() {
 
         const isIntakeUnverified = intakeIsUnverified(data.battery);
 
-        if (fromScan && isIntakeUnverified) {
-          setUnverifiedIntakeData({
-            batteryCode: data.battery.battery_code,
-            truckNumber: data.battery.intake_truck_number,
-            driverName: data.battery.intake_driver_name,
-            intakeId: data.battery.truck_intake_id,
-          });
-          setShowUnverifiedIntakeModal(true);
-        } else if (
-          fromScan &&
-          (isPassedBack ||
-            (data.battery?.status === 'unserviceable' && hasPendingPartsRemoval))
-        ) {
+        if (fromScan && !scanAlertHandledRef.current) {
+          scanAlertHandledRef.current = true;
+          if (isIntakeUnverified) {
+            setUnverifiedIntakeData({
+              batteryCode: data.battery.battery_code,
+              truckNumber: data.battery.intake_truck_number,
+              driverName: data.battery.intake_driver_name,
+              intakeId: data.battery.truck_intake_id,
+            });
+            setShowUnverifiedIntakeModal(true);
+          } else if (
+            isPassedBack ||
+            (data.battery?.status === 'unserviceable' && hasPendingPartsRemoval)
+          ) {
           const fittedParts = hasPendingPartsRemoval
             ? data.pendingPartsRemoval
             : (data.history || []).filter((h) => !h.removed_at);
@@ -649,14 +651,14 @@ export default function BatteryDetailScreen() {
             isRepairedByMe: isRepByMe,
           });
           setShowRepairedByModal(true);
-        } else if (
-          fromScan &&
-          data.battery?.status !== 'in_repair' &&
-          !isOwnInProgress &&
-          !hasPendingPartsRemoval
-        ) {
-          setBlockedStatus(data.battery.status);
-          return;
+          } else if (
+            data.battery?.status !== 'in_repair' &&
+            !isOwnInProgress &&
+            !hasPendingPartsRemoval
+          ) {
+            setBlockedStatus(data.battery.status);
+            return;
+          }
         }
       }
       setResult(data);
@@ -705,9 +707,12 @@ export default function BatteryDetailScreen() {
   }, [result?.battery?.status, isClient]);
 
   const workStartedAt = result?.battery?.work_started_at;
+  const isOwnInProgressForTimer =
+    result?.battery?.status === 'in_progress' &&
+    result?.battery?.started_by_user_id === currentUserId;
   useEffect(() => {
-    if (result?.battery?.status !== 'in_progress' || !workStartedAt || isClient || showIssueForm) {
-      if (result?.battery?.status !== 'in_progress' || !workStartedAt) {
+    if (result?.battery?.status !== 'in_progress' || !isOwnInProgressForTimer || !workStartedAt || isClient || showIssueForm) {
+      if (result?.battery?.status !== 'in_progress' || !isOwnInProgressForTimer || !workStartedAt) {
         setElapsedSeconds(0);
       }
       return;
@@ -719,7 +724,7 @@ export default function BatteryDetailScreen() {
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [result?.battery?.status, workStartedAt, isClient, showIssueForm]);
+  }, [result?.battery?.status, isOwnInProgressForTimer, workStartedAt, isClient, showIssueForm]);
 
   const testingStartedAt = result?.battery?.testing_started_at;
   useEffect(() => {
@@ -884,6 +889,10 @@ export default function BatteryDetailScreen() {
       setTestingElapsedSeconds(0);
       setShowIssueForm(false);
       setShowTestingUnserviceableForm(false);
+      setShowTestingDecisionModal(false);
+      setShowConfirmRemovePartsModal(false);
+      setShowCantServiceAlertModal(false);
+      scanAlertHandledRef.current = true;
       setSelectedReasonId(null);
       setSelectedPartIds([]);
       setSelectedServiceIds([]);
@@ -1745,6 +1754,7 @@ export default function BatteryDetailScreen() {
     pendingPartsRemoval = [],
   } = result || {};
   const cycles = buildCycles(buildEvents(visits, history, returns, issues, services, battery, isClient, isStaff));
+  const isOwnInProgress = battery?.status === 'in_progress' && battery?.started_by_user_id === currentUserId;
   const isClientLocked = battery.serial_number_added_by_role === 'client';
   const totalSpent =
     history.reduce((sum, h) => {
@@ -2168,7 +2178,7 @@ export default function BatteryDetailScreen() {
             </View>
           )}
 
-          {battery.status === 'in_progress' && (
+          {battery.status === 'in_progress' && isOwnInProgress && (
             <View className="mb-5 rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
               <View className="mb-3 flex-row items-center justify-between rounded-xl bg-emerald-50 border border-emerald-200 px-3.5 py-2.5">
                 <Text className="text-xs font-bold text-emerald-800">Time on repair</Text>
@@ -2227,6 +2237,18 @@ export default function BatteryDetailScreen() {
               )}
 
               {renderIssueReportSection()}
+            </View>
+          )}
+
+          {battery.status === 'in_progress' && !isOwnInProgress && (
+            <View className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4 items-center">
+              <View className="mb-2 h-10 w-10 items-center justify-center rounded-xl bg-amber-100 border border-amber-200">
+                <Text className="text-lg">⏳</Text>
+              </View>
+              <Text className="text-sm font-bold text-amber-900">Repair In Progress</Text>
+              <Text className="mt-1 text-center text-xs text-amber-800 leading-relaxed">
+                This battery is currently being repaired by {battery.started_by_name || 'another technician'}{battery.work_started_at ? ` (started at ${new Date(battery.work_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}.
+              </Text>
             </View>
           )}
 
@@ -3157,7 +3179,13 @@ export default function BatteryDetailScreen() {
 
             <View className="gap-2.5">
               <TouchableOpacity
-                onPress={handleConfirmTestingUnserviceable}
+                onPress={async () => {
+                  setShowTestingDecisionModal(false);
+                  setShowConfirmRemovePartsModal(false);
+                  setShowCantServiceAlertModal(false);
+                  scanAlertHandledRef.current = true;
+                  await handleReportIssue();
+                }}
                 disabled={submitting || passToTechSubmitting}
                 className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700 disabled:opacity-50"
               >
@@ -3797,7 +3825,7 @@ export default function BatteryDetailScreen() {
               {/* 1. Continue to Remove Fitted Parts */}
               {cantServiceAlertData?.parts && cantServiceAlertData.parts.length > 0 ? (
                 <TouchableOpacity
-                  onPress={handleConfirmRemoveFittedPartsFromAlert}
+                  onPress={() => setShowCantServiceAlertModal(false)}
                   className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
                 >
                   <Icon name="wrench" color="#ffffff" size={16} />

@@ -19,7 +19,7 @@ import {
 } from 'react-icons/fi';
 
 // Why a scanned battery can't be started — mirrors mobile BatteryDetailScreen.
-const BLOCKED_STATUS_MESSAGES = {
+export const BLOCKED_STATUS_MESSAGES = {
   in_progress: 'This battery is already being worked on by another technician.',
   in_testing: 'This battery is currently in testing.',
   repaired: 'This battery has already been repaired.',
@@ -132,6 +132,8 @@ function TechnicianRepairPanel({
   const allowExitRef = useRef(false);
   const [lightbox, setLightbox] = useState(null); // { images, index, title }
   const scanHandledRef = useRef(false);
+  const initialScanHandledRef = useRef(false);
+  const lastBatteryIdRef = useRef(battery?.id);
 
   function openPhotoViewer(urls, index = 0, title = 'Battery Photo') {
     if (!urls || urls.length === 0) return;
@@ -219,22 +221,40 @@ function TechnicianRepairPanel({
     };
   })();
 
+  useEffect(() => {
+    if (battery?.id && battery.id !== lastBatteryIdRef.current) {
+      lastBatteryIdRef.current = battery.id;
+      scanHandledRef.current = false;
+      initialScanHandledRef.current = false;
+    }
+  }, [battery?.id]);
+
   // Decide which scan-time modal to show, once per battery load, in the same
   // priority order as mobile: unverified → passed back / parts pending →
   // unserviceable/recycled → in testing → anything else that can't be started.
   useEffect(() => {
     if (!fromScan || !battery?.id || scanHandledRef.current) return;
     scanHandledRef.current = true;
+    initialScanHandledRef.current = true;
     const status = battery.status;
-    const hasPending = pendingPartsRemoval.length > 0;
-    if (isIntakeUnverified) return; // handled by its own effect above
-    if (isPassedBack) return; // passed-back / parts-pending effect above
+    const hasPending = (pendingPartsRemoval?.length || 0) > 0;
+    if (isIntakeUnverified) {
+      setShowUnverifiedIntakeModal(true);
+      return;
+    }
+    if (isPassedBack) {
+      setPassedBackScanTime(new Date());
+      setShowPassedBackScanModal(true);
+      return;
+    }
     if (status === 'unserviceable' || status === 'recycled') {
       setShowUnserviceableAlertModal(true);
       return;
     }
     if (status === 'in_testing') {
-      setShowRepairedByModal(true);
+      if (user?.role === 'technician' && !canTest) {
+        setShowRepairedByModal(true);
+      }
       return;
     }
     // tested_parts_removed falls through to "Not Available": rework is not
@@ -243,27 +263,7 @@ function TechnicianRepairPanel({
     if (status !== 'in_repair' && !isOwnInProgress && !hasPending) {
       setBlockedStatus(status);
     }
-  }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval.length]);
-
-  useEffect(() => {
-    if (fromScan && isIntakeUnverified) {
-      setShowUnverifiedIntakeModal(true);
-    }
-  }, [fromScan, isIntakeUnverified]);
-
-
-  const initialScanHandledRef = useRef(false);
-
-  // isPassedBack already covers "unserviceable with parts still fitted", so
-  // this is the single scan-time trigger for the remove-fitted-parts alert
-  // (mobile's cantServiceAlert).
-  useEffect(() => {
-    if (fromScan && !isIntakeUnverified && isPassedBack && !initialScanHandledRef.current) {
-      initialScanHandledRef.current = true;
-      setPassedBackScanTime(new Date());
-      setShowPassedBackScanModal(true);
-    }
-  }, [fromScan, isIntakeUnverified, isPassedBack]);
+  }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval?.length, user?.role, canTest]);
 
   useEffect(() => {
     return () => {
@@ -297,8 +297,8 @@ function TechnicianRepairPanel({
   // Live timer for in_progress
   const workStartedAt = battery?.work_started_at;
   useEffect(() => {
-    if (battery?.status !== 'in_progress' || !workStartedAt || showIssueForm) {
-      if (battery?.status !== 'in_progress' || !workStartedAt) {
+    if (battery?.status !== 'in_progress' || !isOwnInProgress || !workStartedAt || showIssueForm) {
+      if (battery?.status !== 'in_progress' || !isOwnInProgress || !workStartedAt) {
         setElapsedSeconds(0);
       }
       return;
@@ -310,7 +310,7 @@ function TechnicianRepairPanel({
     tick();
     const interval = setInterval(tick, 1000);
     return () => clearInterval(interval);
-  }, [battery?.status, workStartedAt, showIssueForm]);
+  }, [battery?.status, isOwnInProgress, workStartedAt, showIssueForm]);
 
   // Live timer for in_testing
   const testingStartedAt = battery?.testing_started_at;
@@ -334,7 +334,7 @@ function TechnicianRepairPanel({
   // active repair/testing session (running timer) or unsaved inputs, warn
   // before the tab closes AND before any in-app link navigates away.
   const isWorkSessionActive =
-    (battery?.status === 'in_progress' && Boolean(workStartedAt)) ||
+    (battery?.status === 'in_progress' && isOwnInProgress && Boolean(workStartedAt)) ||
     (battery?.status === 'in_testing' && Boolean(testingStartedAt));
   const hasUnsavedInputs =
     selectedPartIds.length > 0 ||
@@ -504,8 +504,8 @@ function TechnicianRepairPanel({
       setElapsedSeconds(0);
       setSelectedServiceIds([]);
       setTestingNotes('');
-      if (onUpdated) onUpdated();
       triggerModalAndRedirect('completed');
+      if (onUpdated) onUpdated();
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -568,7 +568,7 @@ function TechnicianRepairPanel({
 
   // Testing failed and the tester chose "remove fitted parts": the battery is
   // reported unserviceable (with the tester's notes/photos) and the mandatory
-  // parts-removal section takes over. Reached only via the confirm modal.
+  // parts-removal section takes over.
   async function handleContinueToRemoveParts() {
     setSubmitting(true);
     setError(null);
@@ -582,6 +582,10 @@ function TechnicianRepairPanel({
       setTestingElapsedSeconds(0);
       setShowTestingUnserviceableForm(false);
       setShowTestingDecisionModal(false);
+      setShowConfirmRemovePartsModal(false);
+      setShowPassedBackScanModal(false);
+      initialScanHandledRef.current = true;
+      scanHandledRef.current = true;
       setIssueNote('');
       setIssuePhotos([]);
       if (onUpdated) onUpdated();
@@ -958,8 +962,8 @@ function TechnicianRepairPanel({
         );
       })()}
 
-      {/* ── Status: IN_PROGRESS ── */}
-      {battery.status === 'in_progress' && (
+      {/* ── Status: IN_PROGRESS (Own active repair session) ── */}
+      {battery.status === 'in_progress' && isOwnInProgress && (
         <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-blue-200 bg-blue-50/70 p-3 sm:p-4 dark:border-blue-900/40 dark:bg-surface-900">
           {/* Live Timer Banner */}
           <div className="mb-2.5 sm:mb-3 flex items-center justify-between rounded-lg sm:rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 sm:px-3.5 sm:py-2.5 dark:border-emerald-900/40 dark:bg-emerald-950/20">
@@ -1111,6 +1115,32 @@ function TechnicianRepairPanel({
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* ── Status: IN_PROGRESS (Another technician's active session) ── */}
+      {battery.status === 'in_progress' && !isOwnInProgress && (
+        <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-amber-200 bg-amber-50/70 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 text-center">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 text-lg dark:bg-amber-900/40 dark:text-amber-300">
+            ⏳
+          </div>
+          <p className="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200">
+            Repair In Progress
+          </p>
+          <p className="mt-1 text-xs text-amber-800/90 dark:text-amber-300/90 max-w-sm mx-auto leading-relaxed">
+            This battery is currently being repaired by {battery.started_by_name || 'another technician'}{battery.work_started_at ? ` (started at ${new Date(battery.work_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}.
+          </p>
+          {showScanNext && (
+            <div className="mt-3 flex justify-center">
+              <button
+                type="button"
+                onClick={handleScanNext}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-sm hover:bg-blue-700 transition-colors cursor-pointer"
+              >
+                📷 Scan Next Battery
+              </button>
+            </div>
+          )}
         </div>
       )}
 
@@ -1419,7 +1449,7 @@ function TechnicianRepairPanel({
                   <button
                     type="button"
                     onClick={handleScanNext}
-                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors"
+                    className="flex w-full items-center justify-center gap-2 rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700 transition-colors cursor-pointer"
                   >
                     <span>📷 Scan Next Battery</span>
                   </button>
@@ -1429,17 +1459,22 @@ function TechnicianRepairPanel({
                       if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
                       allowExitRef.current = true;
                       setModalType(null);
-                      if (onDone) {
-                        onDone();
-                      } else if (user?.role === 'technician') {
-                        navigate('/batteries/technician');
-                      } else {
-                        navigate('/batteries');
-                      }
+                      navigate('/');
                     }}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors cursor-pointer"
                   >
                     Back to Service List
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+                      allowExitRef.current = true;
+                      setModalType(null);
+                    }}
+                    className="w-full rounded-xl border border-slate-200 bg-white py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-300 transition-colors cursor-pointer"
+                  >
+                    Stay on Battery Page
                   </button>
                 </div>
                 {user?.role === 'technician' && !canTest && (
@@ -1674,8 +1709,8 @@ function TechnicianRepairPanel({
               {pendingPartsRemoval.length > 0 ? (
                 <button
                   type="button"
-                  onClick={openConfirmRemoveFromScanAlert}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-amber-700 transition-colors"
+                  onClick={() => setShowPassedBackScanModal(false)}
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-amber-700 transition-colors cursor-pointer"
                 >
                   <span>🔧</span>
                   <span>Continue to Remove Fitted Parts</span>
@@ -1684,7 +1719,7 @@ function TechnicianRepairPanel({
                 <button
                   type="button"
                   onClick={() => setShowPassedBackScanModal(false)}
-                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-amber-700 transition-colors"
+                  className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-amber-700 transition-colors cursor-pointer"
                 >
                   <span>▶</span>
                   <span>Continue to Battery Rework</span>
@@ -1693,7 +1728,7 @@ function TechnicianRepairPanel({
               <button
                 type="button"
                 onClick={handleScanNext}
-                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-slate-100 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors cursor-pointer"
               >
                 <span>📷 Scan Next Battery</span>
               </button>
@@ -1788,9 +1823,9 @@ function TechnicianRepairPanel({
 
       {/* ── Scan Modal: Not Available (blocked status) ── */}
       {blockedStatus && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
-            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-2xl dark:border-red-900/60 dark:bg-red-950/40">⏳</div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xl p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150 text-center">
+            <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-2xl dark:border-red-900/60 dark:bg-red-950/40">⏳</div>
             <h3 className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Not Available</h3>
             <p className="mb-5 text-xs leading-relaxed text-slate-500 dark:text-neutral-400">
               {BLOCKED_STATUS_MESSAGES[blockedStatus] || 'This battery is not available to start work on.'}
@@ -1798,15 +1833,21 @@ function TechnicianRepairPanel({
             <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setBlockedStatus(null)}
-                className="flex-1 rounded-xl border border-slate-200 bg-slate-100 py-3.5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300"
+                onClick={() => {
+                  if (window.history.length > 1) {
+                    navigate(-1);
+                  } else {
+                    navigate('/');
+                  }
+                }}
+                className="flex-1 rounded-xl border border-slate-200 bg-slate-100 py-3.5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors cursor-pointer"
               >
-                View Details
+                Go Back
               </button>
               <button
                 type="button"
                 onClick={handleScanNext}
-                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-blue-700"
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-colors cursor-pointer"
               >
                 📷 Scan Next
               </button>
@@ -2054,13 +2095,27 @@ function TechnicianRepairPanel({
             </div>
             {error && <div className="mb-3 rounded-xl border border-red-200 bg-red-50 p-2.5 text-center text-xs font-semibold text-red-700">{error}</div>}
             <div className="flex flex-col gap-2.5">
-              <button type="button" onClick={openConfirmRemoveFromTesting} disabled={submitting} className="w-full rounded-2xl bg-amber-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-50">
-                Continue to Remove Fitted Parts
+              <button
+                type="button"
+                onClick={handleContinueToRemoveParts}
+                disabled={submitting}
+                className="w-full rounded-2xl bg-amber-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-amber-700 disabled:opacity-50 transition-colors cursor-pointer"
+              >
+                {submitting ? 'Updating…' : 'Continue to Remove Fitted Parts'}
               </button>
-              <button type="button" onClick={handlePassToTech} disabled={submitting} className="w-full rounded-2xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50">
+              <button
+                type="button"
+                onClick={handlePassToTech}
+                disabled={submitting}
+                className="w-full rounded-2xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+              >
                 {submitting ? 'Passing…' : 'Continue to Pass to Tech'}
               </button>
-              <button type="button" onClick={() => { setError(null); setShowTestingDecisionModal(false); }} className="mt-1 w-full rounded-2xl py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-neutral-400">
+              <button
+                type="button"
+                onClick={() => { setError(null); setShowTestingDecisionModal(false); }}
+                className="mt-1 w-full rounded-2xl py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-neutral-400 cursor-pointer"
+              >
                 Cancel
               </button>
             </div>

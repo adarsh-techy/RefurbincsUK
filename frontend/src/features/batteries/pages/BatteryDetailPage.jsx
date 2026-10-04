@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Link, useNavigate, useParams, useLocation } from 'react-router-dom';
 import QRCode from 'qrcode';
@@ -10,7 +10,7 @@ import Modal from '../../../components/ui/overlays/Modal';
 import TableState from '../../../components/ui/table/TableState';
 import { StatusBadge, ClientStatusBadge } from '../../../components/ui/primitives/Badge';
 import StatCard from '../../../components/ui/primitives/StatCard';
-import TechnicianRepairPanel from '../technician/TechnicianRepairPanel';
+import TechnicianRepairPanel, { BLOCKED_STATUS_MESSAGES } from '../technician/TechnicianRepairPanel';
 import ImageLightboxModal from '../../../components/ui/overlays/ImageLightboxModal';
 import { resolveImageUrl } from '../../../utils/image-url';
 import formatDuration from '../../../utils/format-duration';
@@ -1975,6 +1975,9 @@ function BatteryDetailPage() {
     title: '',
   });
 
+  const initialScanCheckedRef = useRef(false);
+  const [blockedScanStatus, setBlockedScanStatus] = useState(null);
+
   const load = useCallback(async () => {
     setLoading(true);
     setError(null);
@@ -1991,6 +1994,42 @@ function BatteryDetailPage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!result?.battery || initialScanCheckedRef.current) return;
+    initialScanCheckedRef.current = true;
+
+    if (!fromScan || (!isStaffRole && !isAdmin)) return;
+
+    const b = result.battery;
+    const servs = result.services || [];
+    const pending = result.pendingPartsRemoval || [];
+
+    const isIntakeUnv = intakeIsUnverified(b);
+    const passBack = servs.find(
+      (s) =>
+        s.service_name === 'Passed back to Technician' ||
+        s.service_name?.toLowerCase()?.includes('passed back')
+    );
+    const isPassBack = b.status === 'in_repair' && Boolean(passBack);
+    const isOwn =
+      b.status === 'in_progress' && b.started_by_user_id === user?.id;
+    const hasPending = pending.length > 0;
+
+    const isBlocked =
+      b.status !== 'in_repair' &&
+      !isOwn &&
+      !hasPending &&
+      !isIntakeUnv &&
+      !isPassBack &&
+      b.status !== 'in_testing' &&
+      b.status !== 'unserviceable' &&
+      b.status !== 'recycled';
+
+    if (isBlocked) {
+      setBlockedScanStatus(b.status);
+    }
+  }, [result, fromScan, isStaffRole, isAdmin, user?.id]);
 
   useEffect(() => {
     function handleUpdated(battery) {
@@ -2249,6 +2288,44 @@ function BatteryDetailPage() {
         battery?.status === 'passed_for_part_removal')
   );
   const isIntakeUnverified = intakeIsUnverified(battery);
+  const isOwnInProgress =
+    battery?.status === 'in_progress' && battery?.started_by_user_id === user?.id;
+
+  if (blockedScanStatus) {
+    const blockedMsg =
+      BLOCKED_STATUS_MESSAGES?.[blockedScanStatus] ||
+      'This battery is not available to start work on.';
+    return (
+      <div className="min-h-[calc(100vh-12rem)] flex items-center justify-center p-4">
+        <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-2xl dark:border-red-900/60 dark:bg-red-950/40">
+            ⏳
+          </div>
+          <h3 className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Not Available</h3>
+          <p className="mb-5 text-xs leading-relaxed text-slate-500 dark:text-neutral-400">
+            {blockedMsg}
+          </p>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="flex-1 rounded-xl border border-slate-200 bg-slate-100 py-3.5 text-xs font-bold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 transition-colors cursor-pointer"
+            >
+              Go Back
+            </button>
+            <button
+              type="button"
+              onClick={() => navigate('/?autoScan=1')}
+              className="flex flex-1 items-center justify-center gap-1.5 rounded-xl bg-blue-600 py-3.5 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-colors cursor-pointer"
+            >
+              <span>📷</span>
+              <span>Scan Next</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const rawCycles = buildCycles(
     buildEvents(

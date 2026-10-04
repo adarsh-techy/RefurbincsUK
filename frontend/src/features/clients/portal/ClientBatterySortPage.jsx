@@ -244,6 +244,23 @@ function ClientBatterySortPage() {
     return map;
   }, [registeredBatteries]);
 
+  // Summary Metrics Across All Sort Groups
+  const totalSortedBatteries = useMemo(() => {
+    return groups.reduce((sum, g) => sum + (g.batteries || []).length, 0);
+  }, [groups]);
+
+  const totalInServiceBatteries = useMemo(() => {
+    return groups.reduce((sum, g) => {
+      const packed = (g.batteries || []).filter((code) => {
+        const b = codeToBattery.get(String(code).trim().toUpperCase());
+        return isBatteryPackedForRepair(b);
+      });
+      return sum + packed.length;
+    }, 0);
+  }, [groups, codeToBattery]);
+
+  const totalAvailableBatteries = Math.max(0, totalSortedBatteries - totalInServiceBatteries);
+
   function handleExportExcel() {
     if (!activeGroup || !activeGroup.batteries || activeGroup.batteries.length === 0) return;
 
@@ -809,7 +826,7 @@ function ClientBatterySortPage() {
             maxHeight="calc(100vh - 360px)"
           />
         ) : (
-          <div className="grid max-h-[calc(100vh-360px)] grid-cols-1 gap-3 overflow-y-auto pr-1 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid max-h-[calc(100vh-340px)] grid-cols-1 gap-5 overflow-y-auto p-1 pr-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {activeGroup.batteries.map((code) => {
               const match = codeToBattery.get(code.toUpperCase());
               const isPackedForRepair = isBatteryPackedForRepair(match);
@@ -818,26 +835,26 @@ function ClientBatterySortPage() {
               return (
                 <div
                   key={code}
-                  className={`flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-xs transition-all ${
+                  className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     isPackedForRepair
-                      ? 'border-red-300 bg-red-50/90 dark:border-red-500/40 dark:bg-red-950/25'
-                      : 'border-slate-200/90 bg-white dark:border-white/10 dark:bg-surface-900'
+                      ? 'border-rose-300/80 bg-rose-50/70 dark:border-rose-900/40 dark:bg-rose-950/20'
+                      : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
                       <Link
                         to={`/batteries/${encodeURIComponent(code)}`}
-                        className={`block truncate font-mono text-sm font-bold hover:underline ${
+                        className={`block truncate font-mono text-sm font-black hover:underline ${
                           isPackedForRepair
-                            ? 'text-red-700 dark:text-red-400 dark:hover:text-red-300'
-                            : 'text-blue-700 dark:text-blue-400'
+                            ? 'text-rose-700 dark:text-rose-400 dark:hover:text-rose-300'
+                            : 'text-slate-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400'
                         }`}
                       >
                         {code}
                       </Link>
                       {match?.serial_number && (
-                        <p className="text-[11px] font-medium text-slate-600 dark:text-neutral-400">
+                        <p className="text-[11px] font-mono text-slate-500 dark:text-neutral-400 mt-0.5">
                           SN: {match.serial_number}
                         </p>
                       )}
@@ -845,7 +862,7 @@ function ClientBatterySortPage() {
                     <button
                       type="button"
                       onClick={() => removeBatteryFromActiveGroup(code)}
-                      className="shrink-0 rounded-lg p-1.5 text-slate-400 hover:bg-red-100 hover:text-red-600 dark:text-neutral-500 dark:hover:bg-red-950/50 dark:hover:text-red-300"
+                      className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-rose-100 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/50 dark:hover:text-rose-300 transition-colors cursor-pointer"
                       title="Remove from group"
                     >
                       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
@@ -854,8 +871,8 @@ function ClientBatterySortPage() {
                     </button>
                   </div>
 
-                  <div className="space-y-1.5 pt-2 border-t border-slate-200/50 dark:border-white/5">
-                    <div className="flex items-center justify-between gap-2">
+                  <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-white/5">
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
                       {match && hasBeenServiced(match) ? (
                         <ClientStatusBadge
                           status={match.status}
@@ -873,15 +890,15 @@ function ClientBatterySortPage() {
                       )}
 
                       {isPackedForRepair && (
-                        <span className="rounded-md bg-red-100 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-red-800 dark:border dark:border-red-500/30 dark:bg-red-950/60 dark:text-red-300">
+                        <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-rose-800 dark:border dark:border-rose-500/30 dark:bg-rose-950/60 dark:text-rose-300">
                           Packed to Service
                         </span>
                       )}
                     </div>
 
                     {isPackedForRepair && packedDate && (
-                      <p className="text-[11px] font-semibold text-red-700 dark:text-red-400">
-                        Packed to Service: <span className="font-normal text-slate-600 dark:text-red-200/90">{formatDate(packedDate)}</span>
+                      <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-400">
+                        Packed to Service: <span className="font-normal text-slate-600 dark:text-rose-200/90">{formatDate(packedDate)}</span>
                         {match?.truck_number ? ` • Truck ${match.truck_number}` : ''}
                       </p>
                     )}
@@ -1043,41 +1060,139 @@ function ClientBatterySortPage() {
           <button
             type="button"
             onClick={() => setSavedSuccessInfo(null)}
-            className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400"
+            className="text-emerald-700 hover:text-emerald-900 dark:text-emerald-400 cursor-pointer"
           >
             ✕
           </button>
         </div>
       )}
 
+      {/* 4-Card Overview Metric Strip */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+              Sort Groups
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+              <FiLayers className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white font-mono">
+            {groups.length}
+          </p>
+          <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5 block">
+            Custom sorting pools
+          </span>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+              Total Sorted Units
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              <FiPackage className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white font-mono">
+            {totalSortedBatteries}
+          </p>
+          <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5 block">
+            Allocated into groups
+          </span>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+              Available in Fleet
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+              <FiCheckCircle className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">
+            {totalAvailableBatteries}
+          </p>
+          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 block font-medium">
+            Active &amp; operational
+          </span>
+        </div>
+
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+          <div className="flex items-center justify-between">
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+              In Maintenance
+            </span>
+            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+              <FiTruck className="w-4 h-4" />
+            </div>
+          </div>
+          <p className="mt-2 text-2xl font-black text-rose-700 dark:text-rose-400 font-mono">
+            {totalInServiceBatteries}
+          </p>
+          <span className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5 block font-medium">
+            Packed to service / testing
+          </span>
+        </div>
+      </div>
+
+      {/* Search and Filter Bar */}
       {groups.length > 0 && (
-        <div className="relative w-full sm:w-80">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 20 20"
-            fill="currentColor"
-            className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-          >
-            <path
-              fillRule="evenodd"
-              d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
-              clipRule="evenodd"
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
+          <div className="relative w-full sm:w-96">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
+                clipRule="evenodd"
+              />
+            </svg>
+            <input
+              type="text"
+              value={groupSearch}
+              onChange={(e) => setGroupSearch(e.target.value)}
+              placeholder="Search sort group name or battery code…"
+              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500 shadow-2xs"
             />
-          </svg>
-          <input
-            type="text"
-            value={groupSearch}
-            onChange={(e) => setGroupSearch(e.target.value)}
-            placeholder="Search group name or battery code…"
-            className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
-          />
+            {groupSearch.trim() && (
+              <button
+                type="button"
+                onClick={() => setGroupSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
+
+          <div className="flex items-center gap-3">
+            <span className="text-xs font-bold text-slate-500 dark:text-neutral-400">
+              Showing {filteredGroups.length} of {groups.length} {groups.length === 1 ? 'group' : 'groups'}
+            </span>
+            {groupSearch.trim() && (
+              <button
+                type="button"
+                onClick={() => setGroupSearch('')}
+                className="text-xs font-bold text-emerald-600 hover:underline dark:text-emerald-400 cursor-pointer"
+              >
+                Clear filter
+              </button>
+            )}
+          </div>
         </div>
       )}
 
       {groupsSaveError && (
         <div className="mb-4 flex items-start justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50/70 px-4 py-3 text-xs font-semibold text-rose-700 dark:border-rose-500/30 dark:bg-rose-500/10 dark:text-rose-300">
           <span>{groupsSaveError}</span>
-          <button type="button" onClick={() => setGroupsSaveError(null)} className="shrink-0 font-bold underline-offset-2 hover:underline">
+          <button type="button" onClick={() => setGroupsSaveError(null)} className="shrink-0 font-bold underline-offset-2 hover:underline cursor-pointer">
             Dismiss
           </button>
         </div>
@@ -1093,15 +1208,19 @@ function ClientBatterySortPage() {
         </div>
       ) : groups.length === 0 ? (
         <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-white/10 dark:bg-surface-900">
+          <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-surface-800 dark:text-neutral-400 mb-3">
+            <FiLayers className="h-6 w-6" />
+          </div>
           <p className="text-sm font-semibold text-slate-700 dark:text-neutral-300">
             No sort groups yet.
           </p>
-          <p className="mt-1 text-xs text-slate-400">
-            Click &apos;+ New Sort Group&apos; to start organizing batteries for a requirement.
+          <p className="mt-1 text-xs text-slate-400 max-w-sm mx-auto">
+            Click &apos;+ New Sort Group&apos; above to start categorizing and organizing batteries for your fleet requirements.
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 gap-4.5 sm:grid-cols-2 lg:grid-cols-3">
+        /* Cards Grid with Proper Generous Gapping (gap-6 on sm, gap-7 on xl) */
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:gap-7">
           {filteredGroups.map((group) => {
             const totalCount = (group.batteries || []).length;
             const groupPacked = (group.batteries || [])
@@ -1126,132 +1245,158 @@ function ClientBatterySortPage() {
               <div
                 key={group.id}
                 onClick={() => openGroup(group)}
-                className={`group relative overflow-hidden rounded-2xl border bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg dark:bg-surface-900 cursor-pointer pl-6 ${
+                className={`group relative flex flex-col justify-between overflow-hidden rounded-3xl border bg-white p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:bg-surface-900 cursor-pointer pl-7 ${
                   hasPacked
                     ? 'border-rose-200/90 hover:border-rose-400 dark:border-rose-900/40 dark:hover:border-rose-700/60'
                     : 'border-slate-200/90 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'
                 }`}
               >
-                {/* Classic Left Color Stripe */}
+                {/* Left Accent Color Stripe */}
                 <div
-                  className={`absolute left-0 top-0 bottom-0 w-1.5 ${
+                  className={`absolute left-0 top-0 bottom-0 w-2 ${
                     hasPacked
                       ? 'bg-gradient-to-b from-rose-500 to-amber-500'
                       : 'bg-gradient-to-b from-emerald-500 to-teal-500'
                   }`}
                 />
 
-                {/* Card Header: Icon, Group Name, Count Pill */}
-                <div className="flex items-start justify-between gap-3 pb-3.5 border-b border-slate-100 dark:border-white/5">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div
-                      className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-2xs ${
-                        hasPacked
-                          ? 'bg-rose-50 text-rose-600 border-rose-200/70 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
-                          : 'bg-emerald-50 text-emerald-600 border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
-                      }`}
-                    >
-                      <FiLayers className="h-5 w-5" />
-                    </div>
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                          Sort Group
-                        </span>
-                        {hasPacked && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/70 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:text-rose-300">
-                            <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
-                            {groupPacked.length} In Service
-                          </span>
-                        )}
-                      </div>
-                      <h3 className="truncate text-base font-extrabold text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mt-0.5">
-                        {group.name}
-                      </h3>
-                    </div>
-                  </div>
-
-                  <span
-                    className={`inline-flex items-center gap-1 shrink-0 rounded-xl px-2.5 py-1 text-xs font-black shadow-2xs border ${
-                      hasPacked
-                        ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300'
-                        : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
-                    }`}
-                  >
-                    <span>{totalCount}</span>
-                    <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase">
-                      {totalCount === 1 ? 'Unit' : 'Units'}
-                    </span>
-                  </span>
-                </div>
-
-                {/* Structured Logistics Metric Summary (No Raw Battery Chips) */}
-                <div className="mt-3.5 grid grid-cols-2 gap-2">
-                  {/* Volume Metric */}
-                  <div className="flex items-center gap-2.5 rounded-xl bg-slate-50/80 dark:bg-surface-800/60 p-2.5 border border-slate-100 dark:border-white/5">
-                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                      <FiPackage className="h-4 w-4" />
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                        Available
-                      </span>
-                      <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
-                        {readyCount} {readyCount === 1 ? 'Battery' : 'Batteries'}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Status / Logistics Metric */}
-                  <div className="flex items-center gap-2.5 rounded-xl bg-slate-50/80 dark:bg-surface-800/60 p-2.5 border border-slate-100 dark:border-white/5">
-                    <div
-                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
-                        hasPacked
-                          ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
-                          : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                      }`}
-                    >
-                      {hasPacked ? <FiTruck className="h-4 w-4" /> : <FiCheckCircle className="h-4 w-4" />}
-                    </div>
-                    <div className="min-w-0">
-                      <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                        {hasPacked ? 'In Repair' : 'Inventory'}
-                      </span>
-                      <span
-                        className={`block truncate text-xs font-black ${
+                {/* Card Top: Group Icon, Name, Units Badge */}
+                <div>
+                  <div className="flex items-start justify-between gap-3.5 pb-4 border-b border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      <div
+                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border shadow-2xs ${
                           hasPacked
-                            ? 'text-rose-700 dark:text-rose-400'
-                            : 'text-emerald-700 dark:text-emerald-400'
+                            ? 'bg-rose-50 text-rose-600 border-rose-200/70 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
+                            : 'bg-emerald-50 text-emerald-600 border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
                         }`}
                       >
-                        {hasPacked ? `${groupPacked.length} Dispatched` : 'Ready to Pack'}
+                        <FiLayers className="h-6 w-6" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                            Sort Group
+                          </span>
+                          {hasPacked && (
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/70 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:text-rose-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                              {groupPacked.length} In Service
+                            </span>
+                          )}
+                        </div>
+                        <h3 className="truncate text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mt-0.5">
+                          {group.name}
+                        </h3>
+                      </div>
+                    </div>
+
+                    <span
+                      className={`inline-flex items-center gap-1 shrink-0 rounded-xl px-3 py-1.5 text-xs font-black shadow-2xs border ${
+                        hasPacked
+                          ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300'
+                          : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
+                      }`}
+                    >
+                      <span className="font-mono text-sm">{totalCount}</span>
+                      <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase">
+                        {totalCount === 1 ? 'Unit' : 'Units'}
                       </span>
+                    </span>
+                  </div>
+
+                  {/* Logistics Metric Sub-Cards with Clean Spacing */}
+                  <div className="mt-4 grid grid-cols-2 gap-3.5">
+                    {/* Ready in Fleet Metric */}
+                    <div className="flex items-center gap-2.5 rounded-2xl bg-slate-50/90 dark:bg-surface-800/70 p-3 border border-slate-100 dark:border-white/5">
+                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        <FiPackage className="h-4 w-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                          Available
+                        </span>
+                        <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
+                          {readyCount} {readyCount === 1 ? 'Battery' : 'Batteries'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* In Maintenance Status Metric */}
+                    <div className="flex items-center gap-2.5 rounded-2xl bg-slate-50/90 dark:bg-surface-800/70 p-3 border border-slate-100 dark:border-white/5">
+                      <div
+                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                          hasPacked
+                            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+                            : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                        }`}
+                      >
+                        {hasPacked ? <FiTruck className="h-4 w-4" /> : <FiCheckCircle className="h-4 w-4" />}
+                      </div>
+                      <div className="min-w-0">
+                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                          {hasPacked ? 'In Repair' : 'Inventory'}
+                        </span>
+                        <span
+                          className={`block truncate text-xs font-black ${
+                            hasPacked
+                              ? 'text-rose-700 dark:text-rose-400'
+                              : 'text-emerald-700 dark:text-emerald-400'
+                          }`}
+                        >
+                          {hasPacked ? `${groupPacked.length} Dispatched` : 'Ready to Pack'}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                {/* Date & Subtitle */}
-                <div className="mt-3 flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400">
-                  <div className="flex items-center gap-1.5">
-                    <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
-                    <span>Created {formatDate(group.createdAt)}</span>
-                  </div>
-                  {hasPacked && latestPackedDate && (
-                    <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
-                      Packed {formatDate(latestPackedDate)}
-                    </span>
+                  {/* Distribution Readiness Progress Bar */}
+                  {totalCount > 0 && (
+                    <div className="mt-4 space-y-1.5">
+                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                        <span>Readiness</span>
+                        <span className="font-mono text-slate-700 dark:text-neutral-300 font-bold">
+                          {Math.round((readyCount / totalCount) * 100)}% Available
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-surface-800 flex">
+                        <div
+                          style={{ width: `${(readyCount / totalCount) * 100}%` }}
+                          className="h-full bg-emerald-500 transition-all duration-500"
+                        />
+                        {groupPacked.length > 0 && (
+                          <div
+                            style={{ width: `${(groupPacked.length / totalCount) * 100}%` }}
+                            className="h-full bg-rose-500 transition-all duration-500"
+                          />
+                        )}
+                      </div>
+                    </div>
                   )}
+
+                  {/* Date & Subtitle */}
+                  <div className="mt-3.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400">
+                    <div className="flex items-center gap-1.5">
+                      <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
+                      <span>Created {formatDate(group.createdAt)}</span>
+                    </div>
+                    {hasPacked && latestPackedDate && (
+                      <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                        Packed {formatDate(latestPackedDate)}
+                      </span>
+                    )}
+                  </div>
                 </div>
 
-                {/* Footer: Delete action & CTA */}
-                <div className="mt-3.5 flex items-center justify-between pt-3 border-t border-slate-100 dark:border-white/5">
+                {/* Card Footer: Delete Action & Open CTA */}
+                <div className="mt-4 flex items-center justify-between pt-3.5 border-t border-slate-100 dark:border-white/5">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       requestDeleteGroup(group);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-medium text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-colors cursor-pointer"
                     title="Delete group"
                   >
                     <FiTrash2 className="h-3.5 w-3.5" />
@@ -1259,7 +1404,7 @@ function ClientBatterySortPage() {
                   </button>
 
                   <span
-                    className={`inline-flex items-center gap-1.5 text-xs font-black transition-all group-hover:translate-x-0.5 ${
+                    className={`inline-flex items-center gap-1.5 text-xs font-black transition-all group-hover:translate-x-1 ${
                       hasPacked
                         ? 'text-rose-600 group-hover:text-rose-700 dark:text-rose-400'
                         : 'text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400'
