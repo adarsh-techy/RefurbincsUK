@@ -64,10 +64,57 @@ function EyeIcon({ open }) {
   );
 }
 
+const PRESETS = [
+  {
+    id: 'superadmin',
+    name: 'Super Admin',
+    role: 'Administrator',
+    email: 'superadmin@gmail.com',
+    password: '12345678',
+    initials: 'SA',
+    iconBg: '#1e3a8a',
+    activeBg: '#eff6ff',
+    activeBorder: '#2563eb',
+  },
+  {
+    id: 'humanforest',
+    name: 'HumanForest',
+    role: 'Fleet Client',
+    email: 'humanforest@gmail.com',
+    password: '12345678',
+    initials: 'HF',
+    iconBg: '#065f46',
+    activeBg: '#ecfdf5',
+    activeBorder: '#059669',
+  },
+  {
+    id: 'akhil',
+    name: 'Akhil Tech',
+    role: 'Technician',
+    email: 'akhil@gmail.com',
+    password: '12345678',
+    initials: 'AT',
+    iconBg: '#0a4d3c',
+    activeBg: '#f0f6f3',
+    activeBorder: '#0a4d3c',
+  },
+  {
+    id: 'akshay',
+    name: 'Akshay Sup',
+    role: 'Supervisor',
+    email: 'akshay@gmail.com',
+    password: '12345678',
+    initials: 'AS',
+    iconBg: '#52796f',
+    activeBg: '#f2f6f4',
+    activeBorder: '#4a6b5e',
+  },
+];
+
 export default function LoginScreen() {
   const dispatch = useDispatch();
   const { status, error } = useSelector((state) => state.auth);
-  const [email, setEmail] = useState('akhil@gmail.com');
+  const [email, setEmail] = useState('superadmin@gmail.com');
   const [password, setPassword] = useState('12345678');
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
@@ -182,58 +229,78 @@ export default function LoginScreen() {
             <Text className="mb-2 text-xs font-semibold text-slate-600">
               Quick access
             </Text>
-            <View className="flex-row gap-2.5">
-              {/* Akhil Tech */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => {
-                  setEmail('akhil@gmail.com');
-                  setPassword('12345678');
-                }}
-                className={`flex-1 flex-row items-center gap-2.5 rounded-2xl border p-2.5 ${
-                  email === 'akhil@gmail.com'
-                    ? 'border-[#0a4d3c] bg-[#f0f6f3]'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                <View className="h-9 w-9 rounded-full bg-[#0a4d3c] items-center justify-center shrink-0">
-                  <Text className="text-xs font-bold text-white tracking-wider">AT</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
-                    Akhil Tech
-                  </Text>
-                  <Text className="text-[10px] font-medium text-slate-400">
-                    Technician
-                  </Text>
-                </View>
-              </TouchableOpacity>
+            <View className="gap-2">
+              {/* Row 1: Super Admin & HumanForest */}
+              <View className="flex-row gap-2">
+                {PRESETS.slice(0, 2).map((item) => {
+                  const isSelected = email.toLowerCase() === item.email.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setEmail(item.email);
+                        setPassword(item.password);
+                      }}
+                      style={isSelected ? { borderColor: item.activeBorder, backgroundColor: item.activeBg } : {}}
+                      className={`flex-1 flex-row items-center gap-2 rounded-2xl border p-2.5 ${
+                        isSelected ? '' : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      <View
+                        style={{ backgroundColor: item.iconBg }}
+                        className="h-8 w-8 rounded-full items-center justify-center shrink-0"
+                      >
+                        <Text className="text-[11px] font-bold text-white tracking-wider">{item.initials}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text className="text-[10px] font-medium text-slate-400" numberOfLines={1}>
+                          {item.role}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
 
-              {/* Akshay Sup */}
-              <TouchableOpacity
-                activeOpacity={0.8}
-                onPress={() => {
-                  setEmail('akshay@gmail.com');
-                  setPassword('12345678');
-                }}
-                className={`flex-1 flex-row items-center gap-2.5 rounded-2xl border p-2.5 ${
-                  email === 'akshay@gmail.com'
-                    ? 'border-[#4a6b5e] bg-[#f2f6f4]'
-                    : 'border-slate-200 bg-white'
-                }`}
-              >
-                <View className="h-9 w-9 rounded-full bg-[#52796f] items-center justify-center shrink-0">
-                  <Text className="text-xs font-bold text-white tracking-wider">AS</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
-                    Akshay Sup
-                  </Text>
-                  <Text className="text-[10px] font-medium text-slate-400">
-                    Supervisor
-                  </Text>
-                </View>
-              </TouchableOpacity>
+              {/* Row 2: Akhil Tech & Akshay Sup */}
+              <View className="flex-row gap-2">
+                {PRESETS.slice(2, 4).map((item) => {
+                  const isSelected = email.toLowerCase() === item.email.toLowerCase();
+                  return (
+                    <TouchableOpacity
+                      key={item.id}
+                      activeOpacity={0.8}
+                      onPress={() => {
+                        setEmail(item.email);
+                        setPassword(item.password);
+                      }}
+                      style={isSelected ? { borderColor: item.activeBorder, backgroundColor: item.activeBg } : {}}
+                      className={`flex-1 flex-row items-center gap-2 rounded-2xl border p-2.5 ${
+                        isSelected ? '' : 'border-slate-200 bg-white'
+                      }`}
+                    >
+                      <View
+                        style={{ backgroundColor: item.iconBg }}
+                        className="h-8 w-8 rounded-full items-center justify-center shrink-0"
+                      >
+                        <Text className="text-[11px] font-bold text-white tracking-wider">{item.initials}</Text>
+                      </View>
+                      <View className="flex-1">
+                        <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                        <Text className="text-[10px] font-medium text-slate-400" numberOfLines={1}>
+                          {item.role}
+                        </Text>
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
             </View>
           </View>
 
@@ -266,7 +333,7 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoComplete="email"
-                  placeholder="akhil@gmail.com"
+                  placeholder="superadmin@gmail.com"
                   placeholderTextColor="#94a3b8"
                   className="flex-1 py-3 text-sm font-medium text-slate-900"
                 />

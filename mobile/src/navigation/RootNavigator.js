@@ -10,6 +10,38 @@ import ClientInvoicesScreen from '../screens/client/ClientInvoicesScreen';
 import ClientTransactionsScreen from '../screens/client/ClientTransactionsScreen';
 import ClientNotificationsScreen from '../screens/client/ClientNotificationsScreen';
 import ClientSupportScreen from '../screens/client/ClientSupportScreen';
+import ClientHistoryScreen from '../screens/client/ClientHistoryScreen';
+import ClientCertificatesScreen from '../screens/client/ClientCertificatesScreen';
+import AdminDirectoryScreen from '../screens/admin/AdminDirectoryScreen';
+import AdminPartsScreen from '../screens/admin/AdminPartsScreen';
+import AdminFinanceScreen from '../screens/admin/AdminFinanceScreen';
+import AdminGenerateQrScreen from '../screens/admin/AdminGenerateQrScreen';
+import {
+  AdminRepairsScreen, AdminReturnsScreen, AdminServicesScreen, AdminIssueReasonsScreen,
+  AdminRecycleScreen, AdminInvoicesScreen, AdminRatingsScreen, AdminCertificatesScreen,
+  AdminUsersScreen, AdminAuditLogScreen, AdminTrashScreen, AdminNotificationsScreen,
+} from '../screens/admin/AdminPages';
+
+// Admin side-menu pages (see components/admin/AdminSidebar.js). Registered
+// for every signed-in role; the backend rejects anyone without the right
+// role/permission, and the sidebar hides what the user can't open.
+const ADMIN_SCREENS = [
+  ['AdminNotifications', AdminNotificationsScreen, 'Notifications'],
+  ['GenerateQr', AdminGenerateQrScreen, 'Generate QR Codes'],
+  ['Repairs', AdminRepairsScreen, 'Repairs'],
+  ['Returns', AdminReturnsScreen, 'Returns Dispatch'],
+  ['Parts', AdminPartsScreen, 'Parts & Inventory'],
+  ['Services', AdminServicesScreen, 'Services & Rates'],
+  ['IssueReasons', AdminIssueReasonsScreen, 'Issue Reasons'],
+  ['RecycleShipmentsAdmin', AdminRecycleScreen, 'Recycle Shipments'],
+  ['AdminInvoices', AdminInvoicesScreen, 'Invoices'],
+  ['Finance', AdminFinanceScreen, 'Finance'],
+  ['Ratings', AdminRatingsScreen, 'Ratings & Reviews'],
+  ['Certificates', AdminCertificatesScreen, 'Certificates & Impact'],
+  ['Users', AdminUsersScreen, 'User Accounts'],
+  ['AuditLog', AdminAuditLogScreen, 'Audit Log'],
+  ['Trash', AdminTrashScreen, 'Trash Bin'],
+];
 import MainTabs from './MainTabs';
 import { navigationRef } from './navigationRef';
 
@@ -47,14 +79,12 @@ function LoadingScreen() {
 export default function RootNavigator() {
   const { user, token, bootstrapped, authChecked } = useSelector((state) => state.auth);
 
-  if (!bootstrapped || (token && !authChecked)) {
-    return <LoadingScreen />;
-  }
-
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {!user ? (
+        {!bootstrapped || (token && !authChecked) ? (
+          <Stack.Screen name="Loading" component={LoadingScreen} />
+        ) : !user ? (
           <Stack.Screen name="Login" component={LoginScreen} />
         ) : user.must_change_password ? (
           <Stack.Screen name="SetPassword" component={SetPasswordScreen} />
@@ -66,6 +96,14 @@ export default function RootNavigator() {
               component={BatteryDetailScreen}
               options={{ headerShown: true, headerStyle: { backgroundColor: '#ffffff' }, headerTintColor: '#0f172a', headerTitleStyle: { color: '#0f172a', fontWeight: 'bold' }, headerShadowVisible: false, title: 'Battery Details' }}
             />
+            <Stack.Screen
+              name="Directory"
+              component={AdminDirectoryScreen}
+              options={{ ...clientScreenOptions, title: 'Clients & Staff' }}
+            />
+            {ADMIN_SCREENS.map(([name, component, title]) => (
+              <Stack.Screen key={name} name={name} component={component} options={{ ...clientScreenOptions, title }} />
+            ))}
             <Stack.Screen
               name="BatterySorting"
               component={ClientSortingScreen}
@@ -90,6 +128,16 @@ export default function RootNavigator() {
               name="Support"
               component={ClientSupportScreen}
               options={{ ...clientScreenOptions, title: 'Help & Support' }}
+            />
+            <Stack.Screen
+              name="ClientHistory"
+              component={ClientHistoryScreen}
+              options={{ ...clientScreenOptions, title: 'Service History' }}
+            />
+            <Stack.Screen
+              name="ClientCertificates"
+              component={ClientCertificatesScreen}
+              options={{ ...clientScreenOptions, title: 'Certificates & Impact' }}
             />
           </>
         )}
