@@ -88,6 +88,17 @@ const PRESETS = [
     activeBorder: '#059669',
   },
   {
+    id: 'recycle',
+    name: 'Recycle Client',
+    role: 'Recycling Partner',
+    email: 'recycle@gmail.com',
+    password: '12345678',
+    initials: 'RC',
+    iconBg: '#0f766e',
+    activeBg: '#f0fdfa',
+    activeBorder: '#0d9488',
+  },
+  {
     id: 'akhil',
     name: 'Akhil Tech',
     role: 'Technician',
@@ -230,77 +241,47 @@ export default function LoginScreen() {
               Quick access
             </Text>
             <View className="gap-2">
-              {/* Row 1: Super Admin & HumanForest */}
-              <View className="flex-row gap-2">
-                {PRESETS.slice(0, 2).map((item) => {
-                  const isSelected = email.toLowerCase() === item.email.toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setEmail(item.email);
-                        setPassword(item.password);
-                      }}
-                      style={isSelected ? { borderColor: item.activeBorder, backgroundColor: item.activeBg } : {}}
-                      className={`flex-1 flex-row items-center gap-2 rounded-2xl border p-2.5 ${
-                        isSelected ? '' : 'border-slate-200 bg-white'
-                      }`}
-                    >
-                      <View
-                        style={{ backgroundColor: item.iconBg }}
-                        className="h-8 w-8 rounded-full items-center justify-center shrink-0"
-                      >
-                        <Text className="text-[11px] font-bold text-white tracking-wider">{item.initials}</Text>
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text className="text-[10px] font-medium text-slate-400" numberOfLines={1}>
-                          {item.role}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
-
-              {/* Row 2: Akhil Tech & Akshay Sup */}
-              <View className="flex-row gap-2">
-                {PRESETS.slice(2, 4).map((item) => {
-                  const isSelected = email.toLowerCase() === item.email.toLowerCase();
-                  return (
-                    <TouchableOpacity
-                      key={item.id}
-                      activeOpacity={0.8}
-                      onPress={() => {
-                        setEmail(item.email);
-                        setPassword(item.password);
-                      }}
-                      style={isSelected ? { borderColor: item.activeBorder, backgroundColor: item.activeBg } : {}}
-                      className={`flex-1 flex-row items-center gap-2 rounded-2xl border p-2.5 ${
-                        isSelected ? '' : 'border-slate-200 bg-white'
-                      }`}
-                    >
-                      <View
-                        style={{ backgroundColor: item.iconBg }}
-                        className="h-8 w-8 rounded-full items-center justify-center shrink-0"
-                      >
-                        <Text className="text-[11px] font-bold text-white tracking-wider">{item.initials}</Text>
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
-                          {item.name}
-                        </Text>
-                        <Text className="text-[10px] font-medium text-slate-400" numberOfLines={1}>
-                          {item.role}
-                        </Text>
-                      </View>
-                    </TouchableOpacity>
-                  );
-                })}
-              </View>
+              {[0, 2, 4].map((startIndex) => {
+                const row = PRESETS.slice(startIndex, startIndex + 2);
+                if (row.length === 0) return null;
+                return (
+                  <View key={startIndex} className="flex-row gap-2">
+                    {row.map((item) => {
+                      const isSelected = email.toLowerCase() === item.email.toLowerCase();
+                      return (
+                        <TouchableOpacity
+                          key={item.id}
+                          activeOpacity={0.8}
+                          onPress={() => {
+                            setEmail(item.email);
+                            setPassword(item.password);
+                          }}
+                          style={isSelected ? { borderColor: item.activeBorder, backgroundColor: item.activeBg } : {}}
+                          className={`flex-1 flex-row items-center gap-2 rounded-2xl border p-2.5 ${
+                            isSelected ? '' : 'border-slate-200 bg-white'
+                          }`}
+                        >
+                          <View
+                            style={{ backgroundColor: item.iconBg }}
+                            className="h-8 w-8 rounded-full items-center justify-center shrink-0"
+                          >
+                            <Text className="text-[11px] font-bold text-white tracking-wider">{item.initials}</Text>
+                          </View>
+                          <View className="flex-1">
+                            <Text className="text-xs font-bold text-slate-900" numberOfLines={1}>
+                              {item.name}
+                            </Text>
+                            <Text className="text-[10px] font-medium text-slate-400" numberOfLines={1}>
+                              {item.role}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      );
+                    })}
+                    {row.length === 1 && <View className="flex-1" />}
+                  </View>
+                );
+              })}
             </View>
           </View>
 
