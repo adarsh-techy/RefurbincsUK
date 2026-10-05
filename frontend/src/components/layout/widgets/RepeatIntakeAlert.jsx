@@ -84,7 +84,7 @@ function RepeatIntakeAlert() {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-96 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
+        <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
           <div className="flex items-center gap-2.5 border-b border-slate-100 bg-gradient-to-r from-warning-50 to-white px-4 py-3 dark:border-surface-700 dark:from-amber-500/10 dark:to-surface-900">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning-100 text-warning-700 dark:bg-amber-500/15 dark:text-amber-300">
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4.5 w-4.5">
