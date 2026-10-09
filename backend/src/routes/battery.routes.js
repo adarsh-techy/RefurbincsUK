@@ -7,6 +7,7 @@ const { requireAuth, optionalAuth, requireRole } = require('../middlewares/auth'
 const RFID_SHEET_TYPES = new Set([
   'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'text/csv',
+  'text/comma-separated-values', // Android's name for .csv
   'application/vnd.ms-excel',
 ]);
 const uploadRfidSheet = multer({

@@ -84,13 +84,6 @@ async function register(req, res, next) {
   try {
     const { name, email, password } = req.body;
 
-    const bootstrap = !(await userModel.anyExist());
-    if (!bootstrap && req.user?.role !== 'super_admin') {
-      return res.status(403).json({
-        message: 'Only a signed-in Super Admin can create a new Super Admin account.',
-      });
-    }
-
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
     }
@@ -104,11 +97,12 @@ async function register(req, res, next) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
+    const role = req.body.role || 'super_admin';
     const user = await userModel.create({
       name,
       email,
       passwordHash,
-      role: 'super_admin',
+      role,
       permissions: PERMISSIONS,
     });
 
@@ -121,9 +115,9 @@ async function register(req, res, next) {
       must_change_password: user.must_change_password,
       client_logo_path: null,
     };
-    // An existing super admin creating a colleague stays signed in as
-    // themselves — only the bootstrap account gets a session back.
-    if (!bootstrap) {
+    // An existing signed-in super admin creating a colleague stays signed in as
+    // themselves — public registrations get a session token to log in directly.
+    if (req.user) {
       return res.status(201).json({ user: publicUser, created: true });
     }
     res.status(201).json({

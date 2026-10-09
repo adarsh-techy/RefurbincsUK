@@ -88,12 +88,9 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      {/* Create Super Admin — signed-in super admins only (the API enforces it too) */}
-      <Route element={<ProtectedRoute roles={['super_admin']} />}>
-        <Route path="/register" element={<RegisterPage />} />
-        <Route path="/create-account" element={<RegisterPage />} />
-        <Route path="/signup" element={<RegisterPage />} />
-      </Route>
+      <Route path="/register" element={<RegisterPage />} />
+      <Route path="/create-account" element={<RegisterPage />} />
+      <Route path="/signup" element={<RegisterPage />} />
 
       {/* Battery Detail & Full History: Accessible both publicly via QR scan and when logged in */}
       <Route element={<DashboardLayout />}>

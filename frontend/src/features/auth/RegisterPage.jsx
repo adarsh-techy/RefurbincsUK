@@ -6,15 +6,24 @@ import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/REFURBNICS.png';
 
 const inputClasses =
-  'w-full rounded-md border border-slate-300 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/30';
-const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700';
-const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400';
+  'w-full rounded-xl border border-slate-300 bg-white py-2.5 pl-10 pr-3.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-[#0d5c3a] focus:outline-none focus:ring-2 focus:ring-[#0d5c3a]/20 transition';
+const labelClasses = 'mb-1.5 block text-xs font-semibold text-slate-700 uppercase tracking-wider';
+const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400';
+
+const ROLES = [
+  { value: 'super_admin', label: 'Super Admin', icon: '👑', desc: 'Full platform access' },
+  { value: 'client', label: 'Fleet Client', icon: '⚡', desc: 'Fleet portal & battery sorting' },
+  { value: 'technician', label: 'Technician', icon: '🔧', desc: 'Repairs & intake testing' },
+  { value: 'supervisor', label: 'Supervisor', icon: '🛡️', desc: 'QA inspection & workshop lead' },
+];
 
 function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [role, setRole] = useState('super_admin');
   const [showPassword, setShowPassword] = useState(false);
+  const [clientError, setClientError] = useState(null);
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { status, error } = useSelector((state) => state.auth);
@@ -23,7 +32,14 @@ function RegisterPage() {
   async function handleSubmit(e) {
     e.preventDefault();
     setCreated(null);
-    const result = await dispatch(register({ name, email, password, role: 'super_admin' }));
+    setClientError(null);
+
+    if (password.length < 8) {
+      setClientError('Password must be at least 8 characters long.');
+      return;
+    }
+
+    const result = await dispatch(register({ name: name.trim(), email: email.trim().toLowerCase(), password: password.trim(), role }));
     if (register.fulfilled.match(result)) {
       if (result.payload?.token) {
         navigate('/');
@@ -38,30 +54,34 @@ function RegisterPage() {
 
   return (
     <div className="flex min-h-screen bg-white">
+      {/* Left side banner image (desktop) */}
       <div className="relative hidden w-1/2 lg:block">
         <img src={loginImage} alt="" className="h-full w-full object-cover" />
       </div>
 
-      <div className="flex w-full flex-col justify-center bg-white px-8 py-12 sm:px-14 lg:w-1/2">
-        <div className="mx-auto w-full max-w-sm">
-          <img src={logo} alt="Refurbnics" className="mx-auto mb-6 h-auto w-full max-w-xs" />
+      {/* Form area */}
+      <div className="flex w-full flex-col justify-center bg-white px-6 py-10 sm:px-12 lg:w-1/2">
+        <div className="mx-auto w-full max-w-md">
+          <Link to="/login" className="inline-block mb-6">
+            <img src={logo} alt="Refurbnics" className="h-10 w-auto object-contain" />
+          </Link>
 
-          <div className="text-center">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 border border-indigo-200 text-indigo-700 text-xs font-bold mb-3">
-              <span>👑</span>
-              <span>Super Admin Portal</span>
-            </div>
-            <h1 className="text-2xl font-bold text-slate-900">Create Super Admin</h1>
-            <p className="mt-1 text-sm text-slate-500">Register new Super Admin credentials</p>
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">Create an Account</h1>
+            <p className="mt-1.5 text-xs sm:text-sm text-slate-500">
+              Register new credentials to access the Refurbnics platform
+            </p>
           </div>
 
           {created && (
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              Super Admin account <b>{created}</b> created. They can sign in now.{' '}
-              <Link to="/users" className="font-semibold underline">Go to User Accounts</Link>
+              Account <b>{created}</b> created successfully!{' '}
+              <Link to="/login" className="font-semibold underline">Click here to sign in</Link>
             </div>
           )}
+
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
+            {/* Full Name */}
             <div>
               <label className={labelClasses}>Full Name</label>
               <div className="relative">
@@ -79,6 +99,7 @@ function RegisterPage() {
               </div>
             </div>
 
+            {/* Email Address */}
             <div>
               <label className={labelClasses}>Email Address</label>
               <div className="relative">
@@ -91,12 +112,13 @@ function RegisterPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className={inputClasses}
-                  placeholder="admin@example.com"
+                  placeholder="name@company.com"
                   required
                 />
               </div>
             </div>
 
+            {/* Password */}
             <div>
               <label className={labelClasses}>Password</label>
               <div className="relative">
@@ -112,7 +134,7 @@ function RegisterPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   className={`${inputClasses} pr-10`}
-                  placeholder="At least 6 characters"
+                  placeholder="At least 8 characters"
                   required
                 />
                 <button
@@ -138,22 +160,53 @@ function RegisterPage() {
                   )}
                 </button>
               </div>
+              <p className="mt-1 text-[11px] text-slate-400">Must be at least 8 characters long</p>
             </div>
 
+            {/* Role Selection */}
             <div>
-              <label className={labelClasses}>Assigned Role</label>
-              <div className="flex items-center gap-2 rounded-md border border-indigo-200 bg-indigo-50/60 py-2.5 px-3.5 text-sm font-semibold text-indigo-900">
-                <span className="text-base">👑</span>
-                <span>Super Admin (Full Platform Access)</span>
+              <label className={labelClasses}>Select Account Role</label>
+              <div className="grid grid-cols-2 gap-2">
+                {ROLES.map((r) => {
+                  const isSelected = role === r.value;
+                  return (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setRole(r.value)}
+                      className={`flex flex-col items-start rounded-xl border p-2.5 text-left transition cursor-pointer ${
+                        isSelected
+                          ? 'border-[#0d5c3a] bg-[#0d5c3a]/5 ring-1 ring-[#0d5c3a]'
+                          : 'border-slate-200 bg-white hover:border-slate-300'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span>{r.icon}</span>
+                        <span className="text-xs font-bold text-slate-900">{r.label}</span>
+                      </div>
+                      <span className="mt-0.5 text-[10px] text-slate-500 line-clamp-1">{r.desc}</span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
 
-            {error && <p className="text-sm text-red-600">{error}</p>}
+            {clientError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center text-xs font-semibold text-red-600">
+                {clientError}
+              </div>
+            )}
+
+            {error && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-center text-xs font-semibold text-red-600">
+                {error}
+              </div>
+            )}
 
             <button
               type="submit"
               disabled={status === 'loading'}
-              className="mt-4 flex w-full items-center justify-center gap-2 rounded-lg bg-gradient-to-b from-[#61b928] to-[#46a127] py-3 text-sm font-bold uppercase tracking-wide text-white shadow-sm hover:from-[#6cc531] hover:to-[#4dae2c] disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#0d5c3a] hover:bg-[#0a482e] active:bg-[#083a24] py-3 text-sm font-bold text-white shadow-sm transition disabled:cursor-not-allowed disabled:opacity-50 cursor-pointer"
             >
               {status === 'loading' && (
                 <svg
@@ -170,27 +223,22 @@ function RegisterPage() {
                   />
                 </svg>
               )}
-              {status === 'loading' ? 'Creating Super Admin…' : 'Create Super Admin Account'}
+              {status === 'loading' ? 'Creating Account…' : 'Register Account'}
             </button>
           </form>
 
-          <div className="mt-5 text-center text-sm text-slate-600">
+          <div className="mt-6 text-center text-sm text-slate-600">
             Already have an account?{' '}
             <Link
               to="/login"
-              className="font-bold text-emerald-600 hover:text-emerald-700 hover:underline transition cursor-pointer"
+              className="font-bold text-[#0d5c3a] hover:text-[#0a482e] hover:underline transition cursor-pointer"
             >
               Sign In
             </Link>
           </div>
 
-          <p className="mt-6 text-center text-xs text-slate-400">
-            © {new Date().getFullYear()} Refurbinics. All rights reserved.
-          </p>
-          <p className="mt-1 text-center text-xs text-slate-500">
-            Developed by{' '}
-            <span className="font-bold text-blue-600">Eswincha</span>{' '}
-            <span className="font-bold text-red-600">Technologies</span>
+          <p className="mt-8 text-center text-xs text-slate-400">
+            © {new Date().getFullYear()} Refurbnics. All rights reserved.
           </p>
         </div>
       </div>

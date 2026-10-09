@@ -196,10 +196,14 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* New accounts are created by a signed-in Super Admin (User
-                Accounts / Create Super Admin), not from the public login page. */}
             <div className="mt-6 text-center text-sm text-[#4b5563]">
-              Need an account? Ask your Refurbnics administrator.
+              Don't have an account?{' '}
+              <Link
+                to="/register"
+                className="font-bold text-[#0d5c3a] hover:text-[#0a482e] hover:underline transition"
+              >
+                Create an account
+              </Link>
             </div>
 
             {/* Footer Copyright */}
@@ -425,6 +429,16 @@ export default function LoginPage() {
               <div className="pt-2 flex items-center justify-center gap-1.5 text-xs font-medium text-slate-400">
                 <FiLock className="h-3 w-3" />
                 <span>Client &amp; staff access</span>
+              </div>
+
+              <div className="mt-4 text-center text-xs text-slate-600">
+                Don't have an account?{' '}
+                <Link
+                  to="/register"
+                  className="font-bold text-[#0a4d3c] hover:underline"
+                >
+                  Create an account
+                </Link>
               </div>
             </form>
           </div>
