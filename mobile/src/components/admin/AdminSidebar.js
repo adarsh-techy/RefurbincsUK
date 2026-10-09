@@ -28,6 +28,7 @@ const NAV_GROUPS = [
       { key: 'fleet', label: 'Battery Fleet', screen: 'Batteries', params: { status: '', search: '' } },
       { key: 'scan', label: 'Scan Battery', screen: 'Scan' },
       { key: 'qr', label: 'QR Codes (Generate)', screen: 'GenerateQr' },
+      { key: 'rfid', label: 'RFID Assignment', screen: 'RfidAssignment' },
       { key: 'repairs', label: 'Repairs', screen: 'Repairs', permission: 'repairs' },
       { key: 'returns', label: 'Returns Dispatch', screen: 'Returns', permission: 'returns' },
     ],

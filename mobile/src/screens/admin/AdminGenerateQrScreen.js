@@ -21,6 +21,8 @@ export default function AdminGenerateQrScreen() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
   const [result, setResult] = useState(null);
+  const [mode, setMode] = useState('bulk'); // individual | bulk (same tabs as the web page)
+  const [serial, setSerial] = useState('');
 
   useEffect(() => {
     apiClient.get('/clients')
@@ -43,7 +45,26 @@ export default function AdminGenerateQrScreen() {
   const padLen = Math.max(BATTERY_NUMBER_DIGITS, String(to).length);
   const preview = useMemo(() => (prefix ? `${prefix}-${pad(from, padLen)}  →  ${prefix}-${pad(to, padLen)}` : '—'), [prefix, from, to, padLen]);
 
+  async function generateOne() {
+    setError(null);
+    setResult(null);
+    if (!client) { setError('Select a client first.'); return; }
+    setSubmitting(true);
+    try {
+      const code = `${prefix}-${pad(suggestedStart, BATTERY_NUMBER_DIGITS)}`;
+      const { data } = await apiClient.post('/batteries/generate', { clientName: client.name, batteryCode: code, serialNumber: serial.trim() || undefined });
+      setResult({ message: 'Battery created', firstCode: data.battery_code, lastCode: data.battery_code, count: 1 });
+      setSerial('');
+      setSuggestedStart((x) => x + 1);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function generate() {
+    if (mode === 'individual') return generateOne();
     setError(null);
     setResult(null);
     if (!client) { setError('Select a client first.'); return; }
@@ -67,12 +88,16 @@ export default function AdminGenerateQrScreen() {
 
   return (
     <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-4 pb-16 gap-4" keyboardShouldPersistTaps="handled">
-      <View className="rounded-3xl border border-slate-200 bg-white p-4">
-        <Text className="text-base font-extrabold text-slate-900">Bulk generate battery IDs</Text>
-        <Text className="mt-0.5 text-xs text-slate-500">
-          Creates the battery records and their QR codes. Print the QR sheet from the web admin.
-        </Text>
+      <View className="flex-row gap-1 rounded-2xl border border-violet-200 bg-violet-50/60 p-1">
+        {[['individual', 'Individual QR Code'], ['bulk', 'Bulk Generation']].map(([id, label]) => (
+          <TouchableOpacity key={id} onPress={() => { setMode(id); setResult(null); setError(null); }} className={`flex-1 items-center rounded-xl py-2.5 ${mode === id ? 'bg-violet-600' : ''}`}>
+            <Text className={`text-xs font-bold ${mode === id ? 'text-white' : 'text-slate-500'}`}>{label}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
+      <Text className="text-xs text-slate-500">
+        {mode === 'individual' ? 'Creates one battery with the next free ID for the client.' : 'Creates many batteries at once.'} Print the QR codes from the web admin.
+      </Text>
 
       <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">1. Client</Text>
       <View className="flex-row flex-wrap gap-2">
@@ -87,6 +112,14 @@ export default function AdminGenerateQrScreen() {
         {clients.length === 0 && <Text className="text-xs text-slate-400">Loading clients…</Text>}
       </View>
 
+      {mode === 'individual' ? (
+        <View>
+          <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">2. Battery number (serial, optional)</Text>
+          <TextInput value={serial} onChangeText={setSerial} placeholder="Manufacturer serial" placeholderTextColor="#94a3b8" className="mt-2 rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base text-slate-900" />
+          <Text className="mt-2 text-xs text-slate-500">{client ? `New ID: ${prefix}-${pad(suggestedStart, BATTERY_NUMBER_DIGITS)}` : 'Pick a client to see the next ID'}</Text>
+        </View>
+      ) : (
+        <>
       <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">2. How many</Text>
       <View className="flex-row gap-2">
         <View className="flex-1">
@@ -99,11 +132,16 @@ export default function AdminGenerateQrScreen() {
         </View>
       </View>
 
+        </>
+      )}
+
+      {mode === 'bulk' && (
       <View className="rounded-2xl border border-violet-200 bg-violet-50 p-4">
         <Text className="text-[10px] font-bold uppercase tracking-wide text-violet-700">Preview</Text>
         <Text className="mt-1 text-sm font-black text-violet-900">{preview}</Text>
         <Text className="mt-0.5 text-[11px] text-violet-700">{client ? `${n.toLocaleString()} batteries for ${client.name}` : 'Pick a client to see the ID range'}</Text>
       </View>
+      )}
 
       {error && (
         <View className="rounded-2xl border border-red-200 bg-red-50 p-3">

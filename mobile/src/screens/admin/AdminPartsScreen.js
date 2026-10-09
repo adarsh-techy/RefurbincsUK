@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { FlatList, Modal, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
@@ -13,6 +14,7 @@ import Icon from '../../components/ui/Icon';
 const money = (v) => `£${Number(v || 0).toFixed(2)}`;
 
 export default function AdminPartsScreen() {
+  const navigation = useNavigation();
   const user = useSelector((s) => s.auth.user);
   const canRestock = user?.role === 'super_admin' || (user?.permissions || []).includes('parts');
   const [parts, setParts] = useState([]);
@@ -42,6 +44,14 @@ export default function AdminPartsScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) { firstFocus.current = false; return; }
+      load();
+    }, [load])
+  );
 
   const q = search.trim().toLowerCase();
   const visible = parts.filter((p) => {
@@ -74,6 +84,9 @@ export default function AdminPartsScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
+        <TouchableOpacity onPress={() => navigation.navigate('AdminForm', { kind: 'part' })} className="mb-2.5 items-center rounded-2xl bg-emerald-600 py-2.5">
+          <Text className="text-sm font-bold text-white">+ Add part</Text>
+        </TouchableOpacity>
         <View className="flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
           <Icon name="search" color="#94a3b8" size={16} />
           <TextInput
@@ -115,7 +128,7 @@ export default function AdminPartsScreen() {
         renderItem={({ item: p }) => {
           const out = Number(p.quantity) <= 0;
           return (
-            <View className={`rounded-2xl border bg-white p-3.5 ${out ? 'border-red-300' : 'border-slate-200'}`}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('AdminDetail', { kind: 'part', id: p.id, row: p })} className={`rounded-2xl border bg-white p-3.5 ${out ? 'border-red-300' : 'border-slate-200'}`}>
               <View className="flex-row items-start justify-between gap-2">
                 <View className="flex-1">
                   <Text className="text-sm font-extrabold text-slate-900">{p.name}</Text>
@@ -133,7 +146,7 @@ export default function AdminPartsScreen() {
                   </TouchableOpacity>
                 )}
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />

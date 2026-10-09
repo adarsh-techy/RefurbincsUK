@@ -17,6 +17,7 @@ import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import ImageViewerModal from '../../components/ui/ImageViewerModal';
+import BatteryAdminActions from '../../components/admin/BatteryAdminActions';
 import formatDuration from '../../utils/format-duration';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { isIntakeUnverified as intakeIsUnverified } from '../../utils/intake';
@@ -2387,6 +2388,10 @@ export default function BatteryDetailScreen() {
             </View>
           )}
         </>
+      )}
+
+      {currentUser?.role === 'super_admin' && (
+        <BatteryAdminActions battery={battery} onChanged={load} onDeleted={() => navigation.goBack()} />
       )}
 
       {/* If scanned for service by staff/technician, keep view clean & action-oriented */}

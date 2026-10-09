@@ -64,6 +64,8 @@ export function AdminReturnsScreen() {
   const navigation = useNavigation();
   return (
     <AdminListScreen
+      addLabel="New return dispatch"
+      onAdd={() => navigation.navigate('AdminReturnCreate')}
       endpoint="/returns"
       icon="truck"
       searchKeys={['truck_number', 'driver_name', 'client_name']}
@@ -77,7 +79,7 @@ export function AdminReturnsScreen() {
       subtitle={(r) => `${r.client_name || 'Client'} · ${r.driver_name || 'Driver'}`}
       badge={(r) => (r.status === 'verified' || r.verified_at ? { label: 'Received by client', tone: 'good' } : { label: 'In transit', tone: 'warning' })}
       meta={(r) => [`${r.battery_count || 0} batteries · dispatched ${day(r.returned_at)}`, r.document_name ? `Document: ${r.document_name}` : null]}
-      onPress={(r) => navigation.navigate('Batteries', { search: r.client_name || '', status: 'returned' })}
+      onPress={(r) => navigation.navigate('AdminDetail', { kind: 'return', id: r.id })}
       empty="No return dispatches"
     />
   );
@@ -85,8 +87,12 @@ export function AdminReturnsScreen() {
 
 // ── Services & rates ──────────────────────────────────────────────────────
 export function AdminServicesScreen() {
+  const navigation = useNavigation();
   return (
     <AdminListScreen
+      addLabel="Add service"
+      onAdd={() => navigation.navigate('AdminForm', { kind: 'service' })}
+      onPressRow={(row) => navigation.navigate('AdminForm', { kind: 'service', row })}
       endpoint="/services"
       icon="flask"
       searchKeys={['name', 'description']}
@@ -101,8 +107,12 @@ export function AdminServicesScreen() {
 
 // ── Issue reasons ─────────────────────────────────────────────────────────
 export function AdminIssueReasonsScreen() {
+  const navigation = useNavigation();
   return (
     <AdminListScreen
+      addLabel="Add reason"
+      onAdd={() => navigation.navigate('AdminForm', { kind: 'issueReason' })}
+      onPressRow={(row) => navigation.navigate('AdminForm', { kind: 'issueReason', row })}
       endpoint="/issue-reasons"
       icon="alertTriangle"
       searchKeys={['label']}
@@ -116,8 +126,12 @@ export function AdminIssueReasonsScreen() {
 
 // ── Recycle shipments (all partners) ──────────────────────────────────────
 export function AdminRecycleScreen() {
+  const navigation = useNavigation();
   return (
     <AdminListScreen
+      addLabel="New recycle shipment"
+      onAdd={() => navigation.navigate('AdminRecycleCreate')}
+      onPress={(r) => navigation.navigate('AdminDetail', { kind: 'recycle', id: r.id })}
       endpoint="/recycle"
       icon="package"
       searchKeys={['vehicle_number', 'driver_name', 'recycle_client_name']}
@@ -135,6 +149,7 @@ export function AdminRecycleScreen() {
 
 // ── Invoices ──────────────────────────────────────────────────────────────
 export function AdminInvoicesScreen() {
+  const navigation = useNavigation();
   async function openPdf(inv) {
     const token = await AsyncStorage.getItem('token');
     const url = `${apiClient.defaults.baseURL}/invoices/${inv.id}/download?token=${encodeURIComponent(token || '')}`;
@@ -142,6 +157,9 @@ export function AdminInvoicesScreen() {
   }
   return (
     <AdminListScreen
+      addLabel="Upload invoice"
+      onAdd={() => navigation.navigate('AdminForm', { kind: 'invoice' })}
+      onPressRow={(row) => navigation.navigate('AdminForm', { kind: 'invoice', row })}
       endpoint="/invoices"
       icon="card"
       searchKeys={['invoice_number', 'client_name', 'status']}
@@ -237,6 +255,7 @@ export function AdminCertificatesScreen() {
 
 // ── User accounts ─────────────────────────────────────────────────────────
 export function AdminUsersScreen() {
+  const navigation = useNavigation();
   const me = useSelector((s) => s.auth.user);
   function toggle(u) {
     return new Promise((resolve, reject) => {
@@ -253,6 +272,9 @@ export function AdminUsersScreen() {
   }
   return (
     <AdminListScreen
+      addLabel="Add admin user"
+      onAdd={() => navigation.navigate('AdminForm', { kind: 'user' })}
+      onPressRow={(row) => (['admin', 'super_admin'].includes(row.role) ? navigation.navigate('AdminForm', { kind: 'user', row }) : null)}
       endpoint="/users"
       params={{ role: 'all' }}  // the API lists only admin accounts unless asked for all
       icon="user"

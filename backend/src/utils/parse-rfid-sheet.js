@@ -1,5 +1,7 @@
+const path = require('path');
 const { Readable } = require('stream');
 const ExcelJS = require('exceljs');
+const JSZip = require('jszip');
 
 // Reads an RFID assignment spreadsheet (.xlsx or .csv): one row per battery
 // with its tag. Header names are matched loosely so a sheet exported from a
@@ -58,6 +60,30 @@ function sniffDelimiter(buffer) {
     : ',';
 }
 
+const SPREADSHEET_NS = 'http://schemas.openxmlformats.org/spreadsheetml/2006/main';
+
+async function normalizeXlsx(buffer) {
+  const zip = await JSZip.loadAsync(buffer);
+  for (const name of Object.keys(zip.files)) {
+    if (zip.files[name].dir || !/\.(xml|rels)$/i.test(name)) continue;
+    let xml = (await zip.file(name).async('string')).replace(/^﻿/, '');
+    if (name.endsWith('.rels')) {
+      // "xl/_rels/workbook.xml.rels" targets are relative to "xl"; "_rels/.rels" to the root
+      const base = path.posix.dirname(path.posix.dirname(name));
+      xml = xml.replace(/Target="\/([^"]*)"/g, (_, t) => `Target="${base === '.' ? t : path.posix.relative(base, t)}"`);
+    }
+    const prefixed = xml.match(new RegExp(`xmlns:([A-Za-z0-9_]+)="${SPREADSHEET_NS.replace(/[./]/g, '\\$&')}"`));
+    if (prefixed) {
+      const p = prefixed[1];
+      xml = xml
+        .replace(new RegExp(`<(/?)${p}:`, 'g'), '<$1')
+        .replace(`xmlns:${p}="${SPREADSHEET_NS}"`, `xmlns="${SPREADSHEET_NS}"`);
+    }
+    zip.file(name, xml);
+  }
+  return zip.generateAsync({ type: 'nodebuffer' });
+}
+
 async function loadWorksheet(buffer, filename) {
   const workbook = new ExcelJS.Workbook();
   if (/\.csv$/i.test(filename || '')) {
@@ -65,7 +91,18 @@ async function loadWorksheet(buffer, filename) {
     const clean = buffer.length >= 3 && buffer[0] === 0xef && buffer[1] === 0xbb && buffer[2] === 0xbf ? buffer.subarray(3) : buffer;
     await workbook.csv.read(Readable.from(clean), { parserOptions: { delimiter: sniffDelimiter(clean) } });
   } else {
-    await workbook.xlsx.load(buffer);
+    try {
+      await workbook.xlsx.load(buffer);
+    } catch {
+      // Valid .xlsx written by other tools (.NET OpenXML SDK, some generators)
+      // can use absolute part paths and an "x:" namespace prefix, which exceljs
+      // can't read. Rewrite those to the plain form Excel itself writes, retry.
+      try {
+        await workbook.xlsx.load(await normalizeXlsx(buffer));
+      } catch {
+        throw new Error('Could not read this .xlsx file. Open it in Excel or Google Sheets, save it again as .xlsx (or .csv) and upload that.');
+      }
+    }
   }
   const worksheet = workbook.worksheets[0];
   if (!worksheet) throw new Error('File has no readable sheet');

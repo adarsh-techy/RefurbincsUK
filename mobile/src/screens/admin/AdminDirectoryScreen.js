@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import { useRef } from 'react';
 import apiClient from '../../services/api-client';
 import { Badge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
@@ -48,6 +49,14 @@ export default function AdminDirectoryScreen() {
     load();
   }, [load]);
 
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) { firstFocus.current = false; return; }
+      load();
+    }, [load])
+  );
+
   useEffect(() => {
     if (route.params?.tab) setTab(route.params.tab);
   }, [route.params?.tab]);
@@ -64,6 +73,12 @@ export default function AdminDirectoryScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
+        <TouchableOpacity
+          onPress={() => navigation.navigate('AdminForm', { kind: tab === 'staff' ? 'staff' : tab === 'recyclers' ? 'recycleClient' : 'client' })}
+          className="mb-2.5 items-center rounded-2xl bg-emerald-600 py-2.5"
+        >
+          <Text className="text-sm font-bold text-white">+ Add {tab === 'staff' ? 'staff member' : tab === 'recyclers' ? 'recycling partner' : 'fleet client'}</Text>
+        </TouchableOpacity>
         <View className="flex-row rounded-2xl bg-slate-100 p-1">
           {TABS.map((t) => {
             const active = tab === t.id;
@@ -113,7 +128,7 @@ export default function AdminDirectoryScreen() {
         renderItem={({ item: row }) =>
           tab !== 'staff' ? (
             <TouchableOpacity
-              onPress={() => navigation.navigate('Batteries', { search: row.name })}
+              onPress={() => navigation.navigate('AdminDetail', { kind: tab === 'recyclers' ? 'recycleClient' : 'client', id: row.id, row })}
               className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5"
             >
               <View className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
@@ -133,7 +148,7 @@ export default function AdminDirectoryScreen() {
               </View>
             </TouchableOpacity>
           ) : (
-            <View className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5">
+            <TouchableOpacity onPress={() => navigation.navigate('AdminDetail', { kind: 'staff', id: row.id, row })} className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5">
               <View className={`h-10 w-10 items-center justify-center rounded-xl ${row.role === 'supervisor' ? 'bg-red-600' : 'bg-blue-600'}`}>
                 <Text className="text-sm font-extrabold text-white">{initials(row.name)}</Text>
               </View>
@@ -149,7 +164,7 @@ export default function AdminDirectoryScreen() {
                 </Text>
                 {row.active === false && <Badge tone="critical">Inactive</Badge>}
               </View>
-            </View>
+            </TouchableOpacity>
           )
         }
       />

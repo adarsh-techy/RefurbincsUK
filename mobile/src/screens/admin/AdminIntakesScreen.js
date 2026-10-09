@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Alert, FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import { Badge } from '../../components/ui/Badge';
@@ -67,6 +67,14 @@ export default function AdminIntakesScreen() {
     return () => clearTimeout(debounceRef.current);
   }, [fetchPage, search]);
 
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) { firstFocus.current = false; return; }
+      fetchPage(0, true);
+    }, [fetchPage])
+  );
+
   function loadMore() {
     if (loadingMore || loading || !hasMore) return;
     setLoadingMore(true);
@@ -104,6 +112,9 @@ export default function AdminIntakesScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
+        <TouchableOpacity onPress={() => navigation.navigate('AdminIntakeCreate')} className="mb-2.5 items-center rounded-2xl bg-emerald-600 py-2.5">
+          <Text className="text-sm font-bold text-white">+ New truck intake</Text>
+        </TouchableOpacity>
         <View className="flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
           <Icon name="search" color="#94a3b8" size={16} />
           <TextInput
@@ -170,7 +181,7 @@ export default function AdminIntakesScreen() {
         renderItem={({ item: t }) => {
           const verified = isVerified(t);
           return (
-            <View className={`rounded-2xl border bg-white p-4 ${verified ? 'border-slate-200' : 'border-amber-300'}`}>
+            <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('AdminDetail', { kind: 'intake', id: t.id })} className={`rounded-2xl border bg-white p-4 ${verified ? 'border-slate-200' : 'border-amber-300'}`}>
               <View className="flex-row items-start justify-between gap-2">
                 <View className="flex-1">
                   <Text className="text-base font-extrabold text-slate-900">Truck {t.truck_number || `#${t.id}`}</Text>
@@ -202,7 +213,7 @@ export default function AdminIntakesScreen() {
                   </TouchableOpacity>
                 ) : null}
               </View>
-            </View>
+            </TouchableOpacity>
           );
         }}
       />

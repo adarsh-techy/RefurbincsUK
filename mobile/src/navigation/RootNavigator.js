@@ -16,6 +16,10 @@ import AdminDirectoryScreen from '../screens/admin/AdminDirectoryScreen';
 import AdminPartsScreen from '../screens/admin/AdminPartsScreen';
 import AdminFinanceScreen from '../screens/admin/AdminFinanceScreen';
 import AdminGenerateQrScreen from '../screens/admin/AdminGenerateQrScreen';
+import AdminFormScreen from '../screens/admin/AdminFormScreen';
+import AdminDetailScreen from '../screens/admin/AdminDetailScreen';
+import AdminRfidScreen from '../screens/admin/AdminRfidScreen';
+import { AdminIntakeCreateScreen, AdminReturnCreateScreen, AdminRecycleCreateScreen } from '../screens/admin/AdminCreateFlows';
 import {
   AdminRepairsScreen, AdminReturnsScreen, AdminServicesScreen, AdminIssueReasonsScreen,
   AdminRecycleScreen, AdminInvoicesScreen, AdminRatingsScreen, AdminCertificatesScreen,
@@ -41,6 +45,12 @@ const ADMIN_SCREENS = [
   ['Users', AdminUsersScreen, 'User Accounts'],
   ['AuditLog', AdminAuditLogScreen, 'Audit Log'],
   ['Trash', AdminTrashScreen, 'Trash Bin'],
+  ['AdminForm', AdminFormScreen, ''],
+  ['AdminDetail', AdminDetailScreen, 'Details'],
+  ['RfidAssignment', AdminRfidScreen, 'RFID Assignment'],
+  ['AdminIntakeCreate', AdminIntakeCreateScreen, 'New Truck Intake'],
+  ['AdminReturnCreate', AdminReturnCreateScreen, 'New Return Dispatch'],
+  ['AdminRecycleCreate', AdminRecycleCreateScreen, 'New Recycle Shipment'],
 ];
 import MainTabs from './MainTabs';
 import { navigationRef } from './navigationRef';

@@ -6,7 +6,7 @@ import { login } from './auth-slice';
 import loginImage from '../../assets/logpage.png';
 import logo from '../../assets/REFURBNICS.png';
 import SplashIntro from './SplashIntro';
-import { DEMO_LOGIN_ENABLED, DEMO_CREDENTIALS } from '../../config/demo-credentials';
+import { DEMO_LOGIN_ENABLED, DEMO_CREDENTIALS, MOBILE_DEMO_CREDENTIALS } from '../../config/demo-credentials';
 
 export default function LoginPage() {
   const defaultEmail = DEMO_LOGIN_ENABLED
@@ -256,7 +256,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => {
                     setEmail('akhil@gmail.com');
-                    setPassword('12345678');
+                    setPassword(MOBILE_DEMO_CREDENTIALS.akhil.password);
                   }}
                   className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition cursor-pointer ${
                     email === 'akhil@gmail.com'
@@ -282,7 +282,7 @@ export default function LoginPage() {
                   type="button"
                   onClick={() => {
                     setEmail('akshay@gmail.com');
-                    setPassword('12345678');
+                    setPassword(MOBILE_DEMO_CREDENTIALS.akshay.password);
                   }}
                   className={`flex items-center gap-2.5 rounded-2xl border p-2.5 text-left transition cursor-pointer ${
                     email === 'akshay@gmail.com'

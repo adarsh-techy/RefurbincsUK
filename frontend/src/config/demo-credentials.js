@@ -10,13 +10,17 @@
 export const DEMO_LOGIN_ENABLED =
   import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
+// The repo is public, so no password lives in source: set VITE_DEMO_PASSWORD
+// in your local (git-ignored) .env to make the quick-fill buttons log in.
+const DEMO_PASSWORD = import.meta.env.VITE_DEMO_PASSWORD || '';
+
 export const DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
   superAdmin: {
     id: 'superAdmin',
     label: 'Super Admin',
     icon: '👑',
     email: import.meta.env.VITE_DEMO_SUPERADMIN_EMAIL || 'superadmin@gmail.com',
-    password: import.meta.env.VITE_DEMO_SUPERADMIN_PASSWORD || '12345678',
+    password: DEMO_PASSWORD,
     tone: 'indigo',
   },
   client: {
@@ -24,7 +28,7 @@ export const DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
     label: 'HumanForest',
     icon: '⚡',
     email: import.meta.env.VITE_DEMO_CLIENT_EMAIL || 'humanforest@gmail.com',
-    password: import.meta.env.VITE_DEMO_CLIENT_PASSWORD || '12345678',
+    password: DEMO_PASSWORD,
     tone: 'emerald',
   },
   recycle: {
@@ -32,7 +36,7 @@ export const DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
     label: 'Recycle Client',
     icon: '♻️',
     email: import.meta.env.VITE_DEMO_RECYCLE_EMAIL || 'recycle@gmail.com',
-    password: import.meta.env.VITE_DEMO_RECYCLE_PASSWORD || '12345678',
+    password: DEMO_PASSWORD,
     tone: 'teal',
   },
 };
@@ -44,7 +48,7 @@ export const MOBILE_DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
     icon: '🔧',
     role: 'Technician',
     email: 'akhil@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     tone: 'violet',
   },
   akshay: {
@@ -53,7 +57,7 @@ export const MOBILE_DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
     icon: '⚡',
     role: 'Supervisor',
     email: 'akshay@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     tone: 'blue',
   },
 };

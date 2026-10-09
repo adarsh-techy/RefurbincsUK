@@ -66,13 +66,17 @@ function EyeIcon({ open }) {
 
 // Demo quick-fill accounts exist only in development builds; a release APK
 // gets an empty list so no working credentials ship inside the app.
+// No password in source (the repo is public): set EXPO_PUBLIC_DEMO_PASSWORD
+// in mobile/.env (git-ignored) to make the quick-fill buttons log in.
+const DEMO_PASSWORD = process.env.EXPO_PUBLIC_DEMO_PASSWORD || '';
+
 const PRESETS = !__DEV__ ? [] : [
   {
     id: 'superadmin',
     name: 'Super Admin',
     role: 'Administrator',
     email: 'superadmin@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     initials: 'SA',
     iconBg: '#1e3a8a',
     activeBg: '#eff6ff',
@@ -83,7 +87,7 @@ const PRESETS = !__DEV__ ? [] : [
     name: 'HumanForest',
     role: 'Fleet Client',
     email: 'humanforest@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     initials: 'HF',
     iconBg: '#065f46',
     activeBg: '#ecfdf5',
@@ -94,7 +98,7 @@ const PRESETS = !__DEV__ ? [] : [
     name: 'Recycle Client',
     role: 'Recycling Partner',
     email: 'recycle@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     initials: 'RC',
     iconBg: '#0f766e',
     activeBg: '#f0fdfa',
@@ -105,7 +109,7 @@ const PRESETS = !__DEV__ ? [] : [
     name: 'Akhil Tech',
     role: 'Technician',
     email: 'akhil@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     initials: 'AT',
     iconBg: '#0a4d3c',
     activeBg: '#f0f6f3',
@@ -116,7 +120,7 @@ const PRESETS = !__DEV__ ? [] : [
     name: 'Akshay Sup',
     role: 'Supervisor',
     email: 'akshay@gmail.com',
-    password: '12345678',
+    password: DEMO_PASSWORD,
     initials: 'AS',
     iconBg: '#52796f',
     activeBg: '#f2f6f4',
@@ -128,7 +132,7 @@ export default function LoginScreen() {
   const dispatch = useDispatch();
   const { status, error } = useSelector((state) => state.auth);
   const [email, setEmail] = useState(__DEV__ ? 'superadmin@gmail.com' : '');
-  const [password, setPassword] = useState(__DEV__ ? '12345678' : '');
+  const [password, setPassword] = useState(__DEV__ ? DEMO_PASSWORD : '');
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../services/api-client';
 import { Badge } from '../ui/Badge';
@@ -46,6 +47,9 @@ export default function AdminListScreen({
   icon = 'grid',
   keyField = 'id',
   filters, // [{ id, label, test(row) }] local filter chips
+  addLabel, // shows an "+ Add …" button when set
+  onAdd, // (reload) => void
+  onPressRow, // (row, reload) => void — like onPress but gets reload
 }) {
   const [rows, setRows] = useState([]);
   const [extra, setExtra] = useState(null); // the non-list part of the response (stats etc.)
@@ -107,6 +111,15 @@ export default function AdminListScreen({
     fetchPage(0, true);
   };
 
+  // Coming back from a create/edit form: refresh quietly
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) { firstFocus.current = false; return; }
+      fetchPage(0, true);
+    }, [fetchPage])
+  );
+
   function loadMore() {
     if (!paged || loadingMore || loading || !hasMore) return;
     setLoadingMore(true);
@@ -143,8 +156,13 @@ export default function AdminListScreen({
 
   return (
     <View className="flex-1 bg-slate-50">
-      {(searchKeys.length > 0 || filters) && (
+      {(searchKeys.length > 0 || filters || addLabel) && (
         <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
+          {addLabel && onAdd && (
+            <TouchableOpacity onPress={() => onAdd(reload)} className="mb-2.5 items-center rounded-2xl bg-emerald-600 py-2.5">
+              <Text className="text-sm font-bold text-white">+ {addLabel}</Text>
+            </TouchableOpacity>
+          )}
           {searchKeys.length > 0 && (
             <View className="flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
               <Icon name="search" color="#94a3b8" size={16} />
@@ -219,10 +237,11 @@ export default function AdminListScreen({
           const b = badge ? badge(row) : null;
           const metaLines = meta ? [].concat(meta(row)).filter(Boolean) : [];
           const rowActions = actions ? actions(row).filter(Boolean) : [];
-          const Wrapper = onPress ? TouchableOpacity : View;
+          const tap = onPressRow ? () => onPressRow(row, reload) : onPress ? () => onPress(row) : undefined;
+          const Wrapper = tap ? TouchableOpacity : View;
           return (
             <Wrapper
-              onPress={onPress ? () => onPress(row) : undefined}
+              onPress={tap}
               activeOpacity={0.8}
               className="rounded-2xl border border-slate-200 bg-white p-3.5"
             >
