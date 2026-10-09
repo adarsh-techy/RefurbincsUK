@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import RfidScanButton from '../../../components/ui/primitives/RfidScanButton';
 import { Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import * as XLSX from 'xlsx';
@@ -10,6 +11,8 @@ import AlertModal from '../../../components/ui/overlays/AlertModal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import { ClientStatusBadge } from '../../../components/ui/primitives/Badge';
 import extractBatteryCode from '../../../utils/extract-battery-code';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+
 import { useTheme } from '../../../context/ThemeContext';
 import {
   clearLegacySortGroups,
@@ -24,6 +27,11 @@ import {
   FiCheckCircle,
   FiTrash2,
   FiArrowRight,
+  FiSearch,
+  FiCamera,
+  FiPlus,
+  FiAlertCircle,
+  FiX,
 } from 'react-icons/fi';
 
 const formInputClasses =
@@ -492,7 +500,13 @@ function ClientBatterySortPage() {
 
   function addBatteryToActiveGroup(rawInput) {
     if (!activeGroup) return;
-    const extracted = extractBatteryCode(rawInput);
+    // QR link, battery code, or an RFID tag read by a reader
+    const resolved = resolveBatteryInput(rawInput, registeredBatteries);
+    if (resolved.unassignedTag) {
+      setAddError(UNASSIGNED_TAG_MESSAGE);
+      return;
+    }
+    const extracted = resolved.code;
     if (!extracted) {
       setAddError('Please enter a valid battery code or scan a QR code.');
       return;
@@ -632,32 +646,70 @@ function ClientBatterySortPage() {
         </div>
 
         {/* Scan / Type Add Box */}
-        <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-900">
-          <h3 className="mb-1 text-sm font-semibold text-slate-800 dark:text-neutral-100">
-            Scan or Type a Battery to Sort Here
-          </h3>
-          <p className="mb-3 text-xs text-slate-500 dark:text-neutral-400">
-            Use a handheld scanner (types straight into the box), your camera, or type the
-            battery code / serial directly. Pick from your registered fleet for a quick match.
-          </p>
+        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-surface-700/80 dark:bg-surface-900 transition-all">
+          {/* Header */}
+          <div className="mb-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
+            <div>
+              <div className="flex items-center gap-2">
+                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                  <FiSearch className="h-4 w-4" />
+                </div>
+                <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100">
+                  Scan or Type a Battery to Sort
+                </h3>
+              </div>
+              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                Use a handheld scanner (types directly into the box), camera, or type the code / serial.
+              </p>
+            </div>
+            {availableFleetBatteries.length > 0 && (
+              <div className="flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-slate-100 dark:bg-surface-800 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-neutral-300 border border-slate-200/60 dark:border-white/5">
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span>{availableFleetBatteries.length} available to sort</span>
+              </div>
+            )}
+          </div>
 
-          <div className="flex gap-2">
+          {/* Input & Action Buttons Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
             <div ref={scanBoxRef} className="relative flex-1">
-              <input
-                ref={scanInputRef}
-                type="text"
-                value={scanInput}
-                onChange={(e) => {
-                  setScanInput(e.target.value.toUpperCase());
-                  setShowSuggestions(true);
-                }}
-                onKeyDown={handleScanKeyDown}
-                onFocus={() => setShowSuggestions(true)}
-                onClick={() => setShowSuggestions(true)}
-                placeholder="Scan or type battery code / serial…"
-                autoComplete="off"
-                className={formInputClasses}
-              />
+              <div className="relative flex items-center">
+                <span className="pointer-events-none absolute left-3.5 text-slate-400 dark:text-neutral-500">
+                  <FiSearch className="h-4 w-4" />
+                </span>
+                <input
+                  data-rfid-scan="client-sort"
+                  ref={scanInputRef}
+                  type="text"
+                  value={scanInput}
+                  onChange={(e) => {
+                    setScanInput(e.target.value.toUpperCase());
+                    if (addError) setAddError(null);
+                    setShowSuggestions(true);
+                  }}
+                  onKeyDown={handleScanKeyDown}
+                  onFocus={() => setShowSuggestions(true)}
+                  onClick={() => setShowSuggestions(true)}
+                  placeholder="Scan or type battery code / serial…"
+                  autoComplete="off"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-9 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden focus:ring-3 focus:ring-blue-500/15 dark:border-surface-700 dark:bg-surface-800/80 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:bg-surface-800 dark:focus:ring-blue-400/20 transition-all"
+                />
+                {scanInput.trim().length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setScanInput('');
+                      if (addError) setAddError(null);
+                      scanInputRef.current?.focus();
+                    }}
+                    className="absolute right-3 rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-surface-700 dark:hover:text-neutral-200 transition-colors"
+                    title="Clear"
+                  >
+                    <FiX className="h-3.5 w-3.5" />
+                  </button>
+                )}
+              </div>
+
               {showSuggestions && (
                 <div
                   onMouseDown={(e) => e.preventDefault()}
@@ -722,28 +774,60 @@ function ClientBatterySortPage() {
                 </div>
               )}
             </div>
-            <button
-              type="button"
-              onClick={() => addBatteryToActiveGroup(scanInput)}
-              style={{ backgroundColor: accent }}
-              className="rounded-md px-4 py-2.5 text-sm font-bold text-white shadow-xs hover:opacity-90"
-            >
-              Add
-            </button>
-            <button
-              type="button"
-              onClick={() => setCameraOpen(true)}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-bold text-slate-700 shadow-xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
-              title="Scan with camera"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-                <circle cx="12" cy="13" r="3" />
-              </svg>
-            </button>
+
+            {/* Buttons Group */}
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                type="button"
+                onClick={() => addBatteryToActiveGroup(scanInput)}
+                disabled={!scanInput.trim()}
+                style={{ backgroundColor: scanInput.trim() ? accent : undefined }}
+                className={`flex items-center justify-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-xs transition-all ${
+                  scanInput.trim()
+                    ? 'hover:opacity-95 active:scale-98 cursor-pointer'
+                    : 'bg-slate-300 dark:bg-surface-700 text-slate-500 dark:text-neutral-400 cursor-not-allowed opacity-70'
+                }`}
+              >
+                <FiPlus className="h-4 w-4" />
+                <span>Add</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCameraOpen(true)}
+                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 active:scale-98 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-all cursor-pointer"
+                title="Scan with camera"
+              >
+                <FiCamera className="h-4 w-4 text-slate-600 dark:text-neutral-300" />
+                <span className="text-xs font-bold">Camera</span>
+              </button>
+            </div>
           </div>
 
-          {addError && <p className="mt-2 text-xs font-semibold text-red-600 dark:text-red-400">{addError}</p>}
+          {/* Helper / RFID Bar */}
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-surface-800">
+            <RfidScanButton target="client-sort" className="mt-0" />
+            <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+              Press <kbd className="rounded border border-slate-200 bg-slate-100 px-1 py-0.5 font-mono text-[10px] text-slate-600 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-300">Enter</kbd> to add
+            </span>
+          </div>
+
+          {/* Error Message Alert */}
+          {addError && (
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-red-200/80 bg-red-50/90 px-3.5 py-2.5 text-xs font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300 animate-in fade-in duration-200">
+              <div className="flex items-center gap-2">
+                <FiAlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
+                <span>{addError}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setAddError(null)}
+                className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/50"
+              >
+                <FiX className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
         </div>
 
         {cameraOpen && (
