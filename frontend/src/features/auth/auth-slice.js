@@ -10,8 +10,8 @@ export const login = createAsyncThunk('auth/login', async ({ email, password }, 
   }
 });
 
-// TEMPORARY: pairs with the backend's temporary /auth/register endpoint.
-// Remove alongside RegisterPage once real admin management is in use.
+// Create Super Admin (signed-in super admins only — see auth.controller
+// register). The response only carries a token on a fresh-install bootstrap.
 export const register = createAsyncThunk(
   'auth/register',
   async ({ name, email, password, role }, { rejectWithValue }) => {
@@ -98,6 +98,9 @@ const authSlice = createSlice({
       })
       .addCase(register.fulfilled, (state, action) => {
         state.status = 'succeeded';
+        // A signed-in super admin creating another account keeps their own
+        // session; only the very first (bootstrap) account gets signed in.
+        if (!action.payload.token) return;
         state.user = action.payload.user;
         state.token = action.payload.token;
         state.authChecked = true;

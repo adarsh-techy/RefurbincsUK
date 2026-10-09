@@ -302,6 +302,7 @@ const NAV_GROUPS = [
       { to: '/truck-intakes', label: 'Truck Intake', icon: Icons.intake, permission: 'truck_intakes' },
       { to: '/batteries', label: 'Battery Fleet', icon: Icons.battery, end: true },
       { to: '/batteries-qr-code', label: 'Print QR Codes', icon: Icons.qrcode },
+      { to: '/rfid-assignment', label: 'RFID Assignment', icon: Icons.qrcode },
       { to: '/returns', label: 'Returns Dispatch', icon: Icons.returns, permission: 'returns' },
     ],
   },

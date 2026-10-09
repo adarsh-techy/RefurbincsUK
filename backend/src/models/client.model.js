@@ -291,6 +291,27 @@ const NOT_PACKABLE_STATUSES = new Set([
   'unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled',
 ]);
 
+// Scanner input for the client packing endpoints may be a battery code, a
+// serial number, or an RFID tag. A tag that isn't assigned to any battery is
+// refused outright — the old "create a new battery for an unknown code"
+// path must never turn a raw tag ID into a battery.
+const LOOKUP_BY_INPUT = `SELECT * FROM batteries
+  WHERE upper(battery_code) = upper($1)
+     OR (serial_number IS NOT NULL AND upper(serial_number) = upper($1))
+     OR (rfid_tag IS NOT NULL AND rfid_tag = upper(regexp_replace($1, '[^0-9A-Za-z]', '', 'g')))`;
+
+function looksLikeRfidTag(value) {
+  const v = String(value || '');
+  const clean = v.replace(/[^0-9A-Za-z]/g, '');
+  return clean.length >= 8 && !v.includes('-') && !/^[A-Za-z]{2,4}\d+$/.test(clean);
+}
+
+function rejectUnassignedTag(code) {
+  const err = new Error(`RFID tag ${code} is not assigned to any battery. Assign it on the RFID Assignment page first.`);
+  err.status = 400;
+  throw err;
+}
+
 async function assertClientCanPack(conn, battery, clientId, clientName) {
   let intake = null;
   if (battery.truck_intake_id) {
@@ -341,7 +362,7 @@ async function findMyBatteries(clientId, clientName, bucket) {
     const { rows } = await db.query(
       `WITH ${CLIENT_BATTERY_IDS_CTE}
        SELECT b.id, b.battery_code, b.serial_number, b.serial_number_added_by_role, b.serial_number_added_at,
-              b.status, b.notes, b.created_at, b.truck_intake_id,
+              b.status, b.notes, b.created_at, b.truck_intake_id, b.rfid_tag,
               ti.id AS intake_id, ti.truck_number, ti.driver_name, ti.intake_at, ti.status AS intake_status, ti.verified_at,
               last_repair.repaired_at AS last_repaired_at,
               ret.id AS return_id, ret.truck_number AS return_truck, ret.driver_name AS return_driver, ret.returned_at AS return_date,
@@ -390,7 +411,7 @@ async function findMyBatteries(clientId, clientName, bucket) {
                 ELSE b.status
               END AS status,
               b.status AS current_status,
-              b.notes, b.created_at, b.truck_intake_id,
+              b.notes, b.created_at, b.truck_intake_id, b.rfid_tag,
               ti.id AS intake_id, ti.truck_number, ti.driver_name, ti.intake_at, ti.status AS intake_status, ti.verified_at,
               last_repair.repaired_at AS last_repaired_at,
               last_return.return_id, last_return.return_truck, last_return.return_driver, last_return.return_date,
@@ -432,7 +453,7 @@ async function findMyBatteries(clientId, clientName, bucket) {
   const { rows } = await db.query(
     `WITH ${CLIENT_BATTERY_IDS_CTE}
      SELECT b.id, b.battery_code, b.serial_number, b.serial_number_added_by_role, b.serial_number_added_at,
-            b.status, b.notes, b.created_at, b.truck_intake_id,
+            b.status, b.notes, b.created_at, b.truck_intake_id, b.rfid_tag,
             ti.id AS intake_id, ti.truck_number, ti.driver_name, ti.intake_at, ti.status AS intake_status, ti.verified_at,
             last_repair.repaired_at AS last_repaired_at,
             last_return.return_id, last_return.return_truck, last_return.return_driver, last_return.return_date,
@@ -538,8 +559,12 @@ async function findMyTransactions(clientId, clientName) {
        FROM verified_batteries vb
        JOIN battery_services bs ON bs.battery_id = vb.id
        LEFT JOIN staff s ON s.id = bs.staff_id
-       WHERE vb.verified_at IS NULL
-          OR bs.completed_at >= vb.verified_at - INTERVAL '1 minute'
+       -- 'Passed back to Technician' is an internal workflow marker row
+       -- (rate 0, see battery.model passToTech), not a service the client
+       -- bought — it was showing up as £0.00 lines on their statement.
+       WHERE bs.service_name <> 'Passed back to Technician'
+         AND (vb.verified_at IS NULL
+          OR bs.completed_at >= vb.verified_at - INTERVAL '1 minute')
      ),
      all_lines AS (
        SELECT * FROM repair_lines
@@ -686,12 +711,10 @@ async function packBatteryForRepair(clientId, clientName, { batteryCode, serialN
 
     for (const item of items) {
       // 1. Find if battery exists by code or serial
-      let { rows: existingRows } = await client.query(
-        `SELECT * FROM batteries WHERE upper(battery_code) = upper($1) OR (serial_number IS NOT NULL AND upper(serial_number) = upper($1))`,
-        [item.code]
-      );
+      let { rows: existingRows } = await client.query(LOOKUP_BY_INPUT, [item.code]);
 
       let battery = existingRows[0];
+      if (!battery && looksLikeRfidTag(item.code)) rejectUnassignedTag(item.code);
 
       if (battery) {
         await assertClientCanPack(client, battery, clientId, clientName);
@@ -890,10 +913,8 @@ async function recordClientTruckIntake(clientId, clientName, { truckNumber, driv
 
     const processedBatteries = [];
     for (const item of items) {
-      const { rows: existingRows } = await client.query(
-        `SELECT * FROM batteries WHERE upper(battery_code) = upper($1) OR (serial_number IS NOT NULL AND upper(serial_number) = upper($1))`,
-        [item.code]
-      );
+      const { rows: existingRows } = await client.query(LOOKUP_BY_INPUT, [item.code]);
+      if (existingRows.length === 0 && looksLikeRfidTag(item.code)) rejectUnassignedTag(item.code);
       if (existingRows.length > 0) {
         const b = existingRows[0];
         await assertClientCanPack(client, b, clientId, clientName);
@@ -1031,10 +1052,8 @@ async function addBatteriesToClientTruckIntake(clientId, clientName, intakeId, {
     const processed = [];
 
     for (const item of items) {
-      let { rows: existingRows } = await client.query(
-        `SELECT * FROM batteries WHERE upper(battery_code) = upper($1) OR (serial_number IS NOT NULL AND upper(serial_number) = upper($1))`,
-        [item.code]
-      );
+      let { rows: existingRows } = await client.query(LOOKUP_BY_INPUT, [item.code]);
+      if (existingRows.length === 0 && looksLikeRfidTag(item.code)) rejectUnassignedTag(item.code);
       if (existingRows.length > 0) {
         const b = existingRows[0];
         await assertClientCanPack(client, b, clientId, clientName);

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RfidScanButton from '../../components/ui/primitives/RfidScanButton';
 import {
   FiTruck,
   FiUser,
@@ -326,7 +327,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
 
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <input
+                    <input data-rfid-scan="intake"
                       ref={scanInputRef}
                       type="text"
                       value={scanInput}
@@ -355,6 +356,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
                       disabled={scanLoading || !form.clientId}
                       className={`${inputClasses} font-mono disabled:cursor-not-allowed disabled:opacity-50`}
                     />
+                    <RfidScanButton target="intake" />
 
                     {/* Suggestions Dropdown */}
                     {showScanSuggestions && form.clientId && scanSuggestions.length > 0 && (

@@ -4,44 +4,46 @@ import { useDispatch, useSelector } from 'react-redux';
 import Svg, { Path } from 'react-native-svg';
 import { logout } from '../../store/auth-slice';
 import { navigate } from '../../navigation/navigationRef';
+import { hasClientPermission } from '../../utils/permissions';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const PANEL_WIDTH = Math.min(300, SCREEN_WIDTH * 0.82);
 
+// Same groups, labels and order as the web client Sidebar
+// (frontend/src/components/layout/shell/Sidebar.jsx CLIENT_NAV_GROUPS);
+// clientPermission hides a link exactly like the web does.
 const NAV_GROUPS = [
   {
     heading: 'Overview',
     links: [
-      { key: 'dashboard', label: 'Dashboard', screen: 'Dashboard' },
-      { key: 'all', label: 'All Batteries', screen: 'MyBatteries', params: { initialBucket: 'all' } },
+      { key: 'dashboard', label: 'Dashboard', screen: 'Dashboard', clientPermission: 'client_dashboard' },
+      { key: 'all', label: 'All Batteries', screen: 'MyBatteries', params: { initialBucket: 'all' }, clientPermission: 'client_all_batteries' },
+      { key: 'history', label: 'Service History', screen: 'ClientHistory' },
     ],
   },
   {
-    heading: 'Repair Service',
+    heading: 'Repairs & Sorting',
     links: [
-      { key: 'packed', label: 'Packed', screen: 'MyBatteries', params: { initialBucket: 'packed' } },
-      { key: 'pending', label: 'In Service', screen: 'MyBatteries', params: { initialBucket: 'pending' } },
-      { key: 'received', label: 'Received', screen: 'MyBatteries', params: { initialBucket: 'received' } },
+      { key: 'packed', label: 'Packed for Pickup', screen: 'MyBatteries', params: { initialBucket: 'packed' }, clientPermission: 'client_packed' },
+      { key: 'received', label: 'Received Batteries', screen: 'MyBatteries', params: { initialBucket: 'received' }, clientPermission: 'client_received' },
+      { key: 'sorting', label: 'Sort Batteries', screen: 'BatterySorting', clientPermission: 'client_battery_sorting' },
       { key: 'scan', label: 'Scan QR', screen: 'ScanQR' },
     ],
   },
   {
-    heading: 'Sorting',
-    links: [{ key: 'sorting', label: 'Battery Sorting', screen: 'BatterySorting' }],
-  },
-  {
-    heading: 'Billing',
+    heading: 'Billing & Impact',
     links: [
-      { key: 'invoices', label: 'Invoices & Bills', screen: 'Invoices' },
-      { key: 'transactions', label: 'Transactions', screen: 'Transactions' },
+      { key: 'invoices', label: 'Invoices', screen: 'Invoices', clientPermission: 'client_invoices' },
+      { key: 'transactions', label: 'Transactions', screen: 'Transactions', clientPermission: 'client_transactions' },
+      { key: 'certificates', label: 'Certificates', screen: 'ClientCertificates' },
     ],
   },
   {
-    heading: 'Support',
+    heading: 'Help & Account',
     links: [
-      { key: 'support', label: 'Help & Support', screen: 'Support' },
-      { key: 'notifications', label: 'Notifications', screen: 'ClientNotifications' },
-      { key: 'profile', label: 'Profile', screen: 'Profile' },
+      { key: 'support', label: 'Support Chat', screen: 'Support', clientPermission: 'client_support' },
+      { key: 'notifications', label: 'Notifications', screen: 'ClientNotifications', clientPermission: 'client_notifications' },
+      { key: 'profile', label: 'My Profile', screen: 'Profile' },
     ],
   },
 ];
@@ -110,13 +112,16 @@ export default function ClientSidebar({ visible, onClose }) {
           </View>
 
           <ScrollView className="flex-1" contentContainerClassName="px-3 py-4 gap-5">
-            {NAV_GROUPS.map((group) => (
+            {NAV_GROUPS.map((group) => {
+              const links = group.links.filter((l) => hasClientPermission(user, l.clientPermission));
+              if (links.length === 0) return null;
+              return (
               <View key={group.heading}>
                 <Text className="mb-1.5 px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                   {group.heading}
                 </Text>
                 <View className="gap-0.5">
-                  {group.links.map((link) => (
+                  {links.map((link) => (
                     <TouchableOpacity
                       key={link.key}
                       onPress={() => go(link)}
@@ -127,7 +132,8 @@ export default function ClientSidebar({ visible, onClose }) {
                   ))}
                 </View>
               </View>
-            ))}
+              );
+            })}
           </ScrollView>
 
           <View className="border-t border-slate-200/80 dark:border-slate-800/80 p-4">

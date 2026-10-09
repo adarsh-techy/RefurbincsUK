@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RfidScanButton from '../../../components/ui/primitives/RfidScanButton';
 import apiClient from '../../../services/api-client';
 import Modal from '../../../components/ui/overlays/Modal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import TableState from '../../../components/ui/table/TableState';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 
 function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSuccess }) {
@@ -119,7 +121,15 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
   }
 
   function handleScan(raw) {
-    const rawVal = (extractBatteryCode(raw) || raw || '').trim();
+    // QR link, battery code, serial, or an RFID tag read by a reader
+    const resolved = resolveBatteryInput(raw, batteriesList);
+    if (resolved.unassignedTag) {
+      setScanInput('');
+      setShowSuggestions(false);
+      flashFeedback('error', UNASSIGNED_TAG_MESSAGE);
+      return;
+    }
+    const rawVal = (resolved.code || '').trim();
     if (!rawVal) return;
     const query = rawVal.toUpperCase();
     setScanInput('');
@@ -253,7 +263,7 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
                     <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
                   </svg>
                 </div>
-                <input
+                <input data-rfid-scan="client-receive"
                   ref={scanInputRef}
                   type="text"
                   value={scanInput}
@@ -275,6 +285,7 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
                   autoComplete="off"
                   className="w-full rounded-xl border border-blue-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/60 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
                 />
+                <RfidScanButton target="client-receive" />
 
                 {/* Suggestions dropdown */}
                 {showSuggestions && suggestions.length > 0 && (

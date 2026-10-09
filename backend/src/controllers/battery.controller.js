@@ -6,8 +6,10 @@ const clientModel = require('../models/client.model');
 const recycleModel = require('../models/recycle.model');
 const serviceModel = require('../models/service.model');
 const trashModel = require('../models/trash.model');
+const auditLogModel = require('../models/audit-log.model');
 const truckIntakeModel = require('../models/truck-intake.model');
 const realtime = require('../realtime');
+const { parseRfidSheet, normalizeTag } = require('../utils/parse-rfid-sheet');
 
 const ISSUE_PHOTOS_DIR = path.join(__dirname, '..', '..', 'uploads', 'issue-photos');
 if (!fs.existsSync(ISSUE_PHOTOS_DIR)) {
@@ -123,7 +125,13 @@ async function getByCode(req, res, next) {
   try {
     const battery = await batteryModel.findByCode(req.params.code);
     if (!battery) {
-      return res.status(404).json({ message: 'Battery not found' });
+      const raw = String(req.params.code || '');
+      const looksLikeTag = raw.replace(/[^0-9A-Za-z]/g, '').length >= 8 && !raw.includes('-');
+      return res.status(404).json({
+        message: looksLikeTag
+          ? 'This RFID tag is not assigned to any battery yet. Assign it on the RFID Assignment page first.'
+          : 'Battery not found',
+      });
     }
     const [history, returns, visits, issues, recycleBatch, services, pendingPartsRemoval] = await Promise.all([
       batteryModel.findRepairHistory(battery.id),
@@ -694,8 +702,122 @@ async function setBlocked(req, res, next) {
   }
 }
 
+// RFID Assignment page: downloadable .xlsx template — just the header row
+// (Battery Number, RFID Tag, Client Name) plus a notes sheet.
+async function rfidTemplate(req, res, next) {
+  try {
+    const ExcelJS = require('exceljs');
+    const wb = new ExcelJS.Workbook();
+    const ws = wb.addWorksheet('RFID Tags');
+    ws.columns = [
+      { header: 'Battery Number', key: 'battery', width: 20 },
+      { header: 'RFID Tag', key: 'tag', width: 32 },
+      { header: 'Client Name', key: 'client', width: 26 },
+    ];
+    ws.getRow(1).font = { bold: true };
+    ws.getRow(1).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFEDE9FE' } };
+    const notes = wb.addWorksheet('How to fill');
+    notes.getColumn(1).width = 110;
+    [
+      'Battery Number  – the ID printed on the battery / generated on the Generate QR Code page (e.g. HUM-0000123).',
+      'RFID Tag        – the tag ID read from the tag. Letters and digits only; colons, spaces and lower-case are cleaned up automatically.',
+      'Client Name     – required: either fill it here or pick the client on the upload page. It must match the client the battery belongs to, otherwise the row is skipped.',
+      'Keep the header row and add one battery per row underneath it. Up to 5,000 rows per file.',
+    ].forEach((t) => notes.addRow([t]));
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', 'attachment; filename="rfid-assignment-template.xlsx"');
+    await wb.xlsx.write(res);
+    res.end();
+  } catch (err) {
+    next(err);
+  }
+}
+
+// RFID Assignment page, "Assigned tags" table: ?clientName=&search=&limit=&offset=
+async function listRfidAssignments(req, res, next) {
+  try {
+    const limit = Math.min(Math.max(Number(req.query.limit) || 10, 1), 100);
+    const offset = Math.max(Number(req.query.offset) || 0, 0);
+    const clientName = typeof req.query.clientName === 'string' ? req.query.clientName.trim() : '';
+    const search = typeof req.query.search === 'string' ? req.query.search.trim().slice(0, 64) : '';
+    const tagged = ['yes', 'no', 'all'].includes(req.query.tagged) ? req.query.tagged : 'yes';
+    res.json(await batteryModel.findRfidAssignments({ clientName, search, tagged, limit, offset }));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// RFID Assignment page: an uploaded .xlsx/.csv of battery number + RFID tag.
+// ?dryRun=true only matches and reports (the page shows this table first);
+// without it the matched rows are written. Either way every row comes back
+// with a status so unmatched battery numbers can be highlighted.
+// Also accepts JSON { assignments: [{ batteryCode, rfidTag }] } with no file —
+// the page's manual "scan & assign" form sends one pair at a time that way.
+async function assignRfidSheet(req, res, next) {
+  try {
+    let rows;
+    let source = 'manual';
+    if (req.file) {
+      source = req.file.originalname;
+      try {
+        rows = await parseRfidSheet(req.file.buffer, req.file.originalname);
+      } catch (parseErr) {
+        return res.status(400).json({ message: parseErr.message });
+      }
+    } else if (Array.isArray(req.body?.assignments)) {
+      rows = req.body.assignments.slice(0, 5000).map((a, i) => {
+        const batteryCode = String(a?.batteryCode ?? '').trim().toUpperCase();
+        const rfidTag = normalizeTag(a?.rfidTag);
+        const entry = { rowNumber: i + 1, batteryCode, rfidTag, clientName: a?.clientName ? String(a.clientName).trim() : null };
+        if (!batteryCode) entry.error = 'Battery number is empty';
+        else if (!rfidTag) entry.error = 'RFID tag is empty';
+        else if (rfidTag.length < 4 || rfidTag.length > 64) entry.error = 'RFID tag must be 4–64 characters';
+        return entry;
+      });
+    } else {
+      return res.status(400).json({ message: 'Upload an .xlsx or .csv file, or send assignments.' });
+    }
+    if (rows.length === 0) {
+      return res.status(400).json({
+        message: req.file
+          ? 'The sheet only has the header row — add one battery per row (Battery Number, RFID Tag) under it and upload again.'
+          : 'Nothing to assign.',
+      });
+    }
+    // Client is mandatory: either chosen on the page (applies to every row
+    // without one) or filled per row in the sheet. Rows with neither are
+    // skipped so a tag can never be assigned without saying whose battery it is.
+    const defaultClient = typeof req.body?.clientName === 'string' ? req.body.clientName.trim() : '';
+    rows = rows.map((r) => {
+      const clientName = r.clientName || defaultClient || null;
+      if (!r.error && !clientName) return { ...r, clientName, error: 'Client name is missing — pick a client above or fill the Client Name column' };
+      return { ...r, clientName };
+    });
+    if (rows.length > 5000) {
+      return res.status(400).json({ message: 'Please upload at most 5,000 rows per file.' });
+    }
+    const commit = String(req.query.dryRun) !== 'true';
+    const result = await batteryModel.assignRfidTags(rows, { commit });
+    if (commit && result.written > 0) {
+      await auditLogModel.record({
+        userId: req.user.id,
+        action: 'assign_rfid_tags',
+        entity: 'battery',
+        entityId: null,
+        details: { file: source, written: result.written, summary: result.summary },
+      });
+    }
+    res.json({ ...result, committed: commit, fileName: req.file ? req.file.originalname : null });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   list,
+  assignRfidSheet,
+  listRfidAssignments,
+  rfidTemplate,
   getByCode,
   update,
   updateClient,

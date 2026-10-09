@@ -275,7 +275,8 @@ async function findByCode(batteryCode) {
      FROM batteries b
      LEFT JOIN truck_intakes ti ON ti.id = b.truck_intake_id
      LEFT JOIN users u ON u.id = b.started_by_user_id
-     WHERE b.battery_code = $1`,
+     WHERE b.battery_code = $1
+        OR (b.rfid_tag IS NOT NULL AND b.rfid_tag = upper(regexp_replace($1, '[^0-9A-Za-z]', '', 'g')))`,
     [batteryCode]
   );
   return rows[0];
@@ -1051,6 +1052,135 @@ async function createManyForClient({ clientName, count, startNumber }) {
   };
 }
 
+// Matches a sheet of { rowNumber, batteryCode, rfidTag, error? } rows against
+// the fleet and (when commit) writes the tags, all in one transaction. Every
+// row comes back with a status the RFID Assignment page can show:
+//   assigned / replaced / unchanged   written (or would be, on a dry run)
+//   not_found          no battery with that number — check the QR page
+//   tag_in_use         tag already on a different battery
+//   duplicate_in_sheet same tag or same battery appears twice in the file
+//   client_mismatch    sheet's Client Name differs from the battery's client
+//   error              the row failed parsing (empty cell etc.)
+// Batteries that have an RFID tag, in battery-number order, filterable by client and
+// by code/tag search; paged for the "Assigned tags" table on the RFID page.
+// `tagged`: 'yes' (default) only batteries with a tag, 'no' only those still
+// without one, 'all' both — so a client's remaining untagged batteries can be
+// listed. `counts` always covers the client/search scope regardless of `tagged`.
+async function findRfidAssignments({ clientName, search, tagged = 'yes', limit = 10, offset = 0 } = {}) {
+  const conditions = [];
+  if (tagged === 'yes') conditions.push('b.rfid_tag IS NOT NULL');
+  else if (tagged === 'no') conditions.push('b.rfid_tag IS NULL');
+  const params = [];
+  if (clientName) {
+    params.push(clientName.toLowerCase());
+    conditions.push(`lower(b.client_name) = $${params.length}`);
+  }
+  if (search) {
+    params.push(`%${search.replace(/[%_]/g, '\\$&').toUpperCase()}%`);
+    conditions.push(`(upper(b.battery_code) LIKE $${params.length} OR b.rfid_tag LIKE $${params.length})`);
+  }
+  const where = conditions.length ? `WHERE ${conditions.join(' AND ')}` : '';
+  const scope = conditions.filter((c) => !c.startsWith('b.rfid_tag'));
+  const scopeWhere = scope.length ? `WHERE ${scope.join(' AND ')}` : '';
+  const { rows: countRows } = await db.query(`SELECT COUNT(*)::int AS total FROM batteries b ${where}`, params);
+  const { rows: scopeRows } = await db.query(
+    `SELECT COUNT(*) FILTER (WHERE b.rfid_tag IS NOT NULL)::int AS assigned,
+            COUNT(*) FILTER (WHERE b.rfid_tag IS NULL)::int AS unassigned
+     FROM batteries b ${scopeWhere}`,
+    params
+  );
+  params.push(limit + 1, offset);
+  const { rows } = await db.query(
+    `SELECT b.id, b.battery_code, b.rfid_tag, b.client_name, b.status, b.serial_number
+     FROM batteries b
+     ${where}
+     -- natural order: prefix, then the numeric part (so HUM-0000010 follows
+     -- HUM-0000009 and 4-digit legacy codes sort by value too)
+     ORDER BY split_part(b.battery_code, '-', 1),
+              NULLIF(regexp_replace(b.battery_code, '^.*-', ''), '')::bigint NULLS LAST,
+              b.battery_code
+     LIMIT $${params.length - 1} OFFSET $${params.length}`,
+    params
+  );
+  const hasMore = rows.length > limit;
+  return { data: hasMore ? rows.slice(0, limit) : rows, hasMore, total: countRows[0].total, counts: scopeRows[0] };
+}
+
+async function assignRfidTags(rows, { commit = false } = {}) {
+  const codes = [...new Set(rows.filter((r) => !r.error).map((r) => r.batteryCode))];
+  const tags = [...new Set(rows.filter((r) => !r.error).map((r) => r.rfidTag))];
+
+  const { rows: batteries } = codes.length
+    ? await db.query(
+        'SELECT id, battery_code, client_name, rfid_tag FROM batteries WHERE upper(battery_code) = ANY($1::text[])',
+        [codes]
+      )
+    : { rows: [] };
+  const { rows: tagOwners } = tags.length
+    ? await db.query('SELECT id, battery_code, rfid_tag FROM batteries WHERE rfid_tag = ANY($1::text[])', [tags])
+    : { rows: [] };
+
+  const byCode = new Map(batteries.map((b) => [b.battery_code.toUpperCase(), b]));
+  const ownerByTag = new Map(tagOwners.map((b) => [b.rfid_tag, b]));
+
+  const tagCounts = new Map();
+  const codeCounts = new Map();
+  for (const r of rows) {
+    if (r.error) continue;
+    tagCounts.set(r.rfidTag, (tagCounts.get(r.rfidTag) || 0) + 1);
+    codeCounts.set(r.batteryCode, (codeCounts.get(r.batteryCode) || 0) + 1);
+  }
+
+  const results = rows.map((r) => {
+    const out = { rowNumber: r.rowNumber, batteryCode: r.batteryCode, rfidTag: r.rfidTag };
+    if (r.error) return { ...out, status: 'error', message: r.error };
+    const battery = byCode.get(r.batteryCode);
+    if (!battery) return { ...out, status: 'not_found', message: 'No battery with this number — generate it on the QR page first' };
+    out.batteryId = battery.id;
+    out.clientName = battery.client_name;
+    out.sheetClientName = r.clientName || null;
+    out.previousTag = battery.rfid_tag || null;
+    // A client name in the sheet is a safety check, not an assignment: it
+    // must match the battery's client or the row is skipped.
+    if (r.clientName && battery.client_name && r.clientName.trim().toLowerCase() !== battery.client_name.trim().toLowerCase()) {
+      return { ...out, status: 'client_mismatch', message: `Sheet says "${r.clientName}" but this battery belongs to ${battery.client_name}` };
+    }
+    if (tagCounts.get(r.rfidTag) > 1 || codeCounts.get(r.batteryCode) > 1) {
+      return { ...out, status: 'duplicate_in_sheet', message: 'Listed more than once in this file' };
+    }
+    const owner = ownerByTag.get(r.rfidTag);
+    if (owner && owner.id !== battery.id) {
+      return { ...out, status: 'tag_in_use', message: `Tag already assigned to ${owner.battery_code}` };
+    }
+    if (battery.rfid_tag === r.rfidTag) return { ...out, status: 'unchanged', message: 'Already assigned' };
+    if (battery.rfid_tag) return { ...out, status: 'replaced', message: `Replaces previous tag ${battery.rfid_tag}` };
+    return { ...out, status: 'assigned', message: 'Assigned' };
+  });
+
+  const writable = results.filter((r) => r.status === 'assigned' || r.status === 'replaced');
+  if (commit && writable.length) {
+    const client = await db.pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const r of writable) {
+        await client.query('UPDATE batteries SET rfid_tag = $2 WHERE id = $1', [r.batteryId, r.rfidTag]);
+      }
+      await client.query('COMMIT');
+    } catch (err) {
+      await client.query('ROLLBACK');
+      throw err;
+    } finally {
+      client.release();
+    }
+  }
+
+  const summary = results.reduce((acc, r) => {
+    acc[r.status] = (acc[r.status] || 0) + 1;
+    return acc;
+  }, {});
+  return { results, summary, written: commit ? writable.length : 0 };
+}
+
 async function maxSequenceByClientName(clientName) {
   const prefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
   const { rows } = await db.query(
@@ -1166,4 +1296,6 @@ module.exports = {
   findRepeatIntakesThisMonth,
   remove,
   setBlocked,
+  assignRfidTags,
+  findRfidAssignments,
 };

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RfidScanButton from '../../components/ui/primitives/RfidScanButton';
 import {
   FiAlertTriangle,
   FiCheckCircle,
@@ -13,6 +14,7 @@ import apiClient from '../../services/api-client';
 import Modal from '../../components/ui/overlays/Modal';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import TableState from '../../components/ui/table/TableState';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
 function formatDateTime(dt) {
@@ -221,7 +223,15 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
   }
 
   function handleScan(raw) {
-    const rawVal = (extractBatteryCode(raw) || raw || '').trim();
+    // QR link, battery code, serial, or an RFID tag read by a reader
+    const resolved = resolveBatteryInput(raw, batteriesList);
+    if (resolved.unassignedTag) {
+      setScanInput('');
+      setShowSuggestions(false);
+      flashFeedback('error', UNASSIGNED_TAG_MESSAGE);
+      return;
+    }
+    const rawVal = (resolved.code || '').trim();
     if (!rawVal) return;
     const query = rawVal.toUpperCase();
     setScanInput('');
@@ -377,7 +387,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                   </label>
                   <div className="flex gap-2">
                     <div className="relative flex-1">
-                      <input
+                      <input data-rfid-scan="intake-verify"
                         ref={scanInputRef}
                         type="text"
                         value={scanInput}
@@ -402,6 +412,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                         autoFocus
                         className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs font-mono"
                       />
+                      <RfidScanButton target="intake-verify" />
 
                       {/* Dropdown Suggestions */}
                       {showSuggestions && suggestions.length > 0 && (

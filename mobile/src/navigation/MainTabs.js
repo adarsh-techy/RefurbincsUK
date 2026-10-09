@@ -11,6 +11,12 @@ import ClientDashboardScreen from '../screens/client/ClientDashboardScreen';
 import ClientBatteriesScreen from '../screens/client/ClientBatteriesScreen';
 import ClientScanScreen from '../screens/client/ClientScanScreen';
 import ClientSidebar from '../components/client/ClientSidebar';
+import AdminSidebar from '../components/admin/AdminSidebar';
+import { hasClientPermission } from '../utils/permissions';
+import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
+import AdminBatteriesScreen from '../screens/admin/AdminBatteriesScreen';
+import AdminIntakesScreen from '../screens/admin/AdminIntakesScreen';
+import RecycleShipmentsScreen from '../screens/recycle/RecycleShipmentsScreen';
 import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
@@ -65,6 +71,18 @@ function BatteryIcon({ color, size }) {
   );
 }
 
+function TruckIcon({ color, size }) {
+  return (
+    <Svg {...iconProps(color, size)}>
+      <Path d="M14 18V6a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2v11a1 1 0 0 0 1 1h2" />
+      <Path d="M15 18H9" />
+      <Path d="M19 18h2a1 1 0 0 0 1-1v-3.65a1 1 0 0 0-.22-.62l-3.48-4.35A1 1 0 0 0 17.52 8H14" />
+      <Circle cx="17" cy="18" r="2" />
+      <Circle cx="7" cy="18" r="2" />
+    </Svg>
+  );
+}
+
 function ScanIcon({ color, size }) {
   return (
     <Svg {...iconProps(color, size)}>
@@ -81,7 +99,17 @@ const TAB_ICONS = {
   Profile: ProfileIcon,
   MyBatteries: BatteryIcon,
   ScanQR: ScanIcon,
+  Batteries: BatteryIcon,
+  Scan: ScanIcon,
+  Intakes: TruckIcon,
+  Shipments: TruckIcon,
 };
+
+// Which tab set a login gets. Office roles (super_admin / admin / staff) used
+// to fall into the technician tabs, whose screens call /staff/me and fail
+// with "not linked to a staff record" — they now get an admin set, and
+// recycling partners get their shipments.
+const OFFICE_ROLES = ['super_admin', 'admin', 'staff'];
 
 function MenuIcon({ color }) {
   return (
@@ -103,7 +131,7 @@ function MenuIcon({ color }) {
 // itself. bottom-tabs calls this once per tab (all four mount at once, not
 // just the focused one), so anything stateful or context-sensitive placed
 // here runs four times over.
-function Header({ isClient, onMenuPress }) {
+function Header({ showMenu, onMenuPress }) {
   return (
     <View
       style={{
@@ -125,7 +153,7 @@ function Header({ isClient, onMenuPress }) {
         resizeMode="contain"
       />
 
-      {isClient && (
+      {showMenu && (
         <TouchableOpacity onPress={onMenuPress} hitSlop={10} style={{ padding: 8 }}>
           <MenuIcon color="#0f172a" />
         </TouchableOpacity>
@@ -137,6 +165,8 @@ function Header({ isClient, onMenuPress }) {
 export default function MainTabs() {
   const user = useSelector((state) => state.auth.user);
   const isClient = user?.role === 'client';
+  const isOffice = OFFICE_ROLES.includes(user?.role);
+  const isRecycle = user?.role === 'recycle_client';
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   return (
@@ -145,7 +175,7 @@ export default function MainTabs() {
         detachInactiveScreens={!isClient}
         screenOptions={({ route }) => ({
           headerShown: true,
-          header: () => <Header isClient={isClient} onMenuPress={() => setSidebarOpen(true)} />,
+          header: () => <Header showMenu={isClient || isOffice} onMenuPress={() => setSidebarOpen(true)} />,
           tabBarActiveTintColor: '#2563eb',
           tabBarInactiveTintColor: '#64748b',
           tabBarStyle: {
@@ -168,16 +198,29 @@ export default function MainTabs() {
       >
         {isClient ? (
           <>
-            <Tab.Screen
-              name="Dashboard"
-              component={ClientDashboardScreen}
-              options={{ title: 'Dashboard' }}
-            />
-            <Tab.Screen
-              name="MyBatteries"
-              component={ClientBatteriesScreen}
-              options={{ title: 'My Batteries' }}
-            />
+            {/* Tabs follow the client's module permissions like the web menu;
+                a module the admin switched off simply has no tab. */}
+            {hasClientPermission(user, 'client_dashboard') && (
+              <Tab.Screen
+                name="Dashboard"
+                component={ClientDashboardScreen}
+                options={{ title: 'Dashboard' }}
+              />
+            )}
+            {(hasClientPermission(user, 'client_all_batteries') ||
+              hasClientPermission(user, 'client_packed') ||
+              hasClientPermission(user, 'client_received')) && (
+              <Tab.Screen
+                name="MyBatteries"
+                component={ClientBatteriesScreen}
+                options={{ title: 'My Batteries' }}
+                initialParams={{
+                  initialBucket: hasClientPermission(user, 'client_all_batteries')
+                    ? 'all'
+                    : hasClientPermission(user, 'client_packed') ? 'packed' : 'received',
+                }}
+              />
+            )}
             <Tab.Screen
               name="ScanQR"
               component={ClientScanScreen}
@@ -188,6 +231,19 @@ export default function MainTabs() {
               component={ProfileScreen}
               options={{ title: 'Profile' }}
             />
+          </>
+        ) : isOffice ? (
+          <>
+            <Tab.Screen name="Dashboard" component={AdminDashboardScreen} />
+            <Tab.Screen name="Batteries" component={AdminBatteriesScreen} />
+            <Tab.Screen name="Scan" component={ClientScanScreen} options={{ title: 'Scan' }} />
+            <Tab.Screen name="Intakes" component={AdminIntakesScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
+          </>
+        ) : isRecycle ? (
+          <>
+            <Tab.Screen name="Shipments" component={RecycleShipmentsScreen} />
+            <Tab.Screen name="Profile" component={ProfileScreen} />
           </>
         ) : (
           <>
@@ -200,6 +256,7 @@ export default function MainTabs() {
       </Tab.Navigator>
 
       {isClient && <ClientSidebar visible={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
+      {isOffice && <AdminSidebar visible={sidebarOpen} onClose={() => setSidebarOpen(false)} />}
     </>
   );
 }

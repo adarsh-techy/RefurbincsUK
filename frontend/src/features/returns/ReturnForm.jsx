@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RfidScanButton from '../../components/ui/primitives/RfidScanButton';
 import {
   FiCheckCircle,
   FiPackage,
@@ -369,7 +370,7 @@ function ReturnForm({ onCreated, onCancel }) {
 
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input
+                <input data-rfid-scan="return"
                   ref={scanInputRef}
                   type="text"
                   value={scanInput}
@@ -398,6 +399,7 @@ function ReturnForm({ onCreated, onCancel }) {
                   disabled={scanLoading || !form.clientId}
                   className={`${inputClasses} font-mono disabled:cursor-not-allowed disabled:opacity-50`}
                 />
+                <RfidScanButton target="return" />
 
                 {/* Suggestions Dropdown */}
                 {showScanSuggestions && form.clientId && scanSuggestions.length > 0 && (

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import RfidScanButton from '../../components/ui/primitives/RfidScanButton';
 import { FiCheckCircle, FiPackage, FiTruck, FiUser, FiRepeat, FiAlertCircle, FiShield, FiBriefcase } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
@@ -287,7 +288,7 @@ function RecycleForm({ onCreated, onCancel }) {
 
             <div className="flex gap-2">
               <div className="relative flex-1">
-                <input
+                <input data-rfid-scan="recycle"
                   ref={scanInputRef}
                   type="text"
                   value={scanInput}
@@ -312,6 +313,7 @@ function RecycleForm({ onCreated, onCancel }) {
                   disabled={scanLoading}
                   className={`${inputClasses} font-mono disabled:cursor-not-allowed disabled:opacity-50`}
                 />
+                <RfidScanButton target="recycle" />
 
                 {/* Suggestions Dropdown */}
                 {showScanSuggestions && scanSuggestions.length > 0 && (

@@ -14,6 +14,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
 import { StatusBadge } from '../../components/ui/Badge';
 
 function storageKey(userId) {
@@ -142,7 +143,13 @@ export default function ClientSortingScreen() {
   const addBattery = useCallback(
     (rawCode) => {
       if (!activeGroup) return;
-      const code = (extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
+      // QR link, battery code, or an RFID tag read by a reader
+      const resolved = resolveBatteryInput(rawCode, registeredBatteries);
+      if (resolved.unassignedTag) {
+        setAddError(UNASSIGNED_TAG_MESSAGE);
+        return;
+      }
+      const code = resolved.code;
       if (!code) return;
       if (activeGroup.batteries.some((c) => c.toUpperCase() === code)) {
         setAddError(`Battery ${code} is already sorted into this group.`);
@@ -154,7 +161,7 @@ export default function ClientSortingScreen() {
       setScanInput('');
       setAddError(null);
     },
-    [activeGroup]
+    [activeGroup, registeredBatteries]
   );
 
   function removeBattery(code) {

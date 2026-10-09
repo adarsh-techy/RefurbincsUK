@@ -860,6 +860,13 @@ function ClientBatteryDetailView({
                 )
               )}
 
+              {battery.rfid_tag && (
+                <div className="mt-2 inline-flex items-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1 text-xs font-semibold text-violet-800 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">
+                  <span className="uppercase tracking-wider text-[10px]">RFID</span>
+                  <span className="font-mono">{battery.rfid_tag}</span>
+                </div>
+              )}
+
               {isRecycled && (
                 <div className="mt-3.5 inline-flex items-center gap-2 rounded-xl bg-emerald-500/10 border border-emerald-500/20 px-3.5 py-2 text-xs font-medium text-emerald-800 dark:text-emerald-300">
                   <span className="h-2 w-2 rounded-full bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.8)] shrink-0" />
@@ -2547,6 +2554,15 @@ function BatteryDetailPage() {
               {battery.status === 'in_progress' && battery.started_by_name && (
                 <span className="flex items-center gap-1 rounded-full bg-critical-100 px-2.5 py-0.5 text-xs font-medium text-critical-700 dark:bg-red-500/15 dark:text-red-300">
                   Being worked on by {battery.started_by_name}
+                </span>
+              )}
+              {battery.rfid_tag && (
+                <span
+                  className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-0.5 text-xs font-semibold text-violet-800 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300"
+                  title="RFID tag assigned on the RFID Assignment page"
+                >
+                  <span className="text-[10px] font-bold uppercase tracking-wider">RFID</span>
+                  <span className="font-mono">{battery.rfid_tag}</span>
                 </span>
               )}
             </div>

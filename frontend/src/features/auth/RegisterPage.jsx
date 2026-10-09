@@ -18,12 +18,21 @@ function RegisterPage() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
   const { status, error } = useSelector((state) => state.auth);
+  const [created, setCreated] = useState(null);
 
   async function handleSubmit(e) {
     e.preventDefault();
+    setCreated(null);
     const result = await dispatch(register({ name, email, password, role: 'super_admin' }));
     if (register.fulfilled.match(result)) {
-      navigate('/');
+      if (result.payload?.token) {
+        navigate('/');
+      } else {
+        setCreated(result.payload?.user?.email || email);
+        setName('');
+        setEmail('');
+        setPassword('');
+      }
     }
   }
 
@@ -46,6 +55,12 @@ function RegisterPage() {
             <p className="mt-1 text-sm text-slate-500">Register new Super Admin credentials</p>
           </div>
 
+          {created && (
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              Super Admin account <b>{created}</b> created. They can sign in now.{' '}
+              <Link to="/users" className="font-semibold underline">Go to User Accounts</Link>
+            </div>
+          )}
           <form onSubmit={handleSubmit} className="mt-6 flex flex-col gap-4">
             <div>
               <label className={labelClasses}>Full Name</label>

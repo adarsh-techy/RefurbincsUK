@@ -27,6 +27,16 @@ const STATUS_MAP = {
   recycled: { tone: 'black', label: 'Recycled' },
 };
 
+// A client battery row whose status is 'returned' but that has never been on
+// a truck, repaired or dispatched was only ever registered (QR generated) —
+// show "Registered", not "Returned". Mirrors hasBeenServiced() on the web
+// ClientBatteriesPage.
+export function clientBatteryStatus(row) {
+  if (!row) return undefined;
+  const serviced = Boolean(row.truck_intake_id || row.intake_id || row.last_repaired_at || row.return_id);
+  return row.status === 'returned' && !serviced ? 'registered' : row.status;
+}
+
 export function Badge({ tone = 'neutral', children }) {
   const { bg, text } = TONES[tone] || TONES.neutral;
   return (

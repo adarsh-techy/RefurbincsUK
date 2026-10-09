@@ -1,4 +1,5 @@
 import { useEffect, useState, useMemo, useRef } from 'react';
+import RfidScanButton from '../../../components/ui/primitives/RfidScanButton';
 import { Link, useParams, useSearchParams, useLocation } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
@@ -10,6 +11,8 @@ import { fetchSortGroups } from '../../../utils/sort-groups';
 import Modal from '../../../components/ui/overlays/Modal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../../utils/extract-battery-code';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+
 import { useTheme } from '../../../context/ThemeContext';
 import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter, FiRefreshCw } from 'react-icons/fi';
 import { hasClientPermission } from '../../../utils/permissions';
@@ -533,7 +536,13 @@ function ClientBatteriesPage() {
       return;
     }
     const raw = customCode !== undefined ? customCode : editBatchAddInput;
-    const code = (extractBatteryCode(raw) || raw || '').trim().toUpperCase();
+    // accepts a QR link, a battery code, or an RFID tag read by a reader
+    const resolved = resolveBatteryInput(raw, allRegisteredBatteries);
+    if (resolved.unassignedTag) {
+      setEditBatchError(UNASSIGNED_TAG_MESSAGE);
+      return;
+    }
+    const code = resolved.code;
     if (!code) {
       setEditBatchError('Please enter or scan a battery code.');
       return;
@@ -729,7 +738,12 @@ function ClientBatteriesPage() {
   }, [allRegisteredBatteries, selectedBatch, addMoreBatteries, addMoreScanInput, NOT_RETURNABLE_STATUSES]);
 
   function handleAddMoreBattery(rawCode, initialSerial = '') {
-    const code = (extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
+    const resolved = resolveBatteryInput(rawCode, allRegisteredBatteries);
+    if (resolved.unassignedTag) {
+      setAddMoreError(UNASSIGNED_TAG_MESSAGE);
+      return;
+    }
+    const code = resolved.code;
     if (!code) return;
 
     if (addMoreBatteries.some((b) => b.code.toUpperCase() === code)) {
@@ -776,7 +790,12 @@ function ClientBatteriesPage() {
     }
     let finalBatteries = [...addMoreBatteries];
     if (addMoreScanInput.trim()) {
-      const code = (extractBatteryCode(addMoreScanInput) || addMoreScanInput).trim().toUpperCase();
+      const resolved = resolveBatteryInput(addMoreScanInput, allRegisteredBatteries);
+      if (resolved.unassignedTag) {
+        setAddMoreError(UNASSIGNED_TAG_MESSAGE);
+        return;
+      }
+      const code = resolved.code;
       if (code && !finalBatteries.some((b) => b.code === code)) {
         finalBatteries.push({ id: Date.now(), code, serial: '', issue: '' });
       }
@@ -817,7 +836,12 @@ function ClientBatteriesPage() {
       setPackError('Please enter Truck Number and Driver Name first.');
       return;
     }
-    const code = (extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
+    const resolved = resolveBatteryInput(rawCode, allRegisteredBatteries);
+    if (resolved.unassignedTag) {
+      setPackError(UNASSIGNED_TAG_MESSAGE);
+      return;
+    }
+    const code = resolved.code;
     if (!code) return;
 
     if (scannedBatteries.some((b) => b.code.toUpperCase() === code)) {
@@ -2712,7 +2736,7 @@ function ClientBatteriesPage() {
 
                 <div className="flex shrink-0 gap-2">
                   <div className="relative flex-1">
-                    <input
+                    <input data-rfid-scan="client-pack"
                       type="text"
                       disabled={!isLogisticsReady}
                       value={scanInput}
@@ -2734,6 +2758,7 @@ function ClientBatteriesPage() {
                         !isLogisticsReady ? 'cursor-not-allowed opacity-60 bg-slate-100 dark:bg-surface-900' : ''
                       }`}
                     />
+                    <RfidScanButton target="client-pack" />
                   </div>
                   <button
                     type="button"
@@ -3414,7 +3439,7 @@ function ClientBatteriesPage() {
 
               <div className="space-y-3">
                 <div className="relative">
-                  <input
+                  <input data-rfid-scan="client-edit-batch"
                     type="text"
                     value={editBatchAddInput}
                     onChange={(e) => {
@@ -3433,6 +3458,7 @@ function ClientBatteriesPage() {
                     placeholder="Type battery ID (e.g. UBE-0012) or scan QR code…"
                     className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-xs font-mono font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-blue-800/60 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
                   />
+                  <RfidScanButton target="client-edit-batch" />
 
                   {/* Suggestions Dropdown */}
                   {editBatchShowSuggestions && editBatchScanSuggestions.length > 0 && (
@@ -3717,7 +3743,7 @@ function ClientBatteriesPage() {
 
               <div className="flex gap-2">
                 <div className="relative flex-1">
-                  <input
+                  <input data-rfid-scan="client-add-more"
                     type="text"
                     value={addMoreScanInput}
                     onChange={(e) => {
@@ -3735,6 +3761,7 @@ function ClientBatteriesPage() {
                     autoComplete="off"
                     className={formInputClasses}
                   />
+                  <RfidScanButton target="client-add-more" />
                 </div>
                 <button
                   type="button"

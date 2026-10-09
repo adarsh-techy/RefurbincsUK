@@ -12,13 +12,15 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
-import { StatusBadge } from '../../components/ui/Badge';
+import { StatusBadge, clientBatteryStatus } from '../../components/ui/Badge';
+import ClientTruckBatches from '../../components/client/ClientTruckBatches';
+import { hasClientPermission } from '../../utils/permissions';
+import { useSelector } from 'react-redux';
 import Icon from '../../components/ui/Icon';
 
 const BUCKET_TABS = [
   { id: 'all', label: 'All' },
   { id: 'packed', label: 'Packed' },
-  { id: 'pending', label: 'In Service' },
   { id: 'received', label: 'Received' },
 ];
 
@@ -68,8 +70,14 @@ export default function ClientBatteriesScreen() {
   const initialBucket = route.params?.initialBucket || 'all';
 
   const [activeTab, setActiveTab] = useState(initialBucket);
+  const user = useSelector((state) => state.auth.user);
+  // Same module gating as the web ClientBatteriesPage bucketPermissionMap
+  const BUCKET_PERMISSION = { all: 'client_all_batteries', packed: 'client_packed', received: 'client_received' };
+  const bucketAllowed = hasClientPermission(user, BUCKET_PERMISSION[activeTab]);
   const [search, setSearch] = useState('');
   const [dateFilter, setDateFilter] = useState('all');
+  // ?status= on the web "All Batteries" page (dashboard cards link with it)
+  const [statusFilter, setStatusFilter] = useState(route.params?.initialStatus || '');
   const [batteries, setBatteries] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -99,6 +107,8 @@ export default function ClientBatteriesScreen() {
         params.bucket = activeTab;
       }
       const { data } = await apiClient.get('/clients/me/batteries', { params });
+      // packed/received come back as one row per battery per truck visit;
+      // ClientTruckBatches groups them by truck exactly like the web page.
       setBatteries(data.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -112,7 +122,8 @@ export default function ClientBatteriesScreen() {
     if (route.params?.initialBucket) {
       setActiveTab(route.params.initialBucket);
     }
-  }, [route.params?.initialBucket]);
+    setStatusFilter(route.params?.initialStatus || '');
+  }, [route.params?.initialBucket, route.params?.initialStatus]);
 
   useEffect(() => {
     setLoading(true);
@@ -217,6 +228,13 @@ export default function ClientBatteriesScreen() {
   }
 
   const filteredBatteries = batteries.filter((b) => {
+    if (statusFilter && activeTab === 'all') {
+      const shown = clientBatteryStatus(b);
+      const match = statusFilter === 'unserviceable'
+        ? ['unserviceable', 'tested_parts_removed', 'recycled'].includes(shown)
+        : shown === statusFilter;
+      if (!match) return false;
+    }
     if (!matchesDateFilter(relevantDate(b, activeTab), dateFilter)) return false;
     if (!search.trim()) return true;
     const q = search.toLowerCase().trim();
@@ -298,6 +316,16 @@ export default function ClientBatteriesScreen() {
           })}
         </View>
 
+        {statusFilter && activeTab === 'all' ? (
+          <View className="mt-2 flex-row items-center gap-2">
+            <Text className="text-[11px] font-bold text-slate-500">Showing:</Text>
+            <TouchableOpacity onPress={() => setStatusFilter('')} className="flex-row items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1">
+              <Text className="text-[11px] font-bold capitalize text-white">{statusFilter.replace(/_/g, ' ')}</Text>
+              <Text className="text-[11px] font-bold text-white">✕</Text>
+            </TouchableOpacity>
+          </View>
+        ) : null}
+
         {activeTab === 'packed' && (
           <TouchableOpacity
             onPress={() => setPackModalOpen(true)}
@@ -324,6 +352,14 @@ export default function ClientBatteriesScreen() {
             <Text className="text-xs font-bold text-white">Retry</Text>
           </TouchableOpacity>
         </View>
+      ) : !bucketAllowed ? (
+        <View className="flex-1 items-center justify-center p-6">
+          <Text className="text-center text-sm font-medium text-slate-600">
+            You do not have permission to view this section. Please contact your Refurbinics administrator if you need access.
+          </Text>
+        </View>
+      ) : activeTab === 'packed' || activeTab === 'received' ? (
+        <ClientTruckBatches bucket={activeTab} rows={filteredBatteries} onChanged={fetchBatteries} />
       ) : (
         <FlatList
           data={filteredBatteries}
@@ -371,7 +407,7 @@ export default function ClientBatteriesScreen() {
                       </View>
                     )}
                   </View>
-                  <StatusBadge status={item.status} />
+                  <StatusBadge status={clientBatteryStatus(item)} />
                 </View>
 
                 {/* Battery Number row */}

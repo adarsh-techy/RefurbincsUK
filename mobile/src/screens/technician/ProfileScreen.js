@@ -82,9 +82,17 @@ export default function ProfileScreen() {
             <Text className="text-xs font-bold capitalize text-blue-600 dark:text-blue-400">
               {isClient
                 ? 'Client Account'
-                : user?.staff_role
-                  ? user.staff_role.charAt(0).toUpperCase() + user.staff_role.slice(1)
-                  : 'Technician'}
+                : user?.role === 'super_admin'
+                  ? 'Super Admin'
+                  : user?.role === 'admin'
+                    ? 'Admin'
+                    : user?.role === 'staff'
+                      ? 'Office Staff'
+                      : user?.role === 'recycle_client'
+                        ? 'Recycling Partner'
+                        : user?.staff_role
+                          ? user.staff_role.charAt(0).toUpperCase() + user.staff_role.slice(1)
+                          : 'Technician'}
             </Text>
           </View>
         </View>

@@ -8,9 +8,9 @@
  * ship working logins (including super admin) to anyone who opens the site.
  */
 export const DEMO_LOGIN_ENABLED =
-  import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'false' ? false : true;
+  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
-export const DEMO_CREDENTIALS = {
+export const DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
   superAdmin: {
     id: 'superAdmin',
     label: 'Super Admin',
@@ -37,7 +37,7 @@ export const DEMO_CREDENTIALS = {
   },
 };
 
-export const MOBILE_DEMO_CREDENTIALS = {
+export const MOBILE_DEMO_CREDENTIALS = !DEMO_LOGIN_ENABLED ? null : {
   akhil: {
     id: 'akhil',
     label: 'Akhil Tech',

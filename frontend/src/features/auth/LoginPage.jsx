@@ -196,15 +196,10 @@ export default function LoginPage() {
               </button>
             </form>
 
-            {/* Create Super Admin */}
+            {/* New accounts are created by a signed-in Super Admin (User
+                Accounts / Create Super Admin), not from the public login page. */}
             <div className="mt-6 text-center text-sm text-[#4b5563]">
-              Need an account?{' '}
-              <Link
-                to="/register"
-                className="font-semibold text-[#0d5c3a] underline hover:text-[#0a482e] transition cursor-pointer"
-              >
-                Create Super Admin
-              </Link>
+              Need an account? Ask your Refurbnics administrator.
             </div>
 
             {/* Footer Copyright */}
@@ -245,7 +240,8 @@ export default function LoginPage() {
               Sign in to access your workspace.
             </p>
 
-            {/* Quick Access */}
+            {/* Quick Access — dev / demo builds only (see config/demo-credentials.js) */}
+            {DEMO_LOGIN_ENABLED && (
             <div className="mb-5">
               <label className="block text-xs font-semibold text-slate-600 mb-2.5">
                 Quick access
@@ -357,6 +353,7 @@ export default function LoginPage() {
                 </div>
               )}
             </div>
+            )}
 
             {/* Credentials form */}
             <form onSubmit={handleSubmit} className="space-y-4">
@@ -372,7 +369,7 @@ export default function LoginPage() {
                     onChange={(e) => setEmail(e.target.value)}
                     required
                     autoComplete="email"
-                    placeholder="akhil@gmail.com"
+                    placeholder="you@company.com"
                     className="w-full rounded-2xl border border-slate-200 bg-[#f8fafc] py-3 pl-10 pr-3.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 transition focus:border-[#0a4d3c] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0a4d3c]/15"
                   />
                 </div>

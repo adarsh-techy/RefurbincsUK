@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { StatusBadge } from '../../components/ui/Badge';
@@ -12,6 +13,8 @@ const DEBOUNCE_MS = 250;
 
 export default function ClientScanScreen() {
   const navigation = useNavigation();
+  const role = useSelector((s) => s.auth.user?.role);
+  const isClient = role === 'client';
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -27,8 +30,11 @@ export default function ClientScanScreen() {
     }
     debounceRef.current = setTimeout(async () => {
       try {
-        const { data } = await apiClient.get('/clients/me/batteries');
         const q = manualCode.trim().toLowerCase();
+        // Office roles aren't linked to a client — search the whole fleet instead
+        const { data } = isClient
+          ? await apiClient.get('/clients/me/batteries')
+          : await apiClient.get('/batteries', { params: { search: manualCode.trim(), limit: SUGGESTION_LIMIT } });
         const list = (data.data || []).filter(
           (b) =>
             b.battery_code?.toLowerCase().includes(q) ||

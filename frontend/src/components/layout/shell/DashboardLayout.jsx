@@ -221,8 +221,14 @@ function DashboardLayout() {
         </main>
         <AppFooter />
       </div>
-      <LowStockAlert />
-      <UnserviceableBatteriesAlert />
+      {/* Workshop alerts call office-only endpoints (/parts, unserviceable
+          count); a recycle_client also lands in this layout but may not. */}
+      {['super_admin', 'admin', 'staff'].includes(user?.role) && (
+        <>
+          <LowStockAlert />
+          <UnserviceableBatteriesAlert />
+        </>
+      )}
 
       {isCustomizerOpen && <ThemeCustomizerModal onClose={closeCustomizer} />}
     </div>

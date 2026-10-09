@@ -76,13 +76,26 @@ async function login(req, res, next) {
   }
 }
 
-// Register endpoint for creating new accounts
+// Create Super Admin. Once any account exists this is only open to a
+// signed-in super admin — it used to be public, which let anyone on the
+// internet make themselves a super admin. On an empty database the first
+// account may be created without signing in (fresh-install bootstrap).
 async function register(req, res, next) {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password } = req.body;
+
+    const bootstrap = !(await userModel.anyExist());
+    if (!bootstrap && req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        message: 'Only a signed-in Super Admin can create a new Super Admin account.',
+      });
+    }
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
+    }
+    if (typeof password !== 'string' || password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters' });
     }
 
     const existing = await userModel.findByEmail(email);
@@ -99,17 +112,23 @@ async function register(req, res, next) {
       permissions: PERMISSIONS,
     });
 
+    const publicUser = {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      permissions: user.permissions,
+      must_change_password: user.must_change_password,
+      client_logo_path: null,
+    };
+    // An existing super admin creating a colleague stays signed in as
+    // themselves — only the bootstrap account gets a session back.
+    if (!bootstrap) {
+      return res.status(201).json({ user: publicUser, created: true });
+    }
     res.status(201).json({
       token: signToken(user),
-      user: {
-        id: user.id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        permissions: user.permissions,
-        must_change_password: user.must_change_password,
-        client_logo_path: null,
-      },
+      user: publicUser,
     });
   } catch (err) {
     next(err);

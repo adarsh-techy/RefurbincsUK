@@ -64,7 +64,9 @@ function EyeIcon({ open }) {
   );
 }
 
-const PRESETS = [
+// Demo quick-fill accounts exist only in development builds; a release APK
+// gets an empty list so no working credentials ship inside the app.
+const PRESETS = !__DEV__ ? [] : [
   {
     id: 'superadmin',
     name: 'Super Admin',
@@ -125,8 +127,8 @@ const PRESETS = [
 export default function LoginScreen() {
   const dispatch = useDispatch();
   const { status, error } = useSelector((state) => state.auth);
-  const [email, setEmail] = useState('superadmin@gmail.com');
-  const [password, setPassword] = useState('12345678');
+  const [email, setEmail] = useState(__DEV__ ? 'superadmin@gmail.com' : '');
+  const [password, setPassword] = useState(__DEV__ ? '12345678' : '');
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -314,7 +316,7 @@ export default function LoginScreen() {
                   autoCapitalize="none"
                   keyboardType="email-address"
                   autoComplete="email"
-                  placeholder="superadmin@gmail.com"
+                  placeholder="you@company.com"
                   placeholderTextColor="#94a3b8"
                   className="flex-1 py-3 text-sm font-medium text-slate-900"
                 />

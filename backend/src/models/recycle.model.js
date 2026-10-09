@@ -78,7 +78,7 @@ async function findById(id) {
 // originally belonged to and why it was declared unserviceable.
 async function findBatteries(recycleId) {
   const { rows } = await db.query(
-    `SELECT b.id, b.battery_code, b.status, b.client_name,
+    `SELECT b.id, b.battery_code, b.status, b.client_name, b.rfid_tag,
             last_issue.reason AS issue_reason,
             last_issue.note AS issue_note,
             last_issue.photo_urls AS issue_photos,

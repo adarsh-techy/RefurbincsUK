@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import Modal from '../../components/ui/overlays/Modal';
 import { useTheme } from '../../context/ThemeContext';
@@ -48,6 +49,7 @@ function timeAgo(ts) {
 }
 
 export default function ClientSupportPage() {
+  const userRole = useSelector((state) => state.auth.user?.role);
   const { customTheme } = useTheme();
   const accent = customTheme?.accentColor || '#10b981';
 
@@ -124,18 +126,19 @@ export default function ClientSupportPage() {
   }, []);
 
   useEffect(() => {
+    // Only fleet clients have a battery list (the endpoint is
+    // requireRole('client')); a recycle_client or office login would just
+    // get a 403, so don't ask. batteriesLoaded stays false and the battery
+    // field isn't validated against an empty list.
+    if (userRole !== 'client') return;
     apiClient
       .get('/clients/me/batteries')
       .then(({ data: result }) => {
         setMyBatteries(result.data || []);
         setBatteriesLoaded(true);
       })
-      .catch(() => {
-        // Not every account this page serves (e.g. recycle_client) has a
-        // linked battery fleet — fail quietly and leave batteriesLoaded
-        // false, so the field isn't validated against an empty list.
-      });
-  }, []);
+      .catch(() => {});
+  }, [userRole]);
 
   // Socket listeners for real-time messages
   useEffect(() => {

@@ -48,7 +48,9 @@ function Navbar({ onMenuClick }) {
       <div className="ml-auto flex items-center gap-2 sm:gap-4">
         <UkClock />
         {!isClient && <RepeatIntakeAlert />}
-        {isClient ? <ClientNotificationBell /> : <NotificationBell />}
+        {/* The client feed (/clients/me/notifications) is requireRole('client');
+            a recycle partner has no feed, so it gets no bell rather than a 403. */}
+        {user?.role === 'client' ? <ClientNotificationBell /> : user?.role === 'recycle_client' ? null : <NotificationBell />}
         <MessagesHeaderIcon />
         <ThemeCustomizerButton />
         <ThemeToggle />

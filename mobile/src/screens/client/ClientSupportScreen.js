@@ -44,6 +44,24 @@ function timeAgo(ts) {
 
 export default function ClientSupportScreen() {
   const user = useSelector((state) => state.auth.user);
+  // Office roles see every client's tickets and can change status; clients
+  // and recycling partners only see their own and can raise new ones.
+  const isOffice = ['super_admin', 'admin', 'staff'].includes(user?.role);
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  async function changeStatus(status) {
+    if (!activeTicket) return;
+    setUpdatingStatus(true);
+    try {
+      const { data } = await apiClient.patch(`/tickets/${activeTicket.id}/status`, { status });
+      setActiveTicket((t) => ({ ...t, ...(data?.ticket || data || {}), status }));
+      setTickets((list) => list.map((t) => (t.id === activeTicket.id ? { ...t, status } : t)));
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setUpdatingStatus(false);
+    }
+  }
   const [tickets, setTickets] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -165,6 +183,28 @@ export default function ClientSupportScreen() {
             contentContainerClassName="p-4 gap-3"
             onContentSizeChange={() => scrollRef.current?.scrollToEnd({ animated: false })}
           >
+            {isOffice && (
+              <View className="rounded-2xl border border-slate-200 bg-white p-3">
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {activeTicket.client_name || 'Client'} · status: {(activeTicket.status || 'open').replace('_', ' ')}
+                </Text>
+                <View className="mt-2 flex-row flex-wrap gap-1.5">
+                  {['open', 'in_progress', 'resolved', 'closed'].map((s) => {
+                    const active = activeTicket.status === s;
+                    return (
+                      <TouchableOpacity
+                        key={s}
+                        disabled={updatingStatus || active}
+                        onPress={() => changeStatus(s)}
+                        className={`rounded-lg px-2.5 py-1.5 ${active ? 'bg-blue-600' : 'bg-slate-100'}`}
+                      >
+                        <Text className={`text-[11px] font-bold capitalize ${active ? 'text-white' : 'text-slate-600'}`}>{s.replace('_', ' ')}</Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            )}
             {activeTicket.battery_code && (
               <View className="self-start rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1">
                 <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
@@ -173,7 +213,7 @@ export default function ClientSupportScreen() {
               </View>
             )}
             {(activeTicket.messages || []).map((msg) => {
-              const isMe = msg.sender_role === 'client' || msg.sender_role === 'recycle_client';
+              const isMe = msg.sender_id != null && user?.id != null ? Number(msg.sender_id) === Number(user.id) : msg.sender_role === 'client' || msg.sender_role === 'recycle_client';
               return (
                 <View key={msg.id} className={`max-w-[85%] ${isMe ? 'self-end items-end' : 'self-start items-start'}`}>
                   <View
@@ -219,13 +259,17 @@ export default function ClientSupportScreen() {
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-row items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 px-4 py-3">
-        <Text className="text-xs text-slate-500 dark:text-slate-400">Direct messaging with the Refurbinics team</Text>
-        <TouchableOpacity
-          onPress={() => setCreateOpen(true)}
-          className="rounded-xl bg-blue-600 px-3.5 py-2 shadow-sm active:bg-blue-700"
-        >
-          <Text className="text-xs font-bold text-white">+ New Request</Text>
-        </TouchableOpacity>
+        <Text className="text-xs text-slate-500 dark:text-slate-400">
+          {isOffice ? 'Support requests from all clients' : 'Direct messaging with the Refurbinics team'}
+        </Text>
+        {!isOffice && (
+          <TouchableOpacity
+            onPress={() => setCreateOpen(true)}
+            className="rounded-xl bg-blue-600 px-3.5 py-2 shadow-sm active:bg-blue-700"
+          >
+            <Text className="text-xs font-bold text-white">+ New Request</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {loading ? (
@@ -251,7 +295,9 @@ export default function ClientSupportScreen() {
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
               <Text className="text-sm font-bold text-slate-900 dark:text-white">No support requests yet</Text>
-              <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">Tap "+ New Request" to reach the team.</Text>
+              <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">
+                {isOffice ? 'Client support requests will appear here.' : 'Tap "+ New Request" to reach the team.'}
+              </Text>
             </View>
           }
           renderItem={({ item }) => {

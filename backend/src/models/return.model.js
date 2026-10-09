@@ -71,7 +71,7 @@ async function findById(id) {
 // scoped to return_batteries instead of battery_visits.
 async function findBatteries(returnId) {
   const { rows } = await db.query(
-    `SELECT b.id, b.battery_code, b.serial_number, b.status,
+    `SELECT b.id, b.battery_code, b.serial_number, b.status, b.rfid_tag,
             last_repair.repaired_at AS last_repaired_at,
             last_parts.part_names AS last_repaired_parts
      FROM return_batteries rb

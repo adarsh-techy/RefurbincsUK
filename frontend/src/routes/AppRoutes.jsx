@@ -17,6 +17,7 @@ const UnserviceableBatteriesPage = lazy(() => import('../features/batteries/page
 const RecycledBatteriesPage = lazy(() => import('../features/batteries/pages/RecycledBatteriesPage'));
 const BatteryDetailPage = lazy(() => import('../features/batteries/pages/BatteryDetailPage'));
 const GenerateQrPage = lazy(() => import('../features/batteries/pages/GenerateQrPage'));
+const RfidAssignmentPage = lazy(() => import('../features/batteries/pages/RfidAssignmentPage'));
 const StaffPage = lazy(() => import('../features/staff/StaffPage'));
 const StaffDetailPage = lazy(() => import('../features/staff/StaffDetailPage'));
 const PartsPage = lazy(() => import('../features/parts/PartsPage'));
@@ -87,9 +88,12 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/register" element={<RegisterPage />} />
-      <Route path="/create-account" element={<RegisterPage />} />
-      <Route path="/signup" element={<RegisterPage />} />
+      {/* Create Super Admin — signed-in super admins only (the API enforces it too) */}
+      <Route element={<ProtectedRoute roles={['super_admin']} />}>
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/create-account" element={<RegisterPage />} />
+        <Route path="/signup" element={<RegisterPage />} />
+      </Route>
 
       {/* Battery Detail & Full History: Accessible both publicly via QR scan and when logged in */}
       <Route element={<DashboardLayout />}>
@@ -118,6 +122,7 @@ function AppRoutes() {
             <Route path="/batteries/unserviceable" element={<UnserviceableBatteriesPage />} />
             <Route path="/batteries/recycled" element={<RecycledBatteriesPage />} />
             <Route path="/batteries-qr-code" element={<GenerateQrPage />} />
+            <Route path="/rfid-assignment" element={<RfidAssignmentPage />} />
             <Route path="/trash" element={<TrashPage />} />
             <Route path="/trash/:id" element={<TrashDetailPage />} />
           </Route>

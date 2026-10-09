@@ -3,6 +3,30 @@ const multer = require('multer');
 const batteryController = require('../controllers/battery.controller');
 const { requireAuth, optionalAuth, requireRole } = require('../middlewares/auth');
 
+// RFID Assignment sheet upload (.xlsx / .csv), parsed in memory
+const RFID_SHEET_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'text/csv',
+  'application/vnd.ms-excel',
+]);
+const uploadRfidSheet = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  // Decide by extension: the file is parsed in memory and never stored, and
+  // browsers/OSes report CSV and XLSX with inconsistent MIME types
+  // (application/octet-stream is common for .csv on macOS).
+  fileFilter: (req, file, cb) => {
+    const okExt = /\.(xlsx|csv)$/i.test(file.originalname || '');
+    const okType = RFID_SHEET_TYPES.has(file.mimetype) || file.mimetype === 'application/octet-stream' || !file.mimetype;
+    if (!okExt || !okType) {
+      const err = new Error('Only .xlsx or .csv files are supported');
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, true);
+  },
+});
+
 const uploadIssuePhotos = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file, up to 3 files
@@ -13,6 +37,8 @@ const uploadIssuePhotos = multer({
 router.get('/count-by-client', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.countByClient);
 router.get('/serial-numbers', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.listSerialNumbers);
 router.get('/repeat-intakes-this-month', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.repeatIntakesThisMonth);
+router.get('/rfid-assignments', requireAuth, requireRole('super_admin', 'admin', 'staff'), batteryController.listRfidAssignments);
+router.get('/rfid-template', requireAuth, requireRole('super_admin', 'admin', 'staff'), batteryController.rfidTemplate);
 router.get('/unserviceable-count', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.unserviceableCount);
 
 // Public / client QR code tracking endpoint — anyone scanning a QR code can see
@@ -29,6 +55,14 @@ router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician', 'supe
 router.post('/generate', requireRole('super_admin', 'admin', 'staff'), batteryController.generate);
 // Bulk generating up to 50,000 QR codes for a client.
 router.post('/generate-bulk', requireRole('super_admin', 'admin', 'staff'), batteryController.generateBulk);
+// RFID Assignment page: upload a sheet of battery number + tag; ?dryRun=true
+// previews the matching without writing.
+router.post(
+  '/rfid-assign',
+  requireRole('super_admin', 'admin', 'staff'),
+  uploadRfidSheet.single('file'),
+  batteryController.assignRfidSheet
+);
 // Assigning a client (for the Generate QR Code page).
 router.patch('/:id/client', requireRole('super_admin', 'admin', 'staff'), batteryController.updateClient);
 // Assigning or updating physical Battery Number (serial_number).
