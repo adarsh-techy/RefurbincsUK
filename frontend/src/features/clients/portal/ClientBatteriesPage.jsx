@@ -1679,6 +1679,722 @@ function ClientBatteriesPage() {
   // ═════════════════════════════════════════════════════════════════════
   // ── DEDICATED FULL-SCREEN BATCH DETAIL PAGE VIEW (NOT A POPUP) ───────
   // ═════════════════════════════════════════════════════════════════════
+  // Popups opened from BOTH the list and an open truck batch (verify receipt,
+  // rating, edit batch / battery, remove battery, cancel batch, add more).
+  // The batch view returns early, so it has to render these too — before,
+  // its buttons set state for popups that only the list view rendered.
+  function renderBatchModals() {
+    return (
+      <>
+        {/* ── Client Return Verification Modal ──────────────────────────── */}
+        {verifyTargetReturn && (
+          <ClientReturnVerifyModal
+            returnId={verifyTargetReturn.intakeId || verifyTargetReturn.returnId}
+            batchData={verifyTargetReturn}
+            onClose={() => setVerifyTargetReturn(null)}
+            onSuccess={(verifiedData, returnBatteries) => {
+              loadData();
+              const allBatchBatteries = (returnBatteries && returnBatteries.length > 0)
+                ? returnBatteries
+                : (verifyTargetReturn?.batteries || []);
+              const codes = allBatchBatteries.map((b) => b.battery_code).filter(Boolean);
+              setRatingModalData({
+                isOpen: true,
+                batteryCode: codes[0] || '',
+                batteryCodes: codes,
+                truckNumber: verifyTargetReturn?.truckNumber || '',
+                driverName: verifyTargetReturn?.driverName || '',
+                returnId: verifyTargetReturn?.intakeId || verifyTargetReturn?.returnId || null,
+              });
+              setVerifyTargetReturn(null);
+            }}
+          />
+        )}
+
+        {/* ── Rating & Service Feedback Modal (For whole truck delivery or single battery) ── */}
+        {ratingModalData.isOpen && (
+          <RatingModal
+            batteryCode={ratingModalData.batteryCode}
+            batteryCodes={ratingModalData.batteryCodes}
+            truckNumber={ratingModalData.truckNumber}
+            driverName={ratingModalData.driverName}
+            returnId={ratingModalData.returnId}
+            clientId={user?.client_id || user?.id}
+            onClose={() =>
+              setRatingModalData({
+                isOpen: false,
+                batteryCode: '',
+                batteryCodes: [],
+                truckNumber: '',
+                driverName: '',
+                returnId: null,
+              })
+            }
+            onSuccess={() => {
+              loadData();
+              loadRatedReturns();
+            }}
+          />
+        )}
+
+        {/* ── Edit Batch Modal (Logistics, Add Battery, Remove Battery) ── */}
+        {editBatchTarget && (
+          <Modal
+            size="3xl"
+            title={`Edit Truck Batch — ${editBatchTarget.truckNumber || 'Intake'}`}
+            description="Update truck information, add new batteries to this intake shipment, or remove units."
+            onClose={() => {
+              setEditBatchTarget(null);
+              setEditBatchError(null);
+              setEditBatchSuccess(null);
+            }}
+          >
+            <div className="flex flex-col gap-5">
+              {editBatchSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  {editBatchSuccess}
+                </div>
+              )}
+
+              {editBatchError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                  {editBatchError}
+                </div>
+              )}
+
+              {/* 1. Truck & Driver Metadata */}
+              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-surface-800/60">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200 mb-3 flex items-center gap-1.5">
+                  <FiTruck className="w-3.5 h-3.5 text-blue-500" />
+                  <span>Truck Logistics & Vehicle Info</span>
+                </h4>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className={labelClasses}>
+                      Truck Number <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editBatchTruck}
+                      onChange={(e) => setEditBatchTruck(e.target.value.toUpperCase())}
+                      placeholder="e.g. GB21 XYZ or LD68 FGH"
+                      autoComplete="off"
+                      className={formInputClasses}
+                    />
+                  </div>
+                  <div>
+                    <label className={labelClasses}>
+                      Driver Name <span className="text-rose-500 font-bold">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={editBatchDriver}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setEditBatchDriver(val.charAt(0).toUpperCase() + val.slice(1));
+                      }}
+                      placeholder="e.g. George Davies"
+                      className={formInputClasses}
+                    />
+                  </div>
+                  <div className="sm:col-span-2 flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleEditBatchSave}
+                      disabled={editBatchSaving}
+                      style={{ backgroundColor: accent }}
+                      className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
+                    >
+                      {editBatchSaving ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <span>Saving…</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiCheckCircle className="w-3.5 h-3.5" />
+                          <span>Save Truck &amp; Driver Info</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* 2. Batteries in this Intake Batch */}
+              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-surface-800">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200">
+                      Batteries in this Intake ({editBatchBatteries.length} Loaded)
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-slate-400 dark:text-neutral-500">
+                    {editBatchBatteries.length === 1 ? '1 battery' : `${editBatchBatteries.length} batteries`}
+                  </span>
+                </div>
+
+                {editBatchBatteries.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-white/10 dark:text-neutral-500">
+                    No batteries in this intake batch. Use the form below to add batteries.
+                  </div>
+                ) : (
+                  <div className="max-h-60 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 dark:divide-white/5">
+                    {editBatchBatteries.map((b, idx) => (
+                      <div
+                        key={b.id || b.battery_code || idx}
+                        className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs"
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                          <span className="font-mono text-slate-400 dark:text-neutral-500 w-5 text-center font-bold">
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-lg">
+                                {b.battery_code || b.code}
+                              </span>
+                              {b.serial_number && (
+                                <span className="font-mono text-slate-600 dark:text-neutral-300 text-[11px]">
+                                  SN: {b.serial_number}
+                                </span>
+                              )}
+                            </div>
+                            {b.notes && (
+                              <p className="text-[11px] text-slate-500 dark:text-neutral-400 truncate mt-0.5">
+                                {b.notes}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => handleEditModalRemoveBattery(b)}
+                          disabled={editBatchRemovingId === (b.id || b.battery_code || b.code)}
+                          className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50/80 px-2.5 py-1 text-xs font-bold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                          title="Remove from this intake"
+                        >
+                          {editBatchRemovingId === b.id ? (
+                            <div className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
+                          ) : (
+                            <FiTrash2 className="w-3.5 h-3.5" />
+                          )}
+                          <span>Remove</span>
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* 3. Add Another Battery to this Intake Batch */}
+              <div className="rounded-2xl border border-blue-200/90 bg-blue-50/40 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between mb-2.5">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
+                    <FiPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    <span>Add Another Battery to this Intake</span>
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={() => setEditBatchAddCamera((prev) => !prev)}
+                    className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 cursor-pointer"
+                  >
+                    <FiCamera className="w-3.5 h-3.5" />
+                    <span>{editBatchAddCamera ? 'Close Camera' : 'Scan QR'}</span>
+                  </button>
+                </div>
+
+                {editBatchAddCamera && (
+                  <div className="mb-3 rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/60">
+                    <QrScanner
+                      onScan={(scanned) => {
+                        const code = extractBatteryCode(scanned);
+                        if (code) {
+                          handleEditModalAddBattery(code);
+                        }
+                      }}
+                      onClose={() => setEditBatchAddCamera(false)}
+                    />
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <div className="relative">
+                    <input data-rfid-scan="client-edit-batch"
+                      type="text"
+                      value={editBatchAddInput}
+                      onChange={(e) => {
+                        setEditBatchAddInput(e.target.value.toUpperCase());
+                        setEditBatchShowSuggestions(true);
+                      }}
+                      onFocus={() => setEditBatchShowSuggestions(true)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          if (editBatchAddInput.trim()) {
+                            handleEditModalAddBattery();
+                          }
+                        }
+                      }}
+                      placeholder="Type battery ID (e.g. UBE-0012) or scan QR code…"
+                      className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-xs font-mono font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-blue-800/60 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
+                    />
+                    <RfidScanButton target="client-edit-batch" />
+
+                    {/* Suggestions Dropdown */}
+                    {editBatchShowSuggestions && editBatchScanSuggestions.length > 0 && (
+                      <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-xl border border-blue-200 bg-white p-1.5 shadow-xl dark:border-blue-800/60 dark:bg-surface-900">
+                        <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                          Available Fleet Batteries
+                        </div>
+                        {editBatchScanSuggestions.map((b) => (
+                          <button
+                            key={b.id || b.battery_code}
+                            type="button"
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => {
+                              handleEditModalAddBattery(b.battery_code, b.serial_number || '', b.notes || '');
+                            }}
+                            className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30"
+                          >
+                            <span className="font-mono font-bold text-blue-700 dark:text-blue-400">
+                              {b.battery_code}
+                            </span>
+                            {b.serial_number && (
+                              <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono">
+                                SN: {b.serial_number}
+                              </span>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                    <input
+                      type="text"
+                      value={editBatchAddSerial}
+                      onChange={(e) => setEditBatchAddSerial(e.target.value)}
+                      placeholder="Serial Number (Optional)"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
+                    />
+                    <input
+                      type="text"
+                      value={editBatchAddNotes}
+                      onChange={(e) => setEditBatchAddNotes(e.target.value)}
+                      placeholder="Fault / Defect Note (Optional)"
+                      className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end">
+                    <button
+                      type="button"
+                      onClick={() => handleEditModalAddBattery()}
+                      disabled={editBatchAddLoading || !editBatchAddInput.trim()}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+                    >
+                      {editBatchAddLoading ? (
+                        <>
+                          <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                          <span>Adding Battery…</span>
+                        </>
+                      ) : (
+                        <>
+                          <FiPlus className="w-3.5 h-3.5" />
+                          <span>Add to Intake</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Footer Buttons */}
+              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditBatchTarget(null);
+                    setEditBatchError(null);
+                    setEditBatchSuccess(null);
+                  }}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10 cursor-pointer"
+                >
+                  Close
+                </button>
+                <button
+                  type="button"
+                  onClick={handleEditBatchSave}
+                  disabled={editBatchSaving}
+                  style={{ backgroundColor: accent }}
+                  className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
+                >
+                  {editBatchSaving ? 'Saving Changes…' : 'Save & Done'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Edit Battery in Batch Modal ───────────────────────────────── */}
+        {editBatteryTarget && (
+          <Modal
+            title={`Edit Battery — ${editBatteryTarget.battery_code}`}
+            description="Update the physical serial number or fault/defect notes for this battery."
+            onClose={() => {
+              setEditBatteryTarget(null);
+              setEditBatteryError(null);
+            }}
+          >
+            <form onSubmit={handleEditBatterySave} className="flex flex-col gap-4">
+              {editBatteryError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                  {editBatteryError}
+                </div>
+              )}
+              <div>
+                <label className={labelClasses}>Physical Battery Number (Manufacturer Serial)</label>
+                <input
+                  type="text"
+                  value={editBatterySerial}
+                  onChange={(e) => setEditBatterySerial(e.target.value)}
+                  placeholder="e.g. SN-88213"
+                  autoComplete="off"
+                  className={formInputClasses}
+                />
+              </div>
+              <div>
+                <label className={labelClasses}>Defect / Fault Notes</label>
+                <textarea
+                  rows={3}
+                  value={editBatteryNotes}
+                  onChange={(e) => setEditBatteryNotes(e.target.value)}
+                  placeholder="e.g. BMS error code E04, water ingress, degraded range…"
+                  className={formInputClasses}
+                />
+                <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                  These notes are forwarded to the repair technicians at the workshop.
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditBatteryTarget(null);
+                    setEditBatteryError(null);
+                  }}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={editBatterySaving}
+                  style={{ backgroundColor: accent }}
+                  className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50"
+                >
+                  {editBatterySaving ? 'Saving…' : 'Save Battery'}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {/* ── Remove Battery Confirmation Modal ──────────────────────────── */}
+        {removeBatteryTarget && (
+          <Modal
+            title="Remove Battery from Batch?"
+            description={`Are you sure you want to remove ${removeBatteryTarget.battery.battery_code} from this truck intake?`}
+            onClose={() => {
+              setRemoveBatteryTarget(null);
+              setRemoveBatteryError(null);
+            }}
+          >
+            <div className="flex flex-col gap-4">
+              {removeBatteryError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                  {removeBatteryError}
+                </div>
+              )}
+              <p className="text-xs text-slate-600 dark:text-neutral-300">
+                The battery <strong className="font-mono text-slate-900 dark:text-white">{removeBatteryTarget.battery.battery_code}</strong> will be unlinked from this truck dispatch and returned to your available fleet inventory.
+              </p>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setRemoveBatteryTarget(null);
+                    setRemoveBatteryError(null);
+                  }}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10"
+                >
+                  Keep in Batch
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveBatteryConfirm}
+                  disabled={removeBatteryLoading}
+                  className="rounded-xl bg-red-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {removeBatteryLoading ? 'Removing…' : 'Remove from Batch'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Delete / Cancel Batch Confirmation Modal ──────────────────── */}
+        {deleteBatchTarget && (
+          <Modal
+            title="Cancel Truck Intake Batch?"
+            description={`Are you sure you want to cancel and delete Truck ${deleteBatchTarget.truckNumber || 'Batch'}?`}
+            onClose={() => {
+              setDeleteBatchTarget(null);
+              setDeleteBatchError(null);
+            }}
+          >
+            <div className="flex flex-col gap-4">
+              {deleteBatchError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                  {deleteBatchError}
+                </div>
+              )}
+              <p className="text-xs text-slate-600 dark:text-neutral-300">
+                This will completely cancel the intake batch. All <strong className="text-slate-900 dark:text-white">{deleteBatchTarget.batteries?.length || 0} batteries</strong> in this batch will be automatically unlinked and safely returned to your active fleet inventory.
+              </p>
+              <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDeleteBatchTarget(null);
+                    setDeleteBatchError(null);
+                  }}
+                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10"
+                >
+                  Go Back
+                </button>
+                <button
+                  type="button"
+                  onClick={handleDeleteBatchConfirm}
+                  disabled={deleteBatchLoading}
+                  className="rounded-xl bg-red-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700 disabled:opacity-50 transition-colors"
+                >
+                  {deleteBatchLoading ? 'Cancelling…' : 'Cancel & Delete Batch'}
+                </button>
+              </div>
+            </div>
+          </Modal>
+        )}
+
+        {/* ── Add Batteries to Existing Batch Modal ────────────────────── */}
+        {addMoreToBatchOpen && selectedBatch && (
+          <Modal
+            title={`Add Batteries to Truck ${selectedBatch.truckNumber || ''}`}
+            description="Scan or choose additional batteries to include in this truck dispatch."
+            size="3xl"
+            className="min-h-[520px]"
+            onClose={() => setAddMoreToBatchOpen(false)}
+          >
+            <form onSubmit={handleAddMoreToBatchSubmit} className="flex flex-col gap-5">
+              {addMoreSuccess && (
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                  ✓ {addMoreSuccess}
+                </div>
+              )}
+              {addMoreError && (
+                <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+                  {addMoreError}
+                </div>
+              )}
+
+              <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
+                <div className="mb-1 flex items-center justify-between">
+                  <h3 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
+                    Scan or Pick Batteries
+                  </h3>
+                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
+                    {addMoreBatteries.length} selected
+                  </span>
+                </div>
+                <p className="mb-3 text-xs text-slate-500 dark:text-neutral-400">
+                  Type or scan a battery code to add to Truck {selectedBatch.truckNumber || 'Batch'}.
+                </p>
+
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input data-rfid-scan="client-add-more"
+                      type="text"
+                      value={addMoreScanInput}
+                      onChange={(e) => {
+                        setAddMoreScanInput(e.target.value.toUpperCase());
+                        setAddMoreShowSuggestions(true);
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') {
+                          e.preventDefault();
+                          handleAddMoreBattery(addMoreScanInput);
+                        }
+                      }}
+                      onFocus={() => setAddMoreShowSuggestions(true)}
+                      placeholder="Scan, type code or pick from suggestions…"
+                      autoComplete="off"
+                      className={formInputClasses}
+                    />
+                    <RfidScanButton target="client-add-more" />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleAddMoreBattery(addMoreScanInput)}
+                    disabled={!addMoreScanInput.trim()}
+                    className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                  >
+                    Add
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAddMoreCameraOpen((prev) => !prev)}
+                    className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+                  >
+                    {addMoreCameraOpen ? 'Close Camera' : 'Use Camera'}
+                  </button>
+                </div>
+
+                {/* Suggestions */}
+                {addMoreShowSuggestions && (
+                  <div className="mt-3 overflow-hidden rounded-xl border border-blue-300 bg-white shadow-sm dark:border-blue-800/60 dark:bg-surface-900">
+                    <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3.5 py-2 text-[11px] font-bold text-slate-600 dark:border-white/10 dark:bg-surface-800/80 dark:text-neutral-300">
+                      <span>Available Registered Batteries ({addMoreScanSuggestions.length})</span>
+                      <button
+                        type="button"
+                        onClick={() => setAddMoreShowSuggestions(false)}
+                        className="rounded px-2 py-0.5 text-[11px] font-semibold text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
+                      >
+                        Hide
+                      </button>
+                    </div>
+                    <div className="max-h-52 overflow-y-auto p-2 space-y-1">
+                      {addMoreScanSuggestions.length === 0 ? (
+                        <div className="p-3 text-center text-xs text-slate-500 dark:text-neutral-400">
+                          {addMoreScanInput.trim() ? `Press 'Add' to include "${addMoreScanInput}".` : 'No other registered batteries available.'}
+                        </div>
+                      ) : (
+                        addMoreScanSuggestions.map((b) => (
+                          <button
+                            key={b.id || b.battery_code}
+                            type="button"
+                            onClick={() => {
+                              handleAddMoreBattery(b.battery_code, b.serial_number);
+                              setAddMoreShowSuggestions(false);
+                            }}
+                            className="flex w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2 text-left text-xs transition-all hover:border-blue-400 hover:bg-blue-600 hover:text-white group dark:border-white/5 dark:bg-surface-800 dark:hover:border-blue-500 dark:hover:bg-blue-600"
+                          >
+                            <div className="font-mono font-bold text-slate-900 group-hover:text-white dark:text-white">
+                              {b.battery_code}
+                              {b.serial_number && <span className="ml-2 text-[11px] font-normal text-slate-400 dark:text-neutral-400 group-hover:text-blue-100">({b.serial_number})</span>}
+                            </div>
+                            <span className="rounded-lg bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 group-hover:bg-white group-hover:text-blue-700 dark:bg-blue-950 dark:text-blue-300">
+                              + Add
+                            </span>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {addMoreCameraOpen && (
+                  <div className="mt-3">
+                    <QrScanner
+                      onScan={(value) => {
+                        handleAddMoreBattery(value);
+                        setAddMoreCameraOpen(false);
+                      }}
+                      onClose={() => setAddMoreCameraOpen(false)}
+                    />
+                  </div>
+                )}
+
+                {addMoreBatteries.length > 0 && (
+                  <ul className="mt-3 flex flex-col gap-2 max-h-52 overflow-y-auto no-scrollbar">
+                    {addMoreBatteries.map((b, idx) => (
+                      <li
+                        key={b.id}
+                        className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-blue-200 bg-white p-2.5 dark:border-blue-900/40 dark:bg-surface-900"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-neutral-300">
+                            {idx + 1}
+                          </span>
+                          <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
+                            {b.code}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 flex-1 sm:justify-end">
+                          <input
+                            type="text"
+                            value={b.serial}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAddMoreBatteries((prev) => prev.map((item, i) => (i === idx ? { ...item, serial: val } : item)));
+                            }}
+                            placeholder="Serial (optional)"
+                            className="w-28 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                          />
+                          <input
+                            type="text"
+                            value={b.issue}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setAddMoreBatteries((prev) => prev.map((item, i) => (i === idx ? { ...item, issue: val } : item)));
+                            }}
+                            placeholder="Defect reason (optional)"
+                            className="flex-1 sm:w-44 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setAddMoreBatteries((prev) => prev.filter((_, i) => i !== idx))}
+                            className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
+                            title="Remove"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setAddMoreToBatchOpen(false)}
+                  className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={addMoreLoading || (addMoreBatteries.length === 0 && !addMoreScanInput.trim())}
+                  style={{ backgroundColor: accent }}
+                  className="rounded-md px-5 py-2 text-sm font-medium text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all"
+                >
+                  {addMoreLoading ? 'Saving…' : `Add ${addMoreBatteries.length + (addMoreScanInput.trim() ? 1 : 0)} Batteries`}
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+      </>
+    );
+  }
+
   if (selectedBatch) {
     return (
       <div className="space-y-6">
@@ -2123,6 +2839,7 @@ function ClientBatteriesPage() {
             </div>
           </Modal>
         )}
+        {renderBatchModals()}
       </div>
     );
   }
@@ -3201,711 +3918,7 @@ function ClientBatteriesPage() {
         </Modal>
       )}
 
-      {/* ── Client Return Verification Modal ──────────────────────────── */}
-      {verifyTargetReturn && (
-        <ClientReturnVerifyModal
-          returnId={verifyTargetReturn.intakeId || verifyTargetReturn.returnId}
-          batchData={verifyTargetReturn}
-          onClose={() => setVerifyTargetReturn(null)}
-          onSuccess={(verifiedData, returnBatteries) => {
-            loadData();
-            const allBatchBatteries = (returnBatteries && returnBatteries.length > 0)
-              ? returnBatteries
-              : (verifyTargetReturn?.batteries || []);
-            const codes = allBatchBatteries.map((b) => b.battery_code).filter(Boolean);
-            setRatingModalData({
-              isOpen: true,
-              batteryCode: codes[0] || '',
-              batteryCodes: codes,
-              truckNumber: verifyTargetReturn?.truckNumber || '',
-              driverName: verifyTargetReturn?.driverName || '',
-              returnId: verifyTargetReturn?.intakeId || verifyTargetReturn?.returnId || null,
-            });
-            setVerifyTargetReturn(null);
-          }}
-        />
-      )}
-
-      {/* ── Rating & Service Feedback Modal (For whole truck delivery or single battery) ── */}
-      {ratingModalData.isOpen && (
-        <RatingModal
-          batteryCode={ratingModalData.batteryCode}
-          batteryCodes={ratingModalData.batteryCodes}
-          truckNumber={ratingModalData.truckNumber}
-          driverName={ratingModalData.driverName}
-          returnId={ratingModalData.returnId}
-          clientId={user?.client_id || user?.id}
-          onClose={() =>
-            setRatingModalData({
-              isOpen: false,
-              batteryCode: '',
-              batteryCodes: [],
-              truckNumber: '',
-              driverName: '',
-              returnId: null,
-            })
-          }
-          onSuccess={() => {
-            loadData();
-            loadRatedReturns();
-          }}
-        />
-      )}
-
-      {/* ── Edit Batch Modal (Logistics, Add Battery, Remove Battery) ── */}
-      {editBatchTarget && (
-        <Modal
-          size="3xl"
-          title={`Edit Truck Batch — ${editBatchTarget.truckNumber || 'Intake'}`}
-          description="Update truck information, add new batteries to this intake shipment, or remove units."
-          onClose={() => {
-            setEditBatchTarget(null);
-            setEditBatchError(null);
-            setEditBatchSuccess(null);
-          }}
-        >
-          <div className="flex flex-col gap-5">
-            {editBatchSuccess && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:border-emerald-900/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                {editBatchSuccess}
-              </div>
-            )}
-
-            {editBatchError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-                {editBatchError}
-              </div>
-            )}
-
-            {/* 1. Truck & Driver Metadata */}
-            <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-surface-800/60">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200 mb-3 flex items-center gap-1.5">
-                <FiTruck className="w-3.5 h-3.5 text-blue-500" />
-                <span>Truck Logistics & Vehicle Info</span>
-              </h4>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className={labelClasses}>
-                    Truck Number <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editBatchTruck}
-                    onChange={(e) => setEditBatchTruck(e.target.value.toUpperCase())}
-                    placeholder="e.g. GB21 XYZ or LD68 FGH"
-                    autoComplete="off"
-                    className={formInputClasses}
-                  />
-                </div>
-                <div>
-                  <label className={labelClasses}>
-                    Driver Name <span className="text-rose-500 font-bold">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={editBatchDriver}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setEditBatchDriver(val.charAt(0).toUpperCase() + val.slice(1));
-                    }}
-                    placeholder="e.g. George Davies"
-                    className={formInputClasses}
-                  />
-                </div>
-                <div className="sm:col-span-2 flex justify-end pt-1">
-                  <button
-                    type="button"
-                    onClick={handleEditBatchSave}
-                    disabled={editBatchSaving}
-                    style={{ backgroundColor: accent }}
-                    className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
-                  >
-                    {editBatchSaving ? (
-                      <>
-                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        <span>Saving…</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiCheckCircle className="w-3.5 h-3.5" />
-                        <span>Save Truck &amp; Driver Info</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* 2. Batteries in this Intake Batch */}
-            <div className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-surface-800">
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200">
-                    Batteries in this Intake ({editBatchBatteries.length} Loaded)
-                  </h4>
-                </div>
-                <span className="text-[11px] text-slate-400 dark:text-neutral-500">
-                  {editBatchBatteries.length === 1 ? '1 battery' : `${editBatchBatteries.length} batteries`}
-                </span>
-              </div>
-
-              {editBatchBatteries.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-white/10 dark:text-neutral-500">
-                  No batteries in this intake batch. Use the form below to add batteries.
-                </div>
-              ) : (
-                <div className="max-h-60 overflow-y-auto space-y-2 pr-1 divide-y divide-slate-100 dark:divide-white/5">
-                  {editBatchBatteries.map((b, idx) => (
-                    <div
-                      key={b.id || b.battery_code || idx}
-                      className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs"
-                    >
-                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                        <span className="font-mono text-slate-400 dark:text-neutral-500 w-5 text-center font-bold">
-                          {idx + 1}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-lg">
-                              {b.battery_code || b.code}
-                            </span>
-                            {b.serial_number && (
-                              <span className="font-mono text-slate-600 dark:text-neutral-300 text-[11px]">
-                                SN: {b.serial_number}
-                              </span>
-                            )}
-                          </div>
-                          {b.notes && (
-                            <p className="text-[11px] text-slate-500 dark:text-neutral-400 truncate mt-0.5">
-                              {b.notes}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <button
-                        type="button"
-                        onClick={() => handleEditModalRemoveBattery(b)}
-                        disabled={editBatchRemovingId === (b.id || b.battery_code || b.code)}
-                        className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50/80 px-2.5 py-1 text-xs font-bold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
-                        title="Remove from this intake"
-                      >
-                        {editBatchRemovingId === b.id ? (
-                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
-                        ) : (
-                          <FiTrash2 className="w-3.5 h-3.5" />
-                        )}
-                        <span>Remove</span>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* 3. Add Another Battery to this Intake Batch */}
-            <div className="rounded-2xl border border-blue-200/90 bg-blue-50/40 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
-              <div className="flex items-center justify-between mb-2.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
-                  <FiPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-                  <span>Add Another Battery to this Intake</span>
-                </h4>
-                <button
-                  type="button"
-                  onClick={() => setEditBatchAddCamera((prev) => !prev)}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 hover:text-blue-800 dark:text-blue-400 cursor-pointer"
-                >
-                  <FiCamera className="w-3.5 h-3.5" />
-                  <span>{editBatchAddCamera ? 'Close Camera' : 'Scan QR'}</span>
-                </button>
-              </div>
-
-              {editBatchAddCamera && (
-                <div className="mb-3 rounded-xl overflow-hidden border border-blue-200 dark:border-blue-800/60">
-                  <QrScanner
-                    onScan={(scanned) => {
-                      const code = extractBatteryCode(scanned);
-                      if (code) {
-                        handleEditModalAddBattery(code);
-                      }
-                    }}
-                    onClose={() => setEditBatchAddCamera(false)}
-                  />
-                </div>
-              )}
-
-              <div className="space-y-3">
-                <div className="relative">
-                  <input data-rfid-scan="client-edit-batch"
-                    type="text"
-                    value={editBatchAddInput}
-                    onChange={(e) => {
-                      setEditBatchAddInput(e.target.value.toUpperCase());
-                      setEditBatchShowSuggestions(true);
-                    }}
-                    onFocus={() => setEditBatchShowSuggestions(true)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        if (editBatchAddInput.trim()) {
-                          handleEditModalAddBattery();
-                        }
-                      }
-                    }}
-                    placeholder="Type battery ID (e.g. UBE-0012) or scan QR code…"
-                    className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-xs font-mono font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-blue-800/60 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
-                  />
-                  <RfidScanButton target="client-edit-batch" />
-
-                  {/* Suggestions Dropdown */}
-                  {editBatchShowSuggestions && editBatchScanSuggestions.length > 0 && (
-                    <div className="absolute left-0 right-0 top-full z-20 mt-1 max-h-48 overflow-y-auto rounded-xl border border-blue-200 bg-white p-1.5 shadow-xl dark:border-blue-800/60 dark:bg-surface-900">
-                      <div className="px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                        Available Fleet Batteries
-                      </div>
-                      {editBatchScanSuggestions.map((b) => (
-                        <button
-                          key={b.id || b.battery_code}
-                          type="button"
-                          onMouseDown={(e) => e.preventDefault()}
-                          onClick={() => {
-                            handleEditModalAddBattery(b.battery_code, b.serial_number || '', b.notes || '');
-                          }}
-                          className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs transition-colors hover:bg-blue-50 dark:hover:bg-blue-900/30"
-                        >
-                          <span className="font-mono font-bold text-blue-700 dark:text-blue-400">
-                            {b.battery_code}
-                          </span>
-                          {b.serial_number && (
-                            <span className="text-[11px] text-slate-500 dark:text-neutral-400 font-mono">
-                              SN: {b.serial_number}
-                            </span>
-                          )}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                  <input
-                    type="text"
-                    value={editBatchAddSerial}
-                    onChange={(e) => setEditBatchAddSerial(e.target.value)}
-                    placeholder="Serial Number (Optional)"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
-                  />
-                  <input
-                    type="text"
-                    value={editBatchAddNotes}
-                    onChange={(e) => setEditBatchAddNotes(e.target.value)}
-                    placeholder="Fault / Defect Note (Optional)"
-                    className="w-full rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
-                  />
-                </div>
-
-                <div className="flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => handleEditModalAddBattery()}
-                    disabled={editBatchAddLoading || !editBatchAddInput.trim()}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
-                  >
-                    {editBatchAddLoading ? (
-                      <>
-                        <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
-                        <span>Adding Battery…</span>
-                      </>
-                    ) : (
-                      <>
-                        <FiPlus className="w-3.5 h-3.5" />
-                        <span>Add to Intake</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            {/* Footer Buttons */}
-            <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditBatchTarget(null);
-                  setEditBatchError(null);
-                  setEditBatchSuccess(null);
-                }}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10 cursor-pointer"
-              >
-                Close
-              </button>
-              <button
-                type="button"
-                onClick={handleEditBatchSave}
-                disabled={editBatchSaving}
-                style={{ backgroundColor: accent }}
-                className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
-              >
-                {editBatchSaving ? 'Saving Changes…' : 'Save & Done'}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Edit Battery in Batch Modal ───────────────────────────────── */}
-      {editBatteryTarget && (
-        <Modal
-          title={`Edit Battery — ${editBatteryTarget.battery_code}`}
-          description="Update the physical serial number or fault/defect notes for this battery."
-          onClose={() => {
-            setEditBatteryTarget(null);
-            setEditBatteryError(null);
-          }}
-        >
-          <form onSubmit={handleEditBatterySave} className="flex flex-col gap-4">
-            {editBatteryError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-                {editBatteryError}
-              </div>
-            )}
-            <div>
-              <label className={labelClasses}>Physical Battery Number (Manufacturer Serial)</label>
-              <input
-                type="text"
-                value={editBatterySerial}
-                onChange={(e) => setEditBatterySerial(e.target.value)}
-                placeholder="e.g. SN-88213"
-                autoComplete="off"
-                className={formInputClasses}
-              />
-            </div>
-            <div>
-              <label className={labelClasses}>Defect / Fault Notes</label>
-              <textarea
-                rows={3}
-                value={editBatteryNotes}
-                onChange={(e) => setEditBatteryNotes(e.target.value)}
-                placeholder="e.g. BMS error code E04, water ingress, degraded range…"
-                className={formInputClasses}
-              />
-              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-                These notes are forwarded to the repair technicians at the workshop.
-              </p>
-            </div>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setEditBatteryTarget(null);
-                  setEditBatteryError(null);
-                }}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={editBatterySaving}
-                style={{ backgroundColor: accent }}
-                className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50"
-              >
-                {editBatterySaving ? 'Saving…' : 'Save Battery'}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
-
-      {/* ── Remove Battery Confirmation Modal ──────────────────────────── */}
-      {removeBatteryTarget && (
-        <Modal
-          title="Remove Battery from Batch?"
-          description={`Are you sure you want to remove ${removeBatteryTarget.battery.battery_code} from this truck intake?`}
-          onClose={() => {
-            setRemoveBatteryTarget(null);
-            setRemoveBatteryError(null);
-          }}
-        >
-          <div className="flex flex-col gap-4">
-            {removeBatteryError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-                {removeBatteryError}
-              </div>
-            )}
-            <p className="text-xs text-slate-600 dark:text-neutral-300">
-              The battery <strong className="font-mono text-slate-900 dark:text-white">{removeBatteryTarget.battery.battery_code}</strong> will be unlinked from this truck dispatch and returned to your available fleet inventory.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setRemoveBatteryTarget(null);
-                  setRemoveBatteryError(null);
-                }}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10"
-              >
-                Keep in Batch
-              </button>
-              <button
-                type="button"
-                onClick={handleRemoveBatteryConfirm}
-                disabled={removeBatteryLoading}
-                className="rounded-xl bg-red-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                {removeBatteryLoading ? 'Removing…' : 'Remove from Batch'}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Delete / Cancel Batch Confirmation Modal ──────────────────── */}
-      {deleteBatchTarget && (
-        <Modal
-          title="Cancel Truck Intake Batch?"
-          description={`Are you sure you want to cancel and delete Truck ${deleteBatchTarget.truckNumber || 'Batch'}?`}
-          onClose={() => {
-            setDeleteBatchTarget(null);
-            setDeleteBatchError(null);
-          }}
-        >
-          <div className="flex flex-col gap-4">
-            {deleteBatchError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-                {deleteBatchError}
-              </div>
-            )}
-            <p className="text-xs text-slate-600 dark:text-neutral-300">
-              This will completely cancel the intake batch. All <strong className="text-slate-900 dark:text-white">{deleteBatchTarget.batteries?.length || 0} batteries</strong> in this batch will be automatically unlinked and safely returned to your active fleet inventory.
-            </p>
-            <div className="flex justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => {
-                  setDeleteBatchTarget(null);
-                  setDeleteBatchError(null);
-                }}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10"
-              >
-                Go Back
-              </button>
-              <button
-                type="button"
-                onClick={handleDeleteBatchConfirm}
-                disabled={deleteBatchLoading}
-                className="rounded-xl bg-red-600 px-5 py-2 text-xs font-bold text-white shadow-xs hover:bg-red-700 disabled:opacity-50 transition-colors"
-              >
-                {deleteBatchLoading ? 'Cancelling…' : 'Cancel & Delete Batch'}
-              </button>
-            </div>
-          </div>
-        </Modal>
-      )}
-
-      {/* ── Add Batteries to Existing Batch Modal ────────────────────── */}
-      {addMoreToBatchOpen && selectedBatch && (
-        <Modal
-          title={`Add Batteries to Truck ${selectedBatch.truckNumber || ''}`}
-          description="Scan or choose additional batteries to include in this truck dispatch."
-          size="3xl"
-          className="min-h-[520px]"
-          onClose={() => setAddMoreToBatchOpen(false)}
-        >
-          <form onSubmit={handleAddMoreToBatchSubmit} className="flex flex-col gap-5">
-            {addMoreSuccess && (
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs font-bold text-emerald-800 dark:border-emerald-900/40 dark:bg-emerald-950/40 dark:text-emerald-300">
-                ✓ {addMoreSuccess}
-              </div>
-            )}
-            {addMoreError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
-                {addMoreError}
-              </div>
-            )}
-
-            <div className="rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
-              <div className="mb-1 flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-                  Scan or Pick Batteries
-                </h3>
-                <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
-                  {addMoreBatteries.length} selected
-                </span>
-              </div>
-              <p className="mb-3 text-xs text-slate-500 dark:text-neutral-400">
-                Type or scan a battery code to add to Truck {selectedBatch.truckNumber || 'Batch'}.
-              </p>
-
-              <div className="flex gap-2">
-                <div className="relative flex-1">
-                  <input data-rfid-scan="client-add-more"
-                    type="text"
-                    value={addMoreScanInput}
-                    onChange={(e) => {
-                      setAddMoreScanInput(e.target.value.toUpperCase());
-                      setAddMoreShowSuggestions(true);
-                    }}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        handleAddMoreBattery(addMoreScanInput);
-                      }
-                    }}
-                    onFocus={() => setAddMoreShowSuggestions(true)}
-                    placeholder="Scan, type code or pick from suggestions…"
-                    autoComplete="off"
-                    className={formInputClasses}
-                  />
-                  <RfidScanButton target="client-add-more" />
-                </div>
-                <button
-                  type="button"
-                  onClick={() => handleAddMoreBattery(addMoreScanInput)}
-                  disabled={!addMoreScanInput.trim()}
-                  className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                >
-                  Add
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAddMoreCameraOpen((prev) => !prev)}
-                  className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
-                >
-                  {addMoreCameraOpen ? 'Close Camera' : 'Use Camera'}
-                </button>
-              </div>
-
-              {/* Suggestions */}
-              {addMoreShowSuggestions && (
-                <div className="mt-3 overflow-hidden rounded-xl border border-blue-300 bg-white shadow-sm dark:border-blue-800/60 dark:bg-surface-900">
-                  <div className="flex items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3.5 py-2 text-[11px] font-bold text-slate-600 dark:border-white/10 dark:bg-surface-800/80 dark:text-neutral-300">
-                    <span>Available Registered Batteries ({addMoreScanSuggestions.length})</span>
-                    <button
-                      type="button"
-                      onClick={() => setAddMoreShowSuggestions(false)}
-                      className="rounded px-2 py-0.5 text-[11px] font-semibold text-slate-400 hover:bg-slate-200 hover:text-slate-700 dark:hover:bg-white/10 dark:hover:text-white"
-                    >
-                      Hide
-                    </button>
-                  </div>
-                  <div className="max-h-52 overflow-y-auto p-2 space-y-1">
-                    {addMoreScanSuggestions.length === 0 ? (
-                      <div className="p-3 text-center text-xs text-slate-500 dark:text-neutral-400">
-                        {addMoreScanInput.trim() ? `Press 'Add' to include "${addMoreScanInput}".` : 'No other registered batteries available.'}
-                      </div>
-                    ) : (
-                      addMoreScanSuggestions.map((b) => (
-                        <button
-                          key={b.id || b.battery_code}
-                          type="button"
-                          onClick={() => {
-                            handleAddMoreBattery(b.battery_code, b.serial_number);
-                            setAddMoreShowSuggestions(false);
-                          }}
-                          className="flex w-full items-center justify-between rounded-xl border border-slate-100 bg-slate-50/50 px-3 py-2 text-left text-xs transition-all hover:border-blue-400 hover:bg-blue-600 hover:text-white group dark:border-white/5 dark:bg-surface-800 dark:hover:border-blue-500 dark:hover:bg-blue-600"
-                        >
-                          <div className="font-mono font-bold text-slate-900 group-hover:text-white dark:text-white">
-                            {b.battery_code}
-                            {b.serial_number && <span className="ml-2 text-[11px] font-normal text-slate-400 dark:text-neutral-400 group-hover:text-blue-100">({b.serial_number})</span>}
-                          </div>
-                          <span className="rounded-lg bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-700 group-hover:bg-white group-hover:text-blue-700 dark:bg-blue-950 dark:text-blue-300">
-                            + Add
-                          </span>
-                        </button>
-                      ))
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {addMoreCameraOpen && (
-                <div className="mt-3">
-                  <QrScanner
-                    onScan={(value) => {
-                      handleAddMoreBattery(value);
-                      setAddMoreCameraOpen(false);
-                    }}
-                    onClose={() => setAddMoreCameraOpen(false)}
-                  />
-                </div>
-              )}
-
-              {addMoreBatteries.length > 0 && (
-                <ul className="mt-3 flex flex-col gap-2 max-h-52 overflow-y-auto no-scrollbar">
-                  {addMoreBatteries.map((b, idx) => (
-                    <li
-                      key={b.id}
-                      className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border border-blue-200 bg-white p-2.5 dark:border-blue-900/40 dark:bg-surface-900"
-                    >
-                      <div className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-600 dark:bg-white/10 dark:text-neutral-300">
-                          {idx + 1}
-                        </span>
-                        <span className="font-mono text-xs font-bold text-slate-900 dark:text-white">
-                          {b.code}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-2 flex-1 sm:justify-end">
-                        <input
-                          type="text"
-                          value={b.serial}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setAddMoreBatteries((prev) => prev.map((item, i) => (i === idx ? { ...item, serial: val } : item)));
-                          }}
-                          placeholder="Serial (optional)"
-                          className="w-28 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
-                        />
-                        <input
-                          type="text"
-                          value={b.issue}
-                          onChange={(e) => {
-                            const val = e.target.value;
-                            setAddMoreBatteries((prev) => prev.map((item, i) => (i === idx ? { ...item, issue: val } : item)));
-                          }}
-                          placeholder="Defect reason (optional)"
-                          className="flex-1 sm:w-44 rounded border border-slate-200 bg-slate-50 px-2 py-1 text-xs dark:border-white/10 dark:bg-surface-800 dark:text-white"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setAddMoreBatteries((prev) => prev.filter((_, i) => i !== idx))}
-                          className="text-xs font-bold text-red-500 hover:text-red-700 p-1"
-                          title="Remove"
-                        >
-                          ✕
-                        </button>
-                      </div>
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-
-            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-white/5">
-              <button
-                type="button"
-                onClick={() => setAddMoreToBatchOpen(false)}
-                className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={addMoreLoading || (addMoreBatteries.length === 0 && !addMoreScanInput.trim())}
-                style={{ backgroundColor: accent }}
-                className="rounded-md px-5 py-2 text-sm font-medium text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all"
-              >
-                {addMoreLoading ? 'Saving…' : `Add ${addMoreBatteries.length + (addMoreScanInput.trim() ? 1 : 0)} Batteries`}
-              </button>
-            </div>
-          </form>
-        </Modal>
-      )}
+      {renderBatchModals()}
 
       {/* ── Truck Intake Success Modal ─────────────────────────────────── */}
       {showIntakeSuccessModal && intakeSuccessResult && (
