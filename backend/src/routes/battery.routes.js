@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const batteryController = require('../controllers/battery.controller');
 const { requireAuth, optionalAuth, requireRole } = require('../middlewares/auth');
+const { auditTrail } = require('../middlewares/audit-trail');
 
 // RFID Assignment sheet upload (.xlsx / .csv), parsed in memory
 const RFID_SHEET_TYPES = new Set([
@@ -116,9 +117,9 @@ router.patch(
   batteryController.passToTech
 );
 // Editing/removing batteries (manual status correction) is super_admin only.
-router.patch('/:id', requireRole('super_admin'), batteryController.update);
-router.delete('/:id', requireRole('super_admin'), batteryController.remove);
+router.patch('/:id', requireRole('super_admin'), auditTrail('battery', 'update'), batteryController.update);
+router.delete('/:id', requireRole('super_admin'), auditTrail('battery', 'delete'), batteryController.remove);
 // Hides/restores a battery app-wide without deleting it — super_admin only.
-router.patch('/:id/block', requireRole('super_admin'), batteryController.setBlocked);
+router.patch('/:id/block', requireRole('super_admin'), auditTrail('battery', 'block'), batteryController.setBlocked);
 
 module.exports = router;

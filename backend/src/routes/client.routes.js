@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const clientController = require('../controllers/client.controller');
 const { requireAuth, requirePermission, requireRole } = require('../middlewares/auth');
+const { auditTrail } = require('../middlewares/audit-trail');
 
 const ALLOWED_LOGO_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml']);
 const uploadLogo = multer({
@@ -38,10 +39,10 @@ router.get('/me/history', requireRole('client'), clientController.myHistory);
 router.get('/me/invoices', requireRole('client'), clientController.myInvoices);
 router.get('/me/notifications', requireRole('client'), clientController.myNotifications);
 router.get('/:id', requireRole('super_admin', 'admin', 'staff'), clientController.getById);
-router.post('/', requirePermission('clients'), uploadLogo.single('logo'), clientController.create);
+router.post('/', requirePermission('clients'), auditTrail('client', 'create'), uploadLogo.single('logo'), clientController.create);
 // Editing/removing clients is super_admin only, distinct from the 'clients'
 // permission (which only covers adding new clients).
-router.patch('/:id', requireRole('super_admin'), uploadLogo.single('logo'), clientController.update);
-router.delete('/:id', requireRole('super_admin'), clientController.remove);
+router.patch('/:id', requireRole('super_admin'), auditTrail('client', 'update'), uploadLogo.single('logo'), clientController.update);
+router.delete('/:id', requireRole('super_admin'), auditTrail('client', 'delete'), clientController.remove);
 
 module.exports = router;

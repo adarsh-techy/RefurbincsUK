@@ -87,6 +87,13 @@ async function create(req, res, next) {
         parsedPermissions = Array.isArray(permissions) ? permissions : [];
       }
     }
+    // A partner is only told apart from a fleet client by its login's role, so
+    // a recycling partner must be created with a login.
+    if (role === 'recycle_client' && (!email || !tempPassword)) {
+      return res.status(400).json({
+        message: 'A recycling partner needs a portal login (email and temporary password).',
+      });
+    }
     const passwordHash = email && tempPassword ? await bcrypt.hash(tempPassword, 10) : undefined;
     const logoPath = req.file ? saveLogoFile(req.file) : undefined;
     const client = await clientModel.create({

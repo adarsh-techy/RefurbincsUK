@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const returnController = require('../controllers/return.controller');
 const { requireAuth, requirePermission, requireRole } = require('../middlewares/auth');
+const { auditTrail } = require('../middlewares/audit-trail');
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -41,8 +42,8 @@ router.get('/:id', returnController.getById);
 router.post('/', requirePermission('returns'), uploadDoc.single('docFile'), returnController.create);
 router.patch('/:id/verify-receipt', returnController.verifyReceipt);
 // Editing/removing a return (with battery status reversal) is super_admin only.
-router.patch('/:id', requireRole('super_admin'), uploadDoc.single('docFile'), returnController.update);
-router.delete('/:id', requireRole('super_admin'), returnController.remove);
+router.patch('/:id', requireRole('super_admin'), auditTrail('return', 'update'), uploadDoc.single('docFile'), returnController.update);
+router.delete('/:id', requireRole('super_admin'), auditTrail('return', 'delete'), returnController.remove);
 
 module.exports = router;
 

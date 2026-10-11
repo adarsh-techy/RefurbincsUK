@@ -2,6 +2,7 @@ const router = require('express').Router();
 const multer = require('multer');
 const staffController = require('../controllers/staff.controller');
 const { requireAuth, requirePermission, requireRole } = require('../middlewares/auth');
+const { auditTrail } = require('../middlewares/audit-trail');
 
 const ALLOWED_MIME_TYPES = new Set([
   'application/pdf',
@@ -41,9 +42,9 @@ router.get('/', requireRole('super_admin', 'admin', 'staff'), staffController.li
 router.get('/me', staffController.myProfile);
 // Full record (documents, salary, IDs) needs the Staff module.
 router.get('/:id', requirePermission('staff'), staffController.getById);
-router.post('/', requirePermission('staff'), uploadDoc.single('docFile'), staffController.create);
+router.post('/', requirePermission('staff'), auditTrail('staff', 'create'), uploadDoc.single('docFile'), staffController.create);
 // Editing staff records needs the Staff module (super_admin always has it)
-router.patch('/:id', requirePermission('staff'), uploadDoc.single('docFile'), staffController.update);
-router.delete('/:id', requireRole('super_admin'), staffController.remove);
+router.patch('/:id', requirePermission('staff'), auditTrail('staff', 'update'), uploadDoc.single('docFile'), staffController.update);
+router.delete('/:id', requireRole('super_admin'), auditTrail('staff', 'delete'), staffController.remove);
 
 module.exports = router;

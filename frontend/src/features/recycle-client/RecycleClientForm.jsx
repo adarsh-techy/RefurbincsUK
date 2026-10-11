@@ -8,7 +8,6 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 function RecycleClientForm({ client, onSaved, onCancel }) {
   const isEdit = Boolean(client);
   const [name, setName] = useState(client?.name || '');
-  const [grantLogin, setGrantLogin] = useState(false);
   const [email, setEmail] = useState('');
   const [tempPassword, setTempPassword] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -30,8 +29,8 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
       } else {
         await apiClient.post('/clients', {
           name: formattedName,
-          email: grantLogin ? email : undefined,
-          tempPassword: grantLogin ? tempPassword : undefined,
+          email,
+          tempPassword,
           role: 'recycle_client',
         });
       }
@@ -59,20 +58,13 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
 
       {!isEdit && (
         <div className="rounded-lg border border-slate-200 p-3.5 dark:border-surface-700">
-          <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-neutral-200">
-            <input
-              type="checkbox"
-              checked={grantLogin}
-              onChange={(e) => setGrantLogin(e.target.checked)}
-              className="accent-brand-600"
-            />
-            Grant login access
-          </label>
+          <p className="text-sm font-medium text-slate-700 dark:text-neutral-200">Partner login</p>
           <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            Lets this recycling partner log in to see their assigned unserviceable battery shipments.
+            Required: the partner signs in to see their assigned battery shipments, and the login is
+            what marks this account as a recycling partner (not a fleet client).
           </p>
 
-          {grantLogin && (
+          {(
             <div className="mt-3 flex flex-col gap-3">
               <div>
                 <label className={labelClasses}>Email</label>
@@ -82,7 +74,7 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder="e.g. partner@ecorecycle.com"
                   className={inputClasses}
-                  required={grantLogin}
+                  required
                 />
               </div>
               <div>
@@ -94,7 +86,7 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
                   placeholder="One-time password — they'll set their own on first login"
                   className={inputClasses}
                   minLength={8}
-                  required={grantLogin}
+                  required
                 />
               </div>
             </div>

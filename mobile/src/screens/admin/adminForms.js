@@ -76,8 +76,8 @@ export const ADMIN_FORMS = {
     fields: [
       { key: 'name', label: 'Partner name', type: 'text', required: true, capitalize: capWords },
       { key: 'invoiceEmail', label: 'Contact / invoice email', type: 'email' },
-      { key: 'email', label: 'Portal login email', type: 'email' },
-      { key: 'tempPassword', label: 'Temporary password', type: 'password', help: 'Min 8 characters.' },
+      { key: 'email', label: 'Portal login email', type: 'email', required: true, help: 'Required — the login is what marks this account as a recycling partner.' },
+      { key: 'tempPassword', label: 'Temporary password', type: 'password', required: true, createRequiredOnly: true, help: 'Min 8 characters. On edit: fill only to reset their password.' },
       { key: 'active', label: 'Login active', type: 'toggle', editOnly: true },
     ],
     fromRow: (r) => ({ name: r.name || '', invoiceEmail: r.invoice_email || '', email: r.login_email || '', active: r.user_active !== false }),

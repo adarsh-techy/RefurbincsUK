@@ -1,6 +1,7 @@
 const router = require('express').Router();
 const recycleController = require('../controllers/recycle.controller');
 const { requireAuth, requirePermission, requireRole } = require('../middlewares/auth');
+const { auditTrail } = require('../middlewares/audit-trail');
 
 // recycle_client can list their own batches and view detail; all other
 // operations (create, edit, delete) stay admin-permission-gated.
@@ -16,7 +17,7 @@ router.get('/', requireRecycleAccess, recycleController.list);
 router.get('/:id', requireRecycleAccess, recycleController.getById);
 router.post('/', requirePermission('recycle'), recycleController.create);
 // Editing/removing a recycle batch (with battery status reversal) is super_admin only.
-router.patch('/:id', requireRole('super_admin'), recycleController.update);
+router.patch('/:id', requireRole('super_admin'), auditTrail('recycle_batch', 'update'), recycleController.update);
 router.delete('/:id', requireRole('super_admin'), recycleController.remove);
 
 module.exports = router;

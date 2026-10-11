@@ -44,6 +44,7 @@ import {
   FiZoomIn,
 } from 'react-icons/fi';
 import RatingModal from '../../../components/feedback/RatingModal';
+import BatteryStatusForm from '../components/BatteryStatusForm';
 
 const STATUS_ACCENT = {
   in_repair: 'border-warning-500',
@@ -1965,6 +1966,7 @@ function BatteryDetailPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [qrDataUrl, setQrDataUrl] = useState(null);
+  const [showStatusForm, setShowStatusForm] = useState(false); // super admin: manual status correction
   const [showQrModal, setShowQrModal] = useState(false);
 
   // Battery Number assign / edit modal
@@ -2455,7 +2457,28 @@ function BatteryDetailPage() {
             ? 'Workshop Service & Repair'
             : 'Full intake-to-return history.'
         }
-      />
+      >
+        {isSuperAdmin && (
+          <button
+            type="button"
+            onClick={() => setShowStatusForm(true)}
+            className="inline-flex items-center gap-1.5 rounded-xl border border-violet-200 bg-violet-50 px-3.5 py-2 text-xs font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300"
+            title="Super admin: correct this battery's status by hand"
+          >
+            Correct status
+          </button>
+        )}
+      </PageHeader>
+
+      {showStatusForm && (
+        <Modal title="Correct battery status" onClose={() => setShowStatusForm(false)}>
+          <BatteryStatusForm
+            battery={battery}
+            onSaved={() => { setShowStatusForm(false); load(); }}
+            onCancel={() => setShowStatusForm(false)}
+          />
+        </Modal>
+      )}
 
       {showQrModal && (
         <Modal title={battery.battery_code} onClose={() => setShowQrModal(false)}>
