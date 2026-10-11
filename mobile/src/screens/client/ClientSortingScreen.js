@@ -15,6 +15,7 @@ import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
 import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
+import { exportSortGroup } from '../../utils/export-sort-group';
 import { StatusBadge } from '../../components/ui/Badge';
 
 function storageKey(userId) {
@@ -34,6 +35,19 @@ export default function ClientSortingScreen() {
   const lastSavedRef = useRef(null);
   const [registeredBatteries, setRegisteredBatteries] = useState([]);
   const [batteriesLoaded, setBatteriesLoaded] = useState(false); // false → RFID tags can't be matched yet
+  const [exporting, setExporting] = useState(false);
+
+  // Same export as the web sort page: the open group → "<name>.xlsx"
+  async function exportActiveGroup(group) {
+    setExporting(true);
+    try {
+      await exportSortGroup(group);
+    } catch (err) {
+      Alert.alert('Could not export', err.message || 'Please try again.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [nameModalMode, setNameModalMode] = useState('create');
@@ -211,9 +225,20 @@ export default function ClientSortingScreen() {
             </View>
           </View>
           <Text className="mt-2 text-lg font-extrabold text-slate-900 dark:text-white">{activeGroup.name}</Text>
-          <Text className="text-[11px] text-slate-500 dark:text-slate-400">
-            {activeGroup.batteries.length} {activeGroup.batteries.length === 1 ? 'battery' : 'batteries'} sorted
-          </Text>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] text-slate-500 dark:text-slate-400">
+              {activeGroup.batteries.length} {activeGroup.batteries.length === 1 ? 'battery' : 'batteries'} sorted
+            </Text>
+            {activeGroup.batteries.length > 0 && (
+              <TouchableOpacity
+                disabled={exporting}
+                onPress={() => exportActiveGroup(activeGroup)}
+                className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1.5 dark:border-emerald-800 dark:bg-emerald-950/40"
+              >
+                <Text className="text-[11px] font-bold text-emerald-700 dark:text-emerald-300">{exporting ? 'Exporting…' : 'Export to Excel'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
 
         <>

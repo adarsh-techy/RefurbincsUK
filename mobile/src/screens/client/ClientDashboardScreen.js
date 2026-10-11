@@ -42,6 +42,8 @@ export default function ClientDashboardScreen() {
   const [data, setData] = useState(null);
   const [recent, setRecent] = useState([]);
   const [pendingCerts, setPendingCerts] = useState(0);
+  const [recentTickets, setRecentTickets] = useState([]); // GET /tickets?limit=4, as on the web
+  const [invoices, setInvoices] = useState([]); // GET /clients/me/invoices — latest 3 shown
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -49,14 +51,18 @@ export default function ClientDashboardScreen() {
   const load = useCallback(async () => {
     setError(null);
     try {
-      const [dash, batt, certs] = await Promise.all([
+      const [dash, batt, certs, tick, inv] = await Promise.all([
         apiClient.get('/clients/me/dashboard'),
         apiClient.get('/clients/me/batteries'),
         apiClient.get('/certificates/my-milestones').catch(() => ({ data: null })),
+        apiClient.get('/tickets', { params: { limit: 4 } }).catch(() => ({ data: { data: [] } })),
+        apiClient.get('/clients/me/invoices').catch(() => ({ data: { data: [] } })),
       ]);
       setData(dash.data);
       setRecent((batt.data?.data || []).slice(0, 5));
       setPendingCerts((certs.data?.unacknowledged || []).length);
+      setRecentTickets(tick.data?.data || []);
+      setInvoices(inv.data?.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -218,6 +224,73 @@ export default function ClientDashboardScreen() {
             </TouchableOpacity>
           ))}
         </View>
+      )}
+
+      {/* Recent invoices — same as the web dashboard (latest 3) */}
+      {can('client_invoices') && (
+        <>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Recent invoices</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Invoices')}>
+              <Text className="text-xs font-semibold text-blue-600">All invoices ({invoices.length}) ›</Text>
+            </TouchableOpacity>
+          </View>
+          {invoices.length === 0 ? (
+            <View className="items-center rounded-2xl border border-slate-200 bg-white p-6">
+              <Text className="text-xs text-slate-400">No invoices yet.</Text>
+            </View>
+          ) : (
+            <View className="gap-2">
+              {invoices.slice(0, 3).map((inv) => {
+                const paid = inv.status === 'paid';
+                return (
+                  <TouchableOpacity key={inv.id} onPress={() => navigation.navigate('Invoices')} className="flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-3.5">
+                    <View className="flex-1 pr-2">
+                      <Text className="text-sm font-bold text-slate-900" numberOfLines={1}>{inv.invoice_number || `Invoice #${inv.id}`}</Text>
+                      <Text className="text-[11px] text-slate-500">
+                        {inv.issue_date ? new Date(inv.issue_date).toLocaleDateString() : '—'}
+                        {inv.due_date && !paid ? ` · due ${new Date(inv.due_date).toLocaleDateString()}` : ''}
+                      </Text>
+                    </View>
+                    <View className="items-end">
+                      <Text className="text-sm font-extrabold text-slate-900">£{Number(inv.amount || 0).toFixed(2)}</Text>
+                      <Text className={`text-[10px] font-bold uppercase ${paid ? 'text-emerald-600' : 'text-amber-600'}`}>{inv.status || 'sent'}</Text>
+                    </View>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          )}
+        </>
+      )}
+
+      {/* Recent support tickets — same as the web dashboard (GET /tickets?limit=4) */}
+      {can('client_support') && (
+        <>
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Recent support tickets</Text>
+            <TouchableOpacity onPress={() => navigation.navigate('Support')}>
+              <Text className="text-xs font-semibold text-blue-600">Support chat ›</Text>
+            </TouchableOpacity>
+          </View>
+          {recentTickets.length === 0 ? (
+            <View className="items-center rounded-2xl border border-slate-200 bg-white p-6">
+              <Text className="text-xs text-slate-400">No support tickets yet.</Text>
+            </View>
+          ) : (
+            <View className="gap-2">
+              {recentTickets.map((t) => (
+                <TouchableOpacity key={t.id} onPress={() => navigation.navigate('Support')} className="rounded-2xl border border-slate-200 bg-white p-3.5">
+                  <View className="flex-row items-center justify-between gap-2">
+                    <Text className="text-[11px] font-bold text-slate-500">{t.ticket_number || `#${t.id}`}</Text>
+                    <Text className={`text-[10px] font-bold uppercase ${t.status === 'resolved' || t.status === 'closed' ? 'text-emerald-600' : 'text-amber-600'}`}>{String(t.status || '').replace(/_/g, ' ')}</Text>
+                  </View>
+                  <Text className="mt-1 text-sm font-semibold text-slate-900" numberOfLines={1}>{t.subject}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
+        </>
       )}
     </ScrollView>
   );

@@ -1,14 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FlatList, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import { Badge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import { buildHistoryCsv, historyCsvFileName } from '../../utils/history-csv';
+import { shareCsv } from '../../utils/share-csv';
 
 // Service History — the mobile version of the web ClientHistoryPage:
 // GET /clients/me/history → { summary, events }, every truck packed, every
 // workshop intake and every return dispatch, newest first, with the same
-// type / date filters and search.
+// type / date filters and search. Tapping a shipment opens its detail
+// (ClientHistoryDetail); "Export CSV" shares the filtered list as the same
+// file the web exports.
 
 const TYPE_FILTERS = [
   { id: 'all', label: 'All Truck Shipments' },
@@ -18,6 +22,7 @@ const TYPE_FILTERS = [
 ];
 const DATE_FILTERS = [
   { id: 'all', label: 'All Time', days: null },
+  { id: '7d', label: '7 Days', days: 7 },
   { id: '30d', label: '30 Days', days: 30 },
   { id: '90d', label: '90 Days', days: 90 },
   { id: 'year', label: '1 Year', days: 365 },
@@ -41,6 +46,7 @@ export default function ClientHistoryScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [exporting, setExporting] = useState(false);
 
   const load = useCallback(async () => {
     try {
@@ -68,10 +74,26 @@ export default function ClientHistoryScreen() {
       if (type !== 'all' && e.type !== type) return false;
       if (since && e.timestamp && new Date(e.timestamp).getTime() < since) return false;
       if (!q) return true;
-      return [e.details, e.reference, e.vehicle_number, e.driver_name, e.type_label, e.staff_name]
+      // same fields as the web search, including the batteries on the truck
+      const listMatch = (e.batteries_list || []).some((b) =>
+        [b.code, b.serial, b.notes].some((v) => v && String(v).toLowerCase().includes(q))
+      );
+      return listMatch || [e.battery_code, e.serial_number, e.reference, e.vehicle_number, e.driver_name, e.staff_name, e.details, e.type_label]
         .some((v) => v && String(v).toLowerCase().includes(q));
     });
   }, [events, type, range, search]);
+
+  async function exportCsv() {
+    if (!visible.length) return;
+    setExporting(true);
+    try {
+      await shareCsv(historyCsvFileName(), buildHistoryCsv(visible));
+    } catch (err) {
+      Alert.alert('Export failed', err.message || 'Could not export the history.');
+    } finally {
+      setExporting(false);
+    }
+  }
 
   const counts = {
     all: events.length,
@@ -88,7 +110,7 @@ export default function ClientHistoryScreen() {
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search truck, driver, reference…"
+            placeholder="Search truck, driver, battery, reference…"
             placeholderTextColor="#94a3b8"
             autoCorrect={false}
             className="flex-1 text-sm text-slate-900"
@@ -104,7 +126,7 @@ export default function ClientHistoryScreen() {
             );
           })}
         </ScrollView>
-        <View className="mt-2 flex-row gap-1.5">
+        <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
           {DATE_FILTERS.map((f) => {
             const active = range === f.id;
             return (
@@ -113,6 +135,13 @@ export default function ClientHistoryScreen() {
               </TouchableOpacity>
             );
           })}
+          <TouchableOpacity
+            disabled={!visible.length || exporting}
+            onPress={exportCsv}
+            className={`ml-auto rounded-lg bg-emerald-600 px-2.5 py-1 ${!visible.length || exporting ? 'opacity-50' : ''}`}
+          >
+            <Text className="text-[11px] font-bold text-white">{exporting ? 'Exporting…' : '⤓ Export CSV'}</Text>
+          </TouchableOpacity>
         </View>
       </View>
 
@@ -139,7 +168,11 @@ export default function ClientHistoryScreen() {
           const open = expanded === e.id;
           const list = Array.isArray(e.batteries_list) ? e.batteries_list : [];
           return (
-            <View className="rounded-2xl border border-slate-200 bg-white p-4">
+            <TouchableOpacity
+              activeOpacity={0.85}
+              onPress={() => navigation.navigate('ClientHistoryDetail', { eventId: e.id, event: e })}
+              className="rounded-2xl border border-slate-200 bg-white p-4"
+            >
               <View className="flex-row items-start justify-between gap-2">
                 <View className="flex-row items-center gap-2.5 flex-1">
                   <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
@@ -182,7 +215,10 @@ export default function ClientHistoryScreen() {
                   })}
                 </View>
               )}
-            </View>
+              <Text className="mt-2.5 text-[11px] font-bold text-blue-700">
+                {list.length > 0 ? `View Truck Details (${e.battery_count || list.length} Batteries) ›` : 'View details ›'}
+              </Text>
+            </TouchableOpacity>
           );
         }}
       />

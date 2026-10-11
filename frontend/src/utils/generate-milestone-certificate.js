@@ -519,6 +519,7 @@ export function generateMilestoneCertificatePDF(certificate, clientName) {
   p2Y += rowH + 2;
 
   // Table Rows (14 Chemical Items with Dynamic Amounts)
+  const breakdown = calculateMaterialBreakdown(count);
   breakdown.forEach((item, index) => {
     const isEven = index % 2 === 0;
     if (isEven) {

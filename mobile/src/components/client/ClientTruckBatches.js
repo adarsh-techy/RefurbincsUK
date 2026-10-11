@@ -90,6 +90,7 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
   const [editTruck, setEditTruck] = useState('');
   const [editDriver, setEditDriver] = useState('');
   // add batteries modal
+  const [batteryEdit, setBatteryEdit] = useState(null); // { row, serial, notes } — same as the web "Edit Battery" modal
   const [addOpen, setAddOpen] = useState(false);
   const [addCodes, setAddCodes] = useState('');
   const [fleet, setFleet] = useState([]); // all the client's batteries, to resolve RFID tags
@@ -172,6 +173,18 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
     setAddOpen(false);
     setAddCodes('');
     return `${fresh.length} batteries packed.`;
+  });
+
+  // Serial number + defect notes (PATCH /clients/me/batteries/:id, like the
+  // web): only while the batch is packed and not yet verified by the workshop.
+  const saveBatteryEdit = () => run('Battery', async () => {
+    const { row, serial, notes } = batteryEdit;
+    const { data } = await apiClient.patch(`/clients/me/batteries/${row.id}`, {
+      serialNumber: serial.trim() || null,
+      notes: notes.trim() || null,
+    });
+    setBatteryEdit(null);
+    return data?.message || `${row.battery_code} updated.`;
   });
 
   const removeBattery = (row) => confirm('Remove battery?', `${row.battery_code} will be taken off this truck and returned to your fleet list.`, () =>
@@ -335,12 +348,56 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
           </View>
           {row.notes ? <Text className="mt-1.5 text-[11px] text-slate-500" numberOfLines={2}>{row.notes}</Text> : null}
           {canEdit && (
-            <TouchableOpacity disabled={busy} onPress={() => removeBattery(row)} className="mt-2 self-end rounded-lg border border-red-200 bg-red-50 px-2.5 py-1">
-              <Text className="text-[11px] font-bold text-red-700">Remove</Text>
-            </TouchableOpacity>
+            <View className="mt-2 flex-row justify-end gap-2">
+              <TouchableOpacity
+                disabled={busy}
+                onPress={() => setBatteryEdit({ row, serial: row.serial_number || '', notes: row.notes || '' })}
+                className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1"
+              >
+                <Text className="text-[11px] font-bold text-slate-700">Edit</Text>
+              </TouchableOpacity>
+              <TouchableOpacity disabled={busy} onPress={() => removeBattery(row)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1">
+                <Text className="text-[11px] font-bold text-red-700">Remove</Text>
+              </TouchableOpacity>
+            </View>
           )}
         </View>
       ))}
+
+      {/* Edit battery (serial + defect notes) modal */}
+      <Modal visible={Boolean(batteryEdit)} transparent animationType="fade" onRequestClose={() => setBatteryEdit(null)}>
+        <View className="flex-1 items-center justify-center bg-black/60 px-6">
+          <View className="w-full rounded-3xl bg-white p-5">
+            <Text className="text-base font-extrabold text-slate-900">Edit Battery — {batteryEdit?.row.battery_code}</Text>
+            <Text className="mt-0.5 text-xs text-slate-500">Update the physical serial number or fault/defect notes for this battery.</Text>
+            <Text className="mb-1 mt-3 text-xs font-semibold text-slate-600">Serial number</Text>
+            <TextInput
+              value={batteryEdit?.serial || ''}
+              onChangeText={(t) => setBatteryEdit((e) => ({ ...e, serial: t }))}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              placeholder="e.g. SN-12345"
+              placeholderTextColor="#94a3b8"
+              className="rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+            />
+            <Text className="mb-1 mt-3 text-xs font-semibold text-slate-600">Defect notes</Text>
+            <TextInput
+              value={batteryEdit?.notes || ''}
+              onChangeText={(t) => setBatteryEdit((e) => ({ ...e, notes: t }))}
+              multiline
+              placeholder="Describe the fault (optional)"
+              placeholderTextColor="#94a3b8"
+              className="min-h-[90px] rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm text-slate-900"
+              style={{ textAlignVertical: 'top' }}
+            />
+            <Text className="mt-1 text-[11px] text-slate-400">These notes are forwarded to the repair technicians at the workshop.</Text>
+            <View className="mt-4 flex-row gap-2">
+              <TouchableOpacity onPress={() => setBatteryEdit(null)} className="flex-1 items-center rounded-2xl bg-slate-100 py-3"><Text className="text-sm font-bold text-slate-700">Cancel</Text></TouchableOpacity>
+              <TouchableOpacity disabled={busy} onPress={saveBatteryEdit} className="flex-1 items-center rounded-2xl bg-blue-600 py-3"><Text className="text-sm font-bold text-white">{busy ? 'Saving…' : 'Save'}</Text></TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Edit truck modal */}
       <Modal visible={editOpen} transparent animationType="fade" onRequestClose={() => setEditOpen(false)}>

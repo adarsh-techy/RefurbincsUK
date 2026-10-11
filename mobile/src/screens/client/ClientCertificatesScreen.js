@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../services/api-client';
 import { Badge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import { printCertificate, shareCertificate } from '../../utils/print-milestone-certificate';
 
 // Certificates & Impact — mobile version of the web ClientCertificatesPage:
 // GET /certificates/my-milestones → { servicedCount, allCerts, unacknowledged,
 // milestoneTiers }. Shows progress to the next tier, every tier, and the
 // certificates earned; a newly awarded certificate can be acknowledged
 // (POST /certificates/acknowledge/:id), which clears the dashboard prompt.
+// Each certificate downloads / prints as the same two-page PDF the web makes
+// (utils/print-milestone-certificate).
 
 const day = (v) => (v ? new Date(v).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 const BADGE_TONE = { Bronze: 'warning', Silver: 'neutral', Gold: 'good', Platinum: 'info', Diamond: 'info' };
@@ -19,6 +22,20 @@ export default function ClientCertificatesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
   const [busyId, setBusyId] = useState(null);
+  const [pdfBusy, setPdfBusy] = useState(null); // `${id}:share` | `${id}:print`
+
+  async function runPdf(cert, kind) {
+    setPdfBusy(`${cert.id}:${kind}`);
+    try {
+      const clientName = data?.client?.name;
+      if (kind === 'print') await printCertificate(cert, clientName);
+      else await shareCertificate(cert, clientName);
+    } catch (err) {
+      Alert.alert('Could not create the certificate PDF', err.message || 'Please try again.');
+    } finally {
+      setPdfBusy(null);
+    }
+  }
 
   const load = useCallback(async () => {
     try {
@@ -128,7 +145,15 @@ export default function ClientCertificatesScreen() {
                 <Text className="mt-2 text-xs text-slate-600">
                   {Number(cert.milestone_count || 0).toLocaleString()} batteries · {Math.round(cert.co2_saved_kg || 0)} kg CO2 saved · {Math.round(cert.ewaste_diverted_kg || 0)} kg e-waste diverted
                 </Text>
-                <Text className="mt-1 text-[11px] text-slate-400">Download the PDF certificate from the web portal.</Text>
+                <View className="mt-3 flex-row gap-2">
+                  <TouchableOpacity disabled={Boolean(pdfBusy)} onPress={() => runPdf(cert, 'share')} className="flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-violet-700 py-2.5">
+                    <Icon name="award" color="#fff" size={14} />
+                    <Text className="text-xs font-bold text-white">{pdfBusy === `${cert.id}:share` ? 'Creating PDF…' : 'Download / Share PDF'}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity disabled={Boolean(pdfBusy)} onPress={() => runPdf(cert, 'print')} className="items-center justify-center rounded-xl border border-violet-300 px-4 py-2.5">
+                    <Text className="text-xs font-bold text-violet-700">{pdfBusy === `${cert.id}:print` ? '…' : 'Print'}</Text>
+                  </TouchableOpacity>
+                </View>
                 {isNew && (
                   <TouchableOpacity disabled={busyId === cert.id} onPress={() => acknowledge(cert)} className="mt-3 items-center rounded-xl bg-emerald-600 py-2.5">
                     <Text className="text-xs font-bold text-white">{busyId === cert.id ? 'Saving…' : 'Acknowledge certificate'}</Text>

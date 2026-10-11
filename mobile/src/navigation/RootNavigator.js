@@ -18,6 +18,7 @@ import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import ClientHistoryScreen from '../screens/client/ClientHistoryScreen';
 import ClientCertificatesScreen from '../screens/client/ClientCertificatesScreen';
 import ClientTruckIntakeScreen from '../screens/client/ClientTruckIntakeScreen';
+import ClientHistoryDetailScreen from '../screens/client/ClientHistoryDetailScreen';
 import AdminDirectoryScreen from '../screens/admin/AdminDirectoryScreen';
 import AdminPartsScreen from '../screens/admin/AdminPartsScreen';
 import AdminFinanceScreen from '../screens/admin/AdminFinanceScreen';
@@ -161,6 +162,11 @@ export default function RootNavigator() {
               name="ClientCertificates"
               component={ClientCertificatesScreen}
               options={{ ...clientScreenOptions, title: 'Certificates & Impact' }}
+            />
+            <Stack.Screen
+              name="ClientHistoryDetail"
+              component={ClientHistoryDetailScreen}
+              options={{ ...clientScreenOptions, title: 'Shipment Details' }}
             />
             <Stack.Screen
               name="ClientTruckIntake"
