@@ -16,6 +16,10 @@ import Icon from '../ui/Icon';
 //   title / subtitle / meta / badge / actions / onPress   per-row renderers
 //   header     (rows, extra) => node rendered above the list
 //   empty      text when nothing is found
+//   toolbar    node shown under the search box (screen-owned filter controls —
+//              they change `params`, which refetches)
+//   serverSearch  false → search filters loaded rows only (for APIs with no
+//              ?search=, e.g. /audit-logs); default true
 // Rows refresh on pull-down and after any action resolves.
 
 const PAGE = 25;
@@ -50,6 +54,8 @@ export default function AdminListScreen({
   addLabel, // shows an "+ Add …" button when set
   onAdd, // (reload) => void
   onPressRow, // (row, reload) => void — like onPress but gets reload
+  toolbar,
+  serverSearch = true,
 }) {
   const [rows, setRows] = useState([]);
   const [extra, setExtra] = useState(null); // the non-list part of the response (stats etc.)
@@ -72,7 +78,7 @@ export default function AdminListScreen({
       if (paged) {
         query.limit = PAGE;
         query.offset = offset;
-        if (search.trim()) query.search = search.trim();
+        if (serverSearch && search.trim()) query.search = search.trim();
       }
       const { data } = await apiClient.get(endpoint, { params: query });
       if (reqId !== requestRef.current) return;
@@ -92,19 +98,20 @@ export default function AdminListScreen({
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [endpoint, paramsKey, paged, search]);
+  }, [endpoint, paramsKey, paged, paged && serverSearch ? search : '']);
 
+  const fetchSearch = paged && serverSearch ? search : '';
   useEffect(() => {
     clearTimeout(debounceRef.current);
     if (paged) {
       setLoading(true);
-      debounceRef.current = setTimeout(() => fetchPage(0, true), search ? DEBOUNCE_MS : 0);
+      debounceRef.current = setTimeout(() => fetchPage(0, true), fetchSearch ? DEBOUNCE_MS : 0);
       return () => clearTimeout(debounceRef.current);
     }
     setLoading(true);
     fetchPage(0, true);
     return undefined;
-  }, [fetchPage, paged, search]);
+  }, [fetchPage, paged, fetchSearch]);
 
   const reload = () => {
     setRefreshing(true);
@@ -156,7 +163,7 @@ export default function AdminListScreen({
 
   return (
     <View className="flex-1 bg-slate-50">
-      {(searchKeys.length > 0 || filters || addLabel) && (
+      {(searchKeys.length > 0 || filters || addLabel || toolbar) && (
         <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
           {addLabel && onAdd && (
             <TouchableOpacity onPress={() => onAdd(reload)} className="mb-2.5 items-center rounded-2xl bg-emerald-600 py-2.5">
@@ -181,6 +188,7 @@ export default function AdminListScreen({
               ) : null}
             </View>
           )}
+          {toolbar ? <View className="pt-2.5">{toolbar}</View> : null}
           {filters && (
             <FlatList
               horizontal

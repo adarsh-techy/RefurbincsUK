@@ -4,9 +4,11 @@ import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import Icon from '../../components/ui/Icon';
+import DateField, { prettyYmd, todayYmd } from '../../components/admin/DateField';
 
 // Office-role (super_admin / admin / staff) home: the same figures as the web
-// admin dashboard (GET /dashboard/summary), sized for a phone.
+// admin dashboard (GET /dashboard/summary?date=YYYY-MM-DD — the web's date
+// picker; defaults to today), sized for a phone.
 
 function greeting() {
   const h = new Date().getHours();
@@ -55,10 +57,13 @@ export default function AdminDashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [date, setDate] = useState(todayYmd());
+  const [pickDate, setPickDate] = useState(false);
+  const isToday = date === todayYmd();
 
   const load = useCallback(async () => {
     try {
-      const { data: res } = await apiClient.get('/dashboard/summary');
+      const { data: res } = await apiClient.get('/dashboard/summary', { params: { date } });
       setData(res);
       setError(null);
     } catch (err) {
@@ -67,9 +72,10 @@ export default function AdminDashboardScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [date]);
 
   useEffect(() => {
+    setLoading(true);
     load();
   }, [load]);
 
@@ -101,6 +107,29 @@ export default function AdminDashboardScreen() {
             </View>
           </View>
         </View>
+      </View>
+
+      {/* Date — same as the web dashboard's calendar */}
+      <View className="rounded-2xl border border-slate-200 bg-white p-3">
+        <TouchableOpacity onPress={() => setPickDate((v) => !v)} className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-2">
+            <Icon name="calendar" color="#2563eb" size={16} />
+            <Text className="text-sm font-bold text-slate-900">{isToday ? `Today · ${prettyYmd(date)}` : prettyYmd(date)}</Text>
+          </View>
+          <View className="flex-row items-center gap-2">
+            {!isToday && (
+              <TouchableOpacity onPress={() => setDate(todayYmd())} className="rounded-lg bg-blue-50 px-2 py-1">
+                <Text className="text-[11px] font-bold text-blue-700">Back to today</Text>
+              </TouchableOpacity>
+            )}
+            <Text className="text-[11px] font-bold text-blue-600">{pickDate ? 'Done' : 'Change'}</Text>
+          </View>
+        </TouchableOpacity>
+        {pickDate && (
+          <View className="mt-2">
+            <DateField value={date} onChange={(v) => v && setDate(v)} clearable={false} />
+          </View>
+        )}
       </View>
 
       {error && (
@@ -156,13 +185,13 @@ export default function AdminDashboardScreen() {
 
       {/* Today's repairs */}
       <View className="flex-row items-center justify-between">
-        <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Today's repairs</Text>
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{isToday ? "Today's repairs" : `Repairs · ${prettyYmd(date)}`}</Text>
         <Text className="text-[11px] font-bold text-slate-400">{todays.length}</Text>
       </View>
       {!loading && todays.length === 0 ? (
         <View className="items-center rounded-2xl border border-slate-200 bg-white p-6">
           <Icon name="wrench" color="#94a3b8" size={22} />
-          <Text className="mt-2 text-sm font-semibold text-slate-800">No repairs logged today</Text>
+          <Text className="mt-2 text-sm font-semibold text-slate-800">{isToday ? 'No repairs logged today' : `No repairs on ${prettyYmd(date)}`}</Text>
           <Text className="mt-0.5 text-xs text-slate-400">Repairs appear here as technicians log parts.</Text>
         </View>
       ) : (

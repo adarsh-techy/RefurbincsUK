@@ -18,6 +18,7 @@ import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import ImageViewerModal from '../../components/ui/ImageViewerModal';
 import BatteryAdminActions from '../../components/admin/BatteryAdminActions';
+import { printBatteryReport, shareBatteryReport } from '../../utils/print-battery-report';
 import formatDuration from '../../utils/format-duration';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { isIntakeUnverified as intakeIsUnverified } from '../../utils/intake';
@@ -2390,6 +2391,10 @@ export default function BatteryDetailScreen() {
         </>
       )}
 
+      {(currentUser?.role === 'super_admin' || currentUser?.role === 'admin') && (
+        <PrintReportRow data={result} showPrices={currentUser?.role === 'super_admin'} />
+      )}
+
       {currentUser?.role === 'super_admin' && (
         <BatteryAdminActions battery={battery} onChanged={load} onDeleted={() => navigation.goBack()} />
       )}
@@ -4060,5 +4065,40 @@ export default function BatteryDetailScreen() {
         onClose={() => setLightboxVisible(false)}
       />
     </ScrollView>
+  );
+}
+
+// "Print report" for office roles — the web BatteryDetailPage's Print Report:
+// battery details, visits, repairs / parts, services, issues, returns. Print
+// opens the system dialog (printer or Save as PDF); Share builds the PDF and
+// opens the share sheet. Prices only for a super admin, as on the web.
+function PrintReportRow({ data, showPrices }) {
+  const [busy, setBusy] = useState(null); // 'print' | 'share' | null
+  const [error, setError] = useState(null);
+  if (!data?.battery) return null;
+  async function run(kind) {
+    setBusy(kind);
+    setError(null);
+    try {
+      await (kind === 'share' ? shareBatteryReport : printBatteryReport)(data, { showPrices });
+    } catch (err) {
+      setError(err.message || 'Could not build the report.');
+    } finally {
+      setBusy(null);
+    }
+  }
+  return (
+    <View className="mt-4 rounded-2xl border border-slate-200 bg-white p-4">
+      <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Battery report</Text>
+      <View className="mt-2.5 flex-row gap-2">
+        <TouchableOpacity disabled={Boolean(busy)} onPress={() => run('print')} className={`flex-1 items-center rounded-xl bg-slate-800 py-3 ${busy ? 'opacity-60' : ''}`}>
+          <Text className="text-xs font-bold text-white">{busy === 'print' ? 'Building…' : 'Print report'}</Text>
+        </TouchableOpacity>
+        <TouchableOpacity disabled={Boolean(busy)} onPress={() => run('share')} className={`flex-1 items-center rounded-xl border border-slate-300 bg-white py-3 ${busy ? 'opacity-60' : ''}`}>
+          <Text className="text-xs font-bold text-slate-700">{busy === 'share' ? 'Building…' : 'Share PDF'}</Text>
+        </TouchableOpacity>
+      </View>
+      {error ? <Text className="mt-2 text-xs font-semibold text-red-600">{error}</Text> : null}
+    </View>
   );
 }

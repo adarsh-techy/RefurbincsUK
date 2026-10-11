@@ -8,9 +8,9 @@ import Icon from '../../components/ui/Icon';
 import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
 import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 
-// Admin create flows that were web-only: Truck Intake, Return Dispatch and
-// Recycle Shipment — same endpoints and payloads as TruckIntakeForm,
-// ReturnForm and RecycleForm. Every battery box takes a QR link, a battery
+// Admin create flows that were web-only: Return Dispatch and Recycle
+// Shipment — same endpoints and payloads as ReturnForm and RecycleForm.
+// (Truck intakes are recorded by clients, not created from the admin app.) Every battery box takes a QR link, a battery
 // code, or an RFID tag (a reader in keyboard mode types it + Enter);
 // unassigned tags are refused.
 
@@ -108,85 +108,7 @@ function useSelection() {
   return [selected, toggle, setSelected];
 }
 
-// ── Truck Intake ─────────────────────────────────────────────────────────
-export function AdminIntakeCreateScreen() {
-  const navigation = useNavigation();
-  const clients = useClients('fleet');
-  const [client, setClient] = useState(null);
-  const [truck, setTruck] = useState('');
-  const [driver, setDriver] = useState('');
-  const [count, setCount] = useState('0');
-  const [returning, setReturning] = useState([]); // existing batteries coming back
-  const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
 
-  async function addReturning(input) {
-    const raw = String(input || '').trim();
-    if (!raw) return;
-    setError(null);
-    const r = resolveBatteryInput(raw, []);
-    try {
-      const { data } = await apiClient.get(`/batteries/${encodeURIComponent(r.code || raw)}`);
-      const b = data.battery;
-      if (returning.some((x) => x.id === b.id)) return { tone: 'warn', message: `${b.battery_code} is already on this truck.` };
-      setReturning((list) => [...list, b]);
-      return { tone: 'good', message: `✓ ${b.battery_code} added${b.client_name ? ` (${b.client_name})` : ''}` };
-    } catch (err) {
-      if (!err.response) return { tone: 'bad', message: "Can't reach the server to look this battery up. Check the Wi-Fi / server address." };
-      return { tone: 'bad', message: err.response?.data?.message || err.message };
-    }
-  }
-
-  async function submit() {
-    setError(null);
-    if (!client) return setError('Select the client.');
-    if (!truck.trim() || !driver.trim()) return setError('Truck number and driver name are required.');
-    if ((Number(count) || 0) === 0 && returning.length === 0) return setError('Add a number of new batteries, or scan returning ones.');
-    setBusy(true);
-    try {
-      await apiClient.post('/truck-intakes', {
-        truckNumber: truck.trim(), driverName: driver.trim(), clientId: client.id,
-        batteryCount: Number(count) || 0, scannedBatteryIds: returning.map((b) => b.id),
-      });
-      navigation.goBack();
-    } catch (err) {
-      setError(err.response?.data?.message || err.message);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="p-4 pb-24 gap-4" keyboardShouldPersistTaps="handled">
-        <ErrorBox text={error} />
-        <View><Label required>Client</Label><ClientChips clients={clients} value={client?.id} onChange={setClient} /></View>
-        <View><Label required>Truck number</Label><Input value={truck} onChangeText={(t) => setTruck(t.toUpperCase())} placeholder="e.g. GB21 XYZ" autoCapitalize="characters" /></View>
-        <View><Label required>Driver name</Label><Input value={driver} onChangeText={setDriver} placeholder="e.g. George Davies" /></View>
-        <View>
-          <Label>New batteries on this truck</Label>
-          <Input value={count} onChangeText={setCount} keyboardType="number-pad" />
-          <Text className="mt-1 text-[11px] text-slate-400">Batteries arriving for the first time — IDs are generated automatically.</Text>
-        </View>
-        <View>
-          <Label>Returning batteries (already have a QR / RFID tag)</Label>
-          <ScanBatteryInput onSubmit={addReturning} />
-          <View className="mt-2 gap-1.5">
-            {returning.map((b) => (
-              <View key={b.id} className="flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-3">
-                <Text className="text-sm font-bold text-slate-900">{b.battery_code}</Text>
-                <TouchableOpacity onPress={() => setReturning((l) => l.filter((x) => x.id !== b.id))}><Icon name="x" color="#64748b" size={14} /></TouchableOpacity>
-              </View>
-            ))}
-          </View>
-        </View>
-        <SubmitButton onPress={submit} busy={busy} label={`Record intake (${(Number(count) || 0) + returning.length} batteries)`} />
-      </ScrollView>
-    </KeyboardAvoidingView>
-  );
-}
-
-// ── Return Dispatch ──────────────────────────────────────────────────────
 export function AdminReturnCreateScreen() {
   const navigation = useNavigation();
   const clients = useClients('fleet');

@@ -127,6 +127,15 @@ async function update(id, fields) {
     `UPDATE staff SET ${sets.join(', ')} WHERE id = $1 RETURNING *`,
     params
   );
+  // An inactive staff member must not be able to sign in: keep the linked
+  // workshop login in step with the staff record.
+  if (rows[0]?.user_id && fields.active !== undefined) {
+    const isActive = fields.active === true || String(fields.active).toLowerCase() === 'true';
+    await db.query(
+      `UPDATE users SET active = $2 WHERE id = $1 AND role IN ('technician', 'supervisor', 'staff')`,
+      [rows[0].user_id, isActive]
+    );
+  }
   return rows[0];
 }
 

@@ -325,11 +325,14 @@ async function getPeriodDetail({ type = 'month', period, from, to }) {
     startDate = period;
     endDate = period;
   } else if (type === 'month' && period) {
+    // Plain date strings: building local-midnight Dates and calling
+    // toISOString() shifted both ends back a day on servers east of UTC
+    // (UK summer time → "Sep 30 … Oct 30").
     const [year, month] = period.split('-').map(Number);
-    const firstDay = new Date(year, month - 1, 1);
-    const lastDay = new Date(year, month, 0);
-    startDate = firstDay.toISOString().slice(0, 10);
-    endDate = lastDay.toISOString().slice(0, 10);
+    const mm = String(month).padStart(2, '0');
+    const lastDayOfMonth = new Date(Date.UTC(year, month, 0)).getUTCDate();
+    startDate = `${year}-${mm}-01`;
+    endDate = `${year}-${mm}-${String(lastDayOfMonth).padStart(2, '0')}`;
   }
 
   const { repairWhere, serviceWhere, params: rangeParams } = buildDateRangeWhere(startDate, endDate);

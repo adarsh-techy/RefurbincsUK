@@ -7,7 +7,10 @@ function resolveDateRange(preset, from, to) {
   }
 
   const now = new Date();
-  const formatIsoDate = (d) => d.toISOString().slice(0, 10);
+  // Local calendar date (not toISOString, which converts to UTC and moved
+  // local-midnight dates back a day on servers east of UTC)
+  const pad = (n) => String(n).padStart(2, '0');
+  const formatIsoDate = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
   if (preset === 'today') {
     const today = formatIsoDate(now);

@@ -6,7 +6,6 @@ import DataTable from '../../components/ui/table/DataTable';
 import TableState from '../../components/ui/table/TableState';
 import InfiniteScrollTrigger from '../../components/ui/table/InfiniteScrollTrigger';
 import PageHeader from '../../components/ui/primitives/PageHeader';
-import Button from '../../components/ui/primitives/Button';
 import Modal from '../../components/ui/overlays/Modal';
 import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
 import AlertModal from '../../components/ui/overlays/AlertModal';
@@ -131,26 +130,18 @@ function TruckIntakePage() {
         title="Intake Battery"
         description="Batteries delivered by truck for repair."
         titleClassName="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400"
-      >
-        <Button variant="darkViolet" onClick={() => setFormTarget('new')}>
-          + Add Intake
-        </Button>
-      </PageHeader>
+      />
 
       {formTarget && (
         <Modal
-          title={formTarget === 'new' ? 'Add Truck Intake' : 'Edit Truck Intake'}
-          description={
-            formTarget === 'new'
-              ? 'Record a truck delivering batteries for repair.'
-              : 'Update the truck/driver details for this intake.'
-          }
+          title="Edit Truck Intake"
+          description="Update the truck/driver details for this intake."
           size="5xl"
           className="max-h-[92vh] flex flex-col"
           onClose={() => setFormTarget(null)}
         >
           <TruckIntakeForm
-            intake={formTarget === 'new' ? null : formTarget}
+            intake={formTarget}
             onSaved={handleSaved}
             onCancel={() => setFormTarget(null)}
           />

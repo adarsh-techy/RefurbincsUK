@@ -4,10 +4,12 @@ import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import DateField, { prettyYmd } from '../../components/admin/DateField';
 
 // Whole-fleet battery list for office roles — GET /batteries (paged:
-// { data, hasMore, total }) with the same search and status filters as the
-// web Battery Fleet page. Tap a row to open the shared BatteryDetailScreen.
+// { data, hasMore, total }) with the same search, status, client
+// (?clientName=) and created-on (?date=YYYY-MM-DD) filters as the web
+// Battery Fleet page. Tap a row to open the shared BatteryDetailScreen.
 
 const PAGE = 30;
 const DEBOUNCE_MS = 350;
@@ -27,6 +29,10 @@ export default function AdminBatteriesScreen() {
   const route = useRoute();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState(route.params?.status || '');
+  const [clientName, setClientName] = useState(route.params?.clientName || '');
+  const [date, setDate] = useState('');
+  const [clients, setClients] = useState([]);
+  const [showDate, setShowDate] = useState(false);
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [hasMore, setHasMore] = useState(false);
@@ -44,6 +50,17 @@ export default function AdminBatteriesScreen() {
   useEffect(() => {
     if (route.params?.search !== undefined) setSearch(route.params.search || '');
   }, [route.params?.search]);
+  useEffect(() => {
+    if (route.params?.clientName !== undefined) setClientName(route.params.clientName || '');
+  }, [route.params?.clientName]);
+
+  // fleet clients for the filter — recycling partners don't own batteries
+  useEffect(() => {
+    apiClient
+      .get('/clients')
+      .then(({ data }) => setClients((Array.isArray(data) ? data : data?.data || []).filter((c) => c.user_role !== 'recycle_client').map((c) => c.name).sort()))
+      .catch(() => {});
+  }, []);
 
   const fetchPage = useCallback(async (offset, replace) => {
     const reqId = ++requestRef.current;
@@ -51,6 +68,8 @@ export default function AdminBatteriesScreen() {
       const params = { limit: PAGE, offset };
       if (search.trim()) params.search = search.trim();
       if (status) params.status = status;
+      if (clientName) params.clientName = clientName;
+      if (date) params.date = date;
       const { data } = await apiClient.get('/batteries', { params });
       if (reqId !== requestRef.current) return; // a newer request superseded this one
       setRows((prev) => (replace ? data.data || [] : [...prev, ...(data.data || [])]));
@@ -67,7 +86,7 @@ export default function AdminBatteriesScreen() {
         setRefreshing(false);
       }
     }
-  }, [search, status]);
+  }, [search, status, clientName, date]);
 
   useEffect(() => {
     clearTimeout(debounceRef.current);
@@ -120,6 +139,37 @@ export default function AdminBatteriesScreen() {
             );
           }}
         />
+        {clients.length > 0 && (
+          <FlatList
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            data={['', ...clients]}
+            keyExtractor={(c) => c || 'all-clients'}
+            contentContainerClassName="gap-1.5 pt-2"
+            renderItem={({ item: c }) => {
+              const active = clientName === c;
+              return (
+                <TouchableOpacity
+                  onPress={() => setClientName(c)}
+                  className={`rounded-xl border px-3 py-1.5 ${active ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-white'}`}
+                >
+                  <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{c || 'All clients'}</Text>
+                </TouchableOpacity>
+              );
+            }}
+          />
+        )}
+        <TouchableOpacity onPress={() => setShowDate((v) => !v)} className="mt-2 flex-row items-center justify-between">
+          <Text className="text-[11px] font-bold text-slate-600">
+            Created on: <Text className={date ? 'text-blue-700' : 'text-slate-400'}>{date ? prettyYmd(date) : 'any date'}</Text>
+          </Text>
+          <Text className="text-[11px] font-bold text-blue-600">{showDate ? 'Hide' : 'Pick date'}</Text>
+        </TouchableOpacity>
+        {showDate && (
+          <View className="mt-2">
+            <DateField value={date} onChange={setDate} />
+          </View>
+        )}
       </View>
 
       {error && (

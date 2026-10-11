@@ -106,12 +106,15 @@ export const ADMIN_FORMS = {
       { key: 'niNumber', label: 'NI number', type: 'text' },
       { key: 'shareCode', label: 'Share code', type: 'text' },
       { key: 'docFile', label: 'ID / right-to-work document', type: 'file', accept: ['application/pdf', 'image/*'] },
+      { key: 'active', label: 'Active (can sign in)', type: 'toggle', editOnly: true },
     ],
     fromRow: (r) => ({
       name: r.name || '', role: r.role || 'technician', phone: r.phone || '', email: r.email || r.login_email || '',
       salary: r.salary != null ? String(r.salary) : '', passportNumber: r.passport_number || '', niNumber: r.ni_number || '', shareCode: r.share_code || '',
+      active: r.active !== false,
     }),
-    toPayload: (v) => ({
+    toPayload: (v, { isEdit } = {}) => ({
+      ...(isEdit ? { active: String(v.active !== false) } : {}),
       name: v.name.trim(), role: v.role, phone: v.phone.trim() || undefined, email: v.email.trim() || undefined,
       tempPassword: v.tempPassword || undefined, salary: v.salary !== '' ? v.salary : undefined,
       passportNumber: v.passportNumber.trim() || undefined, niNumber: v.niNumber.trim() || undefined, shareCode: v.shareCode.trim() || undefined,

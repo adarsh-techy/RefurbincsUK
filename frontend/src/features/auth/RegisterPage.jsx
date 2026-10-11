@@ -10,18 +10,10 @@ const inputClasses =
 const labelClasses = 'mb-1.5 block text-xs font-semibold text-slate-700 uppercase tracking-wider';
 const iconClasses = 'pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400';
 
-const ROLES = [
-  { value: 'super_admin', label: 'Super Admin', icon: '👑', desc: 'Full platform access' },
-  { value: 'client', label: 'Fleet Client', icon: '⚡', desc: 'Fleet portal & battery sorting' },
-  { value: 'technician', label: 'Technician', icon: '🔧', desc: 'Repairs & intake testing' },
-  { value: 'supervisor', label: 'Supervisor', icon: '🛡️', desc: 'QA inspection & workshop lead' },
-];
-
 function RegisterPage() {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState('super_admin');
   const [showPassword, setShowPassword] = useState(false);
   const [clientError, setClientError] = useState(null);
   const dispatch = useDispatch();
@@ -39,7 +31,7 @@ function RegisterPage() {
       return;
     }
 
-    const result = await dispatch(register({ name: name.trim(), email: email.trim().toLowerCase(), password: password.trim(), role }));
+    const result = await dispatch(register({ name: name.trim(), email: email.trim().toLowerCase(), password: password.trim() }));
     if (register.fulfilled.match(result)) {
       if (result.payload?.token) {
         navigate('/');
@@ -163,32 +155,16 @@ function RegisterPage() {
               <p className="mt-1 text-[11px] text-slate-400">Must be at least 8 characters long</p>
             </div>
 
-            {/* Role Selection */}
-            <div>
-              <label className={labelClasses}>Select Account Role</label>
-              <div className="grid grid-cols-2 gap-2">
-                {ROLES.map((r) => {
-                  const isSelected = role === r.value;
-                  return (
-                    <button
-                      key={r.value}
-                      type="button"
-                      onClick={() => setRole(r.value)}
-                      className={`flex flex-col items-start rounded-xl border p-2.5 text-left transition cursor-pointer ${
-                        isSelected
-                          ? 'border-[#0d5c3a] bg-[#0d5c3a]/5 ring-1 ring-[#0d5c3a]'
-                          : 'border-slate-200 bg-white hover:border-slate-300'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5">
-                        <span>{r.icon}</span>
-                        <span className="text-xs font-bold text-slate-900">{r.label}</span>
-                      </div>
-                      <span className="mt-0.5 text-[10px] text-slate-500 line-clamp-1">{r.desc}</span>
-                    </button>
-                  );
-                })}
-              </div>
+            {/* Only Super Admin accounts are created here (the API enforces it):
+                clients and workshop staff need their own records. */}
+            <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+              <p className="font-bold text-slate-900">👑 Creates a Super Admin account (full platform access)</p>
+              <p className="mt-1">
+                Other accounts are made where their records live:{' '}
+                <Link to="/clients" className="font-semibold text-[#0d5c3a] hover:underline">Fleet Clients</Link> (client logins),{' '}
+                <Link to="/staff" className="font-semibold text-[#0d5c3a] hover:underline">Staff &amp; Technicians</Link> (technicians, supervisors),{' '}
+                <Link to="/users" className="font-semibold text-[#0d5c3a] hover:underline">User Accounts</Link> (admins with selected modules).
+              </p>
             </div>
 
             {clientError && (

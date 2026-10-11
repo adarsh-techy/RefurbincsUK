@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../services/api-client';
 import Icon from '../../components/ui/Icon';
+import { DEFAULT_COLUMNS, MAX_SHEET_CODES, ROWS, codesInRange, printQrSheet, shareQrSheet } from '../../utils/print-qr-sheet';
 
-// Bulk QR / battery ID generation for office roles — the mobile version of
-// the web Generate QR Code page's "Bulk" tab: pick a client, a count and an
-// optional starting number, POST /batteries/generate-bulk. Printing the QR
-// sheet stays on the web (it needs a printer anyway).
+// QR / battery ID generation for office roles — the mobile version of the web
+// Generate QR Code page: Individual (POST /batteries/generate) or Bulk (pick a
+// client, a count and an optional starting number, POST
+// /batteries/generate-bulk). The QR sheet (A4, `columns` x 9, Battery ID under
+// each code — same layout as the web PDF) can be printed or shared as a PDF
+// right after generating, or re-printed later for any numbered range.
 
 const BATTERY_NUMBER_DIGITS = 7;
 const prefixOf = (name) => (name || '').replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
@@ -23,6 +26,12 @@ export default function AdminGenerateQrScreen() {
   const [result, setResult] = useState(null);
   const [mode, setMode] = useState('bulk'); // individual | bulk (same tabs as the web page)
   const [serial, setSerial] = useState('');
+  // QR sheet printing
+  const [columns, setColumns] = useState(DEFAULT_COLUMNS);
+  const [printing, setPrinting] = useState(null); // 'print' | 'share' | null
+  const [printError, setPrintError] = useState(null);
+  const [rangeFrom, setRangeFrom] = useState('');
+  const [rangeTo, setRangeTo] = useState('');
 
   useEffect(() => {
     apiClient.get('/clients')
@@ -44,6 +53,38 @@ export default function AdminGenerateQrScreen() {
   const prefix = prefixOf(client?.name);
   const padLen = Math.max(BATTERY_NUMBER_DIGITS, String(to).length);
   const preview = useMemo(() => (prefix ? `${prefix}-${pad(from, padLen)}  →  ${prefix}-${pad(to, padLen)}` : '—'), [prefix, from, to, padLen]);
+
+  // Battery IDs the last Generate created (bulk: firstCode → lastCode)
+  function generatedCodes() {
+    if (!result?.firstCode) return [];
+    if (!result.lastCode || result.lastCode === result.firstCode) return [result.firstCode];
+    const [p1, n1] = result.firstCode.split(/-(?=\d+$)/);
+    const [, n2] = result.lastCode.split(/-(?=\d+$)/);
+    return codesInRange(p1, Number(n1), Number(n2));
+  }
+
+  function rangeCodes() {
+    if (!client) throw new Error('Select the client first.');
+    const a = Number(rangeFrom);
+    const b = Number(rangeTo || rangeFrom);
+    if (!Number.isInteger(a) || a < 1 || !Number.isInteger(b) || b < a) throw new Error('Enter a valid From / To number (To must be ≥ From).');
+    return codesInRange(prefix, a, b);
+  }
+
+  async function runPrint(kind, getCodes) {
+    setPrintError(null);
+    setPrinting(kind);
+    try {
+      const codes = getCodes();
+      await (kind === 'share' ? shareQrSheet : printQrSheet)(codes, columns);
+    } catch (err) {
+      setPrintError(err.message || 'Could not build the QR sheet.');
+    } finally {
+      setPrinting(null);
+    }
+  }
+
+  const perSheet = columns * ROWS;
 
   async function generateOne() {
     setError(null);
@@ -96,7 +137,7 @@ export default function AdminGenerateQrScreen() {
         ))}
       </View>
       <Text className="text-xs text-slate-500">
-        {mode === 'individual' ? 'Creates one battery with the next free ID for the client.' : 'Creates many batteries at once.'} Print the QR codes from the web admin.
+        {mode === 'individual' ? 'Creates one battery with the next free ID for the client.' : 'Creates many batteries at once.'} Print or share the QR sheet right after, or re-print any range below.
       </Text>
 
       <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">1. Client</Text>
@@ -160,8 +201,57 @@ export default function AdminGenerateQrScreen() {
             <Text className="text-sm font-extrabold text-emerald-800">{result.message || 'Generated'}</Text>
           </View>
           <Text className="mt-1 text-xs text-emerald-700">{result.firstCode} → {result.lastCode} ({Number(result.count || 0).toLocaleString()} codes)</Text>
+          <View className="mt-3 flex-row gap-2">
+            <TouchableOpacity disabled={Boolean(printing)} onPress={() => runPrint('print', generatedCodes)} className={`flex-1 flex-row items-center justify-center gap-1.5 rounded-xl bg-emerald-600 py-2.5 ${printing ? 'opacity-60' : ''}`}>
+              <Icon name="package" color="#fff" size={14} />
+              <Text className="text-xs font-bold text-white">{printing === 'print' ? 'Building…' : 'Print QR sheet'}</Text>
+            </TouchableOpacity>
+            <TouchableOpacity disabled={Boolean(printing)} onPress={() => runPrint('share', generatedCodes)} className={`flex-1 items-center justify-center rounded-xl border border-emerald-300 bg-white py-2.5 ${printing ? 'opacity-60' : ''}`}>
+              <Text className="text-xs font-bold text-emerald-700">{printing === 'share' ? 'Building…' : 'Share PDF'}</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
+
+      {/* ── Print / re-print a QR sheet ─────────────────────────────── */}
+      <View className="rounded-2xl border border-slate-200 bg-white p-4">
+        <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Print QR sheet</Text>
+        <Text className="mt-1 text-xs text-slate-500">
+          {client ? `Battery IDs ${prefix}-… for ${client.name}.` : 'Pick a client above.'} One A4 sheet = {perSheet} QR codes ({columns} across × {ROWS} down), Battery ID under each. Up to {MAX_SHEET_CODES.toLocaleString()} per print.
+        </Text>
+        <View className="mt-3 flex-row gap-2">
+          <View className="flex-1">
+            <Text className="mb-1 text-xs font-semibold text-slate-600">From #</Text>
+            <TextInput value={rangeFrom} onChangeText={setRangeFrom} keyboardType="number-pad" placeholder="1" placeholderTextColor="#94a3b8" className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-bold text-slate-900" />
+          </View>
+          <View className="flex-1">
+            <Text className="mb-1 text-xs font-semibold text-slate-600">To #</Text>
+            <TextInput value={rangeTo} onChangeText={setRangeTo} keyboardType="number-pad" placeholder={String(Math.max(suggestedStart - 1, 1))} placeholderTextColor="#94a3b8" className="rounded-2xl border border-slate-300 bg-white px-4 py-3 text-base font-bold text-slate-900" />
+          </View>
+        </View>
+        {client && Number(rangeFrom) > 0 ? (
+          <Text className="mt-1.5 text-[11px] font-semibold text-violet-700">
+            {(() => { try { const c = rangeCodes(); return `${c[0]} → ${c[c.length - 1]} (${c.length.toLocaleString()} codes)`; } catch (e) { return e.message; } })()}
+          </Text>
+        ) : null}
+        <Text className="mb-1 mt-3 text-xs font-semibold text-slate-600">QR codes per row</Text>
+        <View className="flex-row gap-1.5">
+          {[3, 4, 5, 6].map((c) => (
+            <TouchableOpacity key={c} onPress={() => setColumns(c)} className={`rounded-xl border px-3.5 py-2 ${columns === c ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-white'}`}>
+              <Text className={`text-xs font-bold ${columns === c ? 'text-white' : 'text-slate-700'}`}>{c}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+        {printError && <Text className="mt-2 text-xs font-semibold text-red-600">{printError}</Text>}
+        <View className="mt-3 flex-row gap-2">
+          <TouchableOpacity disabled={Boolean(printing)} onPress={() => runPrint('print', rangeCodes)} className={`flex-1 items-center rounded-xl bg-violet-600 py-3 ${printing ? 'opacity-60' : ''}`}>
+            <Text className="text-xs font-bold text-white">{printing === 'print' ? 'Building…' : 'Print'}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity disabled={Boolean(printing)} onPress={() => runPrint('share', rangeCodes)} className={`flex-1 items-center rounded-xl border border-violet-300 bg-white py-3 ${printing ? 'opacity-60' : ''}`}>
+            <Text className="text-xs font-bold text-violet-700">{printing === 'share' ? 'Building…' : 'Share PDF'}</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
     </ScrollView>
   );
 }

@@ -84,6 +84,15 @@ async function register(req, res, next) {
   try {
     const { name, email, password } = req.body;
 
+    // No public sign-up: only a signed-in Super Admin can create accounts here
+    // (the very first account on an empty system is the one exception).
+    const bootstrap = !(await userModel.anyExist());
+    if (!bootstrap && req.user?.role !== 'super_admin') {
+      return res.status(403).json({
+        message: 'Public sign-up is closed. Ask your Refurbnics administrator for an account.',
+      });
+    }
+
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Name, email, and password are required' });
     }
@@ -97,12 +106,14 @@ async function register(req, res, next) {
     }
 
     const passwordHash = await bcrypt.hash(password, 10);
-    const role = req.body.role || 'super_admin';
+    // Only Super Admin accounts are made here — clients, technicians and
+    // supervisors need a client / staff record, so they're created from the
+    // Fleet Clients and Staff pages; limited admins from User Accounts.
     const user = await userModel.create({
       name,
       email,
       passwordHash,
-      role,
+      role: 'super_admin',
       permissions: PERMISSIONS,
     });
 
@@ -115,9 +126,9 @@ async function register(req, res, next) {
       must_change_password: user.must_change_password,
       client_logo_path: null,
     };
-    // An existing signed-in super admin creating a colleague stays signed in as
-    // themselves — public registrations get a session token to log in directly.
-    if (req.user) {
+    // A super admin creating a colleague stays signed in as themselves — only
+    // the bootstrap account gets a session back.
+    if (!bootstrap) {
       return res.status(201).json({ user: publicUser, created: true });
     }
     res.status(201).json({

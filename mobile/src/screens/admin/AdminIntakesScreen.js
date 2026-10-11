@@ -132,9 +132,6 @@ export default function AdminIntakesScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-3">
-        <TouchableOpacity onPress={() => navigation.navigate('AdminIntakeCreate')} className="mb-2.5 items-center rounded-2xl bg-emerald-600 py-2.5">
-          <Text className="text-sm font-bold text-white">+ New truck intake</Text>
-        </TouchableOpacity>
         <View className="flex-row items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3.5 py-2.5">
           <Icon name="search" color="#94a3b8" size={16} />
           <TextInput

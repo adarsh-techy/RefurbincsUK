@@ -7,6 +7,9 @@ import LoginScreen from '../screens/auth/LoginScreen';
 import SetPasswordScreen from '../screens/auth/SetPasswordScreen';
 import BatteryDetailScreen from '../screens/shared/BatteryDetailScreen';
 import { setupHardwareScanner } from '../services/hardware-scanner';
+import AdminFinanceDetailScreen from '../screens/admin/AdminFinanceDetailScreen';
+import AdminCertificateClientScreen from '../screens/admin/AdminCertificateClientScreen';
+import AdminRatingDetailScreen from '../screens/admin/AdminRatingDetailScreen';
 import ClientSortingScreen from '../screens/client/ClientSortingScreen';
 import ClientInvoicesScreen from '../screens/client/ClientInvoicesScreen';
 import ClientTransactionsScreen from '../screens/client/ClientTransactionsScreen';
@@ -22,7 +25,7 @@ import AdminGenerateQrScreen from '../screens/admin/AdminGenerateQrScreen';
 import AdminFormScreen from '../screens/admin/AdminFormScreen';
 import AdminDetailScreen from '../screens/admin/AdminDetailScreen';
 import AdminRfidScreen from '../screens/admin/AdminRfidScreen';
-import { AdminIntakeCreateScreen, AdminReturnCreateScreen, AdminRecycleCreateScreen } from '../screens/admin/AdminCreateFlows';
+import { AdminReturnCreateScreen, AdminRecycleCreateScreen } from '../screens/admin/AdminCreateFlows';
 import {
   AdminRepairsScreen, AdminReturnsScreen, AdminServicesScreen, AdminIssueReasonsScreen,
   AdminRecycleScreen, AdminInvoicesScreen, AdminRatingsScreen, AdminCertificatesScreen,
@@ -51,9 +54,11 @@ const ADMIN_SCREENS = [
   ['AdminForm', AdminFormScreen, ''],
   ['AdminDetail', AdminDetailScreen, 'Details'],
   ['RfidAssignment', AdminRfidScreen, 'RFID Assignment'],
-  ['AdminIntakeCreate', AdminIntakeCreateScreen, 'New Truck Intake'],
   ['AdminReturnCreate', AdminReturnCreateScreen, 'New Return Dispatch'],
   ['AdminRecycleCreate', AdminRecycleCreateScreen, 'New Recycle Shipment'],
+  ['FinanceDetail', AdminFinanceDetailScreen, 'Finance Statement'],
+  ['AdminCertificateClient', AdminCertificateClientScreen, 'Client Milestones'],
+  ['AdminRatingDetail', AdminRatingDetailScreen, 'Review'],
 ];
 import MainTabs from './MainTabs';
 import { navigationRef } from './navigationRef';

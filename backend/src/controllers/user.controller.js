@@ -72,25 +72,45 @@ async function update(req, res, next) {
   try {
     const targetId = Number(req.params.id);
     const { name, email, role, permissions, active } = req.body;
-    const safeRole = ['super_admin', 'recycle_client'].includes(role) ? role : 'admin';
+
+    const existing = await userModel.findById(targetId);
+    if (!existing) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    // Fields left out keep their current value (a bare { active } toggle must
+    // not blank the name/email or reactivate anyone). Only office logins
+    // (admin / super_admin / recycle_client) can have their role set here;
+    // client, staff and workshop logins keep their role — this endpoint must
+    // never turn them into admins.
+    const OFFICE_ROLES = ['admin', 'super_admin', 'recycle_client'];
+    const safeRole = !OFFICE_ROLES.includes(existing.role)
+      ? existing.role
+      : OFFICE_ROLES.includes(role)
+        ? role
+        : existing.role;
 
     if (targetId === req.user.id && active === false) {
       return res.status(400).json({ message: 'You cannot deactivate your own account' });
     }
 
+    // admin modules: the ones sent (filtered), or the current ones if none were
+    // sent; other roles keep whatever they already had
+    const currentPermissions = Array.isArray(existing.permissions) ? existing.permissions : [];
     const grantedPermissions =
       safeRole === 'admin'
-        ? (Array.isArray(permissions) ? permissions : []).filter((p) =>
-            PERMISSIONS.includes(p)
-          )
-        : [];
+        ? Array.isArray(permissions)
+          ? permissions.filter((p) => PERMISSIONS.includes(p))
+          : currentPermissions
+        : OFFICE_ROLES.includes(safeRole)
+          ? []
+          : currentPermissions;
 
     const user = await userModel.update(targetId, {
-      name,
-      email,
+      name: typeof name === 'string' && name.trim() ? name.trim() : existing.name,
+      email: typeof email === 'string' && email.trim() ? email.trim() : existing.email,
       role: safeRole,
       permissions: grantedPermissions,
-      active: active !== undefined ? active : true,
+      active: typeof active === 'boolean' ? active : existing.active,
     });
     if (!user) {
       return res.status(404).json({ message: 'User not found' });

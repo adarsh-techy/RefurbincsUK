@@ -63,6 +63,12 @@ export default function ClientSupportScreen() {
     }
   }
   const [tickets, setTickets] = useState([]);
+  // office roles: ticket counters + status / client filters, as on the web
+  // Support Messages page (GET /tickets/stats, client list from /clients)
+  const [stats, setStats] = useState(null);
+  const [clients, setClients] = useState([]);
+  const [filterStatus, setFilterStatus] = useState('all');
+  const [filterClient, setFilterClient] = useState('');
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
@@ -85,19 +91,40 @@ export default function ClientSupportScreen() {
   const fetchTickets = useCallback(async () => {
     setError(null);
     try {
-      const { data } = await apiClient.get('/tickets');
-      setTickets(data?.data || []);
+      if (isOffice) {
+        const [ticketsRes, statsRes, clientsRes] = await Promise.all([
+          apiClient.get('/tickets', { params: { limit: 100 } }),
+          apiClient.get('/tickets/stats').catch(() => ({ data: null })),
+          apiClient.get('/clients').catch(() => ({ data: [] })),
+        ]);
+        setTickets(ticketsRes.data?.data || []);
+        setStats(statsRes.data || null);
+        const list = Array.isArray(clientsRes.data) ? clientsRes.data : clientsRes.data?.data || [];
+        setClients(list);
+      } else {
+        const { data } = await apiClient.get('/tickets');
+        setTickets(data?.data || []);
+      }
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
-  }, []);
+  }, [isOffice]);
 
   useEffect(() => {
     fetchTickets();
   }, [fetchTickets]);
+
+  // same local filter as the web page
+  const visibleTickets = !isOffice
+    ? tickets
+    : tickets.filter((t) => {
+      if (filterStatus !== 'all' && t.status !== filterStatus) return false;
+      if (filterClient && String(t.client_id) !== String(filterClient) && t.client_name !== filterClient) return false;
+      return true;
+    });
 
   function onRefresh() {
     setRefreshing(true);
@@ -272,6 +299,40 @@ export default function ClientSupportScreen() {
         )}
       </View>
 
+      {isOffice && !loading && (
+        <View className="gap-2 border-b border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800/80 dark:bg-slate-900">
+          <View className="flex-row gap-2">
+            {[['Open', stats?.open, 'text-amber-600'], ['In progress', stats?.in_progress, 'text-blue-600'], ['Resolved', stats?.resolved, 'text-emerald-600'], ['Unread', stats?.admin_unread, 'text-red-600']].map(([label, n, color]) => (
+              <View key={label} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-800 dark:bg-slate-950">
+                <Text className="text-[9px] font-bold uppercase text-slate-400">{label}</Text>
+                <Text className={`text-base font-black ${color}`}>{n || 0}</Text>
+              </View>
+            ))}
+          </View>
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
+            {[
+              { id: 'all', label: 'All', count: stats?.total },
+              { id: 'open', label: 'Open', count: stats?.open },
+              { id: 'in_progress', label: 'In Progress', count: stats?.in_progress },
+              { id: 'resolved', label: 'Resolved', count: stats?.resolved },
+            ].map((tab) => (
+              <TouchableOpacity key={tab.id} onPress={() => setFilterStatus(tab.id)} className={`rounded-xl px-3 py-1.5 ${filterStatus === tab.id ? 'bg-blue-600' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                <Text className={`text-[11px] font-bold ${filterStatus === tab.id ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{tab.label} ({tab.count || 0})</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+          {clients.length > 0 && (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
+              {[{ id: '', name: 'All clients' }, ...clients].map((c) => (
+                <TouchableOpacity key={String(c.id)} onPress={() => setFilterClient(String(c.id))} className={`rounded-xl px-3 py-1.5 ${String(filterClient) === String(c.id) ? 'bg-violet-600' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                  <Text className={`text-[11px] font-bold ${String(filterClient) === String(c.id) ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{c.name}</Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          )}
+        </View>
+      )}
+
       {loading ? (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#38bdf8" />
@@ -286,7 +347,7 @@ export default function ClientSupportScreen() {
         </View>
       ) : (
         <FlatList
-          data={tickets}
+          data={visibleTickets}
           keyExtractor={(item) => String(item.id)}
           contentContainerClassName="p-4 gap-3 pb-16"
           refreshControl={
@@ -294,7 +355,7 @@ export default function ClientSupportScreen() {
           }
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
-              <Text className="text-sm font-bold text-slate-900 dark:text-white">No support requests yet</Text>
+              <Text className="text-sm font-bold text-slate-900 dark:text-white">{isOffice && tickets.length ? 'No requests match these filters' : 'No support requests yet'}</Text>
               <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">
                 {isOffice ? 'Client support requests will appear here.' : 'Tap "+ New Request" to reach the team.'}
               </Text>
@@ -318,6 +379,9 @@ export default function ClientSupportScreen() {
                     </Text>
                   </View>
                 </View>
+                {isOffice && item.client_name ? (
+                  <Text className="mt-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300" numberOfLines={1}>{item.client_name}</Text>
+                ) : null}
                 <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
                   {item.last_message?.message || 'No messages yet'}
                 </Text>
