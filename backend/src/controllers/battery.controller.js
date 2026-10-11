@@ -797,14 +797,22 @@ async function assignRfidSheet(req, res, next) {
       return res.status(400).json({ message: 'Please upload at most 5,000 rows per file.' });
     }
     const commit = String(req.query.dryRun) !== 'true';
-    const result = await batteryModel.assignRfidTags(rows, { commit });
+    // createMissing: also register sheet rows whose battery doesn't exist yet
+    const createMissing = String(req.query.createMissing ?? req.body?.createMissing) === 'true';
+    let result;
+    try {
+      result = await batteryModel.assignRfidTags(rows, { commit, createMissing });
+    } catch (err) {
+      if (err.status === 409) return res.status(409).json({ message: err.message });
+      throw err;
+    }
     if (commit && result.written > 0) {
       await auditLogModel.record({
         userId: req.user.id,
         action: 'assign_rfid_tags',
         entity: 'battery',
         entityId: null,
-        details: { file: source, written: result.written, summary: result.summary },
+        details: { file: source, written: result.written, created: result.created, summary: result.summary },
       });
     }
     res.json({ ...result, committed: commit, fileName: req.file ? req.file.originalname : null });

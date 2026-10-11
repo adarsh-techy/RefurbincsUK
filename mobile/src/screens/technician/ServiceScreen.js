@@ -7,6 +7,7 @@ import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import RfidLookupButton from '../../components/scan/RfidLookupButton';
 
 const SUGGESTION_LIMIT = 8;
 const DEBOUNCE_MS = 250;
@@ -128,6 +129,8 @@ export default function ServiceScreen() {
             >
               <Text className="text-base font-semibold text-white">Scan with Camera</Text>
             </TouchableOpacity>
+
+            <RfidLookupButton onScan={goToBattery} />
 
             <View className="flex-row items-center gap-2">
               <View className="h-px flex-1 bg-slate-200" />

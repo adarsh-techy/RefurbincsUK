@@ -43,6 +43,15 @@ function cellText(value) {
   return String(value);
 }
 
+// A long all-digit tag typed into a General/Number cell is kept by Excel as a
+// float: past 15 digits the tail becomes zeros or it shows as 5.44E+22. Such a
+// value can't be recovered, so the row is refused instead of saving a wrong tag.
+function tagLostDigits(value) {
+  const v = value && typeof value === 'object' && value.result != null ? value.result : value;
+  if (typeof v === 'number') return !Number.isSafeInteger(v);
+  return /^\s*\d+(\.\d+)?E\+\d+\s*$/i.test(String(v ?? ''));
+}
+
 // Tags are stored as upper-case alphanumerics only: readers report the same
 // UID with colons, spaces or lower-case hex depending on the device.
 function normalizeTag(value) {
@@ -148,6 +157,7 @@ async function parseRfidSheet(buffer, filename) {
     const entry = { rowNumber, batteryCode, rfidTag, clientName: clientName || null };
     if (!batteryCode) entry.error = 'Battery number is empty';
     else if (!rfidTag) entry.error = 'RFID tag is empty';
+    else if (tagLostDigits(record.rfidTag)) entry.error = 'Excel turned this tag into a number and lost digits (e.g. 5.44E+22). Format the RFID Tag column as Text and paste the tags again';
     else if (rfidTag.length < 4 || rfidTag.length > 64) entry.error = 'RFID tag must be 4–64 characters';
     rows.push(entry);
   });

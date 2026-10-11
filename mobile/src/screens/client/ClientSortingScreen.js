@@ -11,10 +11,10 @@ import {
 } from 'react-native';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions } from 'expo-camera';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 import { StatusBadge } from '../../components/ui/Badge';
 
 function storageKey(userId) {
@@ -33,6 +33,7 @@ export default function ClientSortingScreen() {
   const [loadError, setLoadError] = useState(null);
   const lastSavedRef = useRef(null);
   const [registeredBatteries, setRegisteredBatteries] = useState([]);
+  const [batteriesLoaded, setBatteriesLoaded] = useState(false); // false → RFID tags can't be matched yet
 
   const [nameModalOpen, setNameModalOpen] = useState(false);
   const [nameModalMode, setNameModalMode] = useState('create');
@@ -40,10 +41,6 @@ export default function ClientSortingScreen() {
   const [nameTargetId, setNameTargetId] = useState(null);
 
   const [activeGroupId, setActiveGroupId] = useState(null);
-  const [scanInput, setScanInput] = useState('');
-  const [cameraOpen, setCameraOpen] = useState(false);
-  const [permission, requestPermission] = useCameraPermissions();
-  const [addError, setAddError] = useState(null);
 
   useEffect(() => {
     AsyncStorage.removeItem(storageKey(user?.id)).catch(() => {});
@@ -78,12 +75,23 @@ export default function ClientSortingScreen() {
       .catch(() => {});
   }, [groups, loaded, loadError]);
 
-  useEffect(() => {
-    apiClient
-      .get('/clients/me/batteries')
-      .then(({ data }) => setRegisteredBatteries(data?.data || []))
-      .catch(() => {});
+  // The client's batteries with their RFID tags — the tag → battery lookup.
+  const loadRegistered = useCallback(async () => {
+    try {
+      const { data } = await apiClient.get('/clients/me/batteries');
+      const list = data?.data || [];
+      setRegisteredBatteries(list);
+      setBatteriesLoaded(true);
+      return list;
+    } catch {
+      setBatteriesLoaded(false);
+      return null;
+    }
   }, []);
+
+  useEffect(() => {
+    loadRegistered();
+  }, [loadRegistered]);
 
   const activeGroup = useMemo(() => groups.find((g) => g.id === activeGroupId) || null, [groups, activeGroupId]);
 
@@ -141,27 +149,40 @@ export default function ClientSortingScreen() {
   }
 
   const addBattery = useCallback(
-    (rawCode) => {
+    async (rawCode) => {
       if (!activeGroup) return;
       // QR link, battery code, or an RFID tag read by a reader
-      const resolved = resolveBatteryInput(rawCode, registeredBatteries);
+      let resolved = resolveBatteryInput(rawCode, registeredBatteries);
       if (resolved.unassignedTag) {
-        setAddError(UNASSIGNED_TAG_MESSAGE);
-        return;
+        // The list may be stale (tag assigned after this screen opened) or
+        // may never have loaded — reload once before refusing the tag.
+        const fresh = await loadRegistered();
+        if (!fresh) {
+          const message = `Read ${resolved.code}, but the app can't reach the server to look up this RFID tag. Check the Wi-Fi / server address and try again.`;
+          return { tone: 'bad', message };
+        }
+        resolved = resolveBatteryInput(rawCode, fresh);
+      }
+      if (resolved.unassignedTag) {
+        const message = `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})`;
+        return { tone: 'bad', message };
       }
       const code = resolved.code;
       if (!code) return;
+      if (batteriesLoaded && !resolved.battery) {
+        return { tone: 'bad', message: `${code} is not one of your registered batteries — check the number.` };
+      }
       if (activeGroup.batteries.some((c) => c.toUpperCase() === code)) {
-        setAddError(`Battery ${code} is already sorted into this group.`);
-        return;
+        const message = `Battery ${code} is already sorted into this group.`;
+        return { tone: 'warn', message };
       }
       setGroups((prev) =>
         prev.map((g) => (g.id === activeGroup.id ? { ...g, batteries: [...g.batteries, code] } : g))
       );
-      setScanInput('');
-      setAddError(null);
+      const viaTag = resolved.battery?.rfid_tag && String(rawCode).toUpperCase().replace(/[^0-9A-Z]/g, '') === resolved.battery.rfid_tag;
+      return { tone: 'good', message: `✓ ${code} added to ${activeGroup.name}${viaTag ? ' (RFID)' : ''}` };
     },
-    [activeGroup, registeredBatteries]
+    [activeGroup, registeredBatteries, loadRegistered, batteriesLoaded]
   );
 
   function removeBattery(code) {
@@ -169,14 +190,6 @@ export default function ClientSortingScreen() {
     setGroups((prev) =>
       prev.map((g) => (g.id === activeGroup.id ? { ...g, batteries: g.batteries.filter((c) => c !== code) } : g))
     );
-  }
-
-  async function handleOpenCamera() {
-    if (!permission?.granted) {
-      const result = await requestPermission();
-      if (!result.granted) return;
-    }
-    setCameraOpen(true);
   }
 
   // ── Group Detail View ────────────────────────────────────────────────
@@ -203,55 +216,21 @@ export default function ClientSortingScreen() {
           </Text>
         </View>
 
-        {cameraOpen ? (
-          <View className="flex-1 gap-4 p-5">
-            <View className="flex-1 overflow-hidden rounded-3xl border border-blue-500/50 bg-black">
-              <CameraView
-                style={{ flex: 1 }}
-                facing="back"
-                barcodeScannerSettings={{ barcodeTypes: ['qr'] }}
-                onBarcodeScanned={({ data }) => {
-                  addBattery(data);
-                  setCameraOpen(false);
-                }}
-              />
-            </View>
-            <TouchableOpacity
-              onPress={() => setCameraOpen(false)}
-              className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-4 active:bg-slate-200 dark:active:bg-slate-700"
-            >
-              <Text className="text-sm font-bold text-slate-900 dark:text-white">Close Camera</Text>
-            </TouchableOpacity>
-          </View>
-        ) : (
-          <>
+        <>
             <View className="p-4">
               <View className="rounded-2xl border border-blue-200 dark:border-blue-800/40 bg-white dark:bg-slate-900 p-4">
                 <Text className="mb-2 text-xs font-bold text-slate-900 dark:text-white">Scan or Type a Battery</Text>
-                <View className="flex-row gap-2">
-                  <TextInput
-                    value={scanInput}
-                    onChangeText={(v) => setScanInput(v.toUpperCase())}
-                    onSubmitEditing={() => addBattery(scanInput)}
-                    placeholder="Battery code / serial…"
-                    placeholderTextColor="#64748b"
-                    autoCapitalize="characters"
-                    className="flex-1 rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3.5 py-2.5 text-xs text-slate-900 dark:text-white"
-                  />
-                  <TouchableOpacity
-                    onPress={() => addBattery(scanInput)}
-                    className="items-center justify-center rounded-xl bg-blue-600 px-4"
-                  >
-                    <Text className="text-xs font-bold text-white">Add</Text>
+                <ScanBatteryInput
+                  onSubmit={addBattery}
+                  startInRfidMode
+                />
+                {!batteriesLoaded && (
+                  <TouchableOpacity onPress={loadRegistered} className="mt-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
+                    <Text className="text-[11px] font-semibold text-amber-800">
+                      Your battery list hasn't loaded, so RFID tags can't be matched yet. Tap to retry.
+                    </Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={handleOpenCamera}
-                    className="items-center justify-center rounded-xl border border-slate-300 dark:border-slate-700 bg-slate-100 dark:bg-slate-800 px-4"
-                  >
-                    <Text className="text-xs font-bold text-slate-900 dark:text-white">Scan</Text>
-                  </TouchableOpacity>
-                </View>
-                {addError && <Text className="mt-2 text-[11px] font-semibold text-red-600 dark:text-red-400">{addError}</Text>}
+                )}
               </View>
             </View>
 
@@ -286,8 +265,7 @@ export default function ClientSortingScreen() {
                 );
               }}
             />
-          </>
-        )}
+        </>
 
         <NameModal
           visible={nameModalOpen}

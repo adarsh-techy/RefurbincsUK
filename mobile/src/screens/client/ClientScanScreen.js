@@ -7,6 +7,7 @@ import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import RfidLookupButton from '../../components/scan/RfidLookupButton';
 
 const SUGGESTION_LIMIT = 8;
 const DEBOUNCE_MS = 250;
@@ -105,7 +106,7 @@ export default function ClientScanScreen() {
           </View>
           <Text className="text-2xl font-black text-slate-900 dark:text-white">Scan Battery QR Code</Text>
           <Text className="mt-2 max-w-xs text-center text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            Scan the QR code on your battery to inspect its full intake-to-return lifecycle, repair parts, and testing record.
+            Scan the QR code or RFID tag on your battery to inspect its full intake-to-return lifecycle, repair parts, and testing record.
           </Text>
 
           <View className="mt-8 w-full max-w-xs gap-3">
@@ -116,6 +117,8 @@ export default function ClientScanScreen() {
             >
               <Text className="text-base font-bold text-white">Open Device Camera</Text>
             </TouchableOpacity>
+
+            <RfidLookupButton onScan={goToBattery} />
 
             <View className="flex-row items-center gap-3 my-2">
               <View className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />

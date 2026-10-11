@@ -1,5 +1,5 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from 'react';
-import { Modal, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, Text, TextInput, TouchableOpacity, Vibration, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Icon from '../ui/Icon';
 import { hardwareScannerAvailable, useHardwareScan } from '../../services/hardware-scanner';
@@ -17,12 +17,30 @@ import { hardwareScannerAvailable, useHardwareScan } from '../../services/hardwa
 //   • Zebra devices (TC22 + RFID sled): DataWedge delivers the trigger read
 //     straight to this box via services/hardware-scanner — no focus needed.
 // The parent gets the raw value in onSubmit(raw) and resolves it (QR link,
-// code, serial or tag) with utils/scan-input.
+// code, serial or tag) with utils/scan-input. onSubmit may return (or resolve
+// to) { tone: 'good' | 'warn' | 'bad', message } — every scan then gives a
+// clear answer: good/warn as a banner under the box, bad (unassigned tag, not
+// on this list, no connection…) as a popup that has to be dismissed, each
+// with a vibration. Without a result the box just confirms what was read.
 //
 // UHF tags (EPC "E280…") can't be read by a phone's own NFC, so the reader
 // is always an external device.
 
 const RFID_IDLE_SUBMIT_MS = 300; // readers type a whole tag in well under this
+
+const VIBRATE = { good: 60, warn: 180, bad: [0, 160, 90, 160] };
+
+// popup title for a refused scan, from its message
+function problemTitle(message = '') {
+  if (/not assigned/i.test(message)) return 'RFID tag not assigned';
+  if (/reach the server|network|timeout/i.test(message)) return 'No connection to the server';
+  if (/not (on|in) (this|the)/i.test(message)) return 'Not on this list';
+  if (/already assigned to|tag in use|belongs to another/i.test(message)) return 'Tag is on another battery';
+  if (/does not match|client mismatch/i.test(message)) return 'Different client';
+  if (/already/i.test(message)) return 'Already scanned';
+  if (/not one of your|not found|no battery/i.test(message)) return 'Battery not found';
+  return 'Scan problem';
+}
 
 const ScanBatteryInput = forwardRef(function ScanBatteryInput(
   {
@@ -47,11 +65,41 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
   const [permission, requestPermission] = useCameraPermissions();
   const cameraLockRef = useRef(false);
 
-  const zebra = hardwareScannerAvailable();
-  useHardwareScan((v) => {
+  const [result, setResult] = useState(null); // { tone, message } of the last scan
+  const [problem, setProblem] = useState(null); // { title, message, value } → popup
+  const resultTimer = useRef(null);
+
+  // Every scan (typed, reader, camera, Zebra trigger) ends here.
+  async function deliver(v) {
     setLastRead(v);
-    onSubmit?.(v);
-  }, !disabled);
+    let res;
+    try {
+      res = await onSubmit?.(v);
+    } catch (err) {
+      res = { tone: 'bad', message: err?.response?.data?.message || err?.message || 'Scan failed' };
+    }
+    clearTimeout(resultTimer.current);
+    if (!res?.tone) {
+      setResult({ tone: 'info', message: `Scanned ${v}` });
+    } else if (res.tone === 'bad' || res.tone === 'error') {
+      setResult(null);
+      setProblem({ title: problemTitle(res.message), message: res.message, value: v });
+    } else {
+      setResult(res);
+    }
+    Vibration.vibrate(VIBRATE[res?.tone === 'error' ? 'bad' : res?.tone] || VIBRATE.good);
+    resultTimer.current = setTimeout(() => setResult(null), 4000);
+  }
+
+  function closeProblem() {
+    setProblem(null);
+    if (rfidMode) setTimeout(() => inputRef.current?.focus(), 60);
+  }
+
+  useEffect(() => () => clearTimeout(resultTimer.current), []);
+
+  const zebra = hardwareScannerAvailable();
+  useHardwareScan((v) => deliver(v), !disabled && !problem);
 
   const setText = (t) => {
     valueRef.current = t;
@@ -74,8 +122,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     const v = String(raw ?? valueRef.current).replace(/[\t\r\n]+/g, '').trim();
     if (!v) return;
     setText('');
-    setLastRead(v);
-    onSubmit?.(v);
+    deliver(v);
     if (rfidMode) setTimeout(() => inputRef.current?.focus(), 30);
   }
 
@@ -120,6 +167,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
 
   const tones = {
     good: 'border-emerald-200 bg-emerald-50 text-emerald-800',
+    info: 'border-slate-200 bg-slate-50 text-slate-700',
     warn: 'border-amber-200 bg-amber-50 text-amber-800',
     bad: 'border-red-200 bg-red-50 text-red-700',
     error: 'border-red-200 bg-red-50 text-red-700',
@@ -192,11 +240,37 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
       {lastRead ? (
         <Text className="mt-1.5 font-mono text-[10px] text-slate-400" numberOfLines={1}>Read: {lastRead}</Text>
       ) : null}
-      {feedback?.message ? (
+      {result?.message ? (
+        <Text className={`mt-2 rounded-xl border px-3 py-2.5 text-xs font-bold ${tones[result.tone] || tones.info}`}>
+          {result.message}
+        </Text>
+      ) : feedback?.message ? (
         <Text className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-semibold ${tones[feedback.tone] || tones.bad}`}>
           {feedback.message}
         </Text>
       ) : null}
+
+      {/* refused scan: has to be acknowledged so it can't be missed */}
+      <Modal visible={Boolean(problem)} transparent animationType="fade" onRequestClose={closeProblem}>
+        <View className="flex-1 items-center justify-center bg-black/60 px-6">
+          <View className="w-full items-center rounded-3xl bg-white p-6 dark:bg-slate-900">
+            <View className="h-16 w-16 items-center justify-center rounded-full bg-red-100">
+              <Text className="text-3xl font-black text-red-600">✕</Text>
+            </View>
+            <Text className="mt-4 text-center text-lg font-extrabold text-slate-900 dark:text-white">{problem?.title}</Text>
+            <Text className="mt-2 text-center text-sm text-slate-600 dark:text-slate-300">{problem?.message}</Text>
+            {problem?.value ? (
+              <View className="mt-4 w-full rounded-xl bg-slate-100 px-3 py-2 dark:bg-slate-800">
+                <Text className="text-[10px] font-bold uppercase text-slate-400">Scanned</Text>
+                <Text className="font-mono text-xs font-bold text-slate-900 dark:text-white" selectable>{problem.value}</Text>
+              </View>
+            ) : null}
+            <TouchableOpacity onPress={closeProblem} className="mt-5 w-full items-center rounded-2xl bg-red-600 py-3.5">
+              <Text className="text-sm font-bold text-white">OK</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       <Modal visible={cameraOpen} animationType="slide" onRequestClose={() => setCameraOpen(false)}>
         <View className="flex-1 bg-black">
@@ -209,7 +283,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
               if (cameraLockRef.current) return;
               cameraLockRef.current = true;
               setCameraOpen(false);
-              onSubmit?.(data);
+              deliver(data);
             }}
           />
           <TouchableOpacity onPress={() => setCameraOpen(false)} className="m-5 items-center rounded-2xl bg-white py-4">

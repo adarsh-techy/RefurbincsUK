@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, Text, View } from 'react-native';
+import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
+import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import Icon from '../../components/ui/Icon';
 
 // Recycling partner (role recycle_client) home — the shipments delivered to
 // them (GET /recycle-client/me/shipments → { data: batches }). Mirrors the
-// web Recycle Shipments page; no actions, it's a record of what was received.
+// web Recycle Shipments page; tap a shipment for its batteries (GET
+// /recycle/:id, scoped to the partner's own batches by the backend).
 
 function formatDate(v) {
   return v ? new Date(v).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
@@ -14,6 +16,7 @@ function formatDate(v) {
 
 export default function RecycleShipmentsScreen() {
   const user = useSelector((s) => s.auth.user);
+  const navigation = useNavigation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -80,7 +83,7 @@ export default function RecycleShipmentsScreen() {
         </View>
       }
       renderItem={({ item: r }) => (
-        <View className="rounded-2xl border border-slate-200 bg-white p-4">
+        <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('AdminDetail', { kind: 'recycle', id: r.id })} className="rounded-2xl border border-slate-200 bg-white p-4">
           <View className="flex-row items-center justify-between">
             <Text className="text-base font-extrabold text-slate-900">Vehicle {r.vehicle_number || `#${r.id}`}</Text>
             <Text className="text-[11px] font-semibold text-slate-400">{formatDate(r.recycled_at)}</Text>
@@ -102,7 +105,8 @@ export default function RecycleShipmentsScreen() {
               </View>
             ) : null}
           </View>
-        </View>
+          <Text className="mt-2 text-[11px] font-bold text-violet-700">View batteries ›</Text>
+        </TouchableOpacity>
       )}
     />
   );

@@ -12,6 +12,8 @@ import {
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 import { StatusBadge, clientBatteryStatus } from '../../components/ui/Badge';
 import ClientTruckBatches from '../../components/client/ClientTruckBatches';
 import { hasClientPermission } from '../../utils/permissions';
@@ -93,7 +95,7 @@ export default function ClientBatteriesScreen() {
   const [packModalOpen, setPackModalOpen] = useState(false);
   const [truckNumber, setTruckNumber] = useState('');
   const [driverName, setDriverName] = useState('');
-  const [scanInput, setScanInput] = useState('');
+  const [fleet, setFleet] = useState([]); // every battery the client owns — resolves RFID tags while packing
   const [scannedBatteries, setScannedBatteries] = useState([]);
   const [packing, setPacking] = useState(false);
   const [packError, setPackError] = useState(null);
@@ -158,21 +160,33 @@ export default function ClientBatteriesScreen() {
     }
   }
 
+  // the whole fleet (not just the open tab) so a scanned RFID tag can be
+  // matched to its battery, and a tag nobody assigned refused straight away
+  useEffect(() => {
+    if (!packModalOpen) return;
+    apiClient.get('/clients/me/batteries').then(({ data }) => setFleet(data.data || [])).catch(() => {});
+  }, [packModalOpen]);
+
   function addScanned(rawCode) {
     if (!truckNumber.trim() || !driverName.trim()) {
-      setPackError('Please enter Truck Number and Driver Name first.');
-      return;
+      const message = 'Please enter Truck Number and Driver Name first.';
+      setPackError(message);
+      return { tone: 'warn', message };
     }
-    const code = (extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
-    if (!code) return;
+    const resolved = resolveBatteryInput(rawCode, fleet);
+    if (resolved.unassignedTag) {
+      return { tone: 'bad', message: `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})` };
+    }
+    const code = (resolved.code || extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
+    if (!code) return undefined;
     if (scannedBatteries.some((b) => b.code === code)) {
-      setPackError(`Battery ${code} has already been added to this list.`);
-      return;
+      return { tone: 'warn', message: `Battery ${code} has already been added to this list.` };
     }
     setScannedBatteries((prev) => [...prev, { id: Date.now() + Math.random(), code }]);
-    setScanInput('');
     setPackError(null);
+    return { tone: 'good', message: `✓ ${code} added (${scannedBatteries.length + 1} on this truck)` };
   }
+
 
   function removeScanned(id) {
     setScannedBatteries((prev) => prev.filter((b) => b.id !== id));
@@ -182,20 +196,13 @@ export default function ClientBatteriesScreen() {
     setPackModalOpen(false);
     setTruckNumber('');
     setDriverName('');
-    setScanInput('');
     setScannedBatteries([]);
     setPackError(null);
     setPackSuccess(null);
   }
 
   async function handlePackSubmit() {
-    let finalBatteries = [...scannedBatteries];
-    if (scanInput.trim()) {
-      const code = (extractBatteryCode(scanInput) || scanInput).trim().toUpperCase();
-      if (code && !finalBatteries.some((b) => b.code === code)) {
-        finalBatteries.push({ id: Date.now(), code });
-      }
-    }
+    const finalBatteries = [...scannedBatteries];
     if (!truckNumber.trim()) {
       setPackError('Truck Number is required.');
       return;
@@ -557,23 +564,7 @@ export default function ClientBatteriesScreen() {
             />
 
             <Text className="mb-1.5 mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Scan / Add Batteries</Text>
-            <View className="flex-row gap-2">
-              <TextInput
-                value={scanInput}
-                onChangeText={(v) => setScanInput(v.toUpperCase())}
-                onSubmitEditing={() => addScanned(scanInput)}
-                placeholder="Battery code…"
-                placeholderTextColor="#64748b"
-                autoCapitalize="characters"
-                className="flex-1 rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white"
-              />
-              <TouchableOpacity
-                onPress={() => addScanned(scanInput)}
-                className="items-center justify-center rounded-2xl bg-blue-600 px-4"
-              >
-                <Text className="text-xs font-bold text-white">Add</Text>
-              </TouchableOpacity>
-            </View>
+            <ScanBatteryInput onSubmit={addScanned} placeholder="Battery code, QR or RFID tag…" />
 
             {scannedBatteries.length > 0 && (
               <View className="mt-3 max-h-32">

@@ -6,6 +6,7 @@ import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 
 // Admin create flows that were web-only: Truck Intake, Return Dispatch and
 // Recycle Shipment — same endpoints and payloads as TruckIntakeForm,
@@ -59,23 +60,17 @@ function useClients(kind) {
 
 // Selectable list of eligible batteries + a scan box that ticks them.
 function BatteryPicker({ batteries, selected, onToggle, loading, emptyText }) {
-  const [scan, setScan] = useState('');
-  const [msg, setMsg] = useState(null);
-  function onScan() {
-    const r = resolveBatteryInput(scan, batteries);
-    setScan('');
-    if (r.unassignedTag) { setMsg({ ok: false, text: UNASSIGNED_TAG_MESSAGE }); return; }
-    if (!r.battery) { setMsg({ ok: false, text: `${r.code} is not in the list of eligible batteries.` }); return; }
-    if (!selected.has(r.battery.id)) onToggle(r.battery.id);
-    setMsg({ ok: true, text: `${r.battery.battery_code} selected` });
+  function onScan(raw) {
+    const r = resolveBatteryInput(raw, batteries);
+    if (r.unassignedTag) return { tone: 'bad', message: `${UNASSIGNED_TAG_MESSAGE} (tag ${r.code})` };
+    if (!r.battery) return { tone: 'bad', message: `${r.code} is not in the list of eligible batteries.` };
+    if (selected.has(r.battery.id)) return { tone: 'warn', message: `${r.battery.battery_code} is already selected.` };
+    onToggle(r.battery.id);
+    return { tone: 'good', message: `✓ ${r.battery.battery_code} selected` };
   }
   return (
     <View className="gap-2">
-      <View className="flex-row gap-2">
-        <Input value={scan} onChangeText={setScan} onSubmitEditing={onScan} placeholder="Scan QR / RFID tag or type code" autoCapitalize="characters" className="flex-1" />
-        <TouchableOpacity onPress={onScan} className="items-center justify-center rounded-2xl bg-slate-800 px-4"><Text className="text-xs font-bold text-white">Add</Text></TouchableOpacity>
-      </View>
-      {msg && <Text className={`text-[11px] font-semibold ${msg.ok ? 'text-emerald-700' : 'text-red-600'}`}>{msg.text}</Text>}
+      <ScanBatteryInput onSubmit={onScan} submitLabel="Select" />
       <View className="flex-row items-center justify-between">
         <Text className="text-[11px] font-bold text-slate-500">{selected.size} of {batteries.length} selected</Text>
         {batteries.length > 0 && (
@@ -121,24 +116,24 @@ export function AdminIntakeCreateScreen() {
   const [truck, setTruck] = useState('');
   const [driver, setDriver] = useState('');
   const [count, setCount] = useState('0');
-  const [scan, setScan] = useState('');
   const [returning, setReturning] = useState([]); // existing batteries coming back
   const [error, setError] = useState(null);
   const [busy, setBusy] = useState(false);
 
-  async function addReturning() {
-    const raw = scan.trim();
+  async function addReturning(input) {
+    const raw = String(input || '').trim();
     if (!raw) return;
-    setScan('');
     setError(null);
     const r = resolveBatteryInput(raw, []);
     try {
       const { data } = await apiClient.get(`/batteries/${encodeURIComponent(r.code || raw)}`);
       const b = data.battery;
-      if (returning.some((x) => x.id === b.id)) return;
+      if (returning.some((x) => x.id === b.id)) return { tone: 'warn', message: `${b.battery_code} is already on this truck.` };
       setReturning((list) => [...list, b]);
+      return { tone: 'good', message: `✓ ${b.battery_code} added${b.client_name ? ` (${b.client_name})` : ''}` };
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      if (!err.response) return { tone: 'bad', message: "Can't reach the server to look this battery up. Check the Wi-Fi / server address." };
+      return { tone: 'bad', message: err.response?.data?.message || err.message };
     }
   }
 
@@ -175,10 +170,7 @@ export function AdminIntakeCreateScreen() {
         </View>
         <View>
           <Label>Returning batteries (already have a QR / RFID tag)</Label>
-          <View className="flex-row gap-2">
-            <Input value={scan} onChangeText={setScan} onSubmitEditing={addReturning} placeholder="Scan QR / RFID tag or type code" autoCapitalize="characters" className="flex-1" />
-            <TouchableOpacity onPress={addReturning} className="items-center justify-center rounded-2xl bg-slate-800 px-4"><Text className="text-xs font-bold text-white">Add</Text></TouchableOpacity>
-          </View>
+          <ScanBatteryInput onSubmit={addReturning} />
           <View className="mt-2 gap-1.5">
             {returning.map((b) => (
               <View key={b.id} className="flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-3">

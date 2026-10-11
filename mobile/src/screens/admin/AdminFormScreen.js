@@ -168,7 +168,10 @@ export default function AdminFormScreen() {
           try {
             await apiClient.delete(`${config.endpoint}/${row.id}`);
             route.params?.onSaved?.();
-            navigation.goBack();
+            // opened from a detail screen: that record is gone, go back to the list
+            const routes = navigation.getState()?.routes || [];
+            if (routes.length >= 3 && routes[routes.length - 2]?.name === 'AdminDetail') navigation.pop(2);
+            else navigation.goBack();
           } catch (err) {
             setServerError(err.response?.data?.message || err.message);
           }
@@ -200,7 +203,7 @@ export default function AdminFormScreen() {
               {['text', 'email', 'number', 'password', 'date'].includes(f.type) && (
                 <TextInput
                   value={String(v ?? '')}
-                  onChangeText={(t) => set(f.key, f.capitalize ? capitalizeWords(t) : t)}
+                  onChangeText={(t) => set(f.key, f.uppercase ? t.toUpperCase() : f.capitalize ? capitalizeWords(t) : t)}
                   placeholder={f.placeholder || (f.type === 'date' ? 'YYYY-MM-DD' : '')}
                   placeholderTextColor="#94a3b8"
                   secureTextEntry={f.type === 'password'}

@@ -138,6 +138,13 @@ export default function ClientDashboardScreen() {
         </TouchableOpacity>
       )}
 
+      {can('client_packed') && (
+        <TouchableOpacity onPress={() => navigation.navigate('ClientTruckIntake')} className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5">
+          <Icon name="truck" color="#ffffff" size={18} />
+          <Text className="text-sm font-bold text-white">+ Add truck intake</Text>
+        </TouchableOpacity>
+      )}
+
       {/* Eight stat cards — same as the web dashboard */}
       <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Fleet overview</Text>
       <View className="flex-row flex-wrap justify-between gap-y-3">

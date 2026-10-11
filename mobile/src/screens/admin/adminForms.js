@@ -216,4 +216,55 @@ export const ADMIN_FORMS = {
     }),
     defaults: { status: 'sent', issueDate: new Date().toISOString().slice(0, 10) },
   },
+
+  // Shipments — super_admin only on the backend (PATCH/DELETE reverse the
+  // battery statuses), so AdminDetailScreen only offers these to super_admin.
+  intake: {
+    title: 'Truck Intake',
+    endpoint: '/truck-intakes',
+    deletable: true,
+    superAdminOnly: true,
+    fields: [
+      { key: 'truckNumber', label: 'Truck number', type: 'text', required: true, uppercase: true },
+      { key: 'driverName', label: 'Driver name', type: 'text', required: true, capitalize: capWords },
+      { key: 'clientId', label: 'Client', type: 'select', optionsFrom: 'clients' },
+    ],
+    fromRow: (r) => ({ truckNumber: r.truck_number || '', driverName: r.driver_name || '', clientId: r.client_id ? String(r.client_id) : '' }),
+    toPayload: (v) => ({ truckNumber: v.truckNumber.trim().toUpperCase(), driverName: v.driverName.trim(), clientId: v.clientId || undefined }),
+  },
+
+  return: {
+    title: 'Return Dispatch',
+    endpoint: '/returns',
+    deletable: true,
+    superAdminOnly: true,
+    fields: [
+      { key: 'truckNumber', label: 'Truck number', type: 'text', required: true, uppercase: true },
+      { key: 'driverName', label: 'Driver name', type: 'text', required: true, capitalize: capWords },
+      { key: 'clientId', label: 'Client', type: 'select', optionsFrom: 'clients' },
+      { key: 'returnedAt', label: 'Dispatch date', type: 'date' },
+      { key: 'docFile', label: 'Replace delivery document (PDF / image)', type: 'file', accept: ['application/pdf', 'image/*'] },
+    ],
+    fromRow: (r) => ({
+      truckNumber: r.truck_number || '', driverName: r.driver_name || '', clientId: r.client_id ? String(r.client_id) : '',
+      returnedAt: r.returned_at ? String(r.returned_at).slice(0, 10) : '',
+    }),
+    toPayload: (v) => ({
+      truckNumber: v.truckNumber.trim().toUpperCase(), driverName: v.driverName.trim(), clientId: v.clientId || undefined,
+      returnedAt: v.returnedAt || undefined, docFile: v.docFile || undefined,
+    }),
+  },
+
+  recycle: {
+    title: 'Recycle Shipment',
+    endpoint: '/recycle',
+    deletable: true,
+    superAdminOnly: true,
+    fields: [
+      { key: 'vehicleNumber', label: 'Vehicle number', type: 'text', required: true, uppercase: true },
+      { key: 'driverName', label: 'Driver name', type: 'text', required: true, capitalize: capWords },
+    ],
+    fromRow: (r) => ({ vehicleNumber: r.vehicle_number || '', driverName: r.driver_name || '' }),
+    toPayload: (v) => ({ vehicleNumber: v.vehicleNumber.trim().toUpperCase(), driverName: v.driverName.trim() }),
+  },
 };

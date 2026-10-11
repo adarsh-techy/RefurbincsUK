@@ -1,0 +1,7 @@
+{
+  "name": "zebra-datawedge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Zebra DataWedge bridge: sets up the scan profile and delivers RFID / barcode reads to JS",
+  "main": "index.js"
+}

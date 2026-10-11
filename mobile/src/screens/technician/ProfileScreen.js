@@ -4,6 +4,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import { logout, setUser } from '../../store/auth-slice';
+import ZebraScannerCard from '../../components/scan/ZebraScannerCard';
 
 const CLIENT_LINKS = [
   { to: 'BatterySorting', label: 'Battery Sorting', hint: 'Group batteries by requirement' },
@@ -218,6 +219,8 @@ export default function ProfileScreen() {
           </TouchableOpacity>
         )}
       </View>
+
+      <ZebraScannerCard />
 
       {/* Logout Button */}
       <TouchableOpacity

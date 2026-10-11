@@ -162,6 +162,17 @@ function BatteriesPage() {
       ),
     },
     {
+      key: 'rfid_tag',
+      label: 'RFID Tag',
+      sortValue: (row) => row.rfid_tag || '',
+      render: (row) =>
+        row.rfid_tag ? (
+          <span className="font-mono text-xs text-emerald-700 dark:text-emerald-400" title={row.rfid_tag}>{row.rfid_tag}</span>
+        ) : (
+          <span className="text-slate-400">—</span>
+        ),
+    },
+    {
       key: 'serial_number',
       label: 'Battery Number',
       sortValue: (row) => row.serial_number || '',

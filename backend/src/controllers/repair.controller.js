@@ -19,9 +19,11 @@ async function list(req, res, next) {
     const limit = Math.min(Math.max(Number(req.query.limit) || DEFAULT_LIMIT, 1), MAX_LIMIT);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
     const date = DATE_PATTERN.test(req.query.date) ? req.query.date : undefined;
+    // web sends ?q=, the mobile list screens send ?search=
+    const rawQ = typeof req.query.q === 'string' && req.query.q.trim() ? req.query.q : req.query.search;
     const q =
-      typeof req.query.q === 'string' && req.query.q.trim()
-        ? escapeLike(req.query.q.trim().slice(0, 50))
+      typeof rawQ === 'string' && rawQ.trim()
+        ? escapeLike(rawQ.trim().slice(0, 50))
         : undefined;
 
     const { rows, hasMore } = await repairModel.findPage({ limit, offset, date, q });

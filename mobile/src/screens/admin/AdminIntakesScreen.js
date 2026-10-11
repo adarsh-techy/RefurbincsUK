@@ -5,12 +5,15 @@ import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import { Badge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import ScanVerifyModal from '../../components/scan/ScanVerifyModal';
 
 // Truck intakes for office roles — GET /truck-intakes (paged { data, hasMore })
 // plus the one action that matters on the yard floor: verifying a truck's
 // arrival (PATCH /truck-intakes/:id/verify-arrival), which moves every
-// battery on it to in_repair. Needs the 'truck_intakes' permission
-// (super_admin always has it); the backend refuses a second verify (409).
+// battery on it to in_repair. Like the web, every battery on the truck is
+// scanned (RFID / QR / code) in ScanVerifyModal before the verify is sent.
+// Needs the 'truck_intakes' permission (super_admin always has it); the
+// backend refuses a second verify (409).
 
 const PAGE = 20;
 const DEBOUNCE_MS = 350;
@@ -34,6 +37,7 @@ export default function AdminIntakesScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [verifyingId, setVerifyingId] = useState(null);
+  const [checking, setChecking] = useState(null); // { intake, batteries } while scanning a truck
   const [error, setError] = useState(null);
   const debounceRef = useRef(null);
   const requestRef = useRef(0);
@@ -86,23 +90,39 @@ export default function AdminIntakesScreen() {
   // what's loaded, so "Load more" may be needed to find older pending trucks.
   const visible = rows.filter((t) => (filter === 'all' ? true : filter === 'verified' ? isVerified(t) : !isVerified(t)));
 
-  function confirmVerify(intake) {
-    Alert.alert(
-      'Verify truck arrival?',
-      `Truck ${intake.truck_number || '#' + intake.id}${intake.client_name ? ` from ${intake.client_name}` : ''} — ${intake.battery_count || 0} batteries will be moved to "awaiting repair" and the client's intake fee applied.`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        { text: 'Verify', style: 'default', onPress: () => verify(intake) },
-      ]
-    );
+  async function confirmVerify(intake) {
+    setVerifyingId(intake.id);
+    try {
+      const { data } = await apiClient.get(`/truck-intakes/${intake.id}`);
+      const batteries = data.batteries || [];
+      if (batteries.length) {
+        setChecking({ intake: { ...intake, ...(data.intake || {}) }, batteries });
+        return;
+      }
+      // nothing to scan on an empty truck — plain confirm
+      Alert.alert(
+        'Verify truck arrival?',
+        `Truck ${intake.truck_number || '#' + intake.id} has no batteries listed.`,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Verify', onPress: () => verify(intake) },
+        ]
+      );
+    } catch (err) {
+      Alert.alert('Could not open this truck', err.response?.data?.message || err.message);
+    } finally {
+      setVerifyingId(null);
+    }
   }
 
-  async function verify(intake) {
+  async function verify(intake, { throwOnError = false } = {}) {
     setVerifyingId(intake.id);
     try {
       const { data } = await apiClient.patch(`/truck-intakes/${intake.id}/verify-arrival`);
       setRows((prev) => prev.map((t) => (t.id === intake.id ? { ...t, ...(data.intake || {}), status: 'verified' } : t)));
+      setChecking(null);
     } catch (err) {
+      if (throwOnError) throw err;
       Alert.alert('Could not verify', err.response?.data?.message || err.message);
     } finally {
       setVerifyingId(null);
@@ -216,6 +236,16 @@ export default function AdminIntakesScreen() {
             </TouchableOpacity>
           );
         }}
+      />
+      <ScanVerifyModal
+        visible={Boolean(checking)}
+        title={`Verify truck ${checking?.intake?.truck_number || ''}`}
+        subtitle={checking ? `${checking.intake.client_name || 'No client'} · scan every battery on the truck` : ''}
+        batteries={checking?.batteries || []}
+        confirmLabel="Confirm arrival"
+        repeatCheck
+        onConfirm={() => verify(checking.intake, { throwOnError: true })}
+        onClose={() => setChecking(null)}
       />
     </View>
   );

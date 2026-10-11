@@ -7,8 +7,16 @@
  * bundler drops the credentials entirely, so a production build doesn't
  * ship working logins (including super admin) to anyone who opens the site.
  */
+// VITE_APP_MODE in the root .env switches this by hand:
+//   development → quick-login buttons on (even in a local `vite build`)
+//   production  → off, even on the local dev server
+// Left empty it follows the build: on with `npm run dev`, off when built.
+// Plain comparisons on purpose: Vite inlines the value, so a production
+// build folds this to `false` and drops the demo accounts from the bundle.
 export const DEMO_LOGIN_ENABLED =
-  import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
+  import.meta.env.VITE_APP_MODE === 'development' ? true
+    : import.meta.env.VITE_APP_MODE === 'production' ? false
+      : import.meta.env.DEV || import.meta.env.VITE_ENABLE_DEMO_LOGIN === 'true';
 
 // The repo is public, so no password lives in source: set VITE_DEMO_PASSWORD
 // in your local (git-ignored) .env to make the quick-fill buttons log in.

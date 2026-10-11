@@ -5,6 +5,9 @@ import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { Badge, StatusBadge } from '../ui/Badge';
 import Icon from '../ui/Icon';
+import ScanVerifyModal from '../scan/ScanVerifyModal';
+import ScanBatteryInput from '../scan/ScanBatteryInput';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
 
 // Truck-batch view for the client's Packed and Received buckets — the same
 // grouping and actions as the web ClientBatteriesPage:
@@ -12,7 +15,8 @@ import Icon from '../ui/Icon';
 //             "awaiting pickup" group for batteries packed without a truck);
 //             until the workshop verifies arrival the client can edit the
 //             truck/driver, add or remove batteries, or cancel the batch.
-//   received  one card per return dispatch; the client confirms receipt
+//   received  one card per return dispatch; the client scans every battery
+//             (RFID / QR / code, ScanVerifyModal) and then confirms receipt
 //             (PATCH /returns/:id/verify-receipt) and can rate the service
 //             (POST /ratings, one per battery, same payload as the web
 //             RatingModal).
@@ -88,8 +92,28 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
   // add batteries modal
   const [addOpen, setAddOpen] = useState(false);
   const [addCodes, setAddCodes] = useState('');
+  const [fleet, setFleet] = useState([]); // all the client's batteries, to resolve RFID tags
+
+  useEffect(() => {
+    if (!addOpen) return;
+    apiClient.get('/clients/me/batteries').then(({ data }) => setFleet(data.data || [])).catch(() => {});
+  }, [addOpen]);
+
+  // scanned battery (RFID / QR / code) → one more line in the codes box
+  function addScanned(raw) {
+    const r = resolveBatteryInput(raw, fleet);
+    if (r.unassignedTag) return { tone: 'bad', message: `${UNASSIGNED_TAG_MESSAGE} (tag ${r.code})` };
+    const code = (r.code || '').toUpperCase();
+    if (!code) return undefined;
+    const existing = addCodes.split(/[\s,]+/).map((c) => c.trim().toUpperCase()).filter(Boolean);
+    if (existing.includes(code)) return { tone: 'warn', message: `${code} is already in the list.` };
+    setAddCodes((prev) => (prev.trim() ? `${prev.trim()}\n${code}` : code));
+    return { tone: 'good', message: `✓ ${code} added` };
+  }
+
   // rating modal
   const [rateOpen, setRateOpen] = useState(false);
+  const [receiptScan, setReceiptScan] = useState(false);
   const [rating, setRating] = useState(0);
   const [tags, setTags] = useState([]);
   const [feedback, setFeedback] = useState('');
@@ -162,11 +186,14 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
       return data?.message || 'Batch cancelled.';
     }, { closeDetail: true }), true);
 
-  const verifyReceipt = () => confirm('Confirm receipt?', `Confirm that ${selected.batteries.length} batter${selected.batteries.length === 1 ? 'y' : 'ies'} on ${selected.truckNumber} arrived back with you.`, () =>
-    run('Receipt confirmation', async () => {
-      const { data } = await apiClient.patch(`/returns/${selected.returnId || selected.intakeId}/verify-receipt`);
-      return data?.message || 'Receipt confirmed. Thank you.';
-    }));
+  // received batches: intakeId is the return id too (see groupBatches)
+  const verifyReceipt = () => setReceiptScan(true);
+  async function sendReceipt() {
+    const { data } = await apiClient.patch(`/returns/${selected.returnId || selected.intakeId}/verify-receipt`);
+    setReceiptScan(false);
+    setNotice({ ok: true, text: data?.message || 'Receipt confirmed. Thank you.' });
+    await onChanged?.();
+  }
 
   const submitRating = () => run('Rating', async () => {
     if (!rating) throw new Error('Pick a star rating first.');
@@ -337,7 +364,10 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
         <View className="flex-1 items-center justify-center bg-black/60 px-6">
           <View className="w-full rounded-3xl bg-white p-5">
             <Text className="text-base font-extrabold text-slate-900">Add batteries to this batch</Text>
-            <Text className="mt-0.5 text-xs text-slate-500">Type or paste battery codes, one per line (QR links are fine too).</Text>
+            <Text className="mt-0.5 text-xs text-slate-500">Scan with the RFID reader or camera, or type / paste battery codes, one per line.</Text>
+            <View className="mt-3">
+              <ScanBatteryInput onSubmit={addScanned} compact />
+            </View>
             <TextInput value={addCodes} onChangeText={setAddCodes} multiline autoCapitalize="characters" autoCorrect={false} placeholder={'HUM-0000021\nHUM-0000022'} placeholderTextColor="#94a3b8" className="mt-3 min-h-[110px] rounded-2xl border border-slate-300 bg-slate-50 px-4 py-3 text-sm font-bold text-slate-900" style={{ textAlignVertical: 'top' }} />
             <View className="mt-4 flex-row gap-2">
               <TouchableOpacity onPress={() => setAddOpen(false)} className="flex-1 items-center rounded-2xl bg-slate-100 py-3"><Text className="text-sm font-bold text-slate-700">Cancel</Text></TouchableOpacity>
@@ -381,6 +411,15 @@ export default function ClientTruckBatches({ bucket, rows, onChanged }) {
           </View>
         </View>
       </Modal>
+      <ScanVerifyModal
+        visible={receiptScan}
+        title={`Confirm receipt · ${selected.truckNumber || 'Return'}`}
+        subtitle="Scan every battery that came back to you"
+        batteries={selected.batteries}
+        confirmLabel="Confirm receipt"
+        onConfirm={sendReceipt}
+        onClose={() => setReceiptScan(false)}
+      />
     </ScrollView>
   );
 }

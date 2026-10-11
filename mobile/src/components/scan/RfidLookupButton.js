@@ -1,5 +1,7 @@
 import { useRef, useState } from 'react';
-import { Modal, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, Modal, Text, TouchableOpacity, Vibration, View } from 'react-native';
+import apiClient from '../../services/api-client';
+import extractBatteryCode from '../../utils/extract-battery-code';
 import Icon from '../ui/Icon';
 import ScanBatteryInput from './ScanBatteryInput';
 import { useHardwareScan } from '../../services/hardware-scanner';
@@ -9,15 +11,34 @@ import { useHardwareScan } from '../../services/hardware-scanner';
 // mode, and the tag the reader types goes to onScan(raw). The backend resolves
 // a tag to its battery, and refuses a tag nobody has assigned. On a Zebra
 // device the trigger works on the screen directly, no panel needed.
+// Checks the battery / tag exists before the screen navigates, so an
+// unassigned tag gets a clear popup instead of an empty detail page.
+async function checkBattery(raw) {
+  const code = extractBatteryCode(raw) || String(raw).trim();
+  try {
+    await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
+    return null;
+  } catch (err) {
+    if (!err.response) return "Can't reach the server to look this up. Check the Wi-Fi / server address.";
+    return err.response.data?.message || `No battery found for ${code}.`;
+  }
+}
+
 export default function RfidLookupButton({ onScan, label = 'Scan RFID tag', className = '' }) {
   const [open, setOpen] = useState(false);
   // Zebra trigger on this screen opens the battery directly (the panel's own
   // scan box takes over while it is open)
   // One trigger pull can read several tags — open only the first.
   const lockRef = useRef(0);
-  useHardwareScan((raw) => {
+  useHardwareScan(async (raw) => {
     if (Date.now() - lockRef.current < 1500) return;
     lockRef.current = Date.now();
+    const problem = await checkBattery(raw);
+    if (problem) {
+      Vibration.vibrate([0, 160, 90, 160]);
+      Alert.alert(/not assigned/i.test(problem) ? 'RFID tag not assigned' : 'Battery not found', `${problem}\n\nScanned: ${raw}`);
+      return;
+    }
     onScan?.(raw);
   }, !open);
   return (
@@ -49,9 +70,12 @@ export default function RfidLookupButton({ onScan, label = 'Scan RFID tag', clas
               showCamera={false}
               compact
               submitLabel="Open"
-              onSubmit={(raw) => {
+              onSubmit={async (raw) => {
+                const problem = await checkBattery(raw);
+                if (problem) return { tone: 'bad', message: problem };
                 setOpen(false);
                 onScan?.(raw);
+                return { tone: 'good', message: 'Opening battery…' };
               }}
             />
           </View>

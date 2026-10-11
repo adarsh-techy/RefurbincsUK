@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { ActivityIndicator, Text, View } from 'react-native';
 import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -5,6 +6,7 @@ import { useSelector } from 'react-redux';
 import LoginScreen from '../screens/auth/LoginScreen';
 import SetPasswordScreen from '../screens/auth/SetPasswordScreen';
 import BatteryDetailScreen from '../screens/shared/BatteryDetailScreen';
+import { setupHardwareScanner } from '../services/hardware-scanner';
 import ClientSortingScreen from '../screens/client/ClientSortingScreen';
 import ClientInvoicesScreen from '../screens/client/ClientInvoicesScreen';
 import ClientTransactionsScreen from '../screens/client/ClientTransactionsScreen';
@@ -12,6 +14,7 @@ import ClientNotificationsScreen from '../screens/client/ClientNotificationsScre
 import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import ClientHistoryScreen from '../screens/client/ClientHistoryScreen';
 import ClientCertificatesScreen from '../screens/client/ClientCertificatesScreen';
+import ClientTruckIntakeScreen from '../screens/client/ClientTruckIntakeScreen';
 import AdminDirectoryScreen from '../screens/admin/AdminDirectoryScreen';
 import AdminPartsScreen from '../screens/admin/AdminPartsScreen';
 import AdminFinanceScreen from '../screens/admin/AdminFinanceScreen';
@@ -89,6 +92,11 @@ function LoadingScreen() {
 export default function RootNavigator() {
   const { user, token, bootstrapped, authChecked } = useSelector((state) => state.auth);
 
+  // Zebra devices: create/refresh the DataWedge scan profile (RFID + QR) once
+  useEffect(() => {
+    setupHardwareScanner();
+  }, []);
+
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -148,6 +156,11 @@ export default function RootNavigator() {
               name="ClientCertificates"
               component={ClientCertificatesScreen}
               options={{ ...clientScreenOptions, title: 'Certificates & Impact' }}
+            />
+            <Stack.Screen
+              name="ClientTruckIntake"
+              component={ClientTruckIntakeScreen}
+              options={{ ...clientScreenOptions, title: 'Add Truck Intake' }}
             />
           </>
         )}

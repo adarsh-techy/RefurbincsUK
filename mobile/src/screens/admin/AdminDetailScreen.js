@@ -5,6 +5,9 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../../services/api-client';
 import { Badge, StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
+import ScanVerifyModal from '../../components/scan/ScanVerifyModal';
+import { useSelector } from 'react-redux';
+import { ADMIN_FORMS } from './adminForms';
 
 // Detail pages for admin records — the mobile versions of the web
 // ClientDetailPage, RecycleClientDetailPage, StaffDetailPage, PartDetailPage,
@@ -19,9 +22,9 @@ const KINDS = {
   recycleClient: { title: 'Recycling Partner', url: (id) => `/clients/${id}`, form: 'recycleClient', record: (d) => d.client },
   staff: { title: 'Staff Member', url: (id) => `/staff/${id}`, form: 'staff', record: (d) => d.staff },
   part: { title: 'Part', url: (id) => `/parts/${id}`, form: 'part', record: (d) => d.part },
-  intake: { title: 'Truck Intake', url: (id) => `/truck-intakes/${id}`, record: (d) => d.intake },
-  return: { title: 'Return Dispatch', url: (id) => `/returns/${id}`, record: (d) => d.returnRecord },
-  recycle: { title: 'Recycle Shipment', url: (id) => `/recycle/${id}`, record: (d) => d.batch },
+  intake: { title: 'Truck Intake', url: (id) => `/truck-intakes/${id}`, form: 'intake', record: (d) => d.intake },
+  return: { title: 'Return Dispatch', url: (id) => `/returns/${id}`, form: 'return', record: (d) => d.returnRecord },
+  recycle: { title: 'Recycle Shipment', url: (id) => `/recycle/${id}`, form: 'recycle', record: (d) => d.batch },
 };
 
 function Card({ children, className = '' }) {
@@ -57,6 +60,7 @@ export default function AdminDetailScreen() {
   const route = useRoute();
   const { kind, id } = route.params || {};
   const meta = KINDS[kind];
+  const role = useSelector((s) => s.auth.user?.role);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -90,13 +94,19 @@ export default function AdminDetailScreen() {
     await Linking.openURL(`${origin}${path.startsWith('/') ? '' : '/'}${path}?token=${encodeURIComponent(token || '')}`);
   }
 
-  async function verifyArrival() {
-    Alert.alert('Verify truck arrival?', `${record.battery_count || 0} batteries will move to "awaiting repair".`, [
+  // Like the web: scan every battery on the truck before the verify is sent
+  // (an empty truck gets a plain confirm instead).
+  const [scanVerify, setScanVerify] = useState(false);
+  async function sendVerify() {
+    await apiClient.patch(`/truck-intakes/${id}/verify-arrival`);
+    setScanVerify(false);
+    load();
+  }
+  function verifyArrival() {
+    if ((data?.batteries || []).length) { setScanVerify(true); return; }
+    Alert.alert('Verify truck arrival?', 'This truck has no batteries listed.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: 'Verify', onPress: async () => {
-        try { await apiClient.patch(`/truck-intakes/${id}/verify-arrival`); load(); }
-        catch (err) { Alert.alert('Could not verify', err.response?.data?.message || err.message); }
-      } },
+      { text: 'Verify', onPress: () => sendVerify().catch((err) => Alert.alert('Could not verify', err.response?.data?.message || err.message)) },
     ]);
   }
 
@@ -253,6 +263,16 @@ export default function AdminDetailScreen() {
           </Card>
           <SectionTitle>Batteries on this truck ({(data.batteries || []).length})</SectionTitle>
           {batteryList(data.batteries)}
+          <ScanVerifyModal
+            visible={scanVerify}
+            title={`Verify truck ${record.truck_number || ''}`}
+            subtitle={`${record.client_name || 'No client'} · scan every battery on the truck`}
+            batteries={data.batteries || []}
+            confirmLabel="Confirm arrival"
+            repeatCheck
+            onConfirm={sendVerify}
+            onClose={() => setScanVerify(false)}
+          />
         </>
       )}
 
@@ -293,7 +313,7 @@ export default function AdminDetailScreen() {
         </>
       )}
 
-      {record && meta.form && (
+      {record && meta.form && role !== 'recycle_client' && role !== 'client' && (!ADMIN_FORMS[meta.form]?.superAdminOnly || role === 'super_admin') && (
         <TouchableOpacity onPress={() => navigation.navigate('AdminForm', { kind: meta.form, row: record })} className="mt-2 items-center rounded-2xl bg-violet-600 py-3.5">
           <Text className="text-sm font-bold text-white">Edit {meta.title.toLowerCase()}</Text>
         </TouchableOpacity>

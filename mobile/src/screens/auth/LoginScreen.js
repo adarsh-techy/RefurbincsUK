@@ -64,13 +64,21 @@ function EyeIcon({ open }) {
   );
 }
 
-// Demo quick-fill accounts exist only in development builds; a release APK
-// gets an empty list so no working credentials ship inside the app.
-// No password in source (the repo is public): set EXPO_PUBLIC_DEMO_PASSWORD
-// in mobile/.env (git-ignored) to make the quick-fill buttons log in.
-const DEMO_PASSWORD = process.env.EXPO_PUBLIC_DEMO_PASSWORD || '';
+// Developer helpers (quick-fill accounts, prefilled email). Switch by hand
+// with EXPO_PUBLIC_APP_MODE in mobile/.env:
+//   development → on    production → off    empty → follows __DEV__
+// Restart with `npx expo start -c` after changing it. Kept in this file as
+// plain comparisons so a release bundle folds DEV_MODE to false and drops the
+// accounts entirely (an imported constant can't be folded).
+const DEV_MODE =
+  process.env.EXPO_PUBLIC_APP_MODE === 'development' ? true
+    : process.env.EXPO_PUBLIC_APP_MODE === 'production' ? false
+      : __DEV__;
+// No password in source (the repo is public): EXPO_PUBLIC_DEMO_PASSWORD in
+// mobile/.env (git-ignored), read only in development mode.
+const DEMO_PASSWORD = DEV_MODE ? process.env.EXPO_PUBLIC_DEMO_PASSWORD || '' : '';
 
-const PRESETS = !__DEV__ ? [] : [
+const PRESETS = !DEV_MODE ? [] : [
   {
     id: 'superadmin',
     name: 'Super Admin',
@@ -131,8 +139,8 @@ const PRESETS = !__DEV__ ? [] : [
 export default function LoginScreen() {
   const dispatch = useDispatch();
   const { status, error } = useSelector((state) => state.auth);
-  const [email, setEmail] = useState(__DEV__ ? 'superadmin@gmail.com' : '');
-  const [password, setPassword] = useState(__DEV__ ? DEMO_PASSWORD : '');
+  const [email, setEmail] = useState(DEV_MODE ? 'superadmin@gmail.com' : '');
+  const [password, setPassword] = useState(DEV_MODE ? DEMO_PASSWORD : '');
   const [showPassword, setShowPassword] = useState(false);
   const [emailFocused, setEmailFocused] = useState(false);
   const [passwordFocused, setPasswordFocused] = useState(false);
@@ -144,7 +152,7 @@ export default function LoginScreen() {
   const [testResult, setTestResult] = useState(null);
 
   useEffect(() => {
-    if (!__DEV__) return;
+    if (!DEV_MODE) return;
     AsyncStorage.getItem('custom_server_url').then((val) => {
       if (val && !val.includes(':5000') && !val.includes('onrender.com') && !val.includes('192.0.0.2')) {
         setServerUrl(val);
@@ -201,7 +209,7 @@ export default function LoginScreen() {
         keyboardShouldPersistTaps="handled"
       >
         {/* Top Right Server Settings Button — dev builds only */}
-        {__DEV__ && (
+        {DEV_MODE && (
           <View className="items-end mb-2">
             <TouchableOpacity
               onPress={() => setShowSettings(true)}

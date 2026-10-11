@@ -82,7 +82,7 @@ async function findPage({
   }
   if (q) {
     params.push(`%${q}%`);
-    conditions.push(`(b.battery_code ILIKE $${params.length} OR b.serial_number ILIKE $${params.length})`);
+    conditions.push(`(b.battery_code ILIKE $${params.length} OR b.serial_number ILIKE $${params.length} OR b.rfid_tag ILIKE $${params.length})`);
   }
   // Combined battery-ID-or-client-name search, for the Generated QR Codes
   // list — separate from `q` above (which only matches battery_code and is
@@ -91,7 +91,7 @@ async function findPage({
   if (search) {
     params.push(`%${search}%`);
     conditions.push(
-      `(b.battery_code ILIKE $${params.length} OR b.serial_number ILIKE $${params.length} OR b.client_name ILIKE $${params.length} OR EXISTS (SELECT 1 FROM battery_issues bi JOIN issue_reasons ir ON ir.id = bi.reason_id WHERE bi.battery_id = b.id AND (ir.label ILIKE $${params.length} OR bi.note ILIKE $${params.length})))`
+      `(b.battery_code ILIKE $${params.length} OR b.serial_number ILIKE $${params.length} OR b.rfid_tag ILIKE $${params.length} OR b.client_name ILIKE $${params.length} OR EXISTS (SELECT 1 FROM battery_issues bi JOIN issue_reasons ir ON ir.id = bi.reason_id WHERE bi.battery_id = b.id AND (ir.label ILIKE $${params.length} OR bi.note ILIKE $${params.length})))`
     );
   }
   if (qrGenerated === true) {
@@ -1106,79 +1106,202 @@ async function findRfidAssignments({ clientName, search, tagged = 'yes', limit =
   return { data: hasMore ? rows.slice(0, limit) : rows, hasMore, total: countRows[0].total, counts: scopeRows[0] };
 }
 
-async function assignRfidTags(rows, { commit = false } = {}) {
-  const codes = [...new Set(rows.filter((r) => !r.error).map((r) => r.batteryCode))];
+// Battery codes are matched by client prefix + number, so the zero padding
+// doesn't matter: "HUM-501", "HUM0000501" and an old 4-digit "HUM-0501" all
+// find the same battery. A bare number ("501") uses the row's client prefix.
+const clientPrefix = (name) => String(name || '').trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+
+function parseBatteryCode(code, clientName) {
+  const c = String(code || '').trim().toUpperCase();
+  let m = c.match(/^([A-Z]+)[-_ ]?(\d+)$/);
+  if (!m && /^\d+$/.test(c) && clientPrefix(clientName)) m = [c, clientPrefix(clientName), c];
+  if (!m) return { exact: c, key: null };
+  const num = m[2].replace(/^0+/, '') || '0';
+  return {
+    exact: c,
+    key: `${m[1]}#${num}`,
+    prefix: m[1],
+    canonical: `${m[1]}-${num.padStart(BATTERY_NUMBER_DIGITS, '0')}`,
+  };
+}
+
+const WRITABLE = new Set(['assigned', 'replaced', 'created']);
+
+// Matches every sheet row to a battery and decides what would happen to it.
+// With commit it writes the result in one transaction. createMissing also
+// registers rows whose battery doesn't exist yet (e.g. the sheet already lists
+// HUM-0000501…510 but only 500 were generated) for the row's client — only
+// when the number carries that client's own prefix, so a typo can't create a
+// battery for the wrong fleet.
+async function assignRfidTags(rows, { commit = false, createMissing = false } = {}) {
+  const { rows: clientRows } = await db.query('SELECT name FROM clients');
+  const clientByLower = new Map(clientRows.map((c) => [c.name.trim().toLowerCase(), c.name]));
+
+  const parsed = rows.map((r) => (r.error ? null : parseBatteryCode(r.batteryCode, r.clientName)));
+  const exacts = [...new Set(parsed.filter(Boolean).map((p) => p.exact))];
+  const keys = [...new Set(parsed.filter((p) => p?.key).map((p) => p.key))];
   const tags = [...new Set(rows.filter((r) => !r.error).map((r) => r.rfidTag))];
 
-  const { rows: batteries } = codes.length
+  const { rows: batteries } = exacts.length || keys.length
     ? await db.query(
-        'SELECT id, battery_code, client_name, rfid_tag FROM batteries WHERE upper(battery_code) = ANY($1::text[])',
-        [codes]
+        `SELECT id, battery_code, client_name, rfid_tag, num_key FROM (
+           SELECT id, battery_code, client_name, rfid_tag,
+                  CASE WHEN battery_code ~ '^[A-Za-z]+[-_ ]?[0-9]+$'
+                       THEN upper(substring(battery_code from '^[A-Za-z]+')) || '#' ||
+                            COALESCE(NULLIF(ltrim(substring(battery_code from '[0-9]+$'), '0'), ''), '0')
+                  END AS num_key
+           FROM batteries
+         ) b
+         WHERE upper(battery_code) = ANY($1::text[]) OR num_key = ANY($2::text[])`,
+        [exacts, keys]
       )
     : { rows: [] };
   const { rows: tagOwners } = tags.length
     ? await db.query('SELECT id, battery_code, rfid_tag FROM batteries WHERE rfid_tag = ANY($1::text[])', [tags])
     : { rows: [] };
 
-  const byCode = new Map(batteries.map((b) => [b.battery_code.toUpperCase(), b]));
+  const byExact = new Map(batteries.map((b) => [b.battery_code.toUpperCase(), b]));
+  const byKey = new Map();
+  for (const b of batteries) {
+    if (!b.num_key) continue;
+    byKey.set(b.num_key, [...(byKey.get(b.num_key) || []), b]);
+  }
   const ownerByTag = new Map(tagOwners.map((b) => [b.rfid_tag, b]));
 
-  const tagCounts = new Map();
-  const codeCounts = new Map();
-  for (const r of rows) {
-    if (r.error) continue;
-    tagCounts.set(r.rfidTag, (tagCounts.get(r.rfidTag) || 0) + 1);
-    codeCounts.set(r.batteryCode, (codeCounts.get(r.batteryCode) || 0) + 1);
-  }
-
-  const results = rows.map((r) => {
+  // pass 1: who is each row about?
+  const results = rows.map((r, i) => {
     const out = { rowNumber: r.rowNumber, batteryCode: r.batteryCode, rfidTag: r.rfidTag };
     if (r.error) return { ...out, status: 'error', message: r.error };
-    const battery = byCode.get(r.batteryCode);
-    if (!battery) return { ...out, status: 'not_found', message: 'No battery with this number — generate it on the QR page first' };
-    out.batteryId = battery.id;
-    out.clientName = battery.client_name;
-    out.sheetClientName = r.clientName || null;
-    out.previousTag = battery.rfid_tag || null;
-    // A client name in the sheet is a safety check, not an assignment: it
-    // must match the battery's client or the row is skipped.
-    if (r.clientName && battery.client_name && r.clientName.trim().toLowerCase() !== battery.client_name.trim().toLowerCase()) {
-      return { ...out, status: 'client_mismatch', message: `Sheet says "${r.clientName}" but this battery belongs to ${battery.client_name}` };
+    const p = parsed[i];
+    let battery = byExact.get(p.exact);
+    if (!battery && p.key) {
+      const hits = byKey.get(p.key) || [];
+      if (hits.length > 1) {
+        return { ...out, status: 'error', message: `Matches more than one battery (${hits.map((h) => h.battery_code).join(', ')}) — use the exact battery number` };
+      }
+      battery = hits[0];
     }
-    if (tagCounts.get(r.rfidTag) > 1 || codeCounts.get(r.batteryCode) > 1) {
-      return { ...out, status: 'duplicate_in_sheet', message: 'Listed more than once in this file' };
+    if (battery) {
+      return {
+        ...out,
+        batteryCode: battery.battery_code,
+        sheetBatteryCode: battery.battery_code === r.batteryCode ? undefined : r.batteryCode,
+        batteryId: battery.id,
+        clientName: battery.client_name,
+        sheetClientName: r.clientName || null,
+        previousTag: battery.rfid_tag || null,
+        identity: `id:${battery.id}`,
+      };
     }
-    const owner = ownerByTag.get(r.rfidTag);
-    if (owner && owner.id !== battery.id) {
-      return { ...out, status: 'tag_in_use', message: `Tag already assigned to ${owner.battery_code}` };
+    const client = r.clientName ? clientByLower.get(r.clientName.trim().toLowerCase()) : null;
+    const res = { ...out, status: 'not_found', clientName: client || r.clientName || null, identity: p.key ? `key:${p.key}` : `code:${p.exact}` };
+    if (!p.key) return { ...res, message: 'No battery with this number — check the number or generate it on the QR page' };
+    if (!client) return { ...res, message: `No battery with this number, and client "${r.clientName || ''}" doesn't exist, so it can't be registered here` };
+    if (p.prefix !== clientPrefix(client)) {
+      return { ...res, message: `No battery with this number. ${client} numbers start with ${clientPrefix(client)}-, so it can't be registered for them` };
     }
-    if (battery.rfid_tag === r.rfidTag) return { ...out, status: 'unchanged', message: 'Already assigned' };
-    if (battery.rfid_tag) return { ...out, status: 'replaced', message: `Replaces previous tag ${battery.rfid_tag}` };
-    return { ...out, status: 'assigned', message: 'Assigned' };
+    return { ...res, batteryCode: p.canonical, sheetBatteryCode: p.canonical === r.batteryCode ? undefined : r.batteryCode, canCreate: true, message: `Not registered yet — can be created as ${p.canonical} for ${client}` };
   });
 
-  const writable = results.filter((r) => r.status === 'assigned' || r.status === 'replaced');
+  // repeats: same battery (however it was written) or same tag twice
+  const idCounts = new Map();
+  const tagCounts = new Map();
+  for (const r of results) {
+    if (!r.identity) continue;
+    idCounts.set(r.identity, (idCounts.get(r.identity) || 0) + 1);
+    tagCounts.set(r.rfidTag, (tagCounts.get(r.rfidTag) || 0) + 1);
+  }
+
+  // pass 2: what happens to it
+  for (const r of results) {
+    if (r.status === 'error') continue;
+    if (idCounts.get(r.identity) > 1 || tagCounts.get(r.rfidTag) > 1) {
+      Object.assign(r, { status: 'duplicate_in_sheet', canCreate: false, message: idCounts.get(r.identity) > 1 ? 'This battery is listed more than once in this file' : 'This tag is listed more than once in this file' });
+      continue;
+    }
+    if (r.status === 'not_found') {
+      if (r.canCreate && createMissing) Object.assign(r, { status: 'created', message: `New battery ${r.batteryCode} for ${r.clientName}` });
+      continue;
+    }
+    // A client name in the sheet is a safety check, not an assignment: it
+    // must match the battery's client or the row is skipped.
+    if (r.sheetClientName && r.clientName && r.sheetClientName.trim().toLowerCase() !== r.clientName.trim().toLowerCase()) {
+      Object.assign(r, { status: 'client_mismatch', message: `Sheet says "${r.sheetClientName}" but this battery belongs to ${r.clientName}` });
+      continue;
+    }
+    if (r.previousTag === r.rfidTag) Object.assign(r, { status: 'unchanged', message: 'Already assigned' });
+    else if (r.previousTag) Object.assign(r, { status: 'replaced', message: `Replaces previous tag ${r.previousTag}` });
+    else Object.assign(r, { status: 'assigned', message: 'Assigned' });
+  }
+
+  // pass 3: a tag held by another battery is only free if that battery gets a
+  // different tag in this same file (a swap); repeat until nothing changes
+  // because skipping one row can block the row that depended on it.
+  const rowByBatteryId = new Map(results.filter((r) => r.batteryId).map((r) => [r.batteryId, r]));
+  for (let changed = true; changed;) {
+    changed = false;
+    for (const r of results) {
+      if (!WRITABLE.has(r.status) && !(r.status === 'not_found' && r.canCreate)) continue;
+      const owner = ownerByTag.get(r.rfidTag);
+      if (!owner || owner.id === r.batteryId) continue;
+      const ownerRow = rowByBatteryId.get(owner.id);
+      if (ownerRow && WRITABLE.has(ownerRow.status) && ownerRow.rfidTag !== r.rfidTag) continue;
+      Object.assign(r, { status: 'tag_in_use', canCreate: false, message: `Tag already assigned to ${owner.battery_code}` });
+      changed = true;
+    }
+  }
+
+  const writable = results.filter((r) => WRITABLE.has(r.status));
   if (commit && writable.length) {
+    const toUpdate = writable.filter((r) => r.batteryId);
+    const toCreate = writable.filter((r) => r.status === 'created');
     const client = await db.pool.connect();
     try {
       await client.query('BEGIN');
-      for (const r of writable) {
-        await client.query('UPDATE batteries SET rfid_tag = $2 WHERE id = $1', [r.batteryId, r.rfidTag]);
+      // free the old tags first so swaps don't trip the UNIQUE constraint
+      if (toUpdate.length) {
+        await client.query('UPDATE batteries SET rfid_tag = NULL WHERE id = ANY($1::int[])', [toUpdate.map((r) => r.batteryId)]);
+      }
+      if (toCreate.length) {
+        const { rows: made } = await client.query(
+          `INSERT INTO batteries (battery_code, client_name, rfid_tag, qr_generated_at, status)
+           SELECT code, client, tag, now(), 'returned'
+           FROM unnest($1::text[], $2::text[], $3::text[]) AS v(code, client, tag)
+           RETURNING id, battery_code`,
+          [toCreate.map((r) => r.batteryCode), toCreate.map((r) => r.clientName), toCreate.map((r) => r.rfidTag)]
+        );
+        const idByCode = new Map(made.map((b) => [b.battery_code, b.id]));
+        for (const r of toCreate) r.batteryId = idByCode.get(r.batteryCode);
+      }
+      if (toUpdate.length) {
+        await client.query(
+          `UPDATE batteries b SET rfid_tag = v.tag
+           FROM unnest($1::int[], $2::text[]) AS v(id, tag)
+           WHERE b.id = v.id`,
+          [toUpdate.map((r) => r.batteryId), toUpdate.map((r) => r.rfidTag)]
+        );
       }
       await client.query('COMMIT');
     } catch (err) {
       await client.query('ROLLBACK');
+      if (err.code === '23505') {
+        const conflict = new Error('Another change to these batteries or tags happened while you were assigning. Upload the sheet again to re-check.');
+        conflict.status = 409;
+        throw conflict;
+      }
       throw err;
     } finally {
       client.release();
     }
   }
 
+  for (const r of results) delete r.identity;
   const summary = results.reduce((acc, r) => {
     acc[r.status] = (acc[r.status] || 0) + 1;
+    if (r.status === 'not_found' && r.canCreate) acc.creatable = (acc.creatable || 0) + 1;
     return acc;
   }, {});
-  return { results, summary, written: commit ? writable.length : 0 };
+  return { results, summary, written: commit ? writable.length : 0, created: commit ? writable.filter((r) => r.status === 'created').length : 0 };
 }
 
 async function maxSequenceByClientName(clientName) {

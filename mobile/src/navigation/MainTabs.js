@@ -17,6 +17,7 @@ import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminBatteriesScreen from '../screens/admin/AdminBatteriesScreen';
 import AdminIntakesScreen from '../screens/admin/AdminIntakesScreen';
 import RecycleShipmentsScreen from '../screens/recycle/RecycleShipmentsScreen';
+import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
@@ -103,6 +104,7 @@ const TAB_ICONS = {
   Scan: ScanIcon,
   Intakes: TruckIcon,
   Shipments: TruckIcon,
+  SupportTab: SupportIcon,
 };
 
 // Which tab set a login gets. Office roles (super_admin / admin / staff) used
@@ -110,6 +112,14 @@ const TAB_ICONS = {
 // with "not linked to a staff record" — they now get an admin set, and
 // recycling partners get their shipments.
 const OFFICE_ROLES = ['super_admin', 'admin', 'staff'];
+
+function SupportIcon({ color, size }) {
+  return (
+    <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <Path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </Svg>
+  );
+}
 
 function MenuIcon({ color }) {
   return (
@@ -243,6 +253,8 @@ export default function MainTabs() {
         ) : isRecycle ? (
           <>
             <Tab.Screen name="Shipments" component={RecycleShipmentsScreen} />
+            {/* "SupportTab": the stack already has a "Support" route */}
+            <Tab.Screen name="SupportTab" component={ClientSupportScreen} options={{ title: 'Support' }} />
             <Tab.Screen name="Profile" component={ProfileScreen} />
           </>
         ) : (

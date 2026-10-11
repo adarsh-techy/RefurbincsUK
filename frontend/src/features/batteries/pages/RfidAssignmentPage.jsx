@@ -18,6 +18,7 @@ const STATUS_META = {
   assigned: { label: '✓ Matched — ready to assign', done: '✓ Assigned', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50' },
   replaced: { label: '✓ Matched — will replace old tag', done: '✓ Assigned (old tag replaced)', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/50' },
   unchanged: { label: '✓ Already has this tag', done: '✓ Already has this tag', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-surface-800 dark:text-neutral-300 dark:border-white/10' },
+  created: { label: '✓ New battery — will be registered', done: '✓ Registered + tag assigned', cls: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800/50' },
   not_found: { label: '✕ Battery number not found', done: '✕ Skipped — battery not found', cls: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/50' },
   tag_in_use: { label: '✕ Tag belongs to another battery', done: '✕ Skipped — tag belongs to another battery', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50' },
   duplicate_in_sheet: { label: '✕ Repeated in this file', done: '✕ Skipped — repeated in this file', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50' },
@@ -31,7 +32,7 @@ const PAGE_SIZE = 10;
 
 const FILTERS = [
   { id: 'all', label: 'All rows' },
-  { id: 'ok', label: 'Matched ✓', test: (r) => ['assigned', 'replaced', 'unchanged'].includes(r.status) },
+  { id: 'ok', label: 'Matched ✓', test: (r) => ['assigned', 'replaced', 'unchanged', 'created'].includes(r.status) },
   { id: 'not_found', label: 'Battery not found ✕', test: (r) => r.status === 'not_found' },
   { id: 'problem', label: 'Other problems ✕', test: (r) => ['tag_in_use', 'duplicate_in_sheet', 'client_mismatch', 'error'].includes(r.status) },
 ];
@@ -61,6 +62,7 @@ function RfidAssignmentPage() {
   const [clientFilter, setClientFilter] = useState('');
   const [shown, setShown] = useState(PAGE_SIZE);
   const [assignedVersion, setAssignedVersion] = useState(0); // bump → assigned table reloads
+  const [createMissing, setCreateMissing] = useState(false); // also register numbers that don't exist yet
   const sentinelRef = useRef(null);
   const scrollRef = useRef(null);
 
@@ -74,7 +76,10 @@ function RfidAssignmentPage() {
     const formData = new FormData();
     formData.append('file', selected);
     formData.append('clientName', uploadClient);
-    const { data } = await apiClient.post(`/batteries/rfid-assign${dryRun ? '?dryRun=true' : ''}`, formData, {
+    const params = new URLSearchParams();
+    if (dryRun) params.set('dryRun', 'true');
+    if (!dryRun && createMissing) params.set('createMissing', 'true');
+    const { data } = await apiClient.post(`/batteries/rfid-assign${params.toString() ? `?${params}` : ''}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
     return data;
@@ -85,6 +90,7 @@ function RfidAssignmentPage() {
     if (!uploadClient) { setError('Select the client first, then choose the file.'); return; }
     setFile(selected);
     setResult(null);
+    setCreateMissing(false);
     setError(null);
     setFilter('all');
     setStage('previewing');
@@ -125,8 +131,10 @@ function RfidAssignmentPage() {
 
   const rows = result?.results || [];
   const summary = result?.summary || {};
-  const matched = (summary.assigned || 0) + (summary.replaced || 0);
+  const creatable = rows.filter((r) => r.status === 'not_found' && r.canCreate);
   const committed = stage === 'done';
+  const willCreate = !committed && createMissing ? creatable.length : 0;
+  const matched = (summary.assigned || 0) + (summary.replaced || 0) + (summary.created || 0) + willCreate;
   const visible = useMemo(() => {
     const f = FILTERS.find((x) => x.id === filter);
     const q = search.trim().toLowerCase();
@@ -255,20 +263,36 @@ function RfidAssignmentPage() {
                   <Stat label="rows in file" value={rows.length} />
                   <Stat label={committed ? 'tags assigned' : 'ready to assign'} value={matched} tone="emerald" />
                   {(summary.unchanged || 0) > 0 && <Stat label="already had this tag" value={summary.unchanged} />}
-                  {(summary.not_found || 0) > 0 && <Stat label="battery not found" value={summary.not_found} tone="rose" />}
+                  {(summary.created || 0) > 0 && <Stat label="new batteries registered" value={summary.created} tone="violet" />}
+                  {(summary.not_found || 0) - willCreate > 0 && <Stat label="battery not found" value={summary.not_found - willCreate} tone="rose" />}
                   {(summary.tag_in_use || 0) > 0 && <Stat label="tag belongs to another battery" value={summary.tag_in_use} tone="amber" />}
                   {(summary.duplicate_in_sheet || 0) > 0 && <Stat label="repeated in file" value={summary.duplicate_in_sheet} tone="amber" />}
                   {(summary.client_mismatch || 0) > 0 && <Stat label="client name mismatch" value={summary.client_mismatch} tone="amber" />}
                   {(summary.error || 0) > 0 && <Stat label="incomplete rows" value={summary.error} tone="rose" />}
                 </div>
-                {!committed && (summary.not_found || 0) > 0 && (
+                {!committed && creatable.length > 0 && (
+                  <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs text-violet-900 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-200">
+                    <input
+                      type="checkbox"
+                      checked={createMissing}
+                      onChange={(e) => setCreateMissing(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 accent-violet-600"
+                    />
+                    <span>
+                      <b>Also register {creatable.length} new batter{creatable.length === 1 ? 'y' : 'ies'} for {uploadClient}</b>{' '}
+                      ({creatable[0].batteryCode}{creatable.length > 1 ? ` … ${creatable[creatable.length - 1].batteryCode}` : ''}) and assign their tags.
+                      These numbers are in the sheet but not in the system yet — same as generating them on the QR page. Leave unticked to skip them.
+                    </span>
+                  </label>
+                )}
+                {!committed && (summary.not_found || 0) - creatable.length > 0 && (
                   <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
-                    {summary.not_found} battery number{summary.not_found === 1 ? '' : 's'} do{summary.not_found === 1 ? 'es' : ''} not exist yet. Generate them on the QR page, or fix the sheet — those rows will be skipped.
+                    {summary.not_found - creatable.length} battery number{summary.not_found - creatable.length === 1 ? '' : 's'} can't be matched or registered (wrong prefix or unknown client) — see the Why column. Those rows will be skipped.
                   </p>
                 )}
                 {committed && (
                   <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                    {result.written} tag{result.written === 1 ? '' : 's'} saved. Scanning any of these tags now opens the battery just like its QR code.
+                    {result.written} tag{result.written === 1 ? '' : 's'} saved{result.created ? `, including ${result.created} newly registered batter${result.created === 1 ? 'y' : 'ies'}` : ''}. Scanning any of these tags now opens the battery just like its QR code.
                   </p>
                 )}
               </div>
@@ -342,8 +366,9 @@ function RfidAssignmentPage() {
                     </tr>
                   ) : (
                     pageRows.map((r) => {
-                      const meta = STATUS_META[r.status] || { label: r.status, done: r.status, cls: '' };
-                      const notFound = r.status === 'not_found';
+                      const toCreate = !committed && createMissing && r.status === 'not_found' && r.canCreate;
+                      const meta = STATUS_META[toCreate ? 'created' : r.status] || { label: r.status, done: r.status, cls: '' };
+                      const notFound = r.status === 'not_found' && !toCreate;
                       const bad = notFound || r.status === 'error';
                       return (
                         <tr key={`${r.rowNumber}-${r.batteryCode}`} className={bad ? 'bg-rose-50/70 dark:bg-rose-950/20' : ''}>
@@ -356,6 +381,9 @@ function RfidAssignmentPage() {
                                 {notFound && <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />}
                                 {r.batteryCode || <span className="italic text-slate-400">empty</span>}
                               </span>
+                            )}
+                            {r.sheetBatteryCode && (
+                              <span className="block text-[10px] font-normal text-slate-400">written as {r.sheetBatteryCode}</span>
                             )}
                           </td>
                           <td className="px-4 py-2.5 font-mono text-slate-700 dark:text-neutral-200">{r.rfidTag || <span className="italic text-slate-400">empty</span>}</td>
@@ -399,14 +427,17 @@ function RfidAssignmentPage() {
   );
 }
 
-// Every battery that already has an RFID tag — GET /batteries/rfid-assignments,
-// 10 per request, next page fetched as the bottom of the box scrolls into
-// view. Filter by client and search by battery number / tag.
+// Every battery with its RFID tag (or "No tag yet") — GET
+// /batteries/rfid-assignments, 10 per request, next page fetched as the
+// bottom of the box scrolls into view. Filter by client / tagged, search by
+// battery number or tag, and assign or change a tag right in the row.
 function AssignedTagsTable({ version }) {
   const [clients, setClients] = useState([]);
   const [clientName, setClientName] = useState('');
   const [search, setSearch] = useState('');
-  const [tagged, setTagged] = useState('yes'); // yes | no | all
+  // 'all' by default: before any sheet is uploaded nothing is assigned, and an
+  // 'Assigned'-only table would look empty even though the batteries exist
+  const [tagged, setTagged] = useState('all'); // all | yes | no
   const [rows, setRows] = useState([]);
   const [total, setTotal] = useState(0);
   const [counts, setCounts] = useState({ assigned: 0, unassigned: 0 });
@@ -469,6 +500,33 @@ function AssignedTagsTable({ version }) {
   }, [hasMore, loading, loadingMore, rows.length]);
 
   const pct = counts.assigned + counts.unassigned > 0 ? Math.round((counts.assigned / (counts.assigned + counts.unassigned)) * 100) : 0;
+  const [editingId, setEditingId] = useState(null); // row whose tag is being typed / scanned
+
+  // Manual assign from the table: same endpoint and checks as the sheet
+  // upload (tag already on another battery, client mismatch…), one row.
+  async function saveTag(row, rawTag) {
+    const { data } = await apiClient.post('/batteries/rfid-assign', {
+      assignments: [{ batteryCode: row.battery_code, rfidTag: rawTag, clientName: row.client_name }],
+      clientName: row.client_name || '',
+    });
+    const res = data?.results?.[0];
+    if (!res || !['assigned', 'replaced', 'unchanged'].includes(res.status)) {
+      throw new Error(res?.message || 'Could not assign this tag.');
+    }
+    const hadTag = Boolean(row.rfid_tag);
+    setRows((list) => list.map((x) => (x.id === row.id ? { ...x, rfid_tag: res.rfidTag } : x)));
+    if (!hadTag) setCounts((c) => ({ assigned: c.assigned + 1, unassigned: Math.max(0, c.unassigned - 1) }));
+    return res;
+  }
+
+  // after a save, jump to the next battery without a tag so a reader can
+  // tag a run of batteries back to back
+  function editNextUntagged(afterId) {
+    const i = rows.findIndex((x) => x.id === afterId);
+    const next = rows.slice(i + 1).find((x) => !x.rfid_tag);
+    setEditingId(next ? next.id : null);
+  }
+
   const [copied, setCopied] = useState(null);
   function copyTag(tag) {
     navigator.clipboard?.writeText(tag).then(() => { setCopied(tag); setTimeout(() => setCopied(null), 1200); }).catch(() => {});
@@ -513,7 +571,7 @@ function AssignedTagsTable({ version }) {
       {/* Toolbar */}
       <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
         <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-surface-800">
-          {[['yes', 'Assigned', counts.assigned], ['no', 'Not assigned', counts.unassigned], ['all', 'All', counts.assigned + counts.unassigned]].map(([id, label, n]) => (
+          {[['all', 'All', counts.assigned + counts.unassigned], ['yes', 'Assigned', counts.assigned], ['no', 'Not assigned', counts.unassigned]].map(([id, label, n]) => (
             <button
               key={id}
               type="button"
@@ -584,6 +642,11 @@ function AssignedTagsTable({ version }) {
                     {tagged === 'no' ? `Every battery${clientName ? ' for this client' : ''} already has a tag` : tagged === 'yes' ? `No batteries with an RFID tag${clientName ? ' for this client' : ''} yet` : 'No batteries found'}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">{tagged === 'yes' ? 'Upload a sheet above to assign tags.' : search ? 'Try a different search.' : ''}</p>
+                  {tagged !== 'all' && !search && (
+                    <button type="button" onClick={() => setTagged('all')} className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">
+                      Show all batteries
+                    </button>
+                  )}
                 </td>
               </tr>
             ) : (
@@ -593,22 +656,16 @@ function AssignedTagsTable({ version }) {
                     <Link to={`/batteries/${encodeURIComponent(r.battery_code)}`} className="block truncate font-mono text-[13px] font-bold text-blue-700 hover:underline dark:text-blue-400">{r.battery_code}</Link>
                   </td>
                   <td className="px-5 py-3">
-                    {r.rfid_tag ? (
-                      <button
-                        type="button"
-                        onClick={() => copyTag(r.rfid_tag)}
-                        title="Click to copy"
-                        className="inline-flex max-w-full items-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-mono text-[12px] font-semibold text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200"
-                      >
-                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-                        <span className="truncate">{r.rfid_tag}</span>
-                        <span className="font-sans text-[10px] font-bold text-emerald-600/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-emerald-300/70">{copied === r.rfid_tag ? 'Copied!' : 'copy'}</span>
-                      </button>
-                    ) : (
-                      <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-rose-300 bg-rose-50/70 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300">
-                        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> No tag yet
-                      </span>
-                    )}
+                    <TagCell
+                      row={r}
+                      editing={editingId === r.id}
+                      onEdit={() => setEditingId(r.id)}
+                      onCancel={() => setEditingId(null)}
+                      onSave={saveTag}
+                      onSaved={(viaEnter) => (viaEnter ? editNextUntagged(r.id) : setEditingId(null))}
+                      copied={copied}
+                      onCopy={copyTag}
+                    />
                   </td>
                   <td className="truncate px-5 py-3 font-mono text-slate-600 dark:text-neutral-300">{r.serial_number || <span className="text-slate-300 dark:text-neutral-600">—</span>}</td>
                   <td className="whitespace-nowrap px-5 py-3"><StatusBadge status={r.status} /></td>
@@ -629,11 +686,111 @@ function AssignedTagsTable({ version }) {
   );
 }
 
+// RFID tag cell of the tags-by-battery table: shows the tag (click to copy)
+// or "No tag yet", and edits in place — type it, or click the box and read the
+// sticker with an RFID reader (it types the tag and presses Enter). Stays
+// inside the fixed column so the table never changes size.
+function TagCell({ row, editing, onEdit, onCancel, onSave, onSaved, copied, onCopy }) {
+  const [value, setValue] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!editing) return;
+    setValue('');
+    setError(null);
+    const t = setTimeout(() => inputRef.current?.focus(), 30);
+    return () => clearTimeout(t);
+  }, [editing]);
+
+  // keep the cursor in the box after a refused tag, so the next reader scan
+  // (or Esc) lands here; read-only (not disabled) while saving keeps focus
+  useEffect(() => {
+    if (editing && !saving) inputRef.current?.focus();
+  }, [editing, saving]);
+
+  async function save(viaEnter) {
+    const tag = value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    if (!tag) { setError('Type or scan the tag first.'); return; }
+    setSaving(true);
+    setError(null);
+    try {
+      await onSave(row, tag);
+      onSaved(viaEnter);
+    } catch (err) {
+      setError(err.response?.data?.message || err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (editing) {
+    return (
+      <div>
+        <div className="flex items-center gap-1.5">
+          <input
+            ref={inputRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') { e.preventDefault(); save(true); }
+              if (e.key === 'Escape') onCancel();
+            }}
+            readOnly={saving}
+            placeholder={row.rfid_tag ? 'New tag — type or scan' : 'Type or scan tag…'}
+            className="min-w-0 flex-1 rounded-lg border border-violet-400 bg-white px-2.5 py-1 font-mono text-[12px] uppercase text-slate-900 placeholder:normal-case placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:bg-surface-800 dark:text-neutral-100"
+          />
+          <button type="button" onClick={() => save(false)} disabled={saving} title="Save" className="rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
+            {saving ? '…' : '✓'}
+          </button>
+          <button type="button" onClick={onCancel} disabled={saving} title="Cancel (Esc)" className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:border-surface-600 dark:text-neutral-300">
+            ✕
+          </button>
+        </div>
+        {error && <p className="mt-1 truncate text-[10px] font-semibold text-rose-600" title={error}>{error}</p>}
+      </div>
+    );
+  }
+
+  if (row.rfid_tag) {
+    return (
+      <div className="flex min-w-0 items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => onCopy(row.rfid_tag)}
+          title="Click to copy"
+          className="inline-flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-mono text-[12px] font-semibold text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+        >
+          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+          <span className="truncate">{row.rfid_tag}</span>
+          <span className="font-sans text-[10px] font-bold text-emerald-600/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-emerald-300/70">{copied === row.rfid_tag ? 'Copied!' : 'copy'}</span>
+        </button>
+        <button type="button" onClick={onEdit} title="Change this battery's tag" className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-violet-600 opacity-0 transition-opacity hover:bg-violet-100 group-hover:opacity-100 dark:text-violet-300 dark:hover:bg-violet-950/40">
+          Change
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-rose-300 bg-rose-50/70 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300">
+        <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> No tag yet
+      </span>
+      <button type="button" onClick={onEdit} className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">
+        + Assign tag
+      </button>
+    </div>
+  );
+}
+
 function Stat({ label, value, tone }) {
   const tones = {
     emerald: 'border-emerald-200 bg-emerald-50 text-emerald-800 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300',
     rose: 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-300',
     amber: 'border-amber-200 bg-amber-50 text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300',
+    violet: 'border-violet-200 bg-violet-50 text-violet-800 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300',
   };
   return (
     <span className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 font-semibold ${tones[tone] || 'border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'}`}>
