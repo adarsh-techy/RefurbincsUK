@@ -39,10 +39,11 @@ router.use(requireAuth);
 router.get('/', requireRole('super_admin', 'admin', 'staff'), staffController.list);
 // Must come before /:id or it would be swallowed as an id param.
 router.get('/me', staffController.myProfile);
-router.get('/:id', requireRole('super_admin', 'admin', 'staff'), staffController.getById);
+// Full record (documents, salary, IDs) needs the Staff module.
+router.get('/:id', requirePermission('staff'), staffController.getById);
 router.post('/', requirePermission('staff'), uploadDoc.single('docFile'), staffController.create);
-// Editing staff records is allowed for super_admin and admin
-router.patch('/:id', requireRole('super_admin', 'admin'), uploadDoc.single('docFile'), staffController.update);
+// Editing staff records needs the Staff module (super_admin always has it)
+router.patch('/:id', requirePermission('staff'), uploadDoc.single('docFile'), staffController.update);
 router.delete('/:id', requireRole('super_admin'), staffController.remove);
 
 module.exports = router;

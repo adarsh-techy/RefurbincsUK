@@ -12,9 +12,24 @@ function ensureUploadsDir() {
   }
 }
 
+// Salary, passport / NI numbers, share code and ID documents are only for
+// logins with the Staff module; other office logins (e.g. an admin with only
+// Repairs, who needs the technician dropdown) get name / role / status.
+const PERSONAL_FIELDS = ['salary', 'passport_number', 'ni_number', 'share_code', 'document_path', 'document_name'];
+
+function canSeeStaffPersonalData(user) {
+  return user?.role === 'super_admin' || (user?.permissions || []).includes('staff');
+}
+
 async function list(req, res, next) {
   try {
-    res.json(await staffModel.findAll());
+    const rows = await staffModel.findAll();
+    if (canSeeStaffPersonalData(req.user)) return res.json(rows);
+    res.json(rows.map((row) => {
+      const safe = { ...row };
+      for (const f of PERSONAL_FIELDS) delete safe[f];
+      return safe;
+    }));
   } catch (err) {
     next(err);
   }
