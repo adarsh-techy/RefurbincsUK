@@ -103,7 +103,7 @@ async function findPage({
   // Active filter for technician queues - terminal states are excluded so a
   // returned battery never shows up as something to start work on.
   if (activeOnly) {
-    conditions.push(`b.status NOT IN ('repaired', 'returned', 'unserviceable', 'recycled', 'tested_parts_removed')`);
+    conditions.push(`b.status NOT IN ('registered', 'repaired', 'returned', 'unserviceable', 'recycled', 'tested_parts_removed')`);
   }
   // Restrict to batteries that arrived via an arrival-verified truck intake
   // and are currently awaiting repair (or testing if includeTesting is true for supervisors) —
@@ -466,7 +466,7 @@ async function createMany(batteryCodes, truckIntakeId) {
 // serial as printed on the unit, kept only for reference. QR is marked
 // generated immediately since that's this endpoint's whole purpose.
 //
-// Status starts at 'returned' rather than the table default of 'in_repair'
+// Status starts at 'registered' (with the client, never serviced) rather than the table default of 'in_repair'
 // — a battery registered here represents one already with the client, not
 // one currently at the shop, so it can be scanned straight into a future
 // Truck Intake's "Scan Batteries (returning)" step without being rejected
@@ -474,7 +474,7 @@ async function createMany(batteryCodes, truckIntakeId) {
 async function createForClient({ batteryCode, serialNumber, clientName }) {
   const { rows } = await db.query(
     `INSERT INTO batteries (battery_code, serial_number, client_name, qr_generated_at, status)
-     VALUES ($1, $2, $3, now(), 'returned')
+     VALUES ($1, $2, $3, now(), 'registered')
      RETURNING *`,
     [batteryCode, serialNumber || null, clientName || null]
   );
@@ -1039,7 +1039,7 @@ async function createManyForClient({ clientName, count, startNumber }) {
        $1 || '-' || LPAD(s::text, $2::int, '0'),
        $3,
        now(),
-       'returned'
+       'registered'
      FROM generate_series($4::int, $5::int) AS s
      RETURNING battery_code`,
     [prefix, padLength, clientName.trim(), start, end]
@@ -1265,7 +1265,7 @@ async function assignRfidTags(rows, { commit = false, createMissing = false } = 
       if (toCreate.length) {
         const { rows: made } = await client.query(
           `INSERT INTO batteries (battery_code, client_name, rfid_tag, qr_generated_at, status)
-           SELECT code, client, tag, now(), 'returned'
+           SELECT code, client, tag, now(), 'registered'
            FROM unnest($1::text[], $2::text[], $3::text[]) AS v(code, client, tag)
            RETURNING id, battery_code`,
           [toCreate.map((r) => r.batteryCode), toCreate.map((r) => r.clientName), toCreate.map((r) => r.rfidTag)]

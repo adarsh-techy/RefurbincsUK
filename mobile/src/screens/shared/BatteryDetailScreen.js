@@ -31,6 +31,7 @@ const BLOCKED_STATUS_MESSAGES = {
   in_progress: 'This battery is already being worked on by another technician.',
   in_testing: 'This battery is currently in testing.',
   repaired: 'This battery has already been repaired.',
+  registered: 'This battery is with the client and has not been sent for service yet — it needs a verified truck intake first.',
   returned: 'This battery has already been returned to the client.',
   unserviceable: 'This battery has been marked unserviceable.',
   tested_parts_removed: 'This battery has been marked unserviceable and its parts removed.',

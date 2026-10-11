@@ -239,7 +239,9 @@ export default function ClientBatteriesScreen() {
       const shown = clientBatteryStatus(b);
       const match = statusFilter === 'unserviceable'
         ? ['unserviceable', 'tested_parts_removed', 'recycled'].includes(shown)
-        : shown === statusFilter;
+        : statusFilter === 'in_fleet'
+          ? ['registered', 'returned'].includes(shown)
+          : shown === statusFilter;
       if (!match) return false;
     }
     if (!matchesDateFilter(relevantDate(b, activeTab), dateFilter)) return false;
@@ -327,7 +329,7 @@ export default function ClientBatteriesScreen() {
           <View className="mt-2 flex-row items-center gap-2">
             <Text className="text-[11px] font-bold text-slate-500">Showing:</Text>
             <TouchableOpacity onPress={() => setStatusFilter('')} className="flex-row items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1">
-              <Text className="text-[11px] font-bold capitalize text-white">{statusFilter.replace(/_/g, ' ')}</Text>
+              <Text className="text-[11px] font-bold capitalize text-white">{statusFilter === 'in_fleet' ? 'In your fleet' : statusFilter === 'registered' ? 'Not serviced yet' : statusFilter.replace(/_/g, ' ')}</Text>
               <Text className="text-[11px] font-bold text-white">✕</Text>
             </TouchableOpacity>
           </View>

@@ -11,6 +11,7 @@ const STATUS_BREAKDOWN = [
   { key: 'in_progress_count', label: 'Repair In Progress', dot: 'bg-critical-500' },
   { key: 'in_testing_count', label: 'In Testing', dot: 'bg-blue-500' },
   { key: 'repaired_count', label: 'Repair Completed', dot: 'bg-brand-500' },
+  { key: 'registered_count', label: 'Registered (Not Serviced)', dot: 'bg-slate-400' },
   { key: 'returned_count', label: 'Returned to Client', dot: 'bg-info-500' },
 ];
 

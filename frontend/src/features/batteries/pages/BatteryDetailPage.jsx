@@ -690,7 +690,8 @@ function ClientBatteryDetailView({
     },
   ];
 
-  let currentStepIdx = 0;
+  // A registered battery has never been to the workshop: no step done or active.
+  let currentStepIdx = battery.status === 'registered' ? -1 : 0;
   if (battery.status === 'in_repair') currentStepIdx = 0;
   else if (battery.status === 'in_progress') currentStepIdx = 1;
   else if (battery.status === 'in_testing') currentStepIdx = 2;
@@ -1369,6 +1370,12 @@ function ClientBatteryDetailView({
             })}
           </div>
         ) : (
+          <>
+          {battery.status === 'registered' && (
+            <p className="mb-3 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-xs font-semibold text-slate-600 dark:border-white/10 dark:bg-white/5 dark:text-neutral-300">
+              Registered (Not Serviced): this battery is in your fleet and has not been sent for service yet. The steps below start once it is packed on a truck to the workshop.
+            </p>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3.5">
             {CLIENT_STEPS.map((step, idx) => {
               const isCompleted = idx < currentStepIdx || (idx === currentStepIdx && isReturned);
@@ -1408,6 +1415,7 @@ function ClientBatteryDetailView({
               );
             })}
           </div>
+          </>
         )}
       </div>
 

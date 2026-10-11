@@ -2,6 +2,7 @@ import { useState } from 'react';
 import apiClient from '../../../services/api-client';
 
 const STATUS_OPTIONS = [
+  { value: 'registered', label: 'Registered (Not Serviced)' },
   { value: 'in_repair', label: 'Awaiting Repair' },
   { value: 'in_progress', label: 'Repair In Progress' },
   { value: 'in_testing', label: 'In Testing' },

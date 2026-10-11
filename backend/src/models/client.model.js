@@ -108,6 +108,7 @@ async function getDashboardStats(clientId, clientName) {
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'repaired') AS repaired_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status IN ('unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled')) AS unserviceable_count,
        COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'returned') AS returned_count,
+       COUNT(DISTINCT b.id) FILTER (WHERE b.status = 'registered') AS registered_count,
        (
          SELECT COUNT(DISTINCT rb.battery_id)
          FROM returns ret
@@ -1182,11 +1183,15 @@ async function removeBatteryFromClientTruckIntake(clientId, clientName, intakeId
       );
     }
 
-    // Reset status to returned (with client in active fleet) and unlink intake
+    // Unlink from the intake and put it back in the client's fleet: 'returned'
+    // if it was ever serviced, otherwise 'registered'
     const { rows: updated } = await client.query(
       `UPDATE batteries
        SET truck_intake_id = NULL,
-           status = 'returned'
+           status = CASE
+             WHEN EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = batteries.id)
+               OR EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = batteries.id)
+             THEN 'returned' ELSE 'registered' END
        WHERE id = $1
        RETURNING *`,
       [actualBatteryId]
@@ -1225,7 +1230,10 @@ async function deleteClientTruckIntake(clientId, clientName, intakeId) {
     await client.query(
       `UPDATE batteries
        SET truck_intake_id = NULL,
-           status = 'returned'
+           status = CASE
+             WHEN EXISTS (SELECT 1 FROM return_batteries rb WHERE rb.battery_id = batteries.id)
+               OR EXISTS (SELECT 1 FROM battery_visits bv WHERE bv.battery_id = batteries.id)
+             THEN 'returned' ELSE 'registered' END
        WHERE truck_intake_id = $1`,
       [intakeId]
     );

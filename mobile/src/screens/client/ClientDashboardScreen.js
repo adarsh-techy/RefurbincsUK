@@ -90,7 +90,9 @@ export default function ClientDashboardScreen() {
   const awaitingIntake = n('awaiting_intake_count');
   const workshopQueue = n('workshop_queue_count');
   const repaired = n('repaired_count');
-  const returned = n('returned_count');
+  const returned = n('returned_count'); // came back from the workshop
+  const registered = n('registered_count'); // with the client, never serviced
+  const inFleet = returned + registered;
   const unserviceable = n('unserviceable_count');
   const repairVisits = n('repair_visit_count');
   const returnedFromWorkshop = n('returned_from_workshop_count');
@@ -158,7 +160,7 @@ export default function ClientDashboardScreen() {
         <Card label="On the way" value={awaitingIntake} sub="Traveling to workshop" cta="Inspect" tone="amber" onPress={can('client_packed') ? () => goBatteries('packed') : null} />
         <Card label="In workshop" value={workshopQueue} sub="Under diagnosis & repair" cta="Live queue" tone="blue" onPress={can('client_packed') ? () => goBatteries('packed') : null} />
         <Card label="Ready to return" value={repaired} sub="Repaired & tested" cta="View ready" tone="teal" onPress={can('client_all_batteries') ? () => goBatteries('all', 'repaired') : null} />
-        <Card label="Working in fleet" value={returned} sub="Active in your vehicles" cta="View fleet" tone="emerald" onPress={can('client_all_batteries') ? () => goBatteries('all', 'returned') : null} />
+        <Card label="Working in fleet" value={inFleet} sub={registered ? `${registered} not serviced yet` : 'Active in your vehicles'} cta="View fleet" tone="emerald" onPress={can('client_all_batteries') ? () => goBatteries('all', 'in_fleet') : null} />
         <Card label="Scrapped / recycled" value={unserviceable} sub="Unrepairable units" cta="History" tone="rose" onPress={can('client_all_batteries') ? () => goBatteries('all', 'unserviceable') : null} />
         <Card label="Total repairs done" value={repairVisits} sub="All-time completed jobs" cta="Timeline" tone="violet" onPress={() => navigation.navigate('ClientHistory')} />
         <Card label="Returned batteries" value={returnedFromWorkshop} sub="Received back from workshop" cta="View received" tone="sky" onPress={can('client_received') ? () => goBatteries('received') : null} />

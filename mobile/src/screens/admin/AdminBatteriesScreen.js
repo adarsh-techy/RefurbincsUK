@@ -15,6 +15,7 @@ const PAGE = 30;
 const DEBOUNCE_MS = 350;
 const STATUS_FILTERS = [
   { id: '', label: 'All' },
+  { id: 'registered', label: 'Not serviced' },
   { id: 'in_repair', label: 'Awaiting' },
   { id: 'in_progress', label: 'Repairing' },
   { id: 'in_testing', label: 'Testing' },

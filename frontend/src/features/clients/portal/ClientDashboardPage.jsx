@@ -311,7 +311,9 @@ function ClientDashboardPage() {
   const inProgress = Number(stats?.in_progress_count || 0);
   const inTesting = Number(stats?.in_testing_count || 0);
   const repaired = Number(stats?.repaired_count || 0);
-  const returned = Number(stats?.returned_count || 0);
+  const returned = Number(stats?.returned_count || 0); // came back from the workshop
+  const registered = Number(stats?.registered_count || 0); // with the client, never serviced
+  const inFleet = returned + registered; // every battery currently with the client
   const unserviceable = Number(stats?.unserviceable_count || 0);
   const repairVisits = Number(stats?.repair_visit_count || 0);
   const balanceOwed = Number(stats?.balance || 0);
@@ -382,12 +384,13 @@ function ClientDashboardPage() {
         );
         break;
       case 'fleet':
-        list = list.filter((b) => b.status === 'returned');
+        list = list.filter((b) => b.status === 'returned' || b.status === 'registered');
         break;
       case 'packed':
         list = list.filter(
           (b) =>
             b.status !== 'returned' &&
+            b.status !== 'registered' &&
             (b.intake_status === 'pending_arrival' || (!b.verified_at && b.intake_status !== 'verified'))
         );
         break;
@@ -415,7 +418,7 @@ function ClientDashboardPage() {
 
   // Tab counts
   const workshopCount = inWorkshop;
-  const fleetCount = useMemo(() => allBatteries.filter((b) => b.status === 'returned').length, [allBatteries]);
+  const fleetCount = useMemo(() => allBatteries.filter((b) => b.status === 'returned' || b.status === 'registered').length, [allBatteries]);
   const packedCount = awaitingIntake;
   const unserviceableCount = useMemo(
     () =>
@@ -427,7 +430,7 @@ function ClientDashboardPage() {
 
   // Operational metrics
   const fleetAvailabilityRate =
-    totalBatteries > 0 ? ((returned / totalBatteries) * 100).toFixed(1) : '100.0';
+    totalBatteries > 0 ? ((inFleet / totalBatteries) * 100).toFixed(1) : '100.0';
   const restorationSuccessRate =
     returned + unserviceable > 0 ? ((returned / (returned + unserviceable)) * 100).toFixed(1) : '100.0';
   const estimatedCo2Saved = (returned * 3.8).toFixed(0);
@@ -775,7 +778,7 @@ function ClientDashboardPage() {
 
         {/* Card 5: Working in Fleet */}
         <Link
-          to="/my/batteries/all?status=returned"
+          to="/my/batteries/all?status=in_fleet"
           className="group relative flex flex-col justify-between overflow-hidden rounded-3xl border border-emerald-200/90 bg-gradient-to-br from-emerald-50/50 via-white to-emerald-50/20 p-4 sm:p-5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md hover:border-emerald-400 dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-900"
         >
           <div className="flex items-center justify-between">
@@ -793,10 +796,10 @@ function ClientDashboardPage() {
           </div>
           <div className="mt-3">
             <span className="text-2xl sm:text-3xl font-black text-emerald-800 dark:text-emerald-300">
-              {returned.toLocaleString()}
+              {inFleet.toLocaleString()}
             </span>
             <div className="mt-1 flex items-center justify-between text-[11px] sm:text-xs text-emerald-700/80 dark:text-emerald-400/80">
-              <span>Active in your vehicles</span>
+              <span>Active in your vehicles{registered > 0 ? ` · ${registered.toLocaleString()} not serviced yet` : ''}</span>
               <span className="font-bold text-emerald-800 dark:text-emerald-300 group-hover:translate-x-0.5 transition-transform">View Fleet →</span>
             </div>
           </div>
@@ -907,7 +910,7 @@ function ClientDashboardPage() {
               {fleetAvailabilityRate}%
             </span>
             <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
-              {returned} / {totalBatteries} in rotation
+              {inFleet} / {totalBatteries} in rotation
             </span>
           </div>
           <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-white/10">
@@ -1347,17 +1350,11 @@ function ClientDashboardPage() {
                         )}
                       </td>
                       <td className="py-3 px-3.5 sm:px-4">
-                        {hasBeenServiced(item) ? (
-                          <ClientStatusBadge
-                            status={item.status}
-                            isVerified={item.return_status === 'verified' || Boolean(item.return_verified_at)}
-                            returnStatus={item.return_status}
-                          />
-                        ) : (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-300">
-                            Registered
-                          </span>
-                        )}
+                        <ClientStatusBadge
+                          status={item.status === 'returned' && !hasBeenServiced(item) ? 'registered' : item.status}
+                          isVerified={item.return_status === 'verified' || Boolean(item.return_verified_at)}
+                          returnStatus={item.return_status}
+                        />
                       </td>
                       <td className="py-3 px-3.5 sm:px-4 text-slate-600 dark:text-neutral-300">
                         {item.truck_number ? (

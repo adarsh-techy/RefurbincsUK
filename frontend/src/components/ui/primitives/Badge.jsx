@@ -11,9 +11,9 @@ const TONES = {
 // battery/status strings from the API (snake_case) mapped to a tone +
 // professional display label and status dot indicator.
 const STATUS_MAP = {
-  registered: { tone: 'neutral', label: 'Registered', dot: 'bg-slate-400' },
+  registered: { tone: 'neutral', label: 'Registered (Not Serviced)', dot: 'bg-slate-400' },
   with_client: { tone: 'info', label: 'With Client', dot: 'bg-blue-500 shadow-xs' },
-  new: { tone: 'neutral', label: 'Registered', dot: 'bg-slate-400' },
+  new: { tone: 'neutral', label: 'Registered (Not Serviced)', dot: 'bg-slate-400' },
   in_repair: { tone: 'warning', label: 'Awaiting Repair', dot: 'bg-amber-500 ring-2 ring-amber-400/30' },
   in_progress: { tone: 'critical', label: 'Repair In Progress', dot: 'bg-rose-500 animate-pulse ring-2 ring-rose-400/30' },
   in_testing: { tone: 'testing', label: 'In Testing', dot: 'bg-purple-500 animate-pulse ring-2 ring-purple-400/30' },
@@ -94,7 +94,7 @@ export function StatusBadge({ status, hasPendingParts, isPassedBack }) {
 // the client sidebar's own bucket labels (Packed, In Service, Received) so
 // the wording is consistent everywhere a client sees it.
 const CLIENT_STATUS_MAP = {
-  registered: { tone: 'neutral', label: 'Registered' },
+  registered: { tone: 'neutral', label: 'Registered (Not Serviced)' },
   with_client: { tone: 'info', label: 'With Client' },
   in_repair: { tone: 'warning', label: 'In Service (Awaiting Repair)' },
   in_progress: { tone: 'warning', label: 'In Service (Repairing)' },
@@ -111,7 +111,7 @@ const CLIENT_STATUS_MAP = {
 
 export function ClientStatusBadge({ status, isVerified, returnStatus }) {
   if (!status || status === 'null' || status === 'undefined') {
-    return <Badge tone="neutral">Registered</Badge>;
+    return <Badge tone="neutral">Registered (Not Serviced)</Badge>;
   }
   let meta = CLIENT_STATUS_MAP[status];
   if (status === 'returned') {

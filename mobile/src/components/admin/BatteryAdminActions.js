@@ -10,7 +10,8 @@ const STATUSES = [
   ['in_progress', 'Repairing'],
   ['in_testing', 'In testing'],
   ['repaired', 'Repaired'],
-  ['returned', 'Returned'],
+  ['registered', 'Registered (Not Serviced)'],
+  ['returned', 'Returned to Client'],
   ['unserviceable', 'Unserviceable'],
   ['recycled', 'Recycled'],
 ];

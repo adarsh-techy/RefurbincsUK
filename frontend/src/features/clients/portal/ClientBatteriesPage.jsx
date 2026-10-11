@@ -92,11 +92,9 @@ function getRelevantDate(item) {
   return item.created_at;
 }
 
-// A battery is registered with status 'returned' from day one — it means
-// "currently with the client", not "came back from a service visit" — so a
-// battery that has never actually been through truck intake, repair, or a
-// return dispatch shouldn't show a "Returned" badge; it's simply never been
-// serviced yet.
+// New batteries are stored as 'registered'. Rows from before that status
+// existed were stored as 'returned' from day one; one that never went through
+// truck intake, repair or a return dispatch is treated as never serviced.
 function hasBeenServiced(row) {
   return Boolean(row.truck_intake_id || row.intake_id || row.last_repaired_at || row.return_id);
 }
@@ -1440,7 +1438,9 @@ function ClientBatteriesPage() {
       // it was very much still in service.
       const matchesStatus =
         !statusFilter ||
-        (statusFilter === 'in_service'
+        (statusFilter === 'in_fleet'
+          ? ['registered', 'returned'].includes(item.status)
+          : statusFilter === 'in_service'
           ? ['in_progress', 'in_testing', 'testing', 'repair_testing', 'in_repair', 'repaired'].includes(item.status)
           : statusFilter === 'unserviceable'
           ? ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(item.status)
@@ -2941,9 +2941,9 @@ function ClientBatteriesPage() {
 
           {/* Card 2: Active in Fleet */}
           <div
-            onClick={() => setStatusFilter(statusFilter === 'returned' ? '' : 'returned')}
+            onClick={() => setStatusFilter(statusFilter === 'in_fleet' ? '' : 'in_fleet')}
             className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
-              statusFilter === 'returned'
+              statusFilter === 'in_fleet'
                 ? 'border-emerald-500 bg-emerald-50/40 dark:border-emerald-600 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
                 : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-emerald-300'
             }`}
@@ -2957,7 +2957,10 @@ function ClientBatteriesPage() {
               </span>
             </div>
             <p className="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-400">
-              {data.filter((b) => b.status === 'returned').length}
+              {data.filter((b) => b.status === 'returned' || b.status === 'registered').length}
+            </p>
+            <p className="text-[10px] text-slate-500 dark:text-neutral-400">
+              {data.filter((b) => b.status === 'registered').length} not serviced yet
             </p>
           </div>
 

@@ -13,24 +13,23 @@ const TONES = {
 // battery/status strings from the API (snake_case) mapped to a tone +
 // professional display label.
 const STATUS_MAP = {
-  registered: { tone: 'neutral', label: 'Registered' },
+  registered: { tone: 'neutral', label: 'Registered (Not Serviced)' },
   with_client: { tone: 'info', label: 'With Client' },
-  in_repair: { tone: 'warning', label: 'Pending' },
-  in_progress: { tone: 'critical', label: 'In Progress' },
+  in_repair: { tone: 'warning', label: 'Awaiting Repair' },
+  in_progress: { tone: 'critical', label: 'Repair In Progress' },
   in_testing: { tone: 'testing', label: 'In Testing' },
   testing: { tone: 'testing', label: 'In Testing' },
   repair_testing: { tone: 'testing', label: 'Repair Testing' },
-  repaired: { tone: 'good', label: 'Completed' },
-  returned: { tone: 'info', label: 'Returned' },
+  repaired: { tone: 'good', label: 'Repair Completed' },
+  returned: { tone: 'info', label: 'Returned to Client' },
   unserviceable: { tone: 'critical', label: 'Unserviceable' },
   tested_parts_removed: { tone: 'critical', label: 'Unserviceable', subLabel: 'Test Failed' },
   recycled: { tone: 'black', label: 'Recycled' },
 };
 
-// A client battery row whose status is 'returned' but that has never been on
-// a truck, repaired or dispatched was only ever registered (QR generated) —
-// show "Registered", not "Returned". Mirrors hasBeenServiced() on the web
-// ClientBatteriesPage.
+// New batteries are stored as 'registered' (never serviced). Older rows from
+// before that status existed were stored as 'returned' — those still show as
+// "Registered" when the battery was never on a truck, repaired or dispatched.
 export function clientBatteryStatus(row) {
   if (!row) return undefined;
   const serviced = Boolean(row.truck_intake_id || row.intake_id || row.last_repaired_at || row.return_id);

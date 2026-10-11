@@ -22,7 +22,7 @@ function formatShortDate(isoDateStr) {
 
 const STATUS_FILTERS = [
   { value: '', label: 'All' },
-  { value: 'registered', label: 'Registered' },
+  { value: 'registered', label: 'Registered (Not Serviced)' },
   { value: 'in_repair', label: 'Awaiting Repair' },
   { value: 'in_progress', label: 'Repair In Progress' },
   { value: 'in_testing', label: 'In Testing' },
