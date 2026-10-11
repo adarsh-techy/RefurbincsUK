@@ -117,7 +117,7 @@ function ProcessStepper({ isOngoing, batteryStatus }) {
   );
 }
 
-function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], battery = null, isClient = false) {
+function buildEvents(visits = [], history = [], returns = [], issues = [], services = [], battery = null, isClient = false, isStaff = false) {
   const events = [];
 
   visits.forEach((v) => {

@@ -6,6 +6,19 @@ let isSynced = false;
 let syncSource = 'local';
 let lastSyncTime = 0;
 
+// Europe/London's UTC offset (0 in winter, +1h in summer) at an instant.
+function londonOffsetMs(epochMs) {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/London',
+    hourCycle: 'h23',
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+  }).formatToParts(new Date(epochMs));
+  const get = (t) => Number(parts.find((p) => p.type === t)?.value);
+  const londonWallAsUtc = Date.UTC(get('year'), get('month') - 1, get('day'), get('hour'), get('minute'), get('second'));
+  return londonWallAsUtc - Math.floor(epochMs / 1000) * 1000;
+}
+
 async function fetchFromTimeApiIo() {
   const controller = new AbortController();
   const timeoutId = setTimeout(() => controller.abort(), 4000);
@@ -20,7 +33,11 @@ async function fetchFromTimeApiIo() {
     const data = await res.json();
     
     if (data.dateTime) {
-      const d = new Date(
+      // timeapi.io returns London *wall-clock* fields. Turn them into a real
+      // UTC instant: read them as UTC, then subtract London's offset at that
+      // moment. (new Date(y, m, d, …) read them as the browser's local time,
+      // so the header clock was off by the browser's distance from UK time.)
+      const wallAsUtc = Date.UTC(
         data.year,
         data.month - 1,
         data.day,
@@ -29,7 +46,7 @@ async function fetchFromTimeApiIo() {
         data.seconds,
         data.milliSeconds || 0
       );
-      const apiEpoch = d.getTime();
+      const apiEpoch = wallAsUtc - londonOffsetMs(wallAsUtc);
       const localNow = Date.now();
       clockOffsetMs = (apiEpoch + roundTrip) - localNow;
       isSynced = true;
