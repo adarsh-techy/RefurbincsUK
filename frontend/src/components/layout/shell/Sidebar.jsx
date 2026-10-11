@@ -344,7 +344,7 @@ const NAV_GROUPS = [
     links: [
       { to: '/users', label: 'User Accounts', icon: Icons.users, superAdminOnly: true },
       { to: '/audit-logs', label: 'Activity Audit Log', icon: Icons.audit, permission: 'audit_logs' },
-      { to: '/trash', label: 'Trash Bin', icon: Icons.trash, adminOnly: true },
+      { to: '/trash', label: 'Trash Bin', icon: Icons.trash, superAdminOnly: true },
     ],
   },
 ];

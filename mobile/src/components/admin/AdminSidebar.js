@@ -66,7 +66,7 @@ const NAV_GROUPS = [
       { key: 'certificates', label: 'Certificates & Impact', screen: 'Certificates' },
       { key: 'users', label: 'User Accounts', screen: 'Users', superAdminOnly: true },
       { key: 'audit', label: 'Audit Log', screen: 'AuditLog', permission: 'audit_logs' },
-      { key: 'trash', label: 'Trash Bin', screen: 'Trash', adminOnly: true },
+      { key: 'trash', label: 'Trash Bin', screen: 'Trash', superAdminOnly: true },
     ],
   },
   {

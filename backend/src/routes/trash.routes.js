@@ -3,7 +3,9 @@ const trashController = require('../controllers/trash.controller');
 const { requireAuth, requireRole } = require('../middlewares/auth');
 
 // Both super_admin and admin can access and inspect trash items
-router.use(requireAuth, requireRole('super_admin', 'admin'));
+// Trash holds snapshots of deleted clients / staff (incl. personal data):
+// super admin only.
+router.use(requireAuth, requireRole('super_admin'));
 
 router.get('/stats', trashController.getStats);
 router.get('/', trashController.list);

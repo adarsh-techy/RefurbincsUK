@@ -123,8 +123,6 @@ function AppRoutes() {
             <Route path="/batteries/recycled" element={<RecycledBatteriesPage />} />
             <Route path="/batteries-qr-code" element={<GenerateQrPage />} />
             <Route path="/rfid-assignment" element={<RfidAssignmentPage />} />
-            <Route path="/trash" element={<TrashPage />} />
-            <Route path="/trash/:id" element={<TrashDetailPage />} />
           </Route>
 
           <Route element={<ProtectedRoute permission="truck_intakes" />}>
@@ -204,6 +202,8 @@ function AppRoutes() {
           </Route>
 
           <Route element={<ProtectedRoute roles={['super_admin']} />}>
+            <Route path="/trash" element={<TrashPage />} />
+            <Route path="/trash/:id" element={<TrashDetailPage />} />
             <Route path="/invoices" element={<InvoicesPage />} />
             <Route path="/users" element={<UsersPage />} />
             <Route path="/finance" element={<FinancePage />} />
