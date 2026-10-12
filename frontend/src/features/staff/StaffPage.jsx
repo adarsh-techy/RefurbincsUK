@@ -128,7 +128,7 @@ function StaffPage() {
             key: 'actions',
             label: '',
             render: (row) => (
-              <RowActions onEdit={() => setFormTarget(row)} onDelete={() => setDeleteTarget(row)} />
+              <RowActions onEdit={() => setFormTarget(row)} onDelete={isSuperAdmin ? () => setDeleteTarget(row) : undefined} />
             ),
           },
         ]

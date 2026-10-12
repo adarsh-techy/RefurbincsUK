@@ -18,6 +18,10 @@ import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import ImageViewerModal from '../../components/ui/ImageViewerModal';
 import BatteryAdminActions from '../../components/admin/BatteryAdminActions';
+import SerialNumberModal from '../../components/admin/sa1/SerialNumberModal';
+import QrCodeModal from '../../components/admin/sa1/QrCodeModal';
+import BatteryStatusModal from '../../components/admin/sa1/BatteryStatusModal';
+import FleetStatusBadge from '../../components/admin/sa1/FleetStatusBadge';
 import { printBatteryReport, shareBatteryReport } from '../../utils/print-battery-report';
 import formatDuration from '../../utils/format-duration';
 import { resolveImageUrl } from '../../utils/imageUrl';
@@ -309,6 +313,13 @@ export default function BatteryDetailScreen() {
     currentUser?.role === 'admin' ||
     staffRole === 'supervisor';
   const isTechnicianOnly = isStaff && !canTest;
+  // office admins get the web page's admin extras (client, RFID tag, QR,
+  // battery number override); the super admin also prices and status fixes
+  const isAdminRole = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
+  const isSuperAdmin = currentUser?.role === 'super_admin';
+  const [adminSerialOpen, setAdminSerialOpen] = useState(false);
+  const [showQr, setShowQr] = useState(false);
+  const [showStatusForm, setShowStatusForm] = useState(false);
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -1765,6 +1776,21 @@ export default function BatteryDetailScreen() {
       return sum + Number(h.price || 0) + Number(h.labor_charge || 0);
     }, 0) +
     services.reduce((sum, s) => sum + Number(s.rate || 0), 0);
+  // web BatteryDetailPage figures: repair visits = distinct repair batches,
+  // and each batch's duration counted once
+  const repairVisits = new Set(history.map((h) => h.batch_id)).size;
+  const totalRepairDurationSeconds = Array.from(new Map(history.map((h) => [h.batch_id, h.duration_seconds])).values())
+    .reduce((sum, d) => sum + (Number(d) || 0), 0);
+  const nowDate = new Date();
+  const repairVisitsThisMonth = new Set(
+    history
+      .filter((h) => {
+        const d = new Date(h.repaired_at);
+        return d.getFullYear() === nowDate.getFullYear() && d.getMonth() === nowDate.getMonth();
+      })
+      .map((h) => h.batch_id)
+  ).size;
+  const isWorkshopRole = ['technician', 'staff', 'supervisor'].includes(currentUser?.role) || staffRole === 'supervisor';
 
   return (
     <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-5 pb-16">
@@ -1772,8 +1798,43 @@ export default function BatteryDetailScreen() {
       <View className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <View className="flex-row items-center justify-between">
           <Text className="text-2xl font-black text-slate-900">{battery.battery_code}</Text>
-          <StatusBadge status={battery.status} />
+          {isAdminRole ? (
+            <FleetStatusBadge status={battery.status} isPassedBack={battery.is_passed_back} hasPendingParts={pendingPartsRemoval.length > 0} />
+          ) : (
+            <StatusBadge status={battery.status} />
+          )}
         </View>
+        {isAdminRole && (
+          <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
+            {battery.client_name ? (
+              <Text className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-700">Client: {battery.client_name}</Text>
+            ) : null}
+            {battery.status === 'in_progress' && battery.started_by_name ? (
+              <Text className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">Being worked on by {battery.started_by_name}</Text>
+            ) : null}
+            {battery.rfid_tag ? (
+              <Text className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-800" selectable>
+                <Text className="font-bold">RFID </Text><Text className="font-mono">{battery.rfid_tag}</Text>
+              </Text>
+            ) : null}
+          </View>
+        )}
+        {isAdminRole && repairVisitsThisMonth > 1 && (
+          <Text className="mt-2 text-xs font-semibold text-amber-700">⚠ Serviced {repairVisitsThisMonth} times this month — worth a closer look.</Text>
+        )}
+        {isAdminRole && (
+          <View className="mt-3 flex-row gap-2">
+            <TouchableOpacity onPress={() => setShowQr(true)} className="flex-row items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <Icon name="grid" color="#334155" size={14} />
+              <Text className="text-xs font-bold text-slate-700">QR Code</Text>
+            </TouchableOpacity>
+            {isSuperAdmin && (
+              <TouchableOpacity onPress={() => setShowStatusForm(true)} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2">
+                <Text className="text-xs font-bold text-violet-700">Correct status</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         <Text className="mt-1 text-xs text-slate-500">
           {isClient && battery.client_name ? (
             <>
@@ -2005,7 +2066,7 @@ export default function BatteryDetailScreen() {
                       isClientLocked ? 'text-amber-700' : 'text-slate-600'
                     }`}
                   >
-                    {isClientLocked ? 'Set by you' : 'Admin set'}
+                    {isClientLocked ? (isClient ? 'Set by you' : 'Set by Client') : 'Admin set'}
                   </Text>
                 </View>
               </View>
@@ -2013,6 +2074,14 @@ export default function BatteryDetailScreen() {
               <Text className="mt-1 text-xs text-slate-400 italic">No serial number assigned</Text>
             )}
           </View>
+          {isAdminRole && (
+            <TouchableOpacity
+              onPress={() => setAdminSerialOpen(true)}
+              className="rounded-xl bg-blue-50 px-3.5 py-2 border border-blue-200 active:bg-blue-100"
+            >
+              <Text className="text-xs font-bold text-blue-600">{battery.serial_number ? 'Edit' : '+ Assign Battery Number'}</Text>
+            </TouchableOpacity>
+          )}
           {isClient && !battery.serial_number && (
             <TouchableOpacity
               onPress={openSerialModal}
@@ -2041,6 +2110,14 @@ export default function BatteryDetailScreen() {
                 <Text className="mt-1 mb-4 text-xs text-amber-800 text-center leading-relaxed">
                   This battery arrived on Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot begin until verified.
                 </Text>
+                {isAdminRole && battery.truck_intake_id ? (
+                  <TouchableOpacity
+                    onPress={() => { allowExitRef.current = true; navigation.navigate('AdminDetail', { kind: 'intake', id: battery.truck_intake_id }); }}
+                    className="mb-3 rounded-xl border border-amber-300 bg-white px-3 py-2"
+                  >
+                    <Text className="text-xs font-bold text-amber-800">View Truck Intake #{battery.intake_truck_number} →</Text>
+                  </TouchableOpacity>
+                ) : null}
                 <TouchableOpacity
                   onPress={() => {
                     allowExitRef.current = true;
@@ -2397,7 +2474,14 @@ export default function BatteryDetailScreen() {
       )}
 
       {currentUser?.role === 'super_admin' && (
-        <BatteryAdminActions battery={battery} onChanged={load} onDeleted={() => navigation.goBack()} />
+        <BatteryAdminActions battery={battery} onChanged={load} onDeleted={() => navigation.goBack()} onCorrectStatus={() => setShowStatusForm(true)} />
+      )}
+      {isAdminRole && adminSerialOpen && (
+        <SerialNumberModal battery={battery} onClose={() => setAdminSerialOpen(false)} onSaved={() => { setAdminSerialOpen(false); load(); }} />
+      )}
+      {isAdminRole && showQr && <QrCodeModal battery={battery} onClose={() => setShowQr(false)} />}
+      {isSuperAdmin && showStatusForm && (
+        <BatteryStatusModal battery={battery} onClose={() => setShowStatusForm(false)} onSaved={() => { setShowStatusForm(false); load(); }} />
       )}
 
       {/* If scanned for service by staff/technician, keep view clean & action-oriented */}
@@ -2432,13 +2516,25 @@ export default function BatteryDetailScreen() {
           {/* ── Summary Stats ────────────────────────────────────────────────── */}
           <View className="mb-5 flex-row gap-3">
         <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Repairs</Text>
-          <Text className="mt-0.5 text-lg font-black text-slate-900">{history.length}</Text>
+          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole ? 'Repairs Logged' : 'Repairs'}</Text>
+          <Text className="mt-0.5 text-lg font-black text-slate-900">{isAdminRole ? repairVisits : history.length}</Text>
         </View>
         <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Returns</Text>
+          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole ? 'Return Shipments' : 'Returns'}</Text>
           <Text className="mt-0.5 text-lg font-black text-slate-900">{returns.length}</Text>
         </View>
+        {isSuperAdmin && (
+          <View className="flex-1 rounded-2xl border border-violet-200 bg-violet-50/70 p-3.5 shadow-sm">
+            <Text className="text-[10px] font-bold uppercase tracking-wider text-violet-700">Total Repair Time</Text>
+            <Text className="mt-0.5 text-sm font-black text-violet-900">{totalRepairDurationSeconds > 0 ? formatDuration(totalRepairDurationSeconds) : '—'}</Text>
+          </View>
+        )}
+        {isSuperAdmin && !isWorkshopRole && (
+          <View className="flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
+            <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Price</Text>
+            <Text className="mt-0.5 text-sm font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
+          </View>
+        )}
         {isClient && (
           <View className="flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
             <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Spent</Text>
@@ -2503,7 +2599,7 @@ export default function BatteryDetailScreen() {
                     )}
                   </View>
                   <View className="flex-row items-center gap-2">
-                    {isClient && cycleTotal > 0 ? (
+                    {(isClient || isSuperAdmin) && cycleTotal > 0 ? (
                       <View className="flex-row items-center gap-1 rounded-full border border-blue-200 bg-blue-50 px-2.5 py-0.5">
                         <Text className="text-[10px] font-extrabold text-blue-700">
                           Total: £{cycleTotal.toFixed(2)}
@@ -2677,6 +2773,11 @@ export default function BatteryDetailScreen() {
                           {isClient && event.price !== undefined && event.price > 0 && (
                             <Text className="mt-1 text-[10px] font-bold text-emerald-600">
                               Service Cost: £{Number(event.price).toFixed(2)}
+                            </Text>
+                          )}
+                          {isSuperAdmin && event.price !== undefined && (
+                            <Text className={`mt-1 self-start rounded-lg px-2 py-0.5 text-[10px] font-bold ${event.isRemoved ? 'bg-slate-100 text-slate-500' : 'bg-emerald-50 text-emerald-700'}`}>
+                              {event.isRemoved ? 'Removed · £0.00' : `£${Number(event.price || 0).toFixed(2)}`}
                             </Text>
                           )}
                         </View>

@@ -2,21 +2,11 @@ import { useState } from 'react';
 import { Alert, Text, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../services/api-client';
 
-// Super-admin tools on the battery detail screen — the same three actions as
-// the web BatteryDetailPage admin menu: correct the status, hide/unhide the
-// battery app-wide (PATCH /batteries/:id/block), or delete it.
-const STATUSES = [
-  ['in_repair', 'Awaiting repair'],
-  ['in_progress', 'Repairing'],
-  ['in_testing', 'In testing'],
-  ['repaired', 'Repaired'],
-  ['registered', 'Registered (Not Serviced)'],
-  ['returned', 'Returned to Client'],
-  ['unserviceable', 'Unserviceable'],
-  ['recycled', 'Recycled'],
-];
-
-export default function BatteryAdminActions({ battery, onChanged, onDeleted }) {
+// Super-admin tools on the battery detail screen: correct the status (the
+// web "Correct status" form, opened by the screen), and — as on the web
+// Generate QR list — block / unblock the battery app-wide (PATCH
+// /batteries/:id/block) or delete it.
+export default function BatteryAdminActions({ battery, onChanged, onDeleted, onCorrectStatus }) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState(null);
@@ -27,24 +17,16 @@ export default function BatteryAdminActions({ battery, onChanged, onDeleted }) {
     try { await fn(); } catch (err) { setError(err.response?.data?.message || err.message); } finally { setBusy(false); }
   }
 
-  function setStatus(status, label) {
-    if (status === battery.status) return;
-    Alert.alert('Change status?', `${battery.battery_code} → ${label}. Use this only to correct a mistake.`, [
-      { text: 'Cancel', style: 'cancel' },
-      { text: 'Change', onPress: () => run(async () => { await apiClient.patch(`/batteries/${battery.id}`, { status }); onChanged?.(); }) },
-    ]);
-  }
-
   function toggleBlock() {
     const hide = !battery.is_blocked;
-    Alert.alert(hide ? 'Hide this battery?' : 'Unhide this battery?', hide ? 'It disappears from every list and scan until unhidden. History is kept.' : 'It shows up in lists and scans again.', [
+    Alert.alert(hide ? 'Block this battery?' : 'Unblock this battery?', hide ? 'It disappears from every list and scan until unblocked. History is kept.' : 'It shows up in lists and scans again.', [
       { text: 'Cancel', style: 'cancel' },
-      { text: hide ? 'Hide' : 'Unhide', onPress: () => run(async () => { await apiClient.patch(`/batteries/${battery.id}/block`, { blocked: hide }); onChanged?.(); }) },
+      { text: hide ? 'Block' : 'Unblock', onPress: () => run(async () => { await apiClient.patch(`/batteries/${battery.id}/block`, { blocked: hide }); onChanged?.(); }) },
     ]);
   }
 
   function remove() {
-    Alert.alert('Delete battery?', `${battery.battery_code} and its history will be removed. A copy is kept in the Trash Bin.`, [
+    Alert.alert('Delete Battery', `Delete battery "${battery.battery_code}"? This can't be undone.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Delete', style: 'destructive', onPress: () => run(async () => { await apiClient.delete(`/batteries/${battery.id}`); onDeleted?.(); }) },
     ]);
@@ -57,18 +39,15 @@ export default function BatteryAdminActions({ battery, onChanged, onDeleted }) {
         <Text className="text-violet-700">{open ? '▲' : '▼'}</Text>
       </TouchableOpacity>
       {open && (
-        <View className="mt-3 gap-3">
-          <Text className="text-[11px] font-bold text-slate-600">Correct status</Text>
-          <View className="flex-row flex-wrap gap-1.5">
-            {STATUSES.map(([s, label]) => (
-              <TouchableOpacity key={s} disabled={busy} onPress={() => setStatus(s, label)} className={`rounded-lg border px-2.5 py-1.5 ${battery.status === s ? 'border-violet-600 bg-violet-600' : 'border-slate-300 bg-white'}`}>
-                <Text className={`text-[11px] font-bold ${battery.status === s ? 'text-white' : 'text-slate-700'}`}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+        <View className="mt-3 gap-2">
+          {onCorrectStatus && (
+            <TouchableOpacity disabled={busy} onPress={onCorrectStatus} className="items-center rounded-xl bg-violet-600 py-2.5">
+              <Text className="text-xs font-bold text-white">Correct status</Text>
+            </TouchableOpacity>
+          )}
           <View className="flex-row gap-2">
             <TouchableOpacity disabled={busy} onPress={toggleBlock} className="flex-1 items-center rounded-xl bg-slate-800 py-2.5">
-              <Text className="text-xs font-bold text-white">{battery.is_blocked ? 'Unhide battery' : 'Hide battery'}</Text>
+              <Text className="text-xs font-bold text-white">{battery.is_blocked ? 'Unblock battery' : 'Block battery'}</Text>
             </TouchableOpacity>
             <TouchableOpacity disabled={busy} onPress={remove} className="flex-1 items-center rounded-xl border border-red-200 bg-red-50 py-2.5">
               <Text className="text-xs font-bold text-red-700">Delete battery</Text>

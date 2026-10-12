@@ -1,256 +1,325 @@
-import { useEffect, useMemo, useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, Switch, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import * as DocumentPicker from 'expo-document-picker';
 import apiClient from '../../services/api-client';
-import { StatusBadge } from '../../components/ui/Badge';
-import Icon from '../../components/ui/Icon';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
-import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
+import ManifestPicker, { resolveScan } from '../../components/admin/sa2/ManifestPicker';
+import useFleetClients from '../../components/admin/sa2/useFleetClients';
+import DateTimeField, { DocumentBox, pickDocument } from '../../components/admin/sa2/DateTimeField';
+import { apiError, ClientSelect, ErrorBox, GhostButton, Input, Label, PrimaryButton } from '../../components/admin/sa2/ui';
 
-// Admin create flows that were web-only: Return Dispatch and Recycle
-// Shipment — same endpoints and payloads as ReturnForm and RecycleForm.
-// (Truck intakes are recorded by clients, not created from the admin app.) Every battery box takes a QR link, a battery
-// code, or an RFID tag (a reader in keyboard mode types it + Enter);
-// unassigned tags are refused.
+// Admin create flows: "Record a Return" and "Record a Recycle Shipment" —
+// the web ReturnForm and RecycleForm with the same checks, endpoints and
+// payloads. Batteries are added by scanning (RFID / QR / typed code) or
+// from the list of eligible batteries; each scan is checked against
+// GET /batteries/:code like the web. (Truck intakes are recorded by
+// clients, not created from the admin app.)
 
-function Label({ children, required }) {
-  return <Text className="mb-1.5 text-xs font-bold text-slate-600">{children}{required ? <Text className="text-red-500"> *</Text> : null}</Text>;
+const statusText = (s) => String(s || '').replace('_', ' ');
+
+function Card({ children }) {
+  return <View className="gap-3.5 rounded-2xl border border-slate-200 bg-white p-4">{children}</View>;
 }
-function Input(props) {
-  return <TextInput placeholderTextColor="#94a3b8" autoCorrect={false} {...props} className={`rounded-2xl border border-slate-300 bg-white px-4 py-3 text-sm text-slate-900 ${props.className || ''}`} />;
-}
-function ClientChips({ clients, value, onChange }) {
+
+function Footer({ summary, ok, onCancel, onSubmit, submitLabel, disabled }) {
   return (
-    <View className="flex-row flex-wrap gap-2">
-      {clients.map((c) => {
-        const on = String(c.id) === String(value);
-        return (
-          <TouchableOpacity key={c.id} onPress={() => onChange(c)} className={`rounded-xl border px-3 py-2 ${on ? 'border-violet-600 bg-violet-600' : 'border-slate-300 bg-white'}`}>
-            <Text className={`text-xs font-bold ${on ? 'text-white' : 'text-slate-700'}`}>{c.name}</Text>
-          </TouchableOpacity>
-        );
-      })}
-      {clients.length === 0 && <Text className="text-xs text-slate-400">Loading…</Text>}
-    </View>
-  );
-}
-function ErrorBox({ text }) {
-  if (!text) return null;
-  return <View className="rounded-2xl border border-red-200 bg-red-50 p-3"><Text className="text-xs font-semibold text-red-700">{text}</Text></View>;
-}
-function SubmitButton({ onPress, busy, label, disabled }) {
-  return (
-    <TouchableOpacity disabled={busy || disabled} onPress={onPress} className={`mt-2 items-center rounded-2xl bg-emerald-600 py-4 ${busy || disabled ? 'opacity-50' : ''}`}>
-      <Text className="text-base font-bold text-white">{busy ? 'Saving…' : label}</Text>
-    </TouchableOpacity>
-  );
-}
-
-function useClients(kind) {
-  const [clients, setClients] = useState([]);
-  useEffect(() => {
-    apiClient.get('/clients').then(({ data }) => {
-      const list = Array.isArray(data) ? data : data?.data || [];
-      setClients(list.filter((c) => (kind === 'recycle' ? c.user_role === 'recycle_client' : c.user_role !== 'recycle_client')));
-    }).catch(() => {});
-  }, [kind]);
-  return clients;
-}
-
-// Selectable list of eligible batteries + a scan box that ticks them.
-function BatteryPicker({ batteries, selected, onToggle, loading, emptyText }) {
-  function onScan(raw) {
-    const r = resolveBatteryInput(raw, batteries);
-    if (r.unassignedTag) return { tone: 'bad', message: `${UNASSIGNED_TAG_MESSAGE} (tag ${r.code})` };
-    if (!r.battery) return { tone: 'bad', message: `${r.code} is not in the list of eligible batteries.` };
-    if (selected.has(r.battery.id)) return { tone: 'warn', message: `${r.battery.battery_code} is already selected.` };
-    onToggle(r.battery.id);
-    return { tone: 'good', message: `✓ ${r.battery.battery_code} selected` };
-  }
-  return (
-    <View className="gap-2">
-      <ScanBatteryInput onSubmit={onScan} submitLabel="Select" />
-      <View className="flex-row items-center justify-between">
-        <Text className="text-[11px] font-bold text-slate-500">{selected.size} of {batteries.length} selected</Text>
-        {batteries.length > 0 && (
-          <TouchableOpacity onPress={() => batteries.forEach((b) => { if (selected.size === batteries.length || !selected.has(b.id)) onToggle(b.id); })}>
-            <Text className="text-[11px] font-bold text-violet-700">{selected.size === batteries.length ? 'Clear all' : 'Select all'}</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-      {loading ? <Text className="py-3 text-center text-xs text-slate-400">Loading batteries…</Text> : batteries.length === 0 ? (
-        <Text className="py-3 text-center text-xs text-slate-400">{emptyText}</Text>
-      ) : (
-        <View className="gap-1.5">
-          {batteries.map((b) => {
-            const on = selected.has(b.id);
-            return (
-              <TouchableOpacity key={b.id} onPress={() => onToggle(b.id)} className={`flex-row items-center gap-3 rounded-2xl border p-3 ${on ? 'border-emerald-400 bg-emerald-50' : 'border-slate-200 bg-white'}`}>
-                <View className={`h-5 w-5 items-center justify-center rounded-md border ${on ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300'}`}>{on ? <Icon name="check" color="#fff" size={12} /> : null}</View>
-                <View className="flex-1">
-                  <Text className="text-sm font-bold text-slate-900">{b.battery_code}</Text>
-                  <Text className="text-[11px] text-slate-500" numberOfLines={1}>{b.client_name || ''}{b.rfid_tag ? ` · RFID ${b.rfid_tag}` : ''}</Text>
-                </View>
-                <StatusBadge status={b.status} />
-              </TouchableOpacity>
-            );
-          })}
+    <View className="gap-3 border-t border-slate-200 bg-white p-4 pb-8">
+      <Text className={`text-xs ${ok ? 'font-bold text-emerald-700' : 'font-medium text-slate-500'}`}>{ok ? `✓ ${summary}` : summary}</Text>
+      <View className="flex-row gap-2.5">
+        <GhostButton label="Cancel" onPress={onCancel} />
+        <View className="flex-1">
+          <PrimaryButton tone="emerald" label={submitLabel} onPress={onSubmit} disabled={disabled} />
         </View>
-      )}
+      </View>
     </View>
   );
 }
 
-function useSelection() {
-  const [selected, setSelected] = useState(new Set());
-  const toggle = (id) => setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
-  return [selected, toggle, setSelected];
-}
+const plural = (n) => `${n} ${n === 1 ? 'battery' : 'batteries'}`;
 
-
+// ── Return dispatch ─────────────────────────────────────────────────────
 export function AdminReturnCreateScreen() {
   const navigation = useNavigation();
-  const clients = useClients('fleet');
-  const [client, setClient] = useState(null);
-  const [truck, setTruck] = useState('');
-  const [driver, setDriver] = useState('');
-  const [doc, setDoc] = useState(null);
-  const [batteries, setBatteries] = useState([]);
-  const [loading, setLoading] = useState(false);
-  const [selected, toggle, setSelected] = useSelection();
+  const clients = useFleetClients();
+  const [clientId, setClientId] = useState('');
+  const [truckNumber, setTruckNumber] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [returnedAt, setReturnedAt] = useState(new Date());
+  const [docFile, setDocFile] = useState(null);
+  const [candidates, setCandidates] = useState([]);
+  const [added, setAdded] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
 
+  const client = clients.find((c) => String(c.id) === clientId);
+
+  // the picked client's repaired-and-ready batteries
   useEffect(() => {
-    setSelected(new Set());
-    if (!client) { setBatteries([]); return; }
-    setLoading(true);
-    apiClient.get('/batteries', { params: { status: 'repaired', clientName: client.name, limit: 200, offset: 0 } })
-      .then(({ data }) => setBatteries(data.data || []))
-      .catch((err) => setError(err.response?.data?.message || err.message))
-      .finally(() => setLoading(false));
-  }, [client, setSelected]);
+    if (!client) { setCandidates([]); return undefined; }
+    let cancelled = false;
+    apiClient
+      .get('/batteries', { params: { clientName: client.name, status: 'repaired', limit: 200 } })
+      .then(({ data }) => { if (!cancelled) setCandidates(data.data || []); })
+      .catch(() => { if (!cancelled) setCandidates([]); });
+    return () => { cancelled = true; };
+  }, [client]);
 
-  async function pickDoc() {
-    const res = await DocumentPicker.getDocumentAsync({ type: ['application/pdf', 'image/*'], copyToCacheDirectory: true });
-    if (!res.canceled && res.assets?.length) { const a = res.assets[0]; setDoc({ uri: a.uri, name: a.name, type: a.mimeType || 'application/pdf' }); }
+  function selectClient(id) {
+    setClientId(id);
+    setAdded([]);
+  }
+
+  async function onScan(raw) {
+    const r = await resolveScan(raw, candidates);
+    if (r.error) return { tone: 'bad', message: r.error };
+    if (!r.code) return undefined;
+    try {
+      const { data } = await apiClient.get(`/batteries/${encodeURIComponent(r.code)}`);
+      const battery = data.battery;
+      if (added.some((b) => b.id === battery.id)) return { tone: 'warn', message: `${battery.battery_code} is already in this return manifest.` };
+      if (battery.status !== 'repaired') return { tone: 'bad', message: `${battery.battery_code} is not ready to return (status: ${statusText(battery.status)}).` };
+      if (client && battery.client_name && battery.client_name.toLowerCase() !== client.name.toLowerCase()) {
+        return { tone: 'bad', message: `${battery.battery_code} belongs to ${battery.client_name}, not ${client.name}.` };
+      }
+      setAdded((prev) => (prev.some((b) => b.id === battery.id) ? prev : [...prev, battery]));
+      return { tone: 'good', message: `✓ ${battery.battery_code}${battery.serial_number ? ` (SN: ${battery.serial_number})` : ''} added.` };
+    } catch (err) {
+      return { tone: 'bad', message: err.response?.status === 404 ? `No battery found with code "${r.code}".` : apiError(err) };
+    }
   }
 
   async function submit() {
+    if (!clientId) return setError('Please select a fleet client.');
+    if (!truckNumber.trim() || !driverName.trim()) return setError('Dispatch truck number and driver name are required.');
+    if (!returnedAt) return setError('Enter a valid return date and time.');
+    if (added.length === 0) return setError('Please add at least one repaired battery to dispatch.');
+    setSubmitting(true);
     setError(null);
-    if (!client) return setError('Select the client.');
-    if (!truck.trim() || !driver.trim()) return setError('Truck number and driver name are required.');
-    if (selected.size === 0) return setError('Select at least one repaired battery.');
-    setBusy(true);
     try {
-      const ids = [...selected];
-      if (doc) {
-        const fd = new FormData();
-        fd.append('truckNumber', truck.trim()); fd.append('driverName', driver.trim()); fd.append('clientId', String(client.id));
-        fd.append('batteryIds', JSON.stringify(ids)); fd.append('returnedAt', new Date().toISOString());
-        fd.append('docFile', { uri: doc.uri, name: doc.name, type: doc.type });
-        await apiClient.post('/returns', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
-      } else {
-        await apiClient.post('/returns', { truckNumber: truck.trim(), driverName: driver.trim(), clientId: client.id, batteryIds: ids, returnedAt: new Date().toISOString() });
-      }
+      const fd = new FormData();
+      fd.append('truckNumber', truckNumber);
+      fd.append('driverName', driverName);
+      fd.append('clientId', clientId);
+      fd.append('returnedAt', returnedAt.toISOString());
+      fd.append('batteryIds', JSON.stringify(added.map((b) => b.id)));
+      if (docFile) fd.append('docFile', { uri: docFile.uri, name: docFile.name, type: docFile.type });
+      await apiClient.post('/returns', fd, { headers: { 'Content-Type': 'multipart/form-data' } });
       navigation.goBack();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(apiError(err));
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="p-4 pb-24 gap-4" keyboardShouldPersistTaps="handled">
+      <ScrollView contentContainerClassName="p-4 pb-10 gap-4" keyboardShouldPersistTaps="handled">
+        <View>
+          <Text className="text-base font-extrabold text-slate-900">Record a Return</Text>
+          <Text className="text-xs text-slate-500">Dispatch repaired batteries back to the customer.</Text>
+        </View>
+        <Card>
+          <View>
+            <Label>🏢 Destination Client</Label>
+            <Text className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">Select Fleet Client ({clients.length})</Text>
+            <ClientSelect clients={clients} value={clientId} onChange={(id) => selectClient(id)} />
+          </View>
+          <View>
+            <Label>🚚 Dispatch Truck Number</Label>
+            <Input value={truckNumber} onChangeText={(t) => setTruckNumber(t.toUpperCase())} autoCapitalize="characters" placeholder="e.g. GB21 XYZ" />
+          </View>
+          <View>
+            <Label>👤 Driver Name</Label>
+            <Input value={driverName} onChangeText={setDriverName} placeholder="e.g. George Davies" />
+          </View>
+          <View>
+            <Label>📅 Return Date & Time</Label>
+            <DateTimeField value={returnedAt} onChange={setReturnedAt} autoLabel="Auto-Set: Current Time" />
+          </View>
+          <View>
+            <Label>Return Note / Document File (Optional)</Label>
+            <DocumentBox file={docFile} onPick={async () => setDocFile(await pickDocument())} onRemove={() => setDocFile(null)} />
+          </View>
+        </Card>
+
+        <ManifestPicker
+          label="Scan / Pick Repaired Batteries for Return"
+          countText={clientId ? `${candidates.filter((b) => !added.some((a) => a.id === b.id)).length} repaired units ready` : null}
+          disabled={!clientId}
+          placeholder={clientId ? 'Scan QR code or enter repaired battery ID…' : 'Select destination client above first…'}
+          candidates={candidates}
+          added={added}
+          onScan={onScan}
+          onRemove={(b) => setAdded((prev) => prev.filter((x) => x.id !== b.id))}
+          suggestionTitle={(filtering, n) => (filtering ? `Matching Repaired Batteries (${n})` : `Repaired & Ready for ${client?.name} (${n})`)}
+          notice={{
+            title: 'Dispatch Verification Note',
+            text: 'Only batteries that have successfully passed all testing and are marked as Repaired can be added to this return shipment.',
+          }}
+          manifestTitle="Return Shipment Manifest"
+          stagedBadge={{ label: 'Repaired', cls: 'bg-emerald-100 text-emerald-800' }}
+          emptyTitle="No batteries staged for return yet"
+          emptyText={clientId ? 'Scan QR or select from the list above.' : 'Select a client first to view ready repaired units.'}
+        />
         <ErrorBox text={error} />
-        <View><Label required>Client</Label><ClientChips clients={clients} value={client?.id} onChange={setClient} /></View>
-        <View><Label required>Truck number</Label><Input value={truck} onChangeText={(t) => setTruck(t.toUpperCase())} autoCapitalize="characters" /></View>
-        <View><Label required>Driver name</Label><Input value={driver} onChangeText={setDriver} /></View>
-        <View>
-          <Label>Dispatch note / document (optional)</Label>
-          <TouchableOpacity onPress={pickDoc} className="flex-row items-center gap-2 rounded-2xl border border-dashed border-violet-300 bg-violet-50 px-4 py-3">
-            <Icon name="photo" color="#7c3aed" size={16} />
-            <Text className="flex-1 text-xs font-bold text-violet-700" numberOfLines={1}>{doc ? doc.name : 'Choose PDF or photo'}</Text>
-          </TouchableOpacity>
-        </View>
-        <View>
-          <Label required>Repaired batteries to send back</Label>
-          {client ? (
-            <BatteryPicker batteries={batteries} selected={selected} onToggle={toggle} loading={loading} emptyText="No repaired batteries waiting for this client." />
-          ) : <Text className="text-xs text-slate-400">Select a client to see their repaired batteries.</Text>}
-        </View>
-        <SubmitButton onPress={submit} busy={busy} label={`Dispatch ${selected.size} batter${selected.size === 1 ? 'y' : 'ies'}`} disabled={selected.size === 0} />
       </ScrollView>
+      <Footer
+        ok={added.length > 0}
+        summary={added.length > 0 ? `${added.length} repaired batteries staged for return` : 'Select client and add batteries to dispatch'}
+        onCancel={() => navigation.goBack()}
+        onSubmit={submit}
+        submitLabel={submitting ? 'Recording Dispatch…' : `✓ Record Return (${plural(added.length)})`}
+        disabled={submitting || added.length === 0 || !clientId}
+      />
     </KeyboardAvoidingView>
   );
 }
 
-// ── Recycle Shipment ─────────────────────────────────────────────────────
+// ── Recycle shipment ────────────────────────────────────────────────────
 export function AdminRecycleCreateScreen() {
   const navigation = useNavigation();
-  const partners = useClients('recycle');
-  const [partner, setPartner] = useState(null);
-  const [vehicle, setVehicle] = useState('');
-  const [driver, setDriver] = useState('');
-  const [weight, setWeight] = useState('');
-  const [price, setPrice] = useState('3.40');
-  const [batteries, setBatteries] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, toggle] = useSelection();
+  const partners = useFleetClients(true, 'recycle');
+  const [vehicleNumber, setVehicleNumber] = useState('');
+  const [driverName, setDriverName] = useState('');
+  const [partnerId, setPartnerId] = useState('');
+  const [pricePerKg, setPricePerKg] = useState('3.40');
+  const [totalWeightKg, setTotalWeightKg] = useState('');
+  const [candidates, setCandidates] = useState([]);
+  const [added, setAdded] = useState([]);
+  const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
-  const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    apiClient.get('/batteries', { params: { status: 'unserviceable', limit: 300, offset: 0 } })
-      .then(({ data }) => setBatteries((data.data || []).filter((b) => ['unserviceable', 'tested_parts_removed'].includes(b.status))))
-      .catch((err) => setError(err.response?.data?.message || err.message))
-      .finally(() => setLoading(false));
+    let cancelled = false;
+    apiClient
+      .get('/batteries', { params: { status: 'unserviceable,tested_parts_removed', limit: 200 } })
+      .then(({ data }) => { if (!cancelled) setCandidates(data.data || []); })
+      .catch(() => { if (!cancelled) setCandidates([]); });
+    return () => { cancelled = true; };
   }, []);
 
-  const value = useMemo(() => (Number(weight) || 0) * (Number(price) || 0), [weight, price]);
+  async function onScan(raw) {
+    const r = await resolveScan(raw, candidates);
+    if (r.error) return { tone: 'bad', message: r.error };
+    if (!r.code) return undefined;
+    try {
+      const { data } = await apiClient.get(`/batteries/${encodeURIComponent(r.code)}`);
+      const battery = data.battery;
+      if (added.some((b) => b.id === battery.id)) return { tone: 'warn', message: `${battery.battery_code} is already in this recycle manifest.` };
+      if (battery.status !== 'unserviceable' && battery.status !== 'tested_parts_removed') {
+        return { tone: 'bad', message: `${battery.battery_code} is not marked unserviceable (status: ${statusText(battery.status)}).` };
+      }
+      if (data.pendingPartsRemoval?.length > 0) {
+        return { tone: 'bad', message: `${battery.battery_code} still has ${data.pendingPartsRemoval.length} fitted part(s) that must be removed & restocked first.` };
+      }
+      setAdded((prev) => (prev.some((b) => b.id === battery.id) ? prev : [...prev, battery]));
+      return { tone: 'good', message: `✓ ${battery.battery_code}${battery.serial_number ? ` (SN: ${battery.serial_number})` : ''} added to recycle manifest.` };
+    } catch (err) {
+      return { tone: 'bad', message: err.response?.status === 404 ? `No battery found with code "${r.code}".` : apiError(err) };
+    }
+  }
+
+  const rate = parseFloat(pricePerKg) || 3.4;
+  const weight = parseFloat(totalWeightKg) || 0;
 
   async function submit() {
+    if (!vehicleNumber.trim() || !driverName.trim()) return setError('Vehicle number and driver name are required.');
+    if (added.length === 0) return setError('Please add at least one unserviceable battery to recycle.');
+    setSubmitting(true);
     setError(null);
-    if (!partner) return setError('Select the recycling partner.');
-    if (!vehicle.trim() || !driver.trim()) return setError('Vehicle number and driver name are required.');
-    if (selected.size === 0) return setError('Select at least one battery.');
-    setBusy(true);
     try {
       await apiClient.post('/recycle', {
-        vehicleNumber: vehicle.trim(), driverName: driver.trim(), batteryIds: [...selected], recycleClientId: partner.id,
-        totalWeightKg: weight ? Number(weight) : undefined, pricePerKg: price ? Number(price) : undefined,
+        vehicleNumber,
+        driverName,
+        batteryIds: added.map((b) => b.id),
+        recycleClientId: partnerId || undefined,
+        totalWeightKg: totalWeightKg !== '' ? Number(totalWeightKg) : undefined,
+        pricePerKg: pricePerKg !== '' ? Number(pricePerKg) : 3.4,
       });
       navigation.goBack();
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
+      setError(apiError(err));
     } finally {
-      setBusy(false);
+      setSubmitting(false);
     }
   }
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-slate-50">
-      <ScrollView contentContainerClassName="p-4 pb-24 gap-4" keyboardShouldPersistTaps="handled">
-        <ErrorBox text={error} />
-        <View><Label required>Recycling partner</Label><ClientChips clients={partners} value={partner?.id} onChange={setPartner} /></View>
-        <View><Label required>Vehicle number</Label><Input value={vehicle} onChangeText={(t) => setVehicle(t.toUpperCase())} autoCapitalize="characters" /></View>
-        <View><Label required>Driver name</Label><Input value={driver} onChangeText={setDriver} /></View>
-        <View className="flex-row gap-2">
-          <View className="flex-1"><Label>Total weight (kg)</Label><Input value={weight} onChangeText={setWeight} keyboardType="decimal-pad" /></View>
-          <View className="flex-1"><Label>Price per kg (£)</Label><Input value={price} onChangeText={setPrice} keyboardType="decimal-pad" /></View>
-        </View>
-        {value > 0 && <Text className="text-xs font-bold text-emerald-700">Shipment value: £{value.toFixed(2)}</Text>}
+      <ScrollView contentContainerClassName="p-4 pb-10 gap-4" keyboardShouldPersistTaps="handled">
         <View>
-          <Label required>Unserviceable batteries</Label>
-          <BatteryPicker batteries={batteries} selected={selected} onToggle={toggle} loading={loading} emptyText="No unserviceable batteries waiting." />
+          <Text className="text-base font-extrabold text-slate-900">Record a Recycle Shipment</Text>
+          <Text className="text-xs text-slate-500">Send unserviceable batteries out for recycling.</Text>
         </View>
-        <SubmitButton onPress={submit} busy={busy} label={`Ship ${selected.size} batter${selected.size === 1 ? 'y' : 'ies'} for recycling`} disabled={selected.size === 0} />
+        <Card>
+          <View>
+            <Label>🚚 Vehicle / Truck Number</Label>
+            <Input value={vehicleNumber} onChangeText={(t) => setVehicleNumber(t.toUpperCase())} autoCapitalize="characters" placeholder="e.g. GB21 XYZ" />
+          </View>
+          <View>
+            <Label>👤 Driver Name</Label>
+            <Input value={driverName} onChangeText={setDriverName} placeholder="e.g. George Davies" />
+          </View>
+          <View>
+            <Label>🏢 Recycle Partner (Optional)</Label>
+            <ClientSelect
+              clients={[{ id: '', name: 'None (General Smelting / Recycling)' }, ...partners]}
+              value={partnerId}
+              onChange={(id) => setPartnerId(id)}
+            />
+          </View>
+        </Card>
+
+        <Card>
+          <View className="flex-row gap-2">
+            <View className="flex-1">
+              <Label>£ Rate per kg (£/kg)</Label>
+              <Input value={pricePerKg} onChangeText={setPricePerKg} keyboardType="decimal-pad" placeholder="3.40" />
+            </View>
+            <View className="flex-1">
+              <Label>⚖ Total Weight (kg)</Label>
+              <Input value={totalWeightKg} onChangeText={setTotalWeightKg} keyboardType="decimal-pad" placeholder="e.g. 120.50" />
+            </View>
+          </View>
+          <View>
+            <Label>£ Calculated Total Payout</Label>
+            <View className="flex-row items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-3.5 py-2.5">
+              <Text className="text-[11px] font-semibold text-slate-500">{pricePerKg || '3.40'} × {totalWeightKg || '0'} kg</Text>
+              <Text className="text-base font-bold text-emerald-700">£{(rate * weight).toFixed(2)}</Text>
+            </View>
+          </View>
+        </Card>
+
+        <ManifestPicker
+          label="Scan / Pick Unserviceable Batteries"
+          countText={`${candidates.filter((b) => !added.some((a) => a.id === b.id)).length} unserviceable units available`}
+          placeholder="Scan QR or enter unserviceable battery code…"
+          candidates={candidates}
+          added={added}
+          onScan={onScan}
+          onRemove={(b) => setAdded((prev) => prev.filter((x) => x.id !== b.id))}
+          suggestionTitle={(filtering, n) => (filtering ? `Matching Unserviceable Units (${n})` : `Available for Recycling (${n})`)}
+          sugMeta={(b) => b.client_name || null}
+          notice={{
+            title: '🛡 Environmental & Material Recovery Notice',
+            text: 'Only packs verified as degraded beyond repair (unserviceable) and stripped of reusable components are eligible for raw materials recycling.',
+          }}
+          manifestTitle="Recycle Shipment Manifest"
+          stagedBadge={{ label: 'Unserviceable', cls: 'bg-rose-100 text-rose-800' }}
+          emptyTitle="No batteries staged for recycling yet"
+          emptyText="Scan QR codes or select unserviceable packs from the list above."
+        />
+        <ErrorBox text={error} />
       </ScrollView>
+      <Footer
+        ok={added.length > 0}
+        summary={added.length > 0 ? `${added.length} unserviceable batteries staged for recycling` : 'Scan or pick unserviceable batteries to create shipment'}
+        onCancel={() => navigation.goBack()}
+        onSubmit={submit}
+        submitLabel={submitting ? 'Recording Shipment…' : `✓ Record Recycle Shipment (${plural(added.length)})`}
+        disabled={submitting || added.length === 0}
+      />
     </KeyboardAvoidingView>
   );
 }
 
-export { Switch };

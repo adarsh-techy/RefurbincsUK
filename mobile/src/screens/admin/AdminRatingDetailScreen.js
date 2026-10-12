@@ -1,36 +1,66 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { ActivityIndicator, RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
+import { ClientLogo } from '../../components/admin/sa5/common';
 
-// One customer review — the mobile version of the web RatingDetailPage:
-// GET /ratings/:id. Sentiment banner, the reviewed battery (and the other
-// batteries on that return), the client, the chosen feedback tags and written
-// review, and the battery's recent repairs.
+// One customer review — the web RatingDetailPage: GET /ratings/:id. Client
+// banner with "Verified Service Rating", the score and sentiment, the
+// associated battery (code, status, serial, return dispatch), the client's
+// contact details, the chosen highlights and written comments, and the
+// battery's prior refurbishment services.
 
 const SENTIMENT = {
-  5: { title: '5.0 · Excellent Quality & Service', cls: 'border-emerald-200 bg-emerald-50 text-emerald-800' },
-  4: { title: '4.0 · Very Good Quality', cls: 'border-teal-200 bg-teal-50 text-teal-800' },
-  3: { title: '3.0 · Satisfactory / Average', cls: 'border-amber-200 bg-amber-50 text-amber-800' },
-  2: { title: '2.0 · Fair / Needs Attention', cls: 'border-orange-200 bg-orange-50 text-orange-800' },
-  1: { title: '1.0 · Unsatisfactory / Critical', cls: 'border-red-200 bg-red-50 text-red-700' },
+  5: { title: '5.0 · Excellent Quality & Service', cls: 'border-amber-300 bg-amber-50', text: 'text-amber-700' },
+  4: { title: '4.0 · Very Good Quality', cls: 'border-emerald-300 bg-emerald-50', text: 'text-emerald-700' },
+  3: { title: '3.0 · Satisfactory / Average', cls: 'border-blue-300 bg-blue-50', text: 'text-blue-700' },
+  2: { title: '2.0 · Fair / Needs Attention', cls: 'border-orange-300 bg-orange-50', text: 'text-orange-700' },
+  1: { title: '1.0 · Unsatisfactory / Critical', cls: 'border-rose-300 bg-rose-50', text: 'text-rose-700' },
 };
-const when = (v) => (v ? new Date(v).toLocaleString([], { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : '—');
 
-function Card({ title, children }) {
+function tagsOf(r) {
+  if (Array.isArray(r.preset_tags)) return r.preset_tags;
+  if (typeof r.preset_tags === 'string') {
+    try {
+      return JSON.parse(r.preset_tags || '[]');
+    } catch {
+      return [];
+    }
+  }
+  return [];
+}
+
+function Section({ title, action, onAction, children }) {
   return (
-    <View className="rounded-3xl border border-slate-200 bg-white p-4">
-      {title ? <Text className="mb-2 text-[11px] font-black uppercase tracking-wider text-slate-500">{title}</Text> : null}
+    <View className="rounded-2xl border border-slate-200 bg-white p-4">
+      <View className="mb-3 flex-row items-center justify-between gap-2 border-b border-slate-100 pb-3">
+        <Text className="flex-1 text-[11px] font-black uppercase tracking-wider text-slate-800">{title}</Text>
+        {action ? (
+          <TouchableOpacity onPress={onAction} hitSlop={6}>
+            <Text className="text-xs font-bold text-blue-600">{action} ↗</Text>
+          </TouchableOpacity>
+        ) : null}
+      </View>
       {children}
     </View>
   );
 }
-function Row({ label, value }) {
+
+function Tile({ label, children }) {
   return (
-    <View className="flex-row items-center justify-between border-b border-slate-100 py-2">
-      <Text className="text-xs text-slate-500">{label}</Text>
-      <Text className="ml-3 flex-1 text-right text-sm font-semibold text-slate-900" numberOfLines={2}>{value ?? '—'}</Text>
+    <View className="min-w-[46%] flex-1 rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
+      <View className="mt-1">{children}</View>
+    </View>
+  );
+}
+
+function InfoRow({ label, value, mono }) {
+  return (
+    <View className="mb-2 rounded-xl border border-slate-100 bg-slate-50 p-3">
+      <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
+      <Text className={`mt-0.5 text-xs font-semibold text-slate-800 ${mono ? 'font-mono' : ''}`} selectable>{value}</Text>
     </View>
   );
 }
@@ -42,6 +72,10 @@ export default function AdminRatingDetailScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  useLayoutEffect(() => {
+    navigation.setOptions({ title: id ? `Feedback ID #${id}` : 'Review' });
+  }, [navigation, id]);
 
   const load = useCallback(async () => {
     try {
@@ -63,16 +97,20 @@ export default function AdminRatingDetailScreen() {
   if (loading) {
     return (
       <View className="flex-1 items-center justify-center bg-slate-50">
-        <ActivityIndicator color="#d97706" />
+        <ActivityIndicator color="#2563eb" />
+        <Text className="mt-2 text-xs text-slate-500">Loading client rating & review statement…</Text>
       </View>
     );
   }
   if (error || !r) {
     return (
       <View className="flex-1 items-center justify-center bg-slate-50 p-6">
-        <Text className="text-center text-sm font-semibold text-red-600">{error || 'Review not found.'}</Text>
-        <TouchableOpacity onPress={load} className="mt-3 rounded-xl bg-amber-500 px-5 py-2.5">
+        <Text className="text-center text-sm font-semibold text-red-600">{error || 'Rating record not found.'}</Text>
+        <TouchableOpacity onPress={load} className="mt-3 rounded-xl bg-blue-600 px-5 py-2.5">
           <Text className="text-xs font-bold text-white">Retry</Text>
+        </TouchableOpacity>
+        <TouchableOpacity onPress={() => navigation.goBack()} className="mt-3">
+          <Text className="text-xs font-bold text-blue-600">← Back to Ratings & Feedback</Text>
         </TouchableOpacity>
       </View>
     );
@@ -80,88 +118,142 @@ export default function AdminRatingDetailScreen() {
 
   const stars = Number(r.rating) || 0;
   const sentiment = SENTIMENT[stars] || SENTIMENT[5];
-  const batteryCode = r.resolved_battery_code || r.battery_code;
+  const tags = tagsOf(r);
+  // the web prefers the stored code, then the one resolved from the return
+  const batteryCode = r.battery_code || r.resolved_battery_code;
   const otherCodes = (Array.isArray(r.battery_codes) ? r.battery_codes : []).filter((c) => c !== batteryCode);
+  const dateFormatted = r.created_at
+    ? new Date(r.created_at).toLocaleDateString('en-GB', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })
+    : '—';
   const openBattery = (code) => navigation.navigate('BatteryDetail', { code, fromScan: false });
 
   return (
     <ScrollView
       className="flex-1 bg-slate-50"
-      contentContainerClassName="p-4 pb-16 gap-4"
+      contentContainerClassName="gap-4 p-4 pb-16"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
-      {/* Review banner */}
-      <Card>
-        <Text className="text-3xl text-amber-400">{'★'.repeat(stars)}<Text className="text-slate-200">{'★'.repeat(5 - stars)}</Text></Text>
-        <Text className={`mt-2 self-start rounded-full border px-3 py-1 text-xs font-bold ${sentiment.cls}`}>{sentiment.title}</Text>
-        <Text className="mt-3 text-lg font-black text-slate-900">{r.client_name || 'Client'}</Text>
-        <Text className="text-xs text-slate-500">
-          by {r.user_name || 'client'}{r.user_email ? ` (${r.user_email})` : ''} · {when(r.created_at)}
-        </Text>
-        <Text className="mt-1 text-[11px] text-slate-400">Review #{r.id}{r.return_id ? ` · Return dispatch #${r.return_id}` : ''}</Text>
-      </Card>
+      <View className="flex-row items-center justify-between">
+        <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={6}>
+          <Text className="text-xs font-bold text-blue-600">← Back to Ratings & Feedback</Text>
+        </TouchableOpacity>
+        <Text className="font-mono text-xs text-slate-400">Feedback ID #{r.id}</Text>
+      </View>
 
-      {/* Feedback */}
-      <Card title="Feedback">
-        {Array.isArray(r.preset_tags) && r.preset_tags.length ? (
-          <View className="flex-row flex-wrap gap-1.5">
-            {r.preset_tags.map((t) => (
-              <Text key={t} className="rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-semibold text-amber-800">{t}</Text>
-            ))}
+      {/* Hero banner */}
+      <View className="gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+        <View className="flex-row items-start gap-3">
+          <ClientLogo path={r.client_logo_path} name={r.client_name} size={56} />
+          <View className="flex-1">
+            <Text className="text-lg font-black text-slate-900">{r.client_name || 'Client Review'}</Text>
+            <Text className="mt-1 self-start rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700">🏅 Verified Service Rating</Text>
+            <Text className="mt-2 text-xs text-slate-500">
+              Submitted by: <Text className="font-bold text-slate-700">{r.user_name || r.user_email || 'Portal User'}</Text>
+            </Text>
+            <Text className="mt-0.5 font-mono text-[11px] text-slate-500">🕒 {dateFormatted}</Text>
           </View>
-        ) : (
-          <Text className="text-xs text-slate-400">No feedback tags selected.</Text>
-        )}
-        <Text className="mt-3 text-[11px] font-bold uppercase text-slate-400">Written review</Text>
-        <Text className="mt-1 text-sm text-slate-700">{r.custom_feedback || 'No written comment.'}</Text>
-      </Card>
+        </View>
+        <View className="items-start gap-2 rounded-xl border border-slate-100 bg-slate-50 p-3">
+          <Text className="text-2xl">
+            <Text className="text-amber-400">{'★'.repeat(stars)}</Text>
+            <Text className="text-slate-200">{'★'.repeat(Math.max(0, 5 - stars))}</Text>
+            <Text className="text-lg font-black text-slate-900">  {stars}.0</Text>
+          </Text>
+          <Text className={`rounded-full border px-3 py-1 text-xs font-bold ${sentiment.cls} ${sentiment.text}`}>{sentiment.title}</Text>
+        </View>
+      </View>
 
-      {/* Battery */}
-      <Card title="Reviewed battery">
-        {batteryCode ? (
-          <TouchableOpacity onPress={() => openBattery(batteryCode)} className="flex-row items-center justify-between py-1">
-            <Text className="text-sm font-bold text-blue-700">{batteryCode}</Text>
-            {r.battery_current_status ? <StatusBadge status={r.battery_current_status} /> : null}
-          </TouchableOpacity>
-        ) : (
-          <Text className="text-xs text-slate-400">No battery linked.</Text>
-        )}
-        <Row label="Battery number" value={r.battery_serial_number || '—'} />
-        {otherCodes.length > 0 && (
-          <View className="mt-2">
-            <Text className="text-[11px] font-bold uppercase text-slate-400">Also on this return</Text>
+      {/* Associated battery */}
+      <Section title="🔋 Associated Battery Unit" action={batteryCode ? 'Inspect Battery Profile' : null} onAction={() => openBattery(batteryCode)}>
+        <View className="flex-row flex-wrap gap-2">
+          <Tile label="Battery Code">
+            <Text className="font-mono text-sm font-black text-blue-700">{batteryCode || '—'}</Text>
+          </Tile>
+          <Tile label="Current Status">
+            {r.battery_current_status ? <View className="self-start"><StatusBadge status={r.battery_current_status} /></View> : <Text className="text-xs text-slate-500">—</Text>}
+          </Tile>
+          <Tile label="Serial Number">
+            <Text className="font-mono text-xs font-bold text-slate-800">{r.battery_serial_number || 'None assigned'}</Text>
+          </Tile>
+          <Tile label="Return Dispatch ID">
+            {r.return_id ? (
+              <TouchableOpacity onPress={() => navigation.navigate('AdminDetail', { kind: 'return', id: r.return_id })}>
+                <Text className="font-mono text-xs font-bold text-blue-600">#RET-{r.return_id}</Text>
+              </TouchableOpacity>
+            ) : (
+              <Text className="text-xs text-slate-500">Direct Delivery</Text>
+            )}
+          </Tile>
+        </View>
+        {otherCodes.length > 0 ? (
+          <View className="mt-3">
+            <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">Also on this return</Text>
             <View className="mt-1 flex-row flex-wrap gap-1.5">
               {otherCodes.map((c) => (
-                <TouchableOpacity key={c} onPress={() => openBattery(c)} className="rounded-lg bg-slate-100 px-2 py-1">
-                  <Text className="text-[11px] font-bold text-blue-700">{c}</Text>
+                <TouchableOpacity key={c} onPress={() => openBattery(c)} className="rounded-lg bg-blue-50 px-2 py-1">
+                  <Text className="font-mono text-[11px] font-bold text-blue-700">{c}</Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-        )}
-      </Card>
+        ) : null}
+      </Section>
 
       {/* Client */}
-      <Card title="Client">
-        <Row label="Client" value={r.client_name} />
-        <Row label="Invoice email" value={r.client_invoice_email || '—'} />
-        <Row label="Submitted by" value={r.user_email || r.user_name} />
-      </Card>
+      <Section
+        title="Client Organization & Contact"
+        action={r.client_id ? 'View Client Dashboard' : null}
+        onAction={() => navigation.navigate('AdminDetail', { kind: 'client', id: r.client_id })}
+      >
+        <InfoRow label="Submitted By" value={r.user_name || 'Portal User'} />
+        <InfoRow label="User Account Email" value={r.user_email || '—'} mono />
+        {r.client_invoice_email ? <InfoRow label="Billing / Invoice Email" value={r.client_invoice_email} mono /> : null}
+      </Section>
 
-      {/* Repairs on file */}
-      <Card title="Recent repairs on this battery">
-        {Array.isArray(r.recent_repairs) && r.recent_repairs.length ? (
-          r.recent_repairs.map((rep) => (
-            <View key={rep.id} className="border-b border-slate-100 py-2">
-              <Text className="text-sm font-semibold text-slate-900">{rep.part_name || 'Repair'}</Text>
-              <Text className="text-[11px] text-slate-500">{rep.staff_name || 'Technician'} · {when(rep.repaired_at)}</Text>
-              {rep.notes ? <Text className="text-[11px] text-slate-500">{rep.notes}</Text> : null}
+      {/* Feedback */}
+      <Section title="Client Review Details & Feedback Highlights">
+        {tags.length > 0 ? (
+          <View className="mb-3">
+            <Text className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Selected Service Highlights ({tags.length})</Text>
+            <View className="flex-row flex-wrap gap-2">
+              {tags.map((tag, i) => (
+                <Text key={`${tag}${i}`} className="rounded-xl border border-blue-200 bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-800">✓ {tag}</Text>
+              ))}
             </View>
-          ))
+          </View>
+        ) : null}
+        <Text className="mb-2 text-[11px] font-bold uppercase tracking-wider text-slate-400">Written Client Comments</Text>
+        {r.custom_feedback ? (
+          <View className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <Text className="text-sm italic leading-6 text-slate-800">“{r.custom_feedback}”</Text>
+          </View>
         ) : (
-          <Text className="text-xs text-slate-400">No repair history on file.</Text>
+          <View className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 p-4">
+            <Text className="text-xs text-slate-400">No written comments were attached to this rating.</Text>
+          </View>
         )}
-      </Card>
+      </Section>
+
+      {/* Prior refurbishment services (only when there are any, like the web) */}
+      {Array.isArray(r.recent_repairs) && r.recent_repairs.length > 0 ? (
+        <Section title={`Prior Refurbishment Services on this Battery (${r.recent_repairs.length})`}>
+          {r.recent_repairs.map((rep, i) => (
+            <View key={rep.batch_id || rep.id || i} className={`py-2.5 ${i ? 'border-t border-slate-100' : ''}`}>
+              <View className="flex-row items-start justify-between gap-2">
+                <Text className="flex-1 text-xs font-bold text-slate-900">
+                  Parts Changed: <Text className="text-emerald-600">{rep.part_name || 'Standard Refurbishment'}</Text>
+                </Text>
+                <Text className="font-mono text-[11px] text-slate-500">
+                  {rep.repaired_at ? new Date(rep.repaired_at).toLocaleDateString([], { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
+                </Text>
+              </View>
+              <Text className="mt-0.5 text-[11px] text-slate-400">
+                Repaired by {rep.staff_name || 'Technician'}{rep.notes ? ` · Note: ${rep.notes}` : ''}
+              </Text>
+            </View>
+          ))}
+        </Section>
+      ) : null}
     </ScrollView>
   );
 }

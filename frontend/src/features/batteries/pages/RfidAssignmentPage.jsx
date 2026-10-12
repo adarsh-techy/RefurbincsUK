@@ -365,14 +365,19 @@ function RfidAssignmentPage() {
                       <td colSpan={5} className="px-4 py-8 text-center text-slate-400">No rows match this filter.</td>
                     </tr>
                   ) : (
-                    pageRows.map((r) => {
+                    pageRows.map((r, idx) => {
                       const toCreate = !committed && createMissing && r.status === 'not_found' && r.canCreate;
                       const meta = STATUS_META[toCreate ? 'created' : r.status] || { label: r.status, done: r.status, cls: '' };
                       const notFound = r.status === 'not_found' && !toCreate;
                       const bad = notFound || r.status === 'error';
                       return (
                         <tr key={`${r.rowNumber}-${r.batteryCode}`} className={bad ? 'bg-rose-50/70 dark:bg-rose-950/20' : ''}>
-                          <td className="px-4 py-2.5 text-slate-400">{r.rowNumber}</td>
+                          <td className="px-4 py-2.5 font-mono font-semibold text-slate-500 dark:text-neutral-400">
+                            <span>{idx + 1}</span>
+                            {r.rowNumber && r.rowNumber !== idx + 1 && (
+                              <span className="block text-[10px] font-normal text-slate-400">row {r.rowNumber}</span>
+                            )}
+                          </td>
                           <td className={`px-4 py-2.5 font-mono font-semibold ${notFound ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900 dark:text-white'}`}>
                             {r.batteryId ? (
                               <Link to={`/batteries/${encodeURIComponent(r.batteryCode)}`} className="hover:underline">{r.batteryCode}</Link>
@@ -533,62 +538,79 @@ function AssignedTagsTable({ version }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-surface-900">
+    <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-white/10 dark:bg-surface-900">
       {/* Header band */}
-      <div className="border-b border-slate-200 bg-gradient-to-r from-violet-50 via-white to-emerald-50 px-5 py-4 dark:border-white/10 dark:from-violet-950/30 dark:via-surface-900 dark:to-emerald-950/20">
+      <div className="border-b border-slate-200 bg-gradient-to-r from-emerald-500/10 via-slate-50 to-emerald-500/5 px-6 py-4.5 dark:border-white/10 dark:from-emerald-950/30 dark:via-surface-900 dark:to-surface-900">
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-violet-600 text-white shadow-sm">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
+          <div className="flex items-center gap-3.5">
+            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/20 ring-4 ring-emerald-100 dark:ring-emerald-950/50">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
                 <path d="M4.9 19.1a10 10 0 0 1 0-14.2" /><path d="M7.8 16.2a6 6 0 0 1 0-8.4" /><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8a6 6 0 0 1 0 8.4" /><path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
               </svg>
             </div>
             <div>
-              <p className="text-base font-extrabold tracking-tight text-slate-900 dark:text-white">RFID tags by battery</p>
-              <p className="text-xs text-slate-500 dark:text-neutral-400">{clientName || 'All clients'} · in battery-number order</p>
+              <div className="flex items-center gap-2">
+                <p className="text-base font-black tracking-tight text-slate-900 dark:text-white">RFID Tags by Battery</p>
+                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">LIVE REGISTER</span>
+              </div>
+              <p className="text-xs font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
+                {clientName ? `Filtered for ${clientName}` : 'All clients'} · Ordered sequentially by battery ID
+              </p>
             </div>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:w-[372px]">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/80 px-3.5 py-2 dark:border-emerald-800/50 dark:bg-emerald-950/40">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Tagged</p>
-              <p className="text-lg font-black text-emerald-800 dark:text-emerald-200">{loading ? '…' : counts.assigned.toLocaleString()}</p>
+          <div className="grid grid-cols-3 gap-2 sm:w-[390px]">
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 shadow-2xs backdrop-blur-xs dark:border-emerald-800/50 dark:bg-emerald-950/40">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Tagged</p>
+                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              </div>
+              <p className="text-xl font-black text-emerald-800 dark:text-emerald-200 mt-0.5">{loading ? '…' : counts.assigned.toLocaleString()}</p>
             </div>
-            <div className={`rounded-2xl border px-3.5 py-2 ${counts.unassigned > 0 ? 'border-rose-200 bg-rose-50/80 dark:border-rose-800/50 dark:bg-rose-950/40' : 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-surface-800'}`}>
-              <p className={`text-[10px] font-bold uppercase tracking-wider ${counts.unassigned > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500'}`}>Without tag</p>
-              <p className={`text-lg font-black ${counts.unassigned > 0 ? 'text-rose-800 dark:text-rose-200' : 'text-slate-700 dark:text-neutral-200'}`}>{loading ? '…' : counts.unassigned.toLocaleString()}</p>
+            <div className={`rounded-2xl border p-3 shadow-2xs backdrop-blur-xs ${counts.unassigned > 0 ? 'border-rose-200 bg-rose-50/90 dark:border-rose-800/50 dark:bg-rose-950/40' : 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-surface-800'}`}>
+              <div className="flex items-center justify-between">
+                <p className={`text-[10px] font-bold uppercase tracking-wider ${counts.unassigned > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500'}`}>Without tag</p>
+                {counts.unassigned > 0 && <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />}
+              </div>
+              <p className={`text-xl font-black mt-0.5 ${counts.unassigned > 0 ? 'text-rose-800 dark:text-rose-200' : 'text-slate-700 dark:text-neutral-200'}`}>{loading ? '…' : counts.unassigned.toLocaleString()}</p>
             </div>
-            <div className="rounded-2xl border border-violet-200 bg-violet-50/80 px-3.5 py-2 dark:border-violet-800/50 dark:bg-violet-950/40">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">Coverage</p>
-              <p className="text-lg font-black text-violet-800 dark:text-violet-200">{loading ? '…' : `${pct}%`}</p>
+            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 shadow-2xs backdrop-blur-xs dark:border-white/10 dark:bg-surface-800/70">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">Coverage</p>
+                <span className="text-[10px] font-bold text-slate-400">Target 100%</span>
+              </div>
+              <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{loading ? '…' : `${pct}%`}</p>
             </div>
           </div>
         </div>
-        <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
-          <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-violet-500 transition-all" style={{ width: `${pct}%` }} />
+        <div className="mt-3.5 flex items-center gap-2">
+          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
+            <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
+          </div>
+          <span className="text-[11px] font-extrabold text-slate-500 dark:text-neutral-400 min-w-[2.5rem] text-right">{pct}%</span>
         </div>
       </div>
 
       {/* Toolbar */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-5 py-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
-        <div className="flex rounded-xl bg-slate-100 p-1 dark:bg-surface-800">
+      <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 bg-slate-50/40 dark:bg-surface-800/30">
+        <div className="inline-flex rounded-xl bg-slate-200/70 p-1 dark:bg-surface-800 shadow-inner">
           {[['all', 'All', counts.assigned + counts.unassigned], ['yes', 'Assigned', counts.assigned], ['no', 'Not assigned', counts.unassigned]].map(([id, label, n]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTagged(id)}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${tagged === id ? 'bg-white text-violet-700 shadow-sm dark:bg-surface-900 dark:text-violet-300' : 'text-slate-500 hover:text-slate-800 dark:text-neutral-400 dark:hover:text-white'}`}
+              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${tagged === id ? 'bg-white text-emerald-800 shadow-xs dark:bg-surface-900 dark:text-emerald-300' : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'}`}
             >
-              {label} <span className={`ml-1 inline-block min-w-[2.25rem] rounded-full px-1.5 py-0.5 text-center text-[10px] tabular-nums ${tagged === id ? 'bg-violet-100 text-violet-700 dark:bg-violet-950/60 dark:text-violet-300' : 'bg-slate-200/80 text-slate-500 dark:bg-white/10 dark:text-neutral-400'}`}>{loading ? '…' : n.toLocaleString()}</span>
+              {label} <span className={`ml-1.5 inline-block min-w-[2rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums ${tagged === id ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-300/60 text-slate-600 dark:bg-white/10 dark:text-neutral-400'}`}>{loading ? '…' : n.toLocaleString()}</span>
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <select
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
-            className="w-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100"
+            className="w-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 cursor-pointer"
           >
-            <option value="">All clients</option>
+            <option value="">All clients ({clients.length})</option>
             {clients.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
           <div className="relative">
@@ -599,83 +621,127 @@ function AssignedTagsTable({ version }) {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search battery number or tag…"
-              className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 sm:w-72 sm:min-w-[18rem]"
+              placeholder="Search battery or tag…"
+              className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-8 text-xs font-semibold text-slate-900 shadow-2xs placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 sm:w-64"
             />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
           </div>
         </div>
       </div>
-      {error && <p className="px-5 py-2 text-xs font-medium text-rose-600">{error}</p>}
+      {error && <p className="px-6 py-2.5 text-xs font-semibold text-rose-600 bg-rose-50/50">{error}</p>}
 
       {/* Table */}
-      {/* Fixed height + fixed column widths: the box stays the same size
-          whether it holds 2 rows or 500, is loading, or is filtered. */}
       <div ref={scrollRef} className="h-[520px] overflow-auto">
         <table className="w-full min-w-[720px] table-fixed text-left text-xs">
           <colgroup>
-            <col className="w-[22%]" />
-            <col className="w-[40%]" />
+            <col className="w-[8%]" />
+            <col className="w-[23%]" />
+            <col className="w-[37%]" />
             <col className="w-[16%]" />
-            <col className="w-[22%]" />
+            <col className="w-[16%]" />
           </colgroup>
-          <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur dark:bg-surface-800/95">
-            <tr className="border-b border-slate-200 dark:border-white/10">
-              <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Battery</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">RFID tag</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Serial</th>
-              <th className="px-5 py-3 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Status</th>
+          <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-md dark:bg-surface-800/95">
+            <tr className="border-b border-slate-200/90 dark:border-white/10">
+              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400 text-center">#</th>
+              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Battery</th>
+              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">RFID Tag</th>
+              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Serial Number</th>
+              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
             {loading ? (
-              Array.from({ length: 6 }).map((_, i) => (
+              Array.from({ length: 7 }).map((_, i) => (
                 <tr key={`sk-${i}`} className="animate-pulse">
-                  {[28, 48, 20, 24].map((w, c) => (
-                    <td key={c} className="px-5 py-3.5"><div className="h-3 rounded bg-slate-200/80 dark:bg-white/10" style={{ width: `${w}%` }} /></td>
+                  {[8, 23, 37, 16, 16].map((w, c) => (
+                    <td key={c} className="px-5 py-4"><div className="h-3.5 rounded-md bg-slate-200/80 dark:bg-white/10" style={{ width: `${w * 3}%` }} /></td>
                   ))}
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={4} className="px-5 py-14 text-center">
-                  <p className="text-sm font-semibold text-slate-700 dark:text-neutral-200">
-                    {tagged === 'no' ? `Every battery${clientName ? ' for this client' : ''} already has a tag` : tagged === 'yes' ? `No batteries with an RFID tag${clientName ? ' for this client' : ''} yet` : 'No batteries found'}
+                <td colSpan={5} className="px-5 py-16 text-center">
+                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-surface-800">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
+                      <path d="M4.9 19.1a10 10 0 0 1 0-14.2" /><path d="M7.8 16.2a6 6 0 0 1 0-8.4" /><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8a6 6 0 0 1 0 8.4" /><path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
+                    </svg>
+                  </div>
+                  <p className="mt-3 text-sm font-bold text-slate-800 dark:text-neutral-200">
+                    {tagged === 'no' ? `Every battery${clientName ? ` for ${clientName}` : ''} already has a tag` : tagged === 'yes' ? `No batteries with an RFID tag${clientName ? ` for ${clientName}` : ''} yet` : 'No batteries found'}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400">{tagged === 'yes' ? 'Upload a sheet above to assign tags.' : search ? 'Try a different search.' : ''}</p>
-                  {tagged !== 'all' && !search && (
-                    <button type="button" onClick={() => setTagged('all')} className="mt-3 rounded-lg border border-violet-200 bg-violet-50 px-3 py-1.5 text-xs font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">
-                      Show all batteries
+                  <p className="mt-1 text-xs text-slate-400">{tagged === 'yes' ? 'Upload a sheet above to assign tags.' : search ? 'Try a different search query.' : ''}</p>
+                  {(tagged !== 'all' || search || clientName) && (
+                    <button
+                      type="button"
+                      onClick={() => { setTagged('all'); setSearch(''); setClientName(''); }}
+                      className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 cursor-pointer"
+                    >
+                      Reset filters & show all
                     </button>
                   )}
                 </td>
               </tr>
             ) : (
               rows.map((r, idx) => (
-                <tr key={r.id} className={`group transition-colors hover:bg-violet-50/50 dark:hover:bg-violet-950/20 ${idx % 2 ? 'bg-slate-50/40 dark:bg-white/[0.02]' : ''}`}>
-                  <td className="px-5 py-3">
-                    <Link to={`/batteries/${encodeURIComponent(r.battery_code)}`} className="block truncate font-mono text-[13px] font-bold text-blue-700 hover:underline dark:text-blue-400">{r.battery_code}</Link>
+                <tr key={r.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-emerald-950/15">
+                  <td className="px-5 py-3.5 text-center">
+                    <span className="inline-flex h-6.5 w-6.5 items-center justify-center rounded-lg bg-slate-100/90 font-mono text-[11px] font-black text-slate-600 transition-colors group-hover:bg-emerald-100 group-hover:text-emerald-800 dark:bg-surface-800 dark:text-neutral-400 dark:group-hover:bg-emerald-950/60 dark:group-hover:text-emerald-300">
+                      {idx + 1}
+                    </span>
                   </td>
-                  <td className="px-5 py-3">
+                  <td className="px-5 py-3.5">
+                    <Link
+                      to={`/batteries/${encodeURIComponent(r.battery_code)}`}
+                      className="inline-block truncate font-mono text-[13px] font-extrabold text-blue-700 transition-colors hover:text-blue-800 hover:underline dark:text-blue-400"
+                    >
+                      {r.battery_code}
+                    </Link>
+                    {r.client_name && (
+                      <span className="block truncate text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+                        {r.client_name}
+                      </span>
+                    )}
+                  </td>
+                  <td className="px-5 py-3.5">
                     <TagCell
                       row={r}
                       editing={editingId === r.id}
                       onEdit={() => setEditingId(r.id)}
                       onCancel={() => setEditingId(null)}
                       onSave={saveTag}
-                      onSaved={(viaEnter) => (viaEnter ? editNextUntagged(r.id) : setEditingId(null))}
+                      onSaved={() => setEditingId(null)}
                       copied={copied}
                       onCopy={copyTag}
                     />
                   </td>
-                  <td className="truncate px-5 py-3 font-mono text-slate-600 dark:text-neutral-300">{r.serial_number || <span className="text-slate-300 dark:text-neutral-600">—</span>}</td>
-                  <td className="whitespace-nowrap px-5 py-3"><StatusBadge status={r.status} /></td>
+                  <td className="truncate px-5 py-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-neutral-300">
+                    {r.serial_number || <span className="font-normal italic text-slate-300 dark:text-neutral-600">—</span>}
+                  </td>
+                  <td className="whitespace-nowrap px-5 py-3.5">
+                    <StatusBadge status={r.status} />
+                  </td>
                 </tr>
               ))
             )}
             {!loading && rows.length > 0 && (
               <tr ref={sentinelRef}>
-                <td colSpan={4} className="px-5 py-3 text-center text-[11px] text-slate-400">
-                  {hasMore ? `Loading more… (${rows.length} of ${total})` : `Showing all ${rows.length} rows`}
+                <td colSpan={5} className="px-5 py-3.5 text-center text-[11px] font-medium text-slate-400 bg-slate-50/50 dark:bg-surface-800/20">
+                  {hasMore ? (
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                      Loading more batteries… ({rows.length} of {total})
+                    </span>
+                  ) : (
+                    <span>✓ Showing all {rows.length} batteries</span>
+                  )}
                 </td>
               </tr>
             )}
@@ -691,33 +757,47 @@ function AssignedTagsTable({ version }) {
 // sticker with an RFID reader (it types the tag and presses Enter). Stays
 // inside the fixed column so the table never changes size.
 function TagCell({ row, editing, onEdit, onCancel, onSave, onSaved, copied, onCopy }) {
-  const [value, setValue] = useState('');
+  const [tag1, setTag1] = useState('');
+  const [tag2, setTag2] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState(null);
-  const inputRef = useRef(null);
+  const input1Ref = useRef(null);
+  const input2Ref = useRef(null);
 
   useEffect(() => {
     if (!editing) return;
-    setValue('');
+    setTag1('');
+    setTag2('');
     setError(null);
-    const t = setTimeout(() => inputRef.current?.focus(), 30);
-    return () => clearTimeout(t);
+    input1Ref.current?.focus();
   }, [editing]);
 
-  // keep the cursor in the box after a refused tag, so the next reader scan
-  // (or Esc) lands here; read-only (not disabled) while saving keeps focus
-  useEffect(() => {
-    if (editing && !saving) inputRef.current?.focus();
-  }, [editing, saving]);
+  async function verifyAndSave() {
+    const clean1 = tag1.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const clean2 = tag2.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 
-  async function save(viaEnter) {
-    const tag = value.replace(/[^0-9A-Za-z]/g, '').toUpperCase();
-    if (!tag) { setError('Type or scan the tag first.'); return; }
+    if (!clean1) {
+      setError('Enter tag in 1st box first.');
+      input1Ref.current?.focus();
+      return;
+    }
+    if (!clean2) {
+      setError('Re-enter tag in 2nd box to verify.');
+      input2Ref.current?.focus();
+      return;
+    }
+    if (clean1 !== clean2) {
+      setError('Tags do not match! Please check and re-type.');
+      input2Ref.current?.focus();
+      input2Ref.current?.select();
+      return;
+    }
+
     setSaving(true);
     setError(null);
     try {
-      await onSave(row, tag);
-      onSaved(viaEnter);
+      await onSave(row, clean1);
+      onSaved();
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -726,60 +806,169 @@ function TagCell({ row, editing, onEdit, onCancel, onSave, onSaved, copied, onCo
   }
 
   if (editing) {
+    const clean1 = tag1.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const clean2 = tag2.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const isMatching = clean1 && clean2 && clean1 === clean2;
+    const isMismatch = clean1 && clean2 && clean1 !== clean2;
+
     return (
-      <div>
-        <div className="flex items-center gap-1.5">
-          <input
-            ref={inputRef}
-            value={value}
-            onChange={(e) => setValue(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') { e.preventDefault(); save(true); }
-              if (e.key === 'Escape') onCancel();
-            }}
-            readOnly={saving}
-            placeholder={row.rfid_tag ? 'New tag — type or scan' : 'Type or scan tag…'}
-            className="min-w-0 flex-1 rounded-lg border border-violet-400 bg-white px-2.5 py-1 font-mono text-[12px] uppercase text-slate-900 placeholder:normal-case placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:bg-surface-800 dark:text-neutral-100"
-          />
-          <button type="button" onClick={() => save(false)} disabled={saving} title="Save" className="rounded-lg bg-emerald-600 px-2 py-1 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:opacity-60">
-            {saving ? '…' : '✓'}
-          </button>
-          <button type="button" onClick={onCancel} disabled={saving} title="Cancel (Esc)" className="rounded-lg border border-slate-300 px-2 py-1 text-[11px] font-bold text-slate-600 hover:bg-slate-100 dark:border-surface-600 dark:text-neutral-300">
-            ✕
-          </button>
+      <div className="w-full py-1">
+        <div className="rounded-xl border border-slate-200 bg-white p-2 shadow-xs dark:border-white/10 dark:bg-surface-800">
+          <div className="mb-1.5 flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-neutral-400">
+            <span className="flex items-center gap-1 text-slate-700 dark:text-neutral-200">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              Double Verification (Enter tag 2 times)
+            </span>
+            <button
+              type="button"
+              onClick={onCancel}
+              className="text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+              title="Cancel (Esc)"
+            >
+              ✕
+            </button>
+          </div>
+
+          <div className="space-y-1.5">
+            {/* Box 1 */}
+            <div className="flex items-center gap-1.5">
+              <span className="w-16 shrink-0 text-[10px] font-bold text-slate-500 dark:text-neutral-400">1st Enter:</span>
+              <input
+                ref={input1Ref}
+                autoFocus
+                value={tag1}
+                onChange={(e) => { setTag1(e.target.value); setError(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    if (tag1.trim()) {
+                      input2Ref.current?.focus();
+                      input2Ref.current?.select();
+                    }
+                  }
+                  if (e.key === 'Escape') onCancel();
+                }}
+                readOnly={saving}
+                placeholder="Scan or type tag…"
+                className="w-full min-w-0 flex-1 rounded-lg border border-slate-300 bg-slate-50/50 px-2 py-1 font-mono text-[11px] uppercase text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none dark:border-white/15 dark:bg-surface-900 dark:text-neutral-100"
+              />
+            </div>
+
+            {/* Box 2 */}
+            <div className="flex items-center gap-1.5">
+              <span className="w-16 shrink-0 text-[10px] font-bold text-emerald-700 dark:text-emerald-400">2nd Verify:</span>
+              <input
+                ref={input2Ref}
+                value={tag2}
+                onChange={(e) => { setTag2(e.target.value); setError(null); }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    verifyAndSave();
+                  }
+                  if (e.key === 'Escape') onCancel();
+                }}
+                readOnly={saving}
+                placeholder="Re-enter same tag…"
+                className={`w-full min-w-0 flex-1 rounded-lg border px-2 py-1 font-mono text-[11px] uppercase text-slate-900 focus:outline-none dark:text-neutral-100 ${
+                  isMatching
+                    ? 'border-emerald-500 bg-emerald-50/60 dark:border-emerald-600 dark:bg-emerald-950/40'
+                    : isMismatch
+                    ? 'border-rose-400 bg-rose-50/60 dark:border-rose-600 dark:bg-rose-950/40'
+                    : 'border-slate-300 bg-slate-50/50 dark:border-white/15 dark:bg-surface-900'
+                }`}
+              />
+              <button
+                type="button"
+                onClick={verifyAndSave}
+                disabled={saving || !clean1 || !clean2}
+                title="Verify and Save (Enter)"
+                className="inline-flex shrink-0 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 disabled:opacity-40 cursor-pointer"
+              >
+                {saving ? '…' : '✓ Save'}
+              </button>
+            </div>
+          </div>
+
+          {/* Feedback & status message */}
+          {error ? (
+            <p className="mt-1.5 text-[10px] font-bold text-rose-600 dark:text-rose-400">
+              ✕ {error}
+            </p>
+          ) : isMatching ? (
+            <p className="mt-1.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+              ✓ Tags match perfectly! Press Enter or click Save.
+            </p>
+          ) : (
+            <p className="mt-1 text-[9px] text-slate-400 dark:text-neutral-500">
+              {row.rfid_tag ? `Current: ${row.rfid_tag} · ` : ''}Scan / type tag in both fields to confirm.
+            </p>
+          )}
         </div>
-        {error && <p className="mt-1 truncate text-[10px] font-semibold text-rose-600" title={error}>{error}</p>}
       </div>
     );
   }
 
   if (row.rfid_tag) {
     return (
-      <div className="flex min-w-0 items-center gap-1.5">
+      <div className="flex min-w-0 items-center gap-2">
         <button
           type="button"
           onClick={() => onCopy(row.rfid_tag)}
-          title="Click to copy"
-          className="inline-flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1 font-mono text-[12px] font-semibold text-emerald-800 transition-colors hover:border-emerald-300 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-200"
+          title="Click to copy RFID tag"
+          className="group/btn inline-flex min-w-0 max-w-full items-center gap-2 whitespace-nowrap rounded-xl border border-emerald-300/80 bg-emerald-50/90 px-3 py-1.5 font-mono text-[12px] font-bold text-emerald-800 shadow-2xs transition-all hover:border-emerald-400 hover:bg-emerald-100/90 active:scale-98 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200 cursor-pointer"
         >
-          <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-          <span className="truncate">{row.rfid_tag}</span>
-          <span className="font-sans text-[10px] font-bold text-emerald-600/70 opacity-0 transition-opacity group-hover:opacity-100 dark:text-emerald-300/70">{copied === row.rfid_tag ? 'Copied!' : 'copy'}</span>
+          <span className="flex h-2 w-2 shrink-0 items-center justify-center">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+          </span>
+          <span className="truncate tracking-wider">{row.rfid_tag}</span>
+          <span className="flex items-center gap-1 font-sans text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+            {copied === row.rfid_tag ? (
+              <span className="inline-flex items-center gap-0.5 text-emerald-700 dark:text-emerald-300 font-extrabold animate-fade-in">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3">
+                  <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
+                </svg>
+                Copied!
+              </span>
+            ) : (
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 opacity-40 group-hover/btn:opacity-100 transition-opacity">
+                <path d="M7 3.5A1.5 1.5 0 0 1 8.5 2h3.879a1.5 1.5 0 0 1 1.06.44l3.122 3.12a1.5 1.5 0 0 1 .439 1.061V16.5A1.5 1.5 0 0 1 15.5 18h-7A1.5 1.5 0 0 1 7 16.5v-13Z" />
+                <path d="M5 6.5A1.5 1.5 0 0 1 6.5 5h.75v1.5H6.5a.5.5 0 0 0-.5.5v10a.5.5 0 0 0 .5.5h7a.5.5 0 0 0 .5-.5v-.75H15v.75A1.5 1.5 0 0 1 13.5 18h-7A1.5 1.5 0 0 1 5 16.5v-10Z" />
+              </svg>
+            )}
+          </span>
         </button>
-        <button type="button" onClick={onEdit} title="Change this battery's tag" className="shrink-0 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-violet-600 opacity-0 transition-opacity hover:bg-violet-100 group-hover:opacity-100 dark:text-violet-300 dark:hover:bg-violet-950/40">
-          Change
+        <button
+          type="button"
+          onClick={onEdit}
+          title="Edit RFID tag"
+          aria-label="Edit RFID tag"
+          className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-emerald-700 active:scale-95 dark:text-neutral-400 dark:hover:bg-surface-800 dark:hover:text-emerald-300 cursor-pointer"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+            <path d="m5.433 13.917 1.262-3.155A4 4 0 0 1 7.58 9.42l6.92-6.918a2.121 2.121 0 0 1 3 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 0 1-.65-.65Z" />
+            <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0 0 10 3H4.75A2.75 2.75 0 0 0 2 5.75v9.5A2.75 2.75 0 0 0 4.75 18h9.5A2.75 2.75 0 0 0 17 15.25V10a.75.75 0 0 0-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5Z" />
+          </svg>
         </button>
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1.5">
-      <span className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-rose-300 bg-rose-50/70 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:border-rose-800/60 dark:bg-rose-950/30 dark:text-rose-300">
+    <div className="flex items-center gap-2">
+      <span className="inline-flex items-center gap-1.5 rounded-xl border border-dashed border-rose-200 bg-rose-50/80 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:border-rose-900/60 dark:bg-rose-950/30 dark:text-rose-300">
         <span className="h-1.5 w-1.5 rounded-full bg-rose-500" /> No tag yet
       </span>
-      <button type="button" onClick={onEdit} className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 text-[11px] font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">
-        + Assign tag
+      <button
+        type="button"
+        onClick={onEdit}
+        title="Assign RFID tag"
+        aria-label="Assign RFID tag"
+        className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-emerald-600 transition-colors hover:bg-emerald-50 hover:text-emerald-700 active:scale-95 dark:text-emerald-400 dark:hover:bg-emerald-950/40 cursor-pointer"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+          <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+        </svg>
       </button>
     </div>
   );

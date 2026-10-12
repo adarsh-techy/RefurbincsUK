@@ -128,7 +128,7 @@ async function update(id, { vehicleNumber, driverName }) {
 }
 
 // Undoes the shipment: every battery that was part of it goes back to
-// 'unserviceable' (never touching one that's since been re-recycled some
+// 'unserviceable' ('tested_parts_removed' if its parts were reclaimed) (never touching one that's since been re-recycled some
 // other way), then the recycle_batteries links and the batch row are removed.
 async function remove(id) {
   const client = await db.pool.connect();
@@ -136,7 +136,12 @@ async function remove(id) {
     await client.query('BEGIN');
 
     await client.query(
-      `UPDATE batteries SET status = 'unserviceable'
+      `UPDATE batteries b
+          SET status = CASE
+                WHEN EXISTS (SELECT 1 FROM repairs r WHERE r.battery_id = b.id AND r.removed_at IS NOT NULL)
+                  THEN 'tested_parts_removed'
+                ELSE 'unserviceable'
+              END
        WHERE status = 'recycled'
          AND id IN (SELECT battery_id FROM recycle_batteries WHERE recycle_id = $1)`,
       [id]

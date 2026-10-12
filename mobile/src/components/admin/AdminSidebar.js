@@ -44,8 +44,8 @@ const NAV_GROUPS = [
   {
     heading: 'Recycling',
     links: [
-      { key: 'unserviceable', label: 'Unserviceable Batteries', screen: 'Batteries', params: { status: 'unserviceable', search: '' } },
-      { key: 'recycled', label: 'Recycled Batteries', screen: 'Batteries', params: { status: 'recycled', search: '' } },
+      { key: 'unserviceable', label: 'Unserviceable Batteries', screen: 'UnserviceableBatteries' },
+      { key: 'recycled', label: 'Recycled Batteries', screen: 'RecycledBatteries' },
       { key: 'recycle', label: 'Recycle Shipments', screen: 'RecycleShipmentsAdmin', permission: 'recycle' },
     ],
   },

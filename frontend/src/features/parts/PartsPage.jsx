@@ -34,7 +34,7 @@ function PartsPage() {
   const [deleteError, setDeleteError] = useState(null);
   const [restockTarget, setRestockTarget] = useState(null);
 
-  const filtered = lowStockOnly ? (data || []).filter((p) => !p.in_stock) : data;
+  const filtered = lowStockOnly ? (data || []).filter((p) => Number(p.quantity) <= 5) : data;
 
   function handleSaved() {
     refetch();

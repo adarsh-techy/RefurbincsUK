@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useSelector } from 'react-redux';
 import { Link } from 'react-router-dom';
 import {
@@ -22,7 +22,9 @@ import {
   FiChevronRight,
   FiShield,
   FiCheck,
+  FiBell,
 } from 'react-icons/fi';
+import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
 import Sparkline from '../../components/ui/charts/Sparkline';
 import BarChart from '../../components/ui/charts/BarChart';
@@ -160,11 +162,31 @@ function getTimeGreeting() {
   return 'Good evening';
 }
 
+function timeAgo(ts) {
+  if (!ts) return '';
+  const diff = Date.now() - new Date(ts).getTime();
+  const minutes = Math.floor(diff / 60000);
+  if (minutes < 1) return 'Just now';
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
 function DashboardPage() {
   const user = useSelector((state) => state.auth.user);
   const isSuperAdmin = user?.role === 'super_admin';
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const isToday = toLocalDateValue(selectedDate) === toLocalDateValue(new Date());
+
+  const [recentNotifications, setRecentNotifications] = useState([]);
+  useEffect(() => {
+    apiClient
+      .get('/notifications/admin?limit=4')
+      .then((res) => setRecentNotifications(res.data.feed || []))
+      .catch(() => {});
+  }, []);
 
   const { data, loading, error, refetch } = useFetchList(
     `/dashboard/summary?date=${toLocalDateValue(selectedDate)}`
@@ -580,6 +602,87 @@ function DashboardPage() {
             </div>
           </div>
         </div>
+      </div>
+
+      {/* ── Operations Notifications & System Alerts Stream ────────────── */}
+      <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+              <FiBell className="h-5 w-5" />
+            </span>
+            <div>
+              <h2 className="text-sm font-black text-slate-900 dark:text-white sm:text-base">
+                Operational Alerts & System Notifications
+              </h2>
+              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                Critical workshop stock thresholds, logistics dispatches & client alerts
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/notifications"
+            className="inline-flex items-center gap-1 rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-all"
+          >
+            <span>View All Operations Feed</span>
+            <FiArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+
+        {recentNotifications.length === 0 ? (
+          <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
+            All systems normal. No active operational alerts.
+          </p>
+        ) : (
+          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            {recentNotifications.map((notif) => (
+              <Link
+                key={notif.id}
+                to={`/notifications/${notif.id}`}
+                className={`group flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:shadow-xs ${
+                  notif.severity === 'urgent'
+                    ? 'border-rose-200 bg-rose-50/30 hover:border-rose-300 dark:border-rose-900/40 dark:bg-rose-950/15'
+                    : notif.severity === 'warning'
+                    ? 'border-amber-200 bg-amber-50/30 hover:border-amber-300 dark:border-amber-900/40 dark:bg-amber-950/15'
+                    : 'border-slate-200/80 bg-white hover:border-blue-300 dark:border-white/10 dark:bg-surface-850'
+                }`}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-black uppercase tracking-wider ${
+                        notif.severity === 'urgent'
+                          ? 'bg-rose-100 text-rose-800 dark:bg-rose-950/80 dark:text-rose-200'
+                          : notif.severity === 'warning'
+                          ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-200'
+                          : notif.severity === 'success'
+                          ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-200'
+                          : 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-200'
+                      }`}
+                    >
+                      {notif.severity === 'urgent' ? '🚨 Urgent' : notif.severity === 'warning' ? '⚠️ Alert' : notif.category}
+                    </span>
+                    <span className="text-[10px] text-slate-400">
+                      {timeAgo(notif.timestamp)}
+                    </span>
+                  </div>
+
+                  <h3 className="mt-2 text-xs font-black text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400 line-clamp-1">
+                    {notif.title}
+                  </h3>
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-slate-400 line-clamp-2 leading-relaxed">
+                    {notif.message}
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-slate-100/80 pt-2.5 text-[11px] font-bold text-blue-600 group-hover:text-blue-700 dark:border-white/5 dark:text-blue-400">
+                  <span>View Details</span>
+                  <FiArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
+                </div>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ── Client Returns & Logistics Stream ────────────────────────── */}

@@ -1,42 +1,74 @@
-import { useCallback, useEffect, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import DateField from '../../components/admin/DateField';
+import { ErrorBox, PageHead, SearchBox, Stat, money } from '../../components/admin/sa4/ui';
 
-// Finance (super_admin) — GET /finance/summary?preset=&breakdown=&from=&to=:
-// revenue totals and a per-month / per-day breakdown, same filters and figures
-// as the web Finance page. Tap a period for its statement (FinanceDetail →
-// GET /finance/period-detail?type=&period=).
+// Finance & Billing (super_admin) — the phone version of the web FinancePage:
+// GET /finance/summary?preset=&breakdown=&from=&to= → the six KPI cards, the
+// revenue trend chart and the monthly / daily breakdown. Tap a period (or
+// "View Statement") for FinanceDetail { type, period, label }.
 
 const PRESETS = [
-  { id: 'all', label: 'All time' },
+  { id: 'all', label: 'All Time' },
   { id: 'today', label: 'Today' },
   { id: 'yesterday', label: 'Yesterday' },
-  { id: '7days', label: 'Last 7 days' },
-  { id: '30days', label: 'Last 30 days' },
-  { id: 'month', label: 'This month' },
-  { id: 'year', label: 'This year' },
-  { id: 'custom', label: 'Custom range' },
+  { id: '7days', label: 'Last 7 Days' },
+  { id: '30days', label: 'Last 30 Days' },
+  { id: 'month', label: 'This Month' },
+  { id: 'year', label: 'This Year' },
+  { id: 'custom', label: 'Custom Range' },
 ];
-const money = (v) => `£${Number(v || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-function Stat({ label, value, color = 'text-slate-800', wide }) {
+export function avgPerUnit(t) {
+  return t.avgRevenuePerBattery || (t.batteriesCount > 0 ? (Number(t.repairRevenue || 0) + Number(t.servicesRevenue || 0)) / t.batteriesCount : 0);
+}
+
+// the six KPI cards shared with the statement page
+export function FinanceKpis({ totals: t }) {
   return (
-    <View className={`${wide ? 'w-full' : 'w-[48%]'} rounded-2xl border border-slate-200 bg-white p-3.5`}>
-      <Text className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{label}</Text>
-      <Text className={`mt-0.5 text-xl font-black ${color}`}>{value}</Text>
+    <View className="flex-row flex-wrap justify-between gap-y-3">
+      <Stat icon="zap" label="Total Revenue" value={money(t.totalRevenue)} tone="good" sub="All services & recycling" />
+      <Stat icon="wrench" label="Parts Service" value={money(t.repairRevenue)} tone="neutral" sub="Fitting & part charges" />
+      <Stat icon="grid" label="Service & Fees" value={money(t.servicesRevenue)} tone="info" sub={`${t.servicesCount || 0} diagnostic & tests`} />
+      <Stat icon="rotateCcw" label="Recycle Scrap" value={money(t.recycleRevenue)} tone="warning" sub="End-of-life battery payout" />
+      <Stat icon="battery" label="Units Serviced" value={`${t.batteriesCount || 0} units`} tone="good" sub="Unique batteries handled" />
+      <Stat icon="award" label="Avg. per Unit" value={money(avgPerUnit(t))} tone="purple" sub="Average revenue per battery" />
     </View>
+  );
+}
+
+function TrendChart({ series }) {
+  const max = Math.max(1, ...series.map((s) => Number(s.count) || 0));
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+      <View className="h-44 flex-row items-end gap-2 pr-2">
+        {series.map((s, i) => {
+          const v = Number(s.count) || 0;
+          const last = i === series.length - 1;
+          return (
+            <View key={`${s.label}-${i}`} className="w-12 items-center">
+              <Text className="mb-1 text-[9px] font-bold text-slate-500" numberOfLines={1}>{v ? `£${Math.round(v)}` : ''}</Text>
+              <View className="h-28 w-7 justify-end">
+                <View className={`w-full rounded-t-md ${last ? 'bg-emerald-700' : 'bg-emerald-500'}`} style={{ height: `${Math.max(v > 0 ? 6 : 2, (v / max) * 100)}%` }} />
+              </View>
+              <Text className="mt-1 text-center text-[9px] text-slate-500" numberOfLines={2}>{s.label}</Text>
+            </View>
+          );
+        })}
+      </View>
+    </ScrollView>
   );
 }
 
 export default function AdminFinanceScreen() {
   const navigation = useNavigation();
-  const [preset, setPreset] = useState('all');
-  const [breakdownType, setBreakdownType] = useState('month'); // month | day
-  const [from, setFrom] = useState('');
-  const [to, setTo] = useState('');
-  const [search, setSearch] = useState('');
+  const [datePreset, setDatePreset] = useState('all');
+  const [breakdownType, setBreakdownType] = useState('month');
+  const [customFrom, setCustomFrom] = useState('');
+  const [customTo, setCustomTo] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -44,10 +76,10 @@ export default function AdminFinanceScreen() {
 
   const load = useCallback(async () => {
     try {
-      const params = { preset, breakdown: breakdownType };
-      if (preset === 'custom') {
-        if (from) params.from = from;
-        if (to) params.to = to;
+      const params = { preset: datePreset, breakdown: breakdownType };
+      if (datePreset === 'custom') {
+        if (customFrom) params.from = customFrom;
+        if (customTo) params.to = customTo;
       }
       const { data: res } = await apiClient.get('/finance/summary', { params });
       setData(res);
@@ -58,17 +90,34 @@ export default function AdminFinanceScreen() {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [preset, breakdownType, from, to]);
+  }, [datePreset, breakdownType, customFrom, customTo]);
 
   useEffect(() => {
     setLoading(true);
     load();
   }, [load]);
 
-  const t = data?.totals || {};
-  const allPeriods = data?.breakdown || data?.monthly || [];
-  const q = search.trim().toLowerCase();
-  const periods = q ? allPeriods.filter((p) => `${p.label} ${p.key}`.toLowerCase().includes(q)) : allPeriods;
+  const totals = data?.totals || {};
+  const breakdown = data?.breakdown || [];
+  const chartSeries = useMemo(
+    () => breakdown.slice(0, 14).reverse().map((it) => ({ label: it.label, count: it.totalRevenue ?? it.repairRevenue })),
+    [breakdown]
+  );
+  const filtered = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return breakdown;
+    return breakdown.filter((it) => (it.label || '').toLowerCase().includes(q) || (it.key || '').toLowerCase().includes(q));
+  }, [breakdown, searchQuery]);
+
+  const hasActiveFilters = datePreset !== 'all' || customFrom !== '' || customTo !== '' || searchQuery.trim() !== '';
+  const clearAll = () => {
+    setDatePreset('all');
+    setCustomFrom('');
+    setCustomTo('');
+    setSearchQuery('');
+  };
+  const isMonth = breakdownType === 'month';
+  const openStatement = (row) => navigation.navigate('FinanceDetail', { type: breakdownType, period: row.key, label: row.label });
 
   return (
     <ScrollView
@@ -76,99 +125,97 @@ export default function AdminFinanceScreen() {
       contentContainerClassName="p-4 pb-16 gap-4"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
-        {PRESETS.map((p) => {
-          const active = preset === p.id;
-          return (
-            <TouchableOpacity key={p.id} onPress={() => setPreset(p.id)} className={`rounded-xl px-3 py-1.5 ${active ? 'bg-blue-600' : 'bg-white border border-slate-200'}`}>
-              <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{p.label}</Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+      <PageHead title="Finance & Billing" description="Comprehensive repair revenue, recycling revenue, and total financial performance." />
 
-      {preset === 'custom' && (
-        <View className="flex-row gap-2 rounded-2xl border border-slate-200 bg-white p-3">
-          <DateField label="From" value={from} onChange={setFrom} compact quick={false} />
-          <DateField label="To" value={to} onChange={setTo} compact quick={false} />
+      <View className="gap-3 rounded-2xl border border-slate-200 bg-white p-3">
+        <Text className="text-xs font-bold text-slate-500">Date Filter:</Text>
+        <View className="flex-row flex-wrap gap-1.5">
+          {PRESETS.map((p) => {
+            const active = datePreset === p.id;
+            return (
+              <TouchableOpacity key={p.id} onPress={() => setDatePreset(p.id)} className={`rounded-lg px-3 py-1.5 ${active ? 'bg-blue-600' : 'bg-slate-100'}`}>
+                <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{p.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
         </View>
-      )}
-
-      <View className="flex-row rounded-xl bg-slate-100 p-1">
-        {[['month', 'Monthly breakdown'], ['day', 'Daily breakdown']].map(([id, label]) => (
-          <TouchableOpacity key={id} onPress={() => setBreakdownType(id)} className={`flex-1 items-center rounded-lg py-1.5 ${breakdownType === id ? 'bg-white' : ''}`}>
-            <Text className={`text-xs font-bold ${breakdownType === id ? 'text-blue-700' : 'text-slate-500'}`}>{label}</Text>
-          </TouchableOpacity>
-        ))}
+        <View className="flex-row items-center gap-2">
+          <Text className="text-xs font-bold text-slate-500">View By:</Text>
+          <View className="flex-1 flex-row rounded-xl bg-slate-100 p-1">
+            {[['month', 'Monthly'], ['day', 'Daily']].map(([id, label]) => (
+              <TouchableOpacity key={id} onPress={() => setBreakdownType(id)} className={`flex-1 items-center rounded-lg py-1.5 ${breakdownType === id ? 'bg-white' : ''}`}>
+                <Text className={`text-xs font-bold ${breakdownType === id ? 'text-slate-900' : 'text-slate-500'}`}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+        {datePreset === 'custom' && (
+          <View className="gap-3 border-t border-slate-100 pt-3">
+            <DateField label="From:" value={customFrom} onChange={setCustomFrom} />
+            <DateField label="To:" value={customTo} onChange={setCustomTo} />
+          </View>
+        )}
       </View>
 
-      {error && (
-        <View className="rounded-2xl border border-red-200 bg-red-50 p-3">
-          <Text className="text-xs font-semibold text-red-700">{error}</Text>
-        </View>
-      )}
+      {loading && !refreshing ? <Text className="py-6 text-center text-xs text-slate-400">Loading financial breakdown…</Text> : null}
+      <ErrorBox text={error} />
 
-      {loading ? (
-        <Text className="py-6 text-center text-xs text-slate-400">Loading finance…</Text>
-      ) : (
+      {!loading && !error && (
         <>
-          <View className="rounded-3xl bg-emerald-600 p-5">
-            <Text className="text-[11px] font-bold uppercase tracking-wider text-emerald-100">Total revenue</Text>
-            <Text className="mt-1 text-3xl font-black text-white">{money(t.totalRevenue)}</Text>
-            <Text className="mt-1 text-xs text-emerald-100">
-              {t.repairsCount || 0} repairs · {t.servicesCount || 0} services · {t.batteriesCount || 0} batteries
-            </Text>
-          </View>
+          <FinanceKpis totals={totals} />
 
-          <View className="flex-row flex-wrap justify-between gap-y-3">
-            <Stat label="Parts" value={money(t.partsRevenue)} color="text-blue-700" />
-            <Stat label="Labour" value={money(t.laborRevenue)} color="text-violet-700" />
-            <Stat label="Services" value={money(t.servicesRevenue)} color="text-amber-700" />
-            <Stat label="Recycling" value={money(t.recycleRevenue)} color="text-slate-700" />
-            <Stat label="Avg per repair" value={money(t.avgRevenuePerRepair)} />
-            <Stat label="Avg per battery" value={money(t.avgRevenuePerBattery)} />
-          </View>
-
-          <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            {breakdownType === 'month' ? 'Monthly' : 'Daily'} breakdown · tap for the full statement
-          </Text>
-          {allPeriods.length > 3 && (
-            <TextInput
-              value={search}
-              onChangeText={setSearch}
-              placeholder={breakdownType === 'month' ? 'Search month…' : 'Search date…'}
-              placeholderTextColor="#94a3b8"
-              className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-900"
-            />
-          )}
-          {periods.length === 0 ? (
-            <View className="items-center rounded-2xl border border-slate-200 bg-white p-6">
-              <Text className="text-sm font-semibold text-slate-800">No revenue in this range</Text>
-            </View>
-          ) : (
-            <View className="gap-2">
-              {periods.map((p) => (
-                <TouchableOpacity
-                  key={p.key}
-                  activeOpacity={0.85}
-                  onPress={() => navigation.navigate('FinanceDetail', { type: p.type || breakdownType, period: p.key, label: p.label })}
-                  className="rounded-2xl border border-slate-200 bg-white p-3.5"
-                >
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm font-extrabold text-slate-900">{p.label}</Text>
-                    <Text className="text-sm font-black text-emerald-700">{money(p.totalRevenue)}</Text>
-                  </View>
-                  <Text className="mt-1 text-[11px] text-slate-500">
-                    Parts {money(p.partsRevenue)} · Labour {money(p.laborRevenue)} · Services {money(p.servicesRevenue)} · Recycling {money(p.recycleRevenue)}
-                  </Text>
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-[11px] text-slate-400">{p.repairsCount || 0} repairs · {p.batteriesCount || 0} batteries</Text>
-                    <Text className="text-[11px] font-bold text-blue-600">Statement ›</Text>
-                  </View>
-                </TouchableOpacity>
-              ))}
+          {chartSeries.length > 0 && (
+            <View className="rounded-2xl border border-slate-200 bg-white p-4">
+              <Text className="text-sm font-bold text-slate-900">{isMonth ? 'Monthly Revenue Trend' : 'Daily Revenue Trend'}</Text>
+              <Text className="mb-3 text-[11px] text-slate-500">
+                {breakdown.length} period{breakdown.length === 1 ? '' : 's'} tracked · {totals.batteriesCount || 0} total batteries
+              </Text>
+              <TrendChart series={chartSeries} />
             </View>
           )}
+
+          <View className="gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+            <View>
+              <Text className="text-base font-bold text-slate-900">{isMonth ? 'Monthly Financial Breakdown' : 'Daily Financial Breakdown'}</Text>
+              <Text className="mt-0.5 text-xs text-slate-500">
+                Click on any {isMonth ? 'month' : 'day'} row to view its itemized statements, client distribution, battery fees, and technician logs.
+              </Text>
+            </View>
+            <SearchBox value={searchQuery} onChangeText={setSearchQuery} placeholder="Search period…" />
+            {filtered.length === 0 ? (
+              <View className="items-center py-6">
+                <Text className="text-center text-xs text-slate-500">
+                  {searchQuery ? 'No periods match your search query.' : 'No financial activity recorded for the selected date range.'}
+                </Text>
+                {hasActiveFilters && (
+                  <TouchableOpacity onPress={clearAll} className="mt-2">
+                    <Text className="text-xs font-bold text-blue-600">Reset all filters</Text>
+                  </TouchableOpacity>
+                )}
+              </View>
+            ) : (
+              filtered.map((row, i) => {
+                const jobs = (row.repairsCount || 0) + (row.servicesCount || 0);
+                return (
+                  <TouchableOpacity key={row.key || i} activeOpacity={0.85} onPress={() => openStatement(row)} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                    <View className="flex-row items-center justify-between gap-2">
+                      <Text className="text-xs font-bold text-slate-400">{i + 1}</Text>
+                      <Text className="flex-1 text-sm font-extrabold text-blue-700">{row.label}</Text>
+                      <Text className="text-sm font-black text-emerald-700">{money(row.totalRevenue)}</Text>
+                    </View>
+                    <View className="mt-2 flex-row flex-wrap justify-between gap-y-1">
+                      <Text className="w-[48%] text-[11px] text-slate-500">Repair Cost <Text className="font-bold text-slate-800">{money(row.repairRevenue)}</Text></Text>
+                      <Text className="w-[48%] text-[11px] text-slate-500">Service &amp; Fees <Text className="font-bold text-slate-800">{money(row.servicesRevenue || 0)}</Text></Text>
+                      <Text className="w-[48%] text-[11px] text-slate-500">Recycle Revenue <Text className="font-bold text-slate-800">{money(row.recycleRevenue || 0)}</Text></Text>
+                      <Text className="w-[48%] text-[11px] text-slate-500">Jobs Logged <Text className="font-bold text-slate-800">{jobs} job{jobs === 1 ? '' : 's'}</Text></Text>
+                      <Text className="w-[48%] text-[11px] text-slate-500">Batteries Serviced <Text className="font-bold text-slate-800">{row.batteriesCount || 0} unit{row.batteriesCount === 1 ? '' : 's'}</Text></Text>
+                    </View>
+                    <Text className="mt-2 text-right text-[11px] font-bold text-blue-600">View Statement →</Text>
+                  </TouchableOpacity>
+                );
+              })
+            )}
+          </View>
         </>
       )}
     </ScrollView>

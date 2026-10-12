@@ -95,12 +95,12 @@ function FinanceDetailPage() {
     if (type === 'month') {
       const [year, month] = period.split('-').map(Number);
       const dt = new Date(year, month - 1 + direction, 1);
-      const newMonth = dt.toISOString().slice(0, 7);
+      const newMonth = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}`;
       setSearchParams({ type: 'month', period: newMonth });
     } else if (type === 'day') {
-      const dt = new Date(period);
-      dt.setDate(dt.getDate() + direction);
-      const newDay = dt.toISOString().slice(0, 10);
+      const [y, m, d] = period.split('-').map(Number);
+      const dt = new Date(y, m - 1, d + direction);
+      const newDay = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
       setSearchParams({ type: 'day', period: newDay });
     }
   };

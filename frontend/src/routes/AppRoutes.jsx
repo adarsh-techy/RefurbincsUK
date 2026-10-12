@@ -36,6 +36,7 @@ const ClientProfilePage = lazy(() => import('../features/clients/portal/ClientPr
 const ClientSupportPage = lazy(() => import('../features/support/ClientSupportPage'));
 const AdminMessagesPage = lazy(() => import('../features/support/AdminMessagesPage'));
 const AdminNotificationsPage = lazy(() => import('../features/notifications/AdminNotificationsPage'));
+const NotificationDetailPage = lazy(() => import('../features/notifications/NotificationDetailPage'));
 const TechnicianDashboardPage = lazy(() => import('../features/batteries/technician/TechnicianDashboardPage'));
 const TechnicianHistoryPage = lazy(() => import('../features/batteries/technician/TechnicianHistoryPage'));
 const TechnicianProfilePage = lazy(() => import('../features/batteries/technician/TechnicianProfilePage'));
@@ -109,6 +110,7 @@ function AppRoutes() {
           {/* Admin & Operations Notifications & Messages */}
           <Route element={<ProtectedRoute roles={['super_admin', 'admin', 'staff']} />}>
             <Route path="/notifications" element={<AdminNotificationsPage />} />
+            <Route path="/notifications/:id" element={<NotificationDetailPage />} />
             <Route path="/messages" element={<AdminMessagesPage />} />
             <Route path="/ratings" element={<RatingsPage />} />
             <Route path="/ratings/:id" element={<RatingDetailPage />} />

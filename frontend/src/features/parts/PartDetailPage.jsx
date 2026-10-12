@@ -303,7 +303,7 @@ function PartDetailPage() {
             </button>
           )}
 
-          {canManageParts && (
+          {isSuperAdmin && (
             <button
               type="button"
               onClick={() => setEditing(true)}

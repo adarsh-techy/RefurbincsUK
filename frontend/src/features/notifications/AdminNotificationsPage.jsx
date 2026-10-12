@@ -510,9 +510,12 @@ export default function AdminNotificationsPage() {
 
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h4 className="text-xs font-black text-slate-900 dark:text-white sm:text-sm">
+                      <Link
+                        to={`/notifications/${item.id}`}
+                        className="text-xs font-black text-slate-900 hover:text-blue-600 dark:text-white dark:hover:text-blue-400 sm:text-sm hover:underline"
+                      >
                         {item.title}
-                      </h4>
+                      </Link>
 
                       {/* Severity Pill */}
                       {item.severity === 'urgent' && (
@@ -572,6 +575,13 @@ export default function AdminNotificationsPage() {
 
                 {/* Right Action buttons */}
                 <div className="flex shrink-0 items-center justify-end gap-2 border-t border-slate-100 pt-2 sm:border-t-0 sm:pt-0 dark:border-white/5">
+                  <Link
+                    to={`/notifications/${item.id}`}
+                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 dark:hover:bg-white/5 transition-all"
+                  >
+                    <span>View Detail</span>
+                  </Link>
+
                   <button
                     type="button"
                     onClick={() => toggleRead(item.id)}
@@ -590,7 +600,7 @@ export default function AdminNotificationsPage() {
                       to={item.actionUrl}
                       className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-blue-600 dark:bg-surface-800 dark:hover:bg-blue-600 transition-all"
                     >
-                      <span>{item.actionLabel || 'View Details'}</span>
+                      <span>{(item.actionLabel || 'Go to Record').replace(/\s*→\s*$/, '')}</span>
                       <FiArrowRight className="h-3 w-3" />
                     </Link>
                   )}

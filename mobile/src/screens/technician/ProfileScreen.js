@@ -108,7 +108,8 @@ export default function ProfileScreen() {
           </View>
         </View>
 
-        {!isClient && (
+        {/* testing sign-off is a workshop thing — not shown to office or partner logins */}
+        {!isClient && !['super_admin', 'admin', 'staff', 'recycle_client'].includes(user?.role) && (
           <View className="mb-3.5 flex-row justify-between items-center border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
             <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">Testing Access</Text>
             <Text

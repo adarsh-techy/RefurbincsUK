@@ -26,6 +26,14 @@ import Button from '../../components/ui/primitives/Button';
 import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
 import { useTheme } from '../../context/ThemeContext';
 
+// YYYY-MM-DD in the viewer's own timezone, to match the date input's value
+function localDateKey(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function InvoicesPage() {
   const user = useSelector((state) => state.auth.user);
   const isSuperAdmin = user?.role === 'super_admin';
@@ -300,7 +308,7 @@ function InvoicesPage() {
       inv.notes?.toLowerCase().includes(q);
 
     const matchesClient = !clientFilter || String(inv.client_id) === String(clientFilter);
-    const matchesDate = !dateFilter || inv.issue_date?.slice(0, 10) === dateFilter;
+    const matchesDate = !dateFilter || localDateKey(inv.issue_date) === dateFilter;
 
     const matchesStatus =
       !statusFilter ||

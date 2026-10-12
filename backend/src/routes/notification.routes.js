@@ -7,5 +7,6 @@ router.use(requireAuth);
 
 // Admin & Operations notification hub
 router.get('/admin', requireRole('super_admin', 'admin', 'staff'), notificationController.getAdminNotifications);
+router.get('/admin/:id', requireRole('super_admin', 'admin', 'staff'), notificationController.getAdminNotificationById);
 
 module.exports = router;

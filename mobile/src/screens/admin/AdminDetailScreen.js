@@ -55,7 +55,32 @@ function SectionTitle({ children, right }) {
   );
 }
 
+// Kinds that now have their own screen (matching the web detail page): old
+// links to AdminDetail are forwarded there.
+const DEDICATED = {
+  client: 'SAClientDetail',
+  recycleClient: 'SARecycleClientDetail',
+  staff: 'SAStaffDetail',
+  part: 'AdminPartDetail',
+  intake: 'AdminIntakeDetail',
+  return: 'AdminReturnDetail',
+  recycle: 'AdminRecycleDetail',
+};
+
+function Forward({ screen, id }) {
+  const navigation = useNavigation();
+  useEffect(() => { navigation.replace(screen, { id }); }, [navigation, screen, id]);
+  return null;
+}
+
 export default function AdminDetailScreen() {
+  const route = useRoute();
+  const { kind, id } = route.params || {};
+  if (DEDICATED[kind]) return <Forward screen={DEDICATED[kind]} id={id} />;
+  return <GenericAdminDetail />;
+}
+
+function GenericAdminDetail() {
   const navigation = useNavigation();
   const route = useRoute();
   const { kind, id } = route.params || {};

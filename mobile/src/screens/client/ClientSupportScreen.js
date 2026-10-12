@@ -14,7 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useSelector } from 'react-redux';
-import { useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 
 // Help & Support — clients and recycling partners: the mobile version of the
@@ -49,6 +49,18 @@ const CLIENT_TABS = [
 
 const SUPPORT_ROLES = ['admin', 'super_admin', 'staff'];
 
+// office "Quick Reply" snippets — same as the web Support Messages page
+const QUICK_REPLIES = [
+  'Thank you for reaching out. We are actively investigating this battery.',
+  'Our technicians have inspected the battery and the repair is underway.',
+  'This battery has completed testing and is ready for dispatch.',
+  'The issue has been resolved. Please let us know if you need anything else.',
+];
+
+function clientInitials(name) {
+  return (name || 'CL').split(' ').filter(Boolean).map((p) => p[0]).slice(0, 2).join('').toUpperCase();
+}
+
 function formatTime(ts) {
   if (!ts) return '';
   const d = new Date(ts);
@@ -80,6 +92,7 @@ function timeAgo(ts) {
 export default function ClientSupportScreen() {
   const user = useSelector((state) => state.auth.user);
   const route = useRoute();
+  const navigation = useNavigation();
   // Office roles see every client's tickets and can change status; clients
   // and recycling partners only see their own and can raise new ones.
   const isOffice = ['super_admin', 'admin', 'staff'].includes(user?.role);
@@ -176,7 +189,7 @@ export default function ClientSupportScreen() {
   // opened from a notification / dashboard with a ticket id
   const routeTicketId = route.params?.ticketId;
   useEffect(() => {
-    if (!isOffice && routeTicketId) openTicket(routeTicketId);
+    if (routeTicketId) openTicket(routeTicketId);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOffice, routeTicketId]);
 
@@ -184,7 +197,7 @@ export default function ClientSupportScreen() {
   // open conversation (and the list) instead
   const activeId = activeTicket?.id;
   useEffect(() => {
-    if (isOffice || !activeId) return undefined;
+    if (!activeId) return undefined;
     const t = setInterval(async () => {
       try {
         const { data } = await apiClient.get(`/tickets/${activeId}`);
@@ -212,6 +225,11 @@ export default function ClientSupportScreen() {
     : tickets.filter((t) => {
       if (filterStatus !== 'all' && t.status !== filterStatus) return false;
       if (filterClient && String(t.client_id) !== String(filterClient) && t.client_name !== filterClient) return false;
+      const q = search.trim().toLowerCase();
+      if (q) {
+        const hay = [t.ticket_number, t.subject, t.client_name, t.battery_code].map((v) => (v || '').toLowerCase());
+        if (!hay.some((v) => v.includes(q))) return false;
+      }
       return true;
     });
 
@@ -318,10 +336,20 @@ export default function ClientSupportScreen() {
           >
             {isOffice && (
               <View className="rounded-2xl border border-slate-200 bg-white p-3">
-                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {activeTicket.client_name || 'Client'} · status: {(activeTicket.status || 'open').replace('_', ' ')}
-                </Text>
-                <View className="mt-2 flex-row flex-wrap gap-1.5">
+                <View className="flex-row items-center gap-3">
+                  <View className="h-10 w-10 items-center justify-center rounded-xl bg-emerald-600">
+                    <Text className="text-xs font-black text-white">{clientInitials(activeTicket.client_name)}</Text>
+                  </View>
+                  <View className="flex-1">
+                    <View className="flex-row flex-wrap items-center gap-1.5">
+                      <Text className="rounded-md bg-slate-900 px-2 py-0.5 text-[11px] font-bold text-white">{activeTicket.client_name || 'Client'}</Text>
+                      <Text className="font-mono text-[11px] font-bold text-slate-500">{activeTicket.ticket_number}</Text>
+                    </View>
+                    <Text className="mt-1 text-sm font-bold text-slate-900">{activeTicket.subject}</Text>
+                  </View>
+                </View>
+                <Text className="mt-3 text-[10px] font-bold uppercase tracking-wider text-slate-400">Status:</Text>
+                <View className="mt-1 flex-row flex-wrap gap-1.5">
                   {['open', 'in_progress', 'resolved', 'closed'].map((s) => {
                     const active = activeTicket.status === s;
                     return (
@@ -331,7 +359,7 @@ export default function ClientSupportScreen() {
                         onPress={() => changeStatus(s)}
                         className={`rounded-lg px-2.5 py-1.5 ${active ? 'bg-blue-600' : 'bg-slate-100'}`}
                       >
-                        <Text className={`text-[11px] font-bold capitalize ${active ? 'text-white' : 'text-slate-600'}`}>{s.replace('_', ' ')}</Text>
+                        <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{{ open: '🟢 Open', in_progress: '🔵 In Progress', resolved: '✅ Resolved', closed: '⚪ Closed' }[s]}</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -365,11 +393,20 @@ export default function ClientSupportScreen() {
                 </View>
               </View>
             )}
-            {isOffice && activeTicket.battery_code && (
-              <View className="self-start rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1">
-                <Text className="text-[10px] font-bold text-slate-600 dark:text-slate-300">
-                  Battery: {activeTicket.battery_code}
+            {isOffice && (
+              <View className="flex-row flex-wrap items-center gap-1.5">
+                <Text className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600">
+                  Category: <Text className="font-bold capitalize text-slate-900">{(activeTicket.category || 'general').replace('_', ' ')}</Text>
                 </Text>
+                <Text className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600">
+                  Priority: <Text className="font-bold capitalize text-slate-900">{activeTicket.priority || 'normal'}</Text>
+                </Text>
+                {activeTicket.battery_code ? (
+                  <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: activeTicket.battery_code, fromScan: false })} className="rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1">
+                    <Text className="font-mono text-[11px] font-bold text-emerald-800">🔋 {activeTicket.battery_code}</Text>
+                  </TouchableOpacity>
+                ) : null}
+                <Text className="text-[11px] text-slate-400">Created {formatTime(activeTicket.created_at)}</Text>
               </View>
             )}
             {(activeTicket.messages || []).map((msg) => {
@@ -387,7 +424,7 @@ export default function ClientSupportScreen() {
                   </View>
                   <Text className="mt-1 text-[10px] text-slate-400 dark:text-slate-500">
                     {isOffice
-                      ? `${isMe ? 'You' : msg.sender_name || 'Support'} · ${timeAgo(msg.created_at)}`
+                      ? `${SUPPORT_ROLES.includes(msg.sender_role) ? `${msg.sender_name} (Support)` : `${activeTicket.client_name} (${msg.sender_name})`} • ${formatTime(msg.created_at)}`
                       : `${isMe ? 'You' : `${msg.sender_name || 'Support'} (Support Team)`} • ${formatTime(msg.created_at)}`}
                   </Text>
                 </View>
@@ -403,11 +440,22 @@ export default function ClientSupportScreen() {
             </Text>
           </View>
         ) : (
+        <View>
+        {isOffice && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" className="border-t border-slate-200 bg-slate-50" contentContainerClassName="items-center gap-1.5 px-3 py-2">
+            <Text className="text-[10px] font-bold uppercase text-slate-400">Quick Reply:</Text>
+            {QUICK_REPLIES.map((q) => (
+              <TouchableOpacity key={q} onPress={() => setReplyMessage(q)} className="rounded-lg border border-slate-200 bg-white px-2.5 py-1">
+                <Text className="text-[11px] text-slate-600">{q.slice(0, 32)}…</Text>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        )}
         <View className="flex-row items-center gap-2 border-t border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 p-3">
           <TextInput
             value={replyMessage}
             onChangeText={setReplyMessage}
-            placeholder={isOffice ? 'Type a message…' : 'Type your message or response…'}
+            placeholder={isOffice ? `Reply directly to ${activeTicket.client_name || 'the client'}…` : 'Type your message or response…'}
             placeholderTextColor="#64748b"
             multiline
             className="flex-1 max-h-24 rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-2.5 text-sm text-slate-900 dark:text-white"
@@ -420,6 +468,7 @@ export default function ClientSupportScreen() {
             {sendingReply ? <ActivityIndicator color="#fff" size="small" /> : <Text className="text-xs font-bold text-white">Send</Text>}
           </TouchableOpacity>
         </View>
+        </View>
         )}
       </KeyboardAvoidingView>
     );
@@ -429,9 +478,16 @@ export default function ClientSupportScreen() {
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
       <View className="flex-row items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 px-4 py-3">
-        <Text className="flex-1 pr-2 text-xs text-slate-500 dark:text-slate-400">
-          {isOffice ? 'Support requests from all clients' : 'Direct messaging with the Refurbinics service & repair team.'}
-        </Text>
+        {isOffice ? (
+          <View className="flex-1 pr-2">
+            <Text className="text-base font-black text-slate-900">Messages & Support Tickets</Text>
+            <Text className="text-xs text-slate-500">Direct communication channel with your battery fleet clients.</Text>
+          </View>
+        ) : (
+          <Text className="flex-1 pr-2 text-xs text-slate-500 dark:text-slate-400">
+            Direct messaging with the Refurbinics service & repair team.
+          </Text>
+        )}
         {!isOffice && (
           <TouchableOpacity
             onPress={() => setCreateOpen(true)}
@@ -468,10 +524,11 @@ export default function ClientSupportScreen() {
       {isOffice && !loading && (
         <View className="gap-2 border-b border-slate-200/80 bg-white px-4 py-3 dark:border-slate-800/80 dark:bg-slate-900">
           <View className="flex-row gap-2">
-            {[['Open', stats?.open, 'text-amber-600'], ['In progress', stats?.in_progress, 'text-blue-600'], ['Resolved', stats?.resolved, 'text-emerald-600'], ['Unread', stats?.admin_unread, 'text-red-600']].map(([label, n, color]) => (
-              <View key={label} className="flex-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1.5 dark:border-slate-800 dark:bg-slate-950">
-                <Text className="text-[9px] font-bold uppercase text-slate-400">{label}</Text>
-                <Text className={`text-base font-black ${color}`}>{n || 0}</Text>
+            {[['Open:', stats?.open, 'border-amber-200 bg-amber-50', 'bg-amber-500', 'text-amber-800'], ['In Progress:', stats?.in_progress, 'border-blue-200 bg-blue-50', 'bg-blue-500', 'text-blue-800']].map(([label, n, box, dot, text]) => (
+              <View key={label} className={`flex-row items-center gap-1.5 rounded-xl border px-3 py-1.5 ${box}`}>
+                <View className={`h-2 w-2 rounded-full ${dot}`} />
+                <Text className={`text-xs font-semibold ${text}`}>{label}</Text>
+                <Text className={`text-xs font-black ${text}`}>{n || 0}</Text>
               </View>
             ))}
           </View>
@@ -487,9 +544,17 @@ export default function ClientSupportScreen() {
               </TouchableOpacity>
             ))}
           </ScrollView>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search ticket, client, battery…"
+            placeholderTextColor="#94a3b8"
+            autoCorrect={false}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-900"
+          />
           {clients.length > 0 && (
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
-              {[{ id: '', name: 'All clients' }, ...clients].map((c) => (
+              {[{ id: '', name: 'All Clients' }, ...clients].map((c) => (
                 <TouchableOpacity key={String(c.id)} onPress={() => setFilterClient(String(c.id))} className={`rounded-xl px-3 py-1.5 ${String(filterClient) === String(c.id) ? 'bg-violet-600' : 'bg-slate-100 dark:bg-slate-800'}`}>
                   <Text className={`text-[11px] font-bold ${String(filterClient) === String(c.id) ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{c.name}</Text>
                 </TouchableOpacity>
@@ -522,10 +587,10 @@ export default function ClientSupportScreen() {
           ListEmptyComponent={
             <View className="items-center justify-center py-20">
               <Text className="text-sm font-bold text-slate-900 dark:text-white">
-                {isOffice ? (tickets.length ? 'No requests match these filters' : 'No support requests yet') : 'No support tickets'}
+                {isOffice ? 'No tickets found' : 'No support tickets'}
               </Text>
               <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                {isOffice ? 'Client support requests will appear here.' : "Tap 'New Help Request' to submit an inquiry."}
+                {isOffice ? 'No support requests match your search or filter.' : "Tap 'New Help Request' to submit an inquiry."}
               </Text>
             </View>
           }
@@ -567,33 +632,35 @@ export default function ClientSupportScreen() {
                 </TouchableOpacity>
               );
             }
+            const clientLast = item.last_message?.sender_role === 'client' || item.last_message?.sender_role === 'recycle_client';
             return (
               <TouchableOpacity
                 activeOpacity={0.7}
                 onPress={() => openTicket(item.id)}
-                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm active:bg-slate-850"
+                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3.5 shadow-sm"
               >
-                <View className="flex-row items-center justify-between">
-                  <Text className="flex-1 pr-2 text-sm font-bold text-slate-900 dark:text-white" numberOfLines={1}>
-                    {item.subject}
-                  </Text>
-                  <View className={`rounded-full ${tone.bg} px-2.5 py-0.5`}>
-                    <Text className={`text-[10px] font-bold uppercase ${tone.text}`}>
-                      {(item.status || 'open').replace('_', ' ')}
-                    </Text>
+                <View className="flex-row items-center gap-2.5">
+                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-800">
+                    <Text className="text-[11px] font-black text-white">{clientInitials(item.client_name)}</Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="self-start rounded-md bg-violet-50 px-1.5 py-0.5 text-[11px] font-bold text-violet-800" numberOfLines={1}>{item.client_name || 'Client'}</Text>
+                    <Text className="mt-0.5 font-mono text-[10px] text-slate-400">{item.ticket_number}</Text>
+                  </View>
+                  {clientLast && item.status !== 'closed' ? <View className="h-2.5 w-2.5 rounded-full bg-rose-500" /> : null}
+                  <View className={`rounded-md ${tone.bg} px-2 py-0.5`}>
+                    <Text className={`text-[10px] font-bold capitalize ${tone.text}`}>{(item.status || 'open').replace('_', ' ')}</Text>
                   </View>
                 </View>
-                {isOffice && item.client_name ? (
-                  <Text className="mt-0.5 text-[11px] font-semibold text-violet-700 dark:text-violet-300" numberOfLines={1}>{item.client_name}</Text>
-                ) : null}
-                <Text className="mt-1 text-[11px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
+                <Text className="mt-2 text-sm font-bold text-slate-900 dark:text-white" numberOfLines={1}>{item.subject}</Text>
+                <Text className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400" numberOfLines={1}>
                   {item.last_message?.message || 'No messages yet'}
                 </Text>
                 <View className="mt-2 flex-row items-center justify-between">
-                  <Text className="text-[10px] text-slate-400 dark:text-slate-500 capitalize">
-                    {(item.category || 'general').replace('_', ' ')}
-                    {item.battery_code ? ` · ${item.battery_code}` : ''}
-                  </Text>
+                  <View className="flex-1 flex-row items-center gap-1.5">
+                    <Text className="text-[10px] capitalize text-slate-400">{(item.category || 'general').replace('_', ' ')}</Text>
+                    {item.battery_code ? <Text className="rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-700">🔋 {item.battery_code}</Text> : null}
+                  </View>
                   <Text className="text-[10px] text-slate-400 dark:text-slate-500">{timeAgo(item.updated_at)}</Text>
                 </View>
               </TouchableOpacity>

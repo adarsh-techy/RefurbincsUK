@@ -27,31 +27,52 @@ import AdminFormScreen from '../screens/admin/AdminFormScreen';
 import AdminDetailScreen from '../screens/admin/AdminDetailScreen';
 import AdminRfidScreen from '../screens/admin/AdminRfidScreen';
 import { AdminReturnCreateScreen, AdminRecycleCreateScreen } from '../screens/admin/AdminCreateFlows';
-import {
-  AdminRepairsScreen, AdminReturnsScreen, AdminServicesScreen, AdminIssueReasonsScreen,
-  AdminRecycleScreen, AdminInvoicesScreen, AdminRatingsScreen, AdminCertificatesScreen,
-  AdminUsersScreen, AdminAuditLogScreen, AdminTrashScreen, AdminNotificationsScreen,
-} from '../screens/admin/AdminPages';
+import { AdminRepairsScreen } from '../screens/admin/AdminPages';
+import PartDetailScreen from '../screens/admin/sa4/PartDetailScreen';
+import ServicesScreen from '../screens/admin/sa4/ServicesScreen';
+import IssueReasonsScreen from '../screens/admin/sa4/IssueReasonsScreen';
+import InvoicesScreen from '../screens/admin/sa4/InvoicesScreen';
+import AdminNotificationsFeedScreen from '../screens/admin/sa1/AdminNotificationsFeedScreen';
+import { UnserviceableBatteriesScreen, RecycledBatteriesScreen } from '../screens/admin/sa1/IssueBatteriesScreens';
+import ReturnsScreen from '../screens/admin/sa2/ReturnsScreen';
+import RecycleScreen from '../screens/admin/sa2/RecycleScreen';
+import IntakeDetailScreen from '../screens/admin/sa2/IntakeDetailScreen';
+import ReturnDetailScreen from '../screens/admin/sa2/ReturnDetailScreen';
+import RecycleDetailScreen from '../screens/admin/sa2/RecycleDetailScreen';
+import ClientDetailScreen from '../screens/admin/sa3/ClientDetailScreen';
+import ClientFormScreen from '../screens/admin/sa3/ClientFormScreen';
+import RecycleClientDetailScreen from '../screens/admin/sa3/RecycleClientDetailScreen';
+import RecycleClientFormScreen from '../screens/admin/sa3/RecycleClientFormScreen';
+import StaffDetailScreen from '../screens/admin/sa3/StaffDetailScreen';
+import StaffFormScreen from '../screens/admin/sa3/StaffFormScreen';
+import UserFormScreen from '../screens/admin/sa3/UserFormScreen';
+import CreateAccountScreen from '../screens/admin/sa3/CreateAccountScreen';
+import UsersScreen from '../screens/admin/sa3/UsersScreen';
+import RatingsScreen from '../screens/admin/sa5/RatingsScreen';
+import CertificatesScreen from '../screens/admin/sa5/CertificatesScreen';
+import AuditLogScreen from '../screens/admin/sa5/AuditLogScreen';
+import TrashScreen from '../screens/admin/sa5/TrashScreen';
+import TrashDetailScreen from '../screens/admin/sa5/TrashDetailScreen';
 
 // Admin side-menu pages (see components/admin/AdminSidebar.js). Registered
 // for every signed-in role; the backend rejects anyone without the right
 // role/permission, and the sidebar hides what the user can't open.
 const ADMIN_SCREENS = [
-  ['AdminNotifications', AdminNotificationsScreen, 'Notifications'],
+  ['AdminNotifications', AdminNotificationsFeedScreen, 'Notifications'],
   ['GenerateQr', AdminGenerateQrScreen, 'Generate QR Codes'],
   ['Repairs', AdminRepairsScreen, 'Repairs'],
-  ['Returns', AdminReturnsScreen, 'Returns Dispatch'],
+  ['Returns', ReturnsScreen, 'Returns Dispatch'],
   ['Parts', AdminPartsScreen, 'Parts & Inventory'],
-  ['Services', AdminServicesScreen, 'Services & Rates'],
-  ['IssueReasons', AdminIssueReasonsScreen, 'Issue Reasons'],
-  ['RecycleShipmentsAdmin', AdminRecycleScreen, 'Recycle Shipments'],
-  ['AdminInvoices', AdminInvoicesScreen, 'Invoices'],
+  ['Services', ServicesScreen, 'Services & Rates'],
+  ['IssueReasons', IssueReasonsScreen, 'Issue Reasons'],
+  ['RecycleShipmentsAdmin', RecycleScreen, 'Recycle Shipments'],
+  ['AdminInvoices', InvoicesScreen, 'Invoices'],
   ['Finance', AdminFinanceScreen, 'Finance'],
-  ['Ratings', AdminRatingsScreen, 'Ratings & Reviews'],
-  ['Certificates', AdminCertificatesScreen, 'Certificates & Impact'],
-  ['Users', AdminUsersScreen, 'User Accounts'],
-  ['AuditLog', AdminAuditLogScreen, 'Audit Log'],
-  ['Trash', AdminTrashScreen, 'Trash Bin'],
+  ['Ratings', RatingsScreen, 'Ratings & Reviews'],
+  ['Certificates', CertificatesScreen, 'Certificates & Impact'],
+  ['Users', UsersScreen, 'User Accounts'],
+  ['AuditLog', AuditLogScreen, 'Audit Log'],
+  ['Trash', TrashScreen, 'Trash Bin'],
   ['AdminForm', AdminFormScreen, ''],
   ['AdminDetail', AdminDetailScreen, 'Details'],
   ['RfidAssignment', AdminRfidScreen, 'RFID Assignment'],
@@ -60,6 +81,21 @@ const ADMIN_SCREENS = [
   ['FinanceDetail', AdminFinanceDetailScreen, 'Finance Statement'],
   ['AdminCertificateClient', AdminCertificateClientScreen, 'Client Milestones'],
   ['AdminRatingDetail', AdminRatingDetailScreen, 'Review'],
+  ['UnserviceableBatteries', UnserviceableBatteriesScreen, 'Unserviceable Batteries'],
+  ['RecycledBatteries', RecycledBatteriesScreen, 'Recycled Batteries'],
+  ['AdminIntakeDetail', IntakeDetailScreen, 'Truck Intake'],
+  ['AdminReturnDetail', ReturnDetailScreen, 'Return Dispatch'],
+  ['AdminRecycleDetail', RecycleDetailScreen, 'Recycle Shipment'],
+  ['SAClientDetail', ClientDetailScreen, 'Client'],
+  ['SAClientForm', ClientFormScreen, 'Client'],
+  ['SARecycleClientDetail', RecycleClientDetailScreen, 'Recycle Client'],
+  ['SARecycleClientForm', RecycleClientFormScreen, 'Recycle Client'],
+  ['SAStaffDetail', StaffDetailScreen, 'Staff'],
+  ['SAStaffForm', StaffFormScreen, 'Staff'],
+  ['SAUserForm', UserFormScreen, 'Admin User'],
+  ['SACreateAccount', CreateAccountScreen, 'Create Account'],
+  ['AdminTrashDetail', TrashDetailScreen, 'Trash Record'],
+  ['AdminPartDetail', PartDetailScreen, 'Part'],
 ];
 import MainTabs from './MainTabs';
 import { navigationRef } from './navigationRef';

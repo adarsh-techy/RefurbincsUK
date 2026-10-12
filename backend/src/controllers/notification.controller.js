@@ -283,6 +283,298 @@ async function getAdminNotifications(req, res, next) {
   }
 }
 
+/**
+ * Fetch a single operational notification by ID with enriched details
+ */
+async function getAdminNotificationById(req, res, next) {
+  try {
+    const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({ message: 'Notification ID is required' });
+    }
+
+    // 1. Check if it's a Part Stock alert: stock_{partId}
+    if (id.startsWith('stock_')) {
+      const partId = Number(id.replace('stock_', ''));
+      const { rows } = await db.query(
+        `SELECT id, name, sku, quantity, in_stock, repair_cost, created_at, updated_at
+         FROM parts WHERE id = $1`,
+        [partId]
+      );
+      if (rows.length > 0) {
+        const p = rows[0];
+        const isZero = !p.in_stock || Number(p.quantity) <= 0;
+        return res.json({
+          notification: {
+            id,
+            type: 'stock',
+            category: 'inventory',
+            severity: isZero ? 'urgent' : 'warning',
+            title: isZero ? `Out of Stock: ${p.name}` : `Low Stock Alert: ${p.name}`,
+            message: isZero
+              ? `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) has reached 0 units in stock. Reorder immediately to avoid workshop repair delays.`
+              : `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) is running low with only ${p.quantity} unit(s) remaining in stock.`,
+            timestamp: p.updated_at || p.created_at || new Date().toISOString(),
+            actionLabel: 'Restock & Manage Part',
+            actionUrl: `/parts/${p.id}`,
+            meta: {
+              partId: p.id,
+              partName: p.name,
+              sku: p.sku,
+              quantity: p.quantity,
+              inStock: p.in_stock,
+              repairCost: p.repair_cost,
+            },
+            entityDetails: p,
+          },
+        });
+      }
+    }
+
+    // 2. Check if it's a Support Ticket alert: ticket_{ticketId}
+    if (id.startsWith('ticket_')) {
+      const ticketId = Number(id.replace('ticket_', ''));
+      const { rows } = await db.query(
+        `SELECT st.id, st.ticket_number, st.client_id, st.client_name, st.subject, st.category, st.priority, st.status,
+                st.battery_code, st.created_at, st.updated_at,
+                c.email AS client_email, c.phone AS client_phone
+         FROM support_tickets st
+         LEFT JOIN clients c ON c.id = st.client_id
+         WHERE st.id = $1`,
+        [ticketId]
+      );
+      if (rows.length > 0) {
+        const t = rows[0];
+        const { rows: messages } = await db.query(
+          `SELECT id, sender_role, sender_name, message, created_at
+           FROM support_ticket_messages
+           WHERE ticket_id = $1
+           ORDER BY created_at DESC
+           LIMIT 10`,
+          [ticketId]
+        );
+        const isCritical = t.priority === 'critical' || t.priority === 'high';
+        return res.json({
+          notification: {
+            id,
+            type: 'ticket',
+            category: 'support',
+            severity: isCritical ? 'urgent' : 'info',
+            title: `Client Inquiry [${t.ticket_number || `#${t.id}`}]: ${t.subject || 'Support Request'}`,
+            message: `${t.client_name || 'Client'} submitted a ${t.priority || 'standard'} priority support ticket regarding ${t.category || 'battery issue'}${t.battery_code ? ` (Battery: ${t.battery_code})` : ''}. Status: ${t.status}.`,
+            timestamp: t.updated_at || t.created_at,
+            actionLabel: 'Open Conversation',
+            actionUrl: `/messages?ticket=${t.id}`,
+            meta: {
+              ticketId: t.id,
+              ticketNumber: t.ticket_number,
+              clientName: t.client_name,
+              priority: t.priority,
+              status: t.status,
+              batteryCode: t.battery_code,
+              messageCount: messages.length,
+            },
+            entityDetails: { ...t, messages },
+          },
+        });
+      }
+    }
+
+    // 3. Check if it's a Truck Intake alert: intake_{intakeId}
+    if (id.startsWith('intake_')) {
+      const intakeId = Number(id.replace('intake_', ''));
+      const { rows } = await db.query(
+        `SELECT ti.id, ti.truck_number, ti.driver_name, ti.battery_count, ti.status, ti.intake_at, ti.created_at, ti.verified_at,
+                c.id AS client_id, c.name AS client_name, c.email AS client_email
+         FROM truck_intakes ti
+         LEFT JOIN clients c ON c.id = ti.client_id
+         WHERE ti.id = $1`,
+        [intakeId]
+      );
+      if (rows.length > 0) {
+        const ti = rows[0];
+        const isPending = ti.status === 'draft' || ti.status === 'pending';
+        return res.json({
+          notification: {
+            id,
+            type: 'intake',
+            category: 'logistics',
+            severity: isPending ? 'warning' : 'info',
+            title: isPending ? `Intake Pending Verification: Truck ${ti.truck_number}` : `Intake Verified: Truck ${ti.truck_number}`,
+            message: `${ti.battery_count || 0} batteries received from ${ti.client_name || 'Fleet Client'} on Truck ${ti.truck_number || 'N/A'}${ti.driver_name ? ` (Driver: ${ti.driver_name})` : ''}. Status: ${ti.status || 'received'}.`,
+            timestamp: ti.verified_at || ti.intake_at || ti.created_at,
+            actionLabel: 'Inspect Truck Intake',
+            actionUrl: `/truck-intakes/${ti.id}`,
+            meta: {
+              intakeId: ti.id,
+              truckNumber: ti.truck_number,
+              driverName: ti.driver_name,
+              batteryCount: ti.battery_count,
+              status: ti.status,
+              clientName: ti.client_name,
+            },
+            entityDetails: ti,
+          },
+        });
+      }
+    }
+
+    // 4. Check if it's a Return dispatch alert: return_{returnId}
+    if (id.startsWith('return_')) {
+      const returnId = Number(id.replace('return_', ''));
+      const { rows } = await db.query(
+        `SELECT ret.id, ret.truck_number, ret.driver_name, ret.battery_count, ret.returned_at, ret.created_at,
+                c.id AS client_id, c.name AS client_name, c.email AS client_email
+         FROM returns ret
+         LEFT JOIN clients c ON c.id = ret.client_id
+         WHERE ret.id = $1`,
+        [returnId]
+      );
+      if (rows.length > 0) {
+        const ret = rows[0];
+        return res.json({
+          notification: {
+            id,
+            type: 'return',
+            category: 'logistics',
+            severity: 'success',
+            title: `Client Return Dispatched: ${ret.client_name || 'Fleet Client'}`,
+            message: `${ret.battery_count || 0} serviced batteries dispatched on Truck ${ret.truck_number || 'N/A'}${ret.driver_name ? ` with Driver ${ret.driver_name}` : ''}.`,
+            timestamp: ret.returned_at || ret.created_at,
+            actionLabel: 'View Return Manifest',
+            actionUrl: `/returns/${ret.id}`,
+            meta: {
+              returnId: ret.id,
+              truckNumber: ret.truck_number,
+              driverName: ret.driver_name,
+              batteryCount: ret.battery_count,
+              clientName: ret.client_name,
+              clientId: ret.client_id,
+            },
+            entityDetails: ret,
+          },
+        });
+      }
+    }
+
+    // 5. Check if it's a Service Rating feedback alert: rating_{ratingId}
+    if (id.startsWith('rating_')) {
+      const ratingId = Number(id.replace('rating_', ''));
+      const { rows } = await db.query(
+        `SELECT br.id, br.client_id, br.battery_code, br.rating, br.preset_tags, br.custom_feedback, br.created_at,
+                c.name AS client_name, c.email AS client_email
+         FROM battery_ratings br
+         LEFT JOIN clients c ON c.id = br.client_id
+         WHERE br.id = $1`,
+        [ratingId]
+      );
+      if (rows.length > 0) {
+        const r = rows[0];
+        const isLow = Number(r.rating) <= 2;
+        return res.json({
+          notification: {
+            id,
+            type: 'rating',
+            category: 'feedback',
+            severity: isLow ? 'warning' : 'success',
+            title: `${r.rating}★ Service Rating: ${r.client_name || 'Client Fleet'}`,
+            message: `${r.client_name || 'Client'} rated repair service on ${r.battery_code || 'battery'}. Feedback: "${r.custom_feedback || (r.preset_tags && r.preset_tags.length ? r.preset_tags.join(', ') : 'High satisfaction')}"`,
+            timestamp: r.created_at,
+            actionLabel: 'View Review Detail',
+            actionUrl: `/ratings/${r.id}`,
+            meta: {
+              ratingId: r.id,
+              rating: r.rating,
+              batteryCode: r.battery_code,
+              clientName: r.client_name,
+              feedback: r.custom_feedback,
+              presetTags: r.preset_tags,
+            },
+            entityDetails: r,
+          },
+        });
+      }
+    }
+
+    // 6. Check if it's a Milestone certificate alert: milestone_{milestoneId}
+    if (id.startsWith('milestone_')) {
+      const milestoneId = Number(id.replace('milestone_', ''));
+      const { rows } = await db.query(
+        `SELECT mc.id, mc.client_id, mc.milestone_tier, mc.milestone_count, mc.title, mc.co2_saved_kg, mc.ewaste_diverted_kg,
+                mc.certificate_code, mc.issued_at,
+                c.name AS client_name, c.email AS client_email
+         FROM milestone_certificates mc
+         LEFT JOIN clients c ON c.id = mc.client_id
+         WHERE mc.id = $1`,
+        [milestoneId]
+      );
+      if (rows.length > 0) {
+        const m = rows[0];
+        return res.json({
+          notification: {
+            id,
+            type: 'milestone',
+            category: 'milestone',
+            severity: 'success',
+            title: `🏆 Milestone Awarded: ${m.milestone_tier} (${m.client_name || 'Client'})`,
+            message: `${m.client_name || 'Client'} reached ${m.milestone_count} repaired batteries milestone! Diverted ${m.ewaste_diverted_kg}kg E-Waste and saved ${m.co2_saved_kg}kg CO₂.`,
+            timestamp: m.issued_at,
+            actionLabel: 'View Milestone Certificate',
+            actionUrl: `/certificates/client/${m.client_id}`,
+            meta: {
+              certificateId: m.id,
+              certificateCode: m.certificate_code,
+              tier: m.milestone_tier,
+              count: m.milestone_count,
+              clientName: m.client_name,
+              clientId: m.client_id,
+              co2SavedKg: m.co2_saved_kg,
+              ewasteDivertedKg: m.ewaste_diverted_kg,
+            },
+            entityDetails: m,
+          },
+        });
+      }
+    }
+
+    // 7. Check if it's unserviceable scrap summary alert
+    if (id === 'unserviceable_summary') {
+      const { rows: scrapList } = await db.query(
+        `SELECT b.id, b.battery_code, b.client_name, b.created_at, b.notes
+         FROM batteries b
+         WHERE b.status = 'unserviceable'
+           AND NOT EXISTS (SELECT 1 FROM recycle_batteries rb WHERE rb.battery_id = b.id)
+         ORDER BY b.created_at DESC
+         LIMIT 20`
+      );
+      return res.json({
+        notification: {
+          id: 'unserviceable_summary',
+          type: 'unserviceable',
+          category: 'alert',
+          severity: 'warning',
+          title: `⚠️ ${scrapList.length} Unserviceable Batteries Awaiting Recycling`,
+          message: `${scrapList.length} scrap battery pack(s) are stored in the workshop pending batch shipment to certified recycling partners.`,
+          timestamp: scrapList[0]?.created_at || new Date().toISOString(),
+          actionLabel: 'Manage Unserviceable Scrap',
+          actionUrl: `/batteries/unserviceable`,
+          meta: {
+            count: scrapList.length,
+            sampleCodes: scrapList.map((b) => b.battery_code),
+          },
+          entityDetails: { batteries: scrapList },
+        },
+      });
+    }
+
+    // 8. Fallback: retrieve from all generated notifications
+    return res.status(404).json({ message: 'Notification not found or has expired' });
+  } catch (err) {
+    next(err);
+  }
+}
+
 module.exports = {
   getAdminNotifications,
+  getAdminNotificationById,
 };
