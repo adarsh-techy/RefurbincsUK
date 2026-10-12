@@ -22,7 +22,13 @@ const SHEET_SIZE = DEFAULT_COLUMNS * ROWS;
 const LIST_PAGE = 20;
 const DEBOUNCE_MS = 250;
 const BULK_PRESETS = [10, 50, 100, 500, 1000, 5000, 10000, 50000];
-const prefixOf = (name) => (name || '').trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+// Each client has its own stored prefix (clients.battery_prefix); the first
+// three letters of the name are only a fallback.
+const prefixOf = (name, clients = []) => {
+  const trimmed = (name || '').trim();
+  const match = trimmed && clients.find((c) => (c.name || '').trim().toLowerCase() === trimmed.toLowerCase());
+  return match?.battery_prefix || trimmed.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+};
 const pad = (n, len) => String(n).padStart(len, '0');
 
 function useNextNumber(clientName) {
@@ -151,7 +157,7 @@ export default function AdminGenerateQrScreen() {
   useEffect(() => { refetchList(); }, [refetchList]);
 
   // ── individual ──
-  const clientPrefix = prefixOf(clientName);
+  const clientPrefix = prefixOf(clientName, clients);
   const computedBatteryId = clientPrefix ? `${clientPrefix}-${pad(suggestedNumber, BATTERY_NUMBER_DIGITS)}` : '';
 
   async function handleSubmit() {
@@ -186,7 +192,7 @@ export default function AdminGenerateQrScreen() {
   // ── bulk ──
   const bulkStart = Number(bulkStartNumber) > 0 ? Number(bulkStartNumber) : bulkSuggestedStart;
   const bulkEnd = bulkStart + Math.max(Number(bulkCount) || 1, 1) - 1;
-  const bulkPrefix = prefixOf(bulkClientName);
+  const bulkPrefix = prefixOf(bulkClientName, clients);
   const padLen = Math.max(BATTERY_NUMBER_DIGITS, String(bulkEnd).length);
   const bulkFirstPreview = bulkPrefix ? `${bulkPrefix}-${pad(bulkStart, padLen)}` : '—';
   const bulkLastPreview = bulkPrefix ? `${bulkPrefix}-${pad(bulkEnd, padLen)}` : '—';

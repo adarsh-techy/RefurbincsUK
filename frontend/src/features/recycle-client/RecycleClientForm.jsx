@@ -8,8 +8,10 @@ const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-
 function RecycleClientForm({ client, onSaved, onCancel }) {
   const isEdit = Boolean(client);
   const [name, setName] = useState(client?.name || '');
-  const [email, setEmail] = useState('');
+  const hasExistingLogin = Boolean(client?.login_email);
+  const [email, setEmail] = useState(client?.login_email || '');
   const [tempPassword, setTempPassword] = useState('');
+  const [active, setActive] = useState(client?.user_active ?? true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
@@ -20,12 +22,24 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (tempPassword && tempPassword.length < 8) {
+      setError('Password must be at least 8 characters.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const formattedName = capitalizeFirst(name.trim());
       if (isEdit) {
-        await apiClient.patch(`/clients/${client.id}`, { name: formattedName });
+        // Same payload as the mobile partner form: login fields only when the
+        // partner has a login, email only when it changed.
+        const body = { name: formattedName };
+        if (hasExistingLogin) {
+          if (email.trim() && email.trim() !== client.login_email) body.email = email.trim();
+          if (tempPassword) body.tempPassword = tempPassword;
+          body.active = active ? 'true' : 'false';
+        }
+        await apiClient.patch(`/clients/${client.id}`, body);
       } else {
         await apiClient.post('/clients', {
           name: formattedName,
@@ -91,6 +105,47 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {isEdit && hasExistingLogin && (
+        <div className="rounded-lg border border-slate-200 p-3.5 dark:border-surface-700">
+          <p className="text-sm font-medium text-slate-700 dark:text-neutral-200">Partner login</p>
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <label className={labelClasses}>Login Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className={inputClasses}
+                required
+              />
+            </div>
+            <div>
+              <label className={labelClasses}>Reset Password (optional)</label>
+              <input
+                type="text"
+                value={tempPassword}
+                onChange={(e) => setTempPassword(e.target.value)}
+                placeholder="Leave blank to keep existing"
+                className={inputClasses}
+                minLength={8}
+              />
+              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                The partner signs in with this one-time password and must set their own straight away.
+              </p>
+            </div>
+            <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-neutral-200">
+              <input
+                type="checkbox"
+                checked={active}
+                onChange={(e) => setActive(e.target.checked)}
+                className="h-4 w-4 rounded border-slate-300 text-brand-600 focus:ring-brand-500"
+              />
+              Account Active (unchecking prevents this partner from logging in)
+            </label>
+          </div>
         </div>
       )}
 

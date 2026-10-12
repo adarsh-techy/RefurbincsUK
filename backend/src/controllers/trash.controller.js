@@ -1,5 +1,9 @@
 const trashModel = require('../models/trash.model');
 const auditLogModel = require('../models/audit-log.model');
+const realtime = require('../realtime');
+
+// Adds restorable / restore_blocked_reason / restore_note to a trash row.
+const withRestoreInfo = (row) => ({ ...row, ...trashModel.restoreInfo(row.item_type) });
 
 async function list(req, res, next) {
   try {
@@ -31,7 +35,7 @@ async function list(req, res, next) {
     const totalPages = Math.ceil(result.total / parsedLimit);
 
     res.json({
-      data: result.rows,
+      data: result.rows.map(withRestoreInfo),
       pagination: {
         total: result.total,
         page: parsedPage,
@@ -51,7 +55,7 @@ async function getById(req, res, next) {
     if (!item) {
       return res.status(404).json({ message: 'Trash item not found' });
     }
-    res.json({ data: item });
+    res.json({ data: withRestoreInfo(item) });
   } catch (err) {
     next(err);
   }
@@ -93,6 +97,44 @@ async function remove(req, res, next) {
   }
 }
 
+// Puts a trashed record back where it came from (super admin only, via the
+// router). 409 when it would clash with something created since.
+async function restore(req, res, next) {
+  try {
+    const { item, record, notes } = await trashModel.restore(req.params.id);
+
+    await auditLogModel.record({
+      userId: req.user.id,
+      action: 'restore',
+      entity: item.item_type,
+      entityId: record.id,
+      details: {
+        trashItemId: item.id,
+        originalId: item.original_id,
+        title: item.title,
+        notes,
+      },
+    });
+
+    if (item.item_type === 'part') {
+      realtime.broadcastOutOfStockParts().catch((err) => console.error('broadcastOutOfStockParts:', err));
+    }
+    if (item.item_type === 'battery') {
+      realtime.broadcastUnserviceableCount().catch((err) => console.error('broadcastUnserviceableCount:', err));
+    }
+
+    res.json({
+      message: `${item.title} was restored.`,
+      itemType: item.item_type,
+      restoredId: record.id,
+      notes,
+    });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ message: err.message });
+    next(err);
+  }
+}
+
 async function clearAll(req, res, next) {
   try {
     await trashModel.clearAll();
@@ -112,6 +154,7 @@ async function clearAll(req, res, next) {
 }
 
 module.exports = {
+  restore,
   list,
   getById,
   getStats,

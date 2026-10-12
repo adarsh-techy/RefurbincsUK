@@ -1,8 +1,5 @@
-const path = require('path');
-const fs = require('fs');
 const nodemailer = require('nodemailer');
-
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'invoices');
+const fileStorage = require('./file-storage');
 
 function getTransporter() {
   const host = process.env.SMTP_HOST;
@@ -64,11 +61,11 @@ async function sendInvoiceEmail({
 
   const attachments = [];
   if (filePath) {
-    const fullPath = path.join(UPLOADS_DIR, filePath);
-    if (fs.existsSync(fullPath)) {
+    const content = await fileStorage.read(`invoices/${filePath}`);
+    if (content) {
       attachments.push({
         filename: fileName || `Invoice-${invoiceNumber}.pdf`,
-        path: fullPath,
+        content,
       });
     }
   }

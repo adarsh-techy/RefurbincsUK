@@ -153,14 +153,31 @@ async function getDashboardStats(clientId, clientName) {
 // email/passwordHash are optional — when given, also creates a linked
 // `users` login account (role 'client', forced to set its own password on
 // first login) in the same transaction, with specified dashboard permissions.
-async function create({ name, invoiceEmail, email, passwordHash, role = 'client', permissions = [], logoPath }) {
+// A super admin may choose a client's battery-code prefix (migration 056)
+// instead of the automatic one. Returns an error message, or null if OK.
+// Changing it is only allowed while the client owns no batteries, so
+// existing codes never stop matching their client.
+async function checkBatteryPrefix(prefix, { clientId = null, name, currentName } = {}) {
+  if (!/^[A-Z]{2,6}$/.test(prefix)) return 'Battery prefix must be 2–6 letters (A–Z).';
+  if (clientId) {
+    const { rows } = await db.query(
+      'SELECT COUNT(*)::int AS n FROM batteries WHERE lower(trim(client_name)) = lower(trim($1))',
+      [currentName || name]
+    );
+    if (rows[0].n > 0) return 'The battery prefix can only be changed while the client has no batteries.';
+  }
+  const { rows } = await db.query('SELECT battery_prefix_is_free($1, $2, $3) AS free', [prefix, clientId, name]);
+  return rows[0].free ? null : `Battery prefix ${prefix} is already used by another client.`;
+}
+
+async function create({ name, invoiceEmail, email, passwordHash, role = 'client', permissions = [], logoPath, batteryPrefix }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
 
     const { rows: clientRows } = await client.query(
-      'INSERT INTO clients (name, invoice_email, logo_path) VALUES ($1, $2, $3) RETURNING *',
-      [name, invoiceEmail ? invoiceEmail.trim() : null, logoPath || null]
+      'INSERT INTO clients (name, invoice_email, logo_path, battery_prefix) VALUES ($1, $2, $3, $4) RETURNING *',
+      [name, invoiceEmail ? invoiceEmail.trim() : null, logoPath || null, batteryPrefix || null]
     );
     let clientRow = clientRows[0];
 
@@ -189,10 +206,27 @@ async function create({ name, invoiceEmail, email, passwordHash, role = 'client'
   }
 }
 
-async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, permissions, active }) {
+async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, permissions, active, batteryPrefix }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Batteries and tickets are linked to a client by name, so a rename has
+    // to carry them along (and must not collide with another client's name).
+    const { rows: before } = await client.query('SELECT name FROM clients WHERE id = $1 FOR UPDATE', [id]);
+    const oldName = before[0]?.name;
+    const renamed = oldName && name && oldName.trim().toLowerCase() !== name.trim().toLowerCase();
+    if (renamed) {
+      const { rows: clash } = await client.query(
+        'SELECT 1 FROM clients WHERE lower(trim(name)) = lower(trim($1)) AND id <> $2 LIMIT 1',
+        [name, id]
+      );
+      if (clash.length) {
+        const err = new Error(`Another client is already called "${name.trim()}".`);
+        err.status = 409;
+        throw err;
+      }
+    }
 
     const clientUpdates = ['name = $2'];
     const clientParams = [id, name];
@@ -207,6 +241,11 @@ async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, p
       clientUpdates.push(`logo_path = $${clientParams.length}`);
     }
 
+    if (batteryPrefix) {
+      clientParams.push(batteryPrefix);
+      clientUpdates.push(`battery_prefix = $${clientParams.length}`);
+    }
+
     const { rows } = await client.query(
       `UPDATE clients SET ${clientUpdates.join(', ')} WHERE id = $1 RETURNING *`,
       clientParams
@@ -216,6 +255,17 @@ async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, p
     if (!clientRow) {
       await client.query('ROLLBACK');
       return null;
+    }
+
+    if (renamed) {
+      await client.query(
+        'UPDATE batteries SET client_name = $1 WHERE lower(trim(client_name)) = lower(trim($2))',
+        [clientRow.name, oldName]
+      );
+      await client.query(
+        'UPDATE support_tickets SET client_name = $1 WHERE client_id = $2',
+        [clientRow.name, id]
+      );
     }
 
     // If client is linked to a user login account, update their permissions, email, active status or password
@@ -1384,6 +1434,7 @@ async function replaceSortGroups(clientId, userId, groups) {
 }
 
 module.exports = {
+  checkBatteryPrefix,
   findAll,
   findById,
   findByUserId,

@@ -105,6 +105,7 @@ export default function ClientDetailScreen() {
             </View>
             <Text className="mt-1.5 text-xs text-slate-500">
               Client since {client.created_at ? new Date(client.created_at).toLocaleDateString() : '—'}
+              {client.battery_prefix ? ` • Battery IDs: ${client.battery_prefix}-…` : ''}
             </Text>
           </View>
         </View>

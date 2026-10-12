@@ -6,6 +6,7 @@ import Badge from '../../components/ui/primitives/Badge';
 import Button from '../../components/ui/primitives/Button';
 import TableState from '../../components/ui/table/TableState';
 import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import RestoreModal from './RestoreModal';
 import { useSelector } from 'react-redux';
 
 const ITEM_TYPES = [
@@ -79,6 +80,7 @@ export default function TrashPage() {
 
   // Modals
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
   const [emptyTrashModal, setEmptyTrashModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
@@ -455,6 +457,27 @@ export default function TrashPage() {
                             Inspect
                           </Link>
 
+                          {item.restorable ? (
+                            <button
+                              type="button"
+                              onClick={() => setRestoreTarget(item)}
+                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+                                <path d="M3 3v5h5" />
+                              </svg>
+                              Restore
+                            </button>
+                          ) : (
+                            <span
+                              title={item.restore_blocked_reason || 'This item can’t be restored'}
+                              className="cursor-help rounded-lg px-2 py-1.5 text-[11px] font-medium text-slate-400 dark:text-neutral-500"
+                            >
+                              Can’t restore
+                            </span>
+                          )}
+
                           <button
                             type="button"
                             onClick={() => setDeleteTarget(item)}
@@ -509,12 +532,25 @@ export default function TrashPage() {
         </div>
       )}
 
+      {/* Restore Item Modal */}
+      {restoreTarget && (
+        <RestoreModal
+          item={restoreTarget}
+          onClose={() => setRestoreTarget(null)}
+          onRestored={() => {
+            setRestoreTarget(null);
+            fetchStats();
+            fetchTrash();
+          }}
+        />
+      )}
+
       {/* Delete Item Modal */}
       {deleteTarget && (
         <ConfirmModal
           open={Boolean(deleteTarget)}
           title="Permanently Delete Item?"
-          description={`Are you sure you want to permanently purge "${deleteTarget.title}" from the trash bin? This action cannot be undone.`}
+          message={`Are you sure you want to permanently purge "${deleteTarget.title}" from the trash bin? This action cannot be undone.`}
           confirmLabel="Permanently Delete"
           cancelLabel="Cancel"
           tone="critical"
@@ -529,7 +565,7 @@ export default function TrashPage() {
         <ConfirmModal
           open={emptyTrashModal}
           title="Empty Entire Trash Bin?"
-          description="Are you sure you want to permanently delete all archived items in the trash? All deleted history records will be completely removed."
+          message="Are you sure you want to permanently delete all archived items in the trash? All deleted history records will be completely removed."
           confirmLabel="Empty Trash"
           cancelLabel="Cancel"
           tone="critical"

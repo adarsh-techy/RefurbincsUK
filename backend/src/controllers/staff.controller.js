@@ -1,16 +1,8 @@
-const fs = require('fs');
-const path = require('path');
 const bcrypt = require('bcryptjs');
+const fileStorage = require('../services/file-storage');
 const staffModel = require('../models/staff.model');
 const trashModel = require('../models/trash.model');
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'staff-docs');
-
-function ensureUploadsDir() {
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
-}
 
 // Salary, passport / NI numbers, share code and ID documents are only for
 // logins with the Staff module; other office logins (e.g. an admin with only
@@ -80,10 +72,9 @@ async function create(req, res, next) {
     let documentName = undefined;
 
     if (req.file) {
-      ensureUploadsDir();
       const cleanOriginal = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
       const filename = `doc-${Date.now()}-${cleanOriginal}`;
-      fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+      await fileStorage.save(`staff-docs/${filename}`, req.file.buffer, req.file.mimetype);
       documentPath = filename;
       documentName = req.file.originalname;
     }
@@ -134,10 +125,9 @@ async function update(req, res, next) {
     let documentName = undefined;
 
     if (req.file) {
-      ensureUploadsDir();
       const cleanOriginal = req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
       const filename = `doc-${Date.now()}-${cleanOriginal}`;
-      fs.writeFileSync(path.join(UPLOADS_DIR, filename), req.file.buffer);
+      await fileStorage.save(`staff-docs/${filename}`, req.file.buffer, req.file.mimetype);
       documentPath = filename;
       documentName = req.file.originalname;
     }

@@ -23,6 +23,7 @@ function ClientForm({ client, onSaved, onCancel }) {
 
   const [name, setName] = useState(client?.name || '');
   const [invoiceEmail, setInvoiceEmail] = useState(client?.invoice_email || '');
+  const [batteryPrefix, setBatteryPrefix] = useState(client?.battery_prefix || '');
   const [grantLogin, setGrantLogin] = useState(hasExistingLogin);
   const [email, setEmail] = useState(client?.login_email || '');
   const [tempPassword, setTempPassword] = useState('');
@@ -65,6 +66,10 @@ function ClientForm({ client, onSaved, onCancel }) {
       const formData = new FormData();
       formData.append('name', name);
       formData.append('invoiceEmail', invoiceEmail.trim());
+      // Blank on create = picked automatically; unchanged on edit = not sent
+      if (batteryPrefix.trim() && batteryPrefix.trim() !== (client?.battery_prefix || '')) {
+        formData.append('batteryPrefix', batteryPrefix.trim());
+      }
       if (logoFile) {
         formData.append('logo', logoFile);
       }
@@ -126,6 +131,21 @@ function ClientForm({ client, onSaved, onCancel }) {
             Invoices & statements will be sent to this email.
           </p>
         </div>
+      </div>
+
+      <div>
+        <label className={labelClasses}>Battery Code Prefix {isEdit ? '' : '(optional)'}</label>
+        <input
+          type="text"
+          value={batteryPrefix}
+          onChange={(e) => setBatteryPrefix(e.target.value.replace(/[^a-zA-Z]/g, '').slice(0, 6).toUpperCase())}
+          placeholder={isEdit ? '' : 'Picked automatically, e.g. APE'}
+          className={`${inputClasses} max-w-xs font-mono uppercase`}
+        />
+        <p className="mt-1 text-xs text-slate-400 dark:text-neutral-500">
+          {batteryPrefix ? `Battery IDs look like ${batteryPrefix}-0000001. ` : ''}
+          2–6 letters, unique to this client. {isEdit ? 'Can only be changed while the client has no batteries.' : 'Leave blank to use the first free letters of the name.'}
+        </p>
       </div>
 
       <div>

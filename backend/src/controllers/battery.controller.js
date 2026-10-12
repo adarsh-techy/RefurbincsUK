@@ -1,4 +1,3 @@
-const fs = require('fs');
 const path = require('path');
 const batteryModel = require('../models/battery.model');
 const staffModel = require('../models/staff.model');
@@ -9,12 +8,9 @@ const trashModel = require('../models/trash.model');
 const auditLogModel = require('../models/audit-log.model');
 const truckIntakeModel = require('../models/truck-intake.model');
 const realtime = require('../realtime');
+const fileStorage = require('../services/file-storage');
 const { parseRfidSheet, normalizeTag } = require('../utils/parse-rfid-sheet');
 
-const ISSUE_PHOTOS_DIR = path.join(__dirname, '..', '..', 'uploads', 'issue-photos');
-if (!fs.existsSync(ISSUE_PHOTOS_DIR)) {
-  fs.mkdirSync(ISSUE_PHOTOS_DIR, { recursive: true });
-}
 
 const DEFAULT_LIMIT = 15;
 const MAX_LIMIT = 100;
@@ -165,6 +161,26 @@ async function getByCode(req, res, next) {
         removed_by_staff_id: null,
       }));
       const publicServices = services.map((sv) => ({ ...sv, rate: null }));
+      // A recycling partner never learns which fleet client a battery came
+      // from: no client name, and no client truck / driver / return details.
+      if (req.user?.role === 'recycle_client') {
+        return res.json({
+          battery: {
+            ...battery,
+            client_name: null,
+            intake_truck_number: null,
+            intake_driver_name: null,
+            truck_intake_id: null,
+          },
+          history: publicHistory,
+          returns: returns.map((r) => ({ ...r, truck_number: null, driver_name: null })),
+          visits: visits.map((v) => ({ ...v, truck_intake_id: null, truck_number: null, driver_name: null })),
+          issues,
+          recycleBatch,
+          services: publicServices,
+          pendingPartsRemoval,
+        });
+      }
       return res.json({
         battery,
         history: publicHistory,
@@ -279,8 +295,11 @@ async function countByClient(req, res, next) {
     if (!clientName) {
       return res.json({ lastNumber: 0 });
     }
-    const lastNumber = await batteryModel.maxSequenceByClientName(clientName);
-    res.json({ lastNumber });
+    const [lastNumber, prefix] = await Promise.all([
+      batteryModel.maxSequenceByClientName(clientName),
+      batteryModel.prefixForClient(clientName),
+    ]);
+    res.json({ lastNumber, prefix });
   } catch (err) {
     next(err);
   }
@@ -300,6 +319,12 @@ async function generate(req, res, next) {
     }
     if (!batteryCode) {
       return res.status(400).json({ message: 'Battery ID could not be generated.' });
+    }
+    // The ID must carry this client's own prefix (see migration 056)
+    const prefix = await batteryModel.prefixForClient(clientName);
+    const codePrefix = (batteryCode.toUpperCase().match(/^([A-Z]+)-?\d+$/) || [])[1];
+    if (codePrefix !== prefix) {
+      return res.status(400).json({ message: `${clientName} battery IDs start with ${prefix}- — refresh the page and try again.` });
     }
     const battery = await batteryModel.createForClient({
       batteryCode,
@@ -576,7 +601,7 @@ async function reportIssue(req, res, next) {
         const rawExt = path.extname(file.originalname || '').toLowerCase();
         const ext = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'].includes(rawExt) ? rawExt : '.jpg';
         const safeName = `issue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${ext}`;
-        fs.writeFileSync(path.join(ISSUE_PHOTOS_DIR, safeName), file.buffer);
+        await fileStorage.save(`issue-photos/${safeName}`, file.buffer, file.mimetype);
         photoUrls.push(`/uploads/issue-photos/${safeName}`);
       }
     }
@@ -601,7 +626,7 @@ async function reportIssue(req, res, next) {
                 const ext = rawExt.includes('png') ? '.png' : rawExt.includes('webp') ? '.webp' : '.jpg';
                 const buffer = Buffer.from(match[2], 'base64');
                 const safeName = `issue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${ext}`;
-                fs.writeFileSync(path.join(ISSUE_PHOTOS_DIR, safeName), buffer);
+                await fileStorage.save(`issue-photos/${safeName}`, buffer, `image/${ext === '.jpg' ? 'jpeg' : ext.slice(1)}`);
                 photoUrls.push(`/uploads/issue-photos/${safeName}`);
               }
             } else if (item.startsWith('/uploads/')) {

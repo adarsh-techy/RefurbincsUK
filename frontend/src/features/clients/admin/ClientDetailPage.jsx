@@ -94,6 +94,7 @@ function ClientDetailPage() {
             </div>
             <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
               Client since {client.created_at ? new Date(client.created_at).toLocaleDateString() : '—'}
+              {client.battery_prefix && <> • Battery IDs: <span className="font-mono font-bold text-slate-700 dark:text-neutral-200">{client.battery_prefix}-…</span></>}
             </p>
           </div>
         </div>

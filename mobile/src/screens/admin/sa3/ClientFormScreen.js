@@ -23,6 +23,7 @@ export default function ClientFormScreen() {
 
   const [name, setName] = useState(client?.name || '');
   const [invoiceEmail, setInvoiceEmail] = useState(client?.invoice_email || '');
+  const [batteryPrefix, setBatteryPrefix] = useState(client?.battery_prefix || '');
   const [grantLogin, setGrantLogin] = useState(hasExistingLogin);
   const [email, setEmail] = useState(client?.login_email || '');
   const [tempPassword, setTempPassword] = useState('');
@@ -67,6 +68,10 @@ export default function ClientFormScreen() {
     if (tempPassword && tempPassword.length < 8) return setError('Password must be at least 8 characters.');
 
     const fields = { name, invoiceEmail: invoiceEmail.trim() };
+    // Blank on create = picked automatically; unchanged on edit = not sent
+    if (batteryPrefix.trim() && batteryPrefix.trim() !== (client?.battery_prefix || '')) {
+      fields.batteryPrefix = batteryPrefix.trim();
+    }
     if (grantLogin || hasExistingLogin) {
       if (email) fields.email = email;
       if (tempPassword) fields.tempPassword = tempPassword;
@@ -120,6 +125,14 @@ export default function ClientFormScreen() {
           keyboardType="email-address"
           autoCapitalize="none"
           help="Invoices & statements will be sent to this email."
+        />
+        <Input
+          label={`Battery Code Prefix${isEdit ? '' : ' (optional)'}`}
+          value={batteryPrefix}
+          onChangeText={(v) => setBatteryPrefix(v.replace(/[^a-zA-Z]/g, '').slice(0, 6).toUpperCase())}
+          placeholder={isEdit ? '' : 'Picked automatically, e.g. APE'}
+          autoCapitalize="characters"
+          help={`${batteryPrefix ? `Battery IDs look like ${batteryPrefix}-0000001. ` : ''}2–6 letters, unique to this client. ${isEdit ? 'Can only be changed while the client has no batteries.' : 'Leave blank to use the first free letters of the name.'}`}
         />
 
         <View>

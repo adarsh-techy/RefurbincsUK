@@ -1,15 +1,14 @@
-const fs = require('fs');
 const path = require('path');
+const fileStorage = require('../services/file-storage');
 const invoiceModel = require('../models/invoice.model');
 const clientModel = require('../models/client.model');
 const auditLogModel = require('../models/audit-log.model');
 const trashModel = require('../models/trash.model');
 const mailerService = require('../services/mailer.service');
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'invoices');
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-}
+// Invoice files are stored under invoices/ (see services/file-storage.js);
+// the DB keeps just the generated filename.
+const invoiceKey = (fileName) => `invoices/${fileName}`;
 
 async function list(req, res, next) {
   try {
@@ -62,8 +61,7 @@ async function create(req, res, next) {
     const fileName = req.file.originalname;
     const fileSize = req.file.size;
     const safeName = `inv-${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-    const filePath = path.join(UPLOADS_DIR, safeName);
-    fs.writeFileSync(filePath, req.file.buffer);
+    await fileStorage.save(invoiceKey(safeName), req.file.buffer, req.file.mimetype);
 
     const invoice = await invoiceModel.create({
       clientId: Number(clientId),
@@ -147,15 +145,11 @@ async function update(req, res, next) {
       fileName = req.file.originalname;
       fileSize = req.file.size;
       const safeName = `inv-${Date.now()}-${req.file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-      const newPath = path.join(UPLOADS_DIR, safeName);
-      fs.writeFileSync(newPath, req.file.buffer);
+      await fileStorage.save(invoiceKey(safeName), req.file.buffer, req.file.mimetype);
 
       // Clean up previous file if existing
       if (existing.file_path) {
-        const oldPath = path.join(UPLOADS_DIR, existing.file_path);
-        if (fs.existsSync(oldPath)) {
-          try { fs.unlinkSync(oldPath); } catch (_) {}
-        }
+        await fileStorage.remove(invoiceKey(existing.file_path));
       }
       filePath = safeName;
     }
@@ -199,10 +193,7 @@ async function remove(req, res, next) {
     }
 
     if (existing.file_path) {
-      const fullPath = path.join(UPLOADS_DIR, existing.file_path);
-      if (fs.existsSync(fullPath)) {
-        try { fs.unlinkSync(fullPath); } catch (_) {}
-      }
+      await fileStorage.remove(invoiceKey(existing.file_path));
     }
 
     await invoiceModel.remove(req.params.id);
@@ -253,8 +244,8 @@ async function downloadFile(req, res, next) {
       return res.status(403).json({ message: 'Access denied to this invoice.' });
     }
 
-    const fullPath = path.join(UPLOADS_DIR, invoice.file_path);
-    if (!fs.existsSync(fullPath)) {
+    const file = await fileStorage.open(invoiceKey(invoice.file_path));
+    if (!file) {
       return res.status(404).json({ message: 'File is no longer on disk.' });
     }
 
@@ -273,8 +264,9 @@ async function downloadFile(req, res, next) {
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Content-Disposition', `${disposition}; filename="${encodeURIComponent(downloadName)}"`);
-    const fileStream = fs.createReadStream(fullPath);
-    fileStream.pipe(res);
+    if (file.length != null) res.setHeader('Content-Length', file.length);
+    file.stream.on('error', next);
+    file.stream.pipe(res);
   } catch (err) {
     next(err);
   }

@@ -121,7 +121,7 @@ export default function RecycleDetailScreen() {
             <View className="flex-row flex-wrap gap-2">
               <StatTile label="📦 Total Batteries" value={batch.battery_count} tone="blue" />
               <StatTile label="✅ Confirmed Recycled" value={recycledCount} tone="emerald" />
-              <StatTile label="🏢 Original Clients" value={distinctClients} tone="slate" />
+              {!isRecycleClient && <StatTile label="🏢 Original Clients" value={distinctClients} tone="slate" />}
               <StatTile label="📸 With Evidence Photos" value={withPhotos} tone="amber" />
             </View>
 
@@ -154,7 +154,9 @@ export default function RecycleDetailScreen() {
                       <StatusBadge status={b.status} />
                     </View>
                     <View className="mt-2 gap-1.5">
-                      <Text className="text-xs text-slate-500">Original Client: <Text className="font-medium text-slate-800">{b.client_name || '—'}</Text></Text>
+                      {!isRecycleClient && (
+                        <Text className="text-xs text-slate-500">Original Client: <Text className="font-medium text-slate-800">{b.client_name || '—'}</Text></Text>
+                      )}
                       <View className="flex-row items-center">
                         <Text className="text-xs text-slate-500">Declared Reason: </Text>
                         {b.issue_reason ? (

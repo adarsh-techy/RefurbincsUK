@@ -1,6 +1,5 @@
-const fs = require('fs');
-const path = require('path');
 const bcrypt = require('bcryptjs');
+const fileStorage = require('../services/file-storage');
 const clientModel = require('../models/client.model');
 const invoiceModel = require('../models/invoice.model');
 const recycleModel = require('../models/recycle.model');
@@ -9,27 +8,16 @@ const trashModel = require('../models/trash.model');
 // A client's own logo — uploaded here by an admin, shown back on that
 // client's own dashboard. Stored on disk the same way invoice PDFs are
 // (see invoice.controller.js), just the generated filename kept in the DB.
-const LOGO_UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'client-logos');
-if (!fs.existsSync(LOGO_UPLOADS_DIR)) {
-  fs.mkdirSync(LOGO_UPLOADS_DIR, { recursive: true });
-}
-
-function saveLogoFile(file) {
+async function saveLogoFile(file) {
   const safeName = `logo-${Date.now()}-${file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
-  fs.writeFileSync(path.join(LOGO_UPLOADS_DIR, safeName), file.buffer);
+  await fileStorage.save(`client-logos/${safeName}`, file.buffer, file.mimetype);
   return safeName;
 }
 
-function deleteLogoFile(fileName) {
+// non-fatal — an orphaned file isn't worth failing the request over
+async function deleteLogoFile(fileName) {
   if (!fileName) return;
-  const fullPath = path.join(LOGO_UPLOADS_DIR, fileName);
-  if (fs.existsSync(fullPath)) {
-    try {
-      fs.unlinkSync(fullPath);
-    } catch {
-      // non-fatal — an orphaned file on disk isn't worth failing the request over
-    }
-  }
+  await fileStorage.remove(`client-logos/${fileName}`);
 }
 
 async function list(req, res, next) {
@@ -94,9 +82,18 @@ async function create(req, res, next) {
         message: 'A recycling partner needs a portal login (email and temporary password).',
       });
     }
+    // Optional battery-code prefix; left out, the database picks a free one
+    const batteryPrefix = typeof req.body.batteryPrefix === 'string' && req.body.batteryPrefix.trim()
+      ? req.body.batteryPrefix.trim().toUpperCase()
+      : undefined;
+    if (batteryPrefix) {
+      const prefixError = await clientModel.checkBatteryPrefix(batteryPrefix, { name });
+      if (prefixError) return res.status(prefixError.includes('already used') ? 409 : 400).json({ message: prefixError });
+    }
     const passwordHash = email && tempPassword ? await bcrypt.hash(tempPassword, 10) : undefined;
-    const logoPath = req.file ? saveLogoFile(req.file) : undefined;
+    const logoPath = req.file ? await saveLogoFile(req.file) : undefined;
     const client = await clientModel.create({
+      batteryPrefix,
       name,
       invoiceEmail: invoiceEmail || invoice_email,
       email,
@@ -113,7 +110,9 @@ async function create(req, res, next) {
       return res.status(409).json({
         message: err.constraint === 'users_email_key'
           ? 'An account with that email already exists.'
-          : 'A client with this name already exists.',
+          : err.constraint === 'clients_battery_prefix_unique'
+            ? 'That battery prefix is already used by another client.'
+            : 'A client with this name already exists.',
       });
     }
     next(err);
@@ -131,13 +130,30 @@ async function update(req, res, next) {
         parsedPermissions = Array.isArray(permissions) ? permissions : [];
       }
     }
+    let batteryPrefix = typeof req.body.batteryPrefix === 'string' && req.body.batteryPrefix.trim()
+      ? req.body.batteryPrefix.trim().toUpperCase()
+      : undefined;
+    if (batteryPrefix) {
+      const current = await clientModel.findById(req.params.id);
+      if (!current) return res.status(404).json({ message: 'Client not found' });
+      if (batteryPrefix === current.battery_prefix) {
+        batteryPrefix = undefined;
+      } else {
+        const prefixError = await clientModel.checkBatteryPrefix(batteryPrefix, {
+          clientId: current.id,
+          name: name || current.name,
+          currentName: current.name,
+        });
+        if (prefixError) return res.status(prefixError.includes('already used') ? 409 : 400).json({ message: prefixError });
+      }
+    }
     const passwordHash = tempPassword ? await bcrypt.hash(tempPassword, 10) : undefined;
     let logoPath;
     let previousLogoPath;
     if (req.file) {
       const existing = await clientModel.findById(req.params.id);
       previousLogoPath = existing?.logo_path;
-      logoPath = saveLogoFile(req.file);
+      logoPath = await saveLogoFile(req.file);
     }
     const client = await clientModel.update(req.params.id, {
       name,
@@ -147,12 +163,13 @@ async function update(req, res, next) {
       passwordHash,
       permissions: parsedPermissions,
       active,
+      batteryPrefix,
     });
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
     if (previousLogoPath && previousLogoPath !== logoPath) {
-      deleteLogoFile(previousLogoPath);
+      await deleteLogoFile(previousLogoPath);
     }
     res.json(client);
   } catch (err) {
@@ -160,7 +177,9 @@ async function update(req, res, next) {
       return res.status(409).json({
         message: err.constraint === 'users_email_key'
           ? 'An account with that email already exists.'
-          : 'A client with this name already exists.',
+          : err.constraint === 'clients_battery_prefix_unique'
+            ? 'That battery prefix is already used by another client.'
+            : 'A client with this name already exists.',
       });
     }
     next(err);

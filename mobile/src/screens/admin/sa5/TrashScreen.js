@@ -5,12 +5,13 @@ import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
 import DateField from '../../../components/admin/DateField';
 import { Banner, Chips, ConfirmModal, EmptyState, Loading, SmallButton, initials, relativeTime } from '../../../components/admin/sa5/common';
+import RestoreModal from '../../../components/admin/sa5/RestoreModal';
 import { ITEM_TYPES, TYPE_CONFIG, typeConfig } from './trash-config';
 
 // Trash Bin — the web TrashPage: GET /trash/stats for the counter cards and
 // GET /trash?page=&limit=15&search=&itemType=&startDate=&endDate= for the
 // list (Previous / Next pages). Tap a counter to filter by type. Each item
-// has Inspect (→ AdminTrashDetail) and Delete Permanently
+// has Inspect (→ AdminTrashDetail), Restore and Delete Permanently
 // (DELETE /trash/:id); the super admin can Empty Trash (DELETE /trash).
 
 const LIMIT = 15;
@@ -35,6 +36,7 @@ export default function TrashScreen() {
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: LIMIT });
 
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [restoreTarget, setRestoreTarget] = useState(null);
   const [emptyTrashModal, setEmptyTrashModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
   const reqRef = useRef(0);
@@ -263,8 +265,16 @@ export default function TrashScreen() {
                     </View>
                   </View>
 
-                  <View className="flex-row justify-end gap-2">
+                  <View className="flex-row flex-wrap justify-end gap-2">
                     <SmallButton label="👁 Inspect" onPress={() => openItem(item)} />
+                    {item.restorable ? (
+                      <SmallButton label="↺ Restore" tone="green" onPress={() => setRestoreTarget(item)} />
+                    ) : (
+                      <SmallButton
+                        label="Can’t restore"
+                        onPress={() => Alert.alert('Can’t be restored', item.restore_blocked_reason || 'This item can’t be restored.')}
+                      />
+                    )}
                     <SmallButton label="✕ Delete Permanently" tone="danger" onPress={() => setDeleteTarget(item)} />
                   </View>
                 </View>
@@ -289,6 +299,14 @@ export default function TrashScreen() {
         )}
       </ScrollView>
 
+      <RestoreModal
+        item={restoreTarget}
+        onClose={() => setRestoreTarget(null)}
+        onRestored={() => {
+          setRestoreTarget(null);
+          refreshAll();
+        }}
+      />
       <ConfirmModal
         open={!!deleteTarget}
         title="Permanently Delete Item?"

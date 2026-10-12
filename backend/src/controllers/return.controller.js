@@ -1,16 +1,9 @@
-const fs = require('fs');
 const path = require('path');
+const fileStorage = require('../services/file-storage');
 const returnModel = require('../models/return.model');
 const clientModel = require('../models/client.model');
 const auditLogModel = require('../models/audit-log.model');
 
-const UPLOADS_DIR = path.join(__dirname, '..', '..', 'uploads', 'return-docs');
-
-function ensureUploadsDir() {
-  if (!fs.existsSync(UPLOADS_DIR)) {
-    fs.mkdirSync(UPLOADS_DIR, { recursive: true });
-  }
-}
 
 // GET /:id and PATCH /:id/verify-receipt are reachable by any authenticated
 // role (not just requirePermission('returns') staff) so a client can view
@@ -64,21 +57,17 @@ async function getById(req, res, next) {
 // the public path + original name. Shared by create() and update(); async so
 // a 15MB PDF doesn't stall the event loop for every other request.
 async function persistReturnDoc(file) {
-  ensureUploadsDir();
   const cleanOriginal = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
   const filename = `return-${Date.now()}-${cleanOriginal}`;
-  await fs.promises.writeFile(path.join(UPLOADS_DIR, filename), file.buffer);
+  await fileStorage.save(`return-docs/${filename}`, file.buffer, file.mimetype);
   return { documentUrl: `/uploads/return-docs/${filename}`, documentName: file.originalname };
 }
 
 // Removes a previously stored return document (best effort — a missing file
-// is not an error). Only ever touches files inside UPLOADS_DIR.
+// is not an error). Only ever touches files inside return-docs/.
 async function removeReturnDoc(documentUrl) {
   if (!documentUrl) return;
-  const filename = path.basename(documentUrl);
-  try {
-    await fs.promises.unlink(path.join(UPLOADS_DIR, filename));
-  } catch (_) {}
+  await fileStorage.remove(`return-docs/${path.basename(documentUrl)}`);
 }
 
 // returned_at comes from a date picker; anything unparseable must be a 400,

@@ -50,9 +50,16 @@ function ClientsPage() {
       key: 'name',
       label: 'Client',
       render: (row) => (
-        <Link to={`/clients/${row.id}`} className="font-medium text-blue-700 hover:underline dark:text-blue-400">
-          {row.name}
-        </Link>
+        <div>
+          <Link to={`/clients/${row.id}`} className="font-medium text-blue-700 hover:underline dark:text-blue-400">
+            {row.name}
+          </Link>
+          {row.battery_prefix && (
+            <span className="ml-2 rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
+              {row.battery_prefix}-
+            </span>
+          )}
+        </div>
       ),
     },
     {

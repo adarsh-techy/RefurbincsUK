@@ -280,7 +280,7 @@ function RecycleDetailPage() {
       </div>
 
       {/* KPI Stat Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
+      <div className={`grid grid-cols-2 gap-3.5 ${isRecycleClient ? 'lg:grid-cols-3' : 'lg:grid-cols-4'}`}>
         <StatCard
           label="Total Batteries"
           value={batch.battery_count}
@@ -293,12 +293,14 @@ function RecycleDetailPage() {
           tone="good"
           icon="✅"
         />
-        <StatCard
-          label="Original Clients"
-          value={distinctClients}
-          tone="neutral"
-          icon="🏢"
-        />
+        {!isRecycleClient && (
+          <StatCard
+            label="Original Clients"
+            value={distinctClients}
+            tone="neutral"
+            icon="🏢"
+          />
+        )}
         <StatCard
           label="With Evidence Photos"
           value={withPhotosCount}
@@ -393,7 +395,7 @@ function RecycleDetailPage() {
             bordered={false}
             maxHeight="calc(100vh - 430px)"
             emptyMessage="No batteries match your filter or search."
-            columns={columns}
+            columns={isRecycleClient ? columns.filter((c) => c.key !== 'client_name') : columns}
             rows={filteredBatteries}
           />
         </div>

@@ -3,13 +3,15 @@ import { ActivityIndicator, Alert, ScrollView, Share, Text, TouchableOpacity, Vi
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../../services/api-client';
 import { ConfirmModal, SmallButton, initials, relativeTime } from '../../../components/admin/sa5/common';
+import RestoreModal from '../../../components/admin/sa5/RestoreModal';
 import { typeConfig } from './trash-config';
 
 // One trash record — the web TrashDetailPage: GET /trash/:id. Hero card
 // (type, original ID, "Archived / Deleted", trash record #), who deleted it
 // and when, and the data snapshot as labelled fields with Show / Hide Raw
 // JSON and Copy JSON (the share sheet — there's no clipboard package).
-// Permanent Delete → DELETE /trash/:id, then back to the Trash Bin.
+// Restore → POST /trash/:id/restore; Permanent Delete → DELETE /trash/:id;
+// both go back to the Trash Bin.
 
 const formatKey = (k) => k.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 
@@ -25,6 +27,7 @@ export default function TrashDetailScreen() {
   const [error, setError] = useState(null);
   const [showRawJson, setShowRawJson] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [restoreOpen, setRestoreOpen] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   useLayoutEffect(() => {
@@ -101,8 +104,28 @@ export default function TrashDetailScreen() {
           <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={6}>
             <Text className="text-sm font-medium text-slate-600">‹ Back to Trash Bin</Text>
           </TouchableOpacity>
-          <SmallButton label="🗑 Permanent Delete" tone="danger" onPress={() => setDeleteModal(true)} />
+          <View className="flex-row gap-2">
+            {item.restorable ? <SmallButton label="↺ Restore" tone="green" onPress={() => setRestoreOpen(true)} /> : null}
+            <SmallButton label="🗑 Permanent Delete" tone="danger" onPress={() => setDeleteModal(true)} />
+          </View>
         </View>
+
+        {/* Restore availability */}
+        {item.restorable ? (
+          item.restore_note ? (
+            <View className="rounded-2xl border border-amber-200 bg-amber-50 px-3.5 py-3">
+              <Text className="text-xs text-amber-800">
+                <Text className="font-bold">Restore puts this record back.</Text> {item.restore_note}
+              </Text>
+            </View>
+          ) : null
+        ) : (
+          <View className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3">
+            <Text className="text-xs text-slate-600">
+              <Text className="font-bold">Can’t be restored.</Text> {item.restore_blocked_reason}
+            </Text>
+          </View>
+        )}
 
         {/* Hero */}
         <Card className="gap-2">
@@ -185,6 +208,14 @@ export default function TrashDetailScreen() {
         </Card>
       </ScrollView>
 
+      <RestoreModal
+        item={restoreOpen ? item : null}
+        onClose={() => setRestoreOpen(false)}
+        onRestored={() => {
+          setRestoreOpen(false);
+          navigation.goBack();
+        }}
+      />
       <ConfirmModal
         open={deleteModal}
         title="Permanently Delete Item?"

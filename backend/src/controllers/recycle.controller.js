@@ -31,7 +31,11 @@ async function getById(req, res, next) {
         return res.status(403).json({ message: 'Access denied to this shipment' });
       }
     }
-    const batteries = await recycleModel.findBatteries(req.params.id);
+    let batteries = await recycleModel.findBatteries(req.params.id);
+    // Partners don't get to see which fleet client a battery came from.
+    if (req.user.role === 'recycle_client') {
+      batteries = batteries.map((b) => ({ ...b, client_name: null }));
+    }
     res.json({ batch, batteries });
   } catch (err) {
     next(err);

@@ -8,6 +8,7 @@ const routes = require('./routes');
 const { corsOrigin } = require('./config/cors-origin');
 const { notFound, errorHandler } = require('./middlewares/error-handler');
 const { requireAuth, requireRole } = require('./middlewares/auth');
+const fileStorage = require('./services/file-storage');
 
 const app = express();
 
@@ -51,7 +52,7 @@ app.get('/health', (req, res) => res.json({ status: 'ok' }));
 //                 through the ownership-checked /api/invoices/:id/download.
 // Auth is an Authorization header or ?token= (see requireAuth), the latter
 // needed since <img>/<a href> can't set headers.
-const UPLOADS_DIR = path.join(__dirname, '..', 'uploads');
+const UPLOADS_DIR = fileStorage.UPLOADS_ROOT;
 const requireOfficeRole = requireRole('super_admin', 'admin', 'staff');
 app.use(
   '/uploads',
@@ -75,7 +76,24 @@ app.use(
     res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox");
     next();
   },
-  express.static(UPLOADS_DIR)
+  // Local disk: plain static serving. Bucket (STORAGE_BUCKET set): stream
+  // the same key from the bucket, so the URLs stay /uploads/<folder>/<file>.
+  fileStorage.bucketEnabled()
+    ? async (req, res, next) => {
+        try {
+          const key = fileStorage.cleanKey(decodeURIComponent(req.path));
+          const file = await fileStorage.open(key);
+          if (!file) return res.status(404).json({ message: 'Not found' });
+          res.type(path.extname(key) || 'application/octet-stream');
+          if (file.length != null) res.setHeader('Content-Length', file.length);
+          res.setHeader('Cache-Control', 'public, max-age=0');
+          file.stream.on('error', next);
+          file.stream.pipe(res);
+        } catch (err) {
+          next(err);
+        }
+      }
+    : express.static(UPLOADS_DIR)
 );
 
 app.use('/api', routes);

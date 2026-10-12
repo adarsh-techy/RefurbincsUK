@@ -69,8 +69,15 @@ function RecycleClientsAdminPage() {
       label: 'Login Email',
       render: (row) =>
         row.login_email ? (
-          <span className="font-mono text-xs sm:text-sm text-slate-600 dark:text-neutral-300">
-            {row.login_email}
+          <span className="inline-flex items-center gap-2">
+            <span className="font-mono text-xs sm:text-sm text-slate-600 dark:text-neutral-300">
+              {row.login_email}
+            </span>
+            {row.user_active === false && (
+              <span className="rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 ring-1 ring-rose-600/20 dark:bg-rose-950/40 dark:text-rose-300">
+                Login inactive
+              </span>
+            )}
           </span>
         ) : (
           <span className="text-slate-400 dark:text-neutral-500 text-xs">No login</span>

@@ -8,6 +8,8 @@ COPY package*.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 COPY src ./src
+# one-off maintenance scripts, e.g. scripts/migrate-uploads-to-bucket.js
+COPY scripts ./scripts
 
 ENV NODE_ENV=production
 EXPOSE 5000
@@ -17,8 +19,9 @@ EXPOSE 5000
 # to uploads/<kind> (client logos, invoices, staff docs, issue photos, return
 # docs) at import time, so that tree must exist and be owned by "node"
 # before we drop privileges, or the very first require() fails with EACCES.
-# Mount a persistent volume at /app/uploads in production — the container
-# filesystem is discarded on every deploy.
+# In production either set STORAGE_BUCKET (files go to object storage, see
+# src/services/file-storage.js) or mount a persistent volume at /app/uploads —
+# the container filesystem is discarded on every deploy.
 RUN mkdir -p /app/uploads/client-logos /app/uploads/invoices /app/uploads/staff-docs \
              /app/uploads/issue-photos /app/uploads/return-docs \
  && chown -R node:node /app/uploads

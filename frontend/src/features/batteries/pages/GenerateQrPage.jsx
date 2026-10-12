@@ -139,16 +139,25 @@ function GenerateQrPage() {
     return () => clearTimeout(bulkDebounceRef.current);
   }, [bulkClientName]);
 
+  // Each client has its own stored battery-code prefix (clients.battery_prefix);
+  // the first three letters of the name are only a fallback.
+  const prefixFor = (name) => {
+    const trimmed = name.trim();
+    if (!trimmed) return '';
+    const match = fleetClients.find((c) => c.name.trim().toLowerCase() === trimmed.toLowerCase());
+    return match?.battery_prefix || trimmed.replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  };
+
   // ── Individual: derived battery ID ────────────────────────────────────────
   // Battery numbers are zero-padded to 7 digits (HUM-0000001), matching the
   // backend's bulk generation.
-  const clientPrefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  const clientPrefix = prefixFor(clientName);
   const computedBatteryId = clientPrefix ? `${clientPrefix}-${String(suggestedNumber).padStart(BATTERY_NUMBER_DIGITS, '0')}` : '';
 
   // ── Bulk: preview range ────────────────────────────────────────────────────
   const bulkStart = Number(bulkStartNumber) > 0 ? Number(bulkStartNumber) : bulkSuggestedStart;
   const bulkEnd = bulkStart + (Math.max(Number(bulkCount) || 1, 1)) - 1;
-  const bulkPrefix = bulkClientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  const bulkPrefix = prefixFor(bulkClientName);
   const padLen = Math.max(BATTERY_NUMBER_DIGITS, String(bulkEnd).length);
   const bulkFirstPreview = bulkPrefix ? `${bulkPrefix}-${String(bulkStart).padStart(padLen, '0')}` : '—';
   const bulkLastPreview = bulkPrefix ? `${bulkPrefix}-${String(bulkEnd).padStart(padLen, '0')}` : '—';

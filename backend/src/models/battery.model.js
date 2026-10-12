@@ -1013,11 +1013,25 @@ async function findRepeatIntakesThisMonth() {
 
 const BATTERY_NUMBER_DIGITS = 7;
 
+// What a client's prefix used to be: the first three letters of its name.
+// Only a fallback now, for a name with no client row.
+const derivedPrefix = (name) => String(name || '').trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+
+// The client's stored battery-code prefix (clients.battery_prefix, unique
+// per client since migration 056).
+async function prefixForClient(clientName) {
+  const { rows } = await db.query(
+    'SELECT battery_prefix FROM clients WHERE lower(trim(name)) = lower(trim($1)) AND battery_prefix IS NOT NULL LIMIT 1',
+    [clientName]
+  );
+  return rows[0]?.battery_prefix || derivedPrefix(clientName);
+}
+
 // Bulk creates batteries for a client directly from Generate QR Code page (1 to 50,000 QR codes).
 // Uses PostgreSQL generate_series for ultra-fast multi-row insertion in a single query.
 async function createManyForClient({ clientName, count, startNumber }) {
-  const prefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
-  const start = Number(startNumber) > 0 ? Number(startNumber) : (await maxSequenceByClientName(clientName)) + 1;
+  const prefix = await prefixForClient(clientName);
+  const start = Number(startNumber) > 0 ? Number(startNumber) : (await maxSequenceByPrefix(prefix)) + 1;
   const end = start + Number(count) - 1;
   // Battery numbers are zero-padded to 7 digits (HUM-0000001).
   const padLength = Math.max(BATTERY_NUMBER_DIGITS, String(end).length);
@@ -1116,12 +1130,10 @@ async function findRfidAssignments({ clientName, search, tagged = 'yes', limit =
 // Battery codes are matched by client prefix + number, so the zero padding
 // doesn't matter: "HUM-501", "HUM0000501" and an old 4-digit "HUM-0501" all
 // find the same battery. A bare number ("501") uses the row's client prefix.
-const clientPrefix = (name) => String(name || '').trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
-
-function parseBatteryCode(code, clientName) {
+function parseBatteryCode(code, clientPrefix) {
   const c = String(code || '').trim().toUpperCase();
   let m = c.match(/^([A-Z]+)[-_ ]?(\d+)$/);
-  if (!m && /^\d+$/.test(c) && clientPrefix(clientName)) m = [c, clientPrefix(clientName), c];
+  if (!m && /^\d+$/.test(c) && clientPrefix) m = [c, clientPrefix, c];
   if (!m) return { exact: c, key: null };
   const num = m[2].replace(/^0+/, '') || '0';
   return {
@@ -1141,10 +1153,12 @@ const WRITABLE = new Set(['assigned', 'replaced', 'created']);
 // when the number carries that client's own prefix, so a typo can't create a
 // battery for the wrong fleet.
 async function assignRfidTags(rows, { commit = false, createMissing = false } = {}) {
-  const { rows: clientRows } = await db.query('SELECT name FROM clients');
+  const { rows: clientRows } = await db.query('SELECT name, battery_prefix FROM clients');
   const clientByLower = new Map(clientRows.map((c) => [c.name.trim().toLowerCase(), c.name]));
+  const prefixByLower = new Map(clientRows.map((c) => [c.name.trim().toLowerCase(), c.battery_prefix || derivedPrefix(c.name)]));
+  const prefixOf = (name) => prefixByLower.get(String(name || '').trim().toLowerCase()) || derivedPrefix(name);
 
-  const parsed = rows.map((r) => (r.error ? null : parseBatteryCode(r.batteryCode, r.clientName)));
+  const parsed = rows.map((r) => (r.error ? null : parseBatteryCode(r.batteryCode, r.clientName ? prefixOf(r.clientName) : '')));
   const exacts = [...new Set(parsed.filter(Boolean).map((p) => p.exact))];
   const keys = [...new Set(parsed.filter((p) => p?.key).map((p) => p.key))];
   const tags = [...new Set(rows.filter((r) => !r.error).map((r) => r.rfidTag))];
@@ -1204,8 +1218,8 @@ async function assignRfidTags(rows, { commit = false, createMissing = false } = 
     const res = { ...out, status: 'not_found', clientName: client || r.clientName || null, identity: p.key ? `key:${p.key}` : `code:${p.exact}` };
     if (!p.key) return { ...res, message: 'No battery with this number — check the number or generate it on the QR page' };
     if (!client) return { ...res, message: `No battery with this number, and client "${r.clientName || ''}" doesn't exist, so it can't be registered here` };
-    if (p.prefix !== clientPrefix(client)) {
-      return { ...res, message: `No battery with this number. ${client} numbers start with ${clientPrefix(client)}-, so it can't be registered for them` };
+    if (p.prefix !== prefixOf(client)) {
+      return { ...res, message: `No battery with this number. ${client} numbers start with ${prefixOf(client)}-, so it can't be registered for them` };
     }
     return { ...res, batteryCode: p.canonical, sheetBatteryCode: p.canonical === r.batteryCode ? undefined : r.batteryCode, canCreate: true, message: `Not registered yet — can be created as ${p.canonical} for ${client}` };
   });
@@ -1312,7 +1326,10 @@ async function assignRfidTags(rows, { commit = false, createMissing = false } = 
 }
 
 async function maxSequenceByClientName(clientName) {
-  const prefix = clientName.trim().replace(/[^a-zA-Z]/g, '').slice(0, 3).toUpperCase();
+  return maxSequenceByPrefix(await prefixForClient(clientName));
+}
+
+async function maxSequenceByPrefix(prefix) {
   const { rows } = await db.query(
     // Restricted to a purely-numeric suffix so a legacy/manually-entered
     // code like "HUM-A1B2" for this client prefix can't blow up the ::int
@@ -1402,6 +1419,7 @@ module.exports = {
   createMany,
   createManyForClient,
   maxSequenceByClientName,
+  prefixForClient,
   updateSerialNumber,
   findTimeline,
   addVisit,

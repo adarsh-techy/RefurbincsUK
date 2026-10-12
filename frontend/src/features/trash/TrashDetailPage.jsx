@@ -4,6 +4,7 @@ import apiClient from '../../services/api-client';
 import TableState from '../../components/ui/table/TableState';
 import Button from '../../components/ui/primitives/Button';
 import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
+import RestoreModal from './RestoreModal';
 
 const TYPE_CONFIG = {
   battery: { label: 'Battery', tone: 'good', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
@@ -61,6 +62,7 @@ export default function TrashDetailPage() {
   const [copied, setCopied] = useState(false);
   const [showRawJson, setShowRawJson] = useState(false);
   const [deleteModal, setDeleteModal] = useState(false);
+  const [restoreModal, setRestoreModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
 
   useEffect(() => {
@@ -139,6 +141,20 @@ export default function TrashDetailPage() {
           Back to Trash Bin
         </Link>
 
+        <div className="flex items-center gap-2">
+        {item.restorable && (
+          <button
+            type="button"
+            onClick={() => setRestoreModal(true)}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-medium text-white shadow-sm hover:bg-emerald-700"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
+              <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
+              <path d="M3 3v5h5" />
+            </svg>
+            Restore
+          </button>
+        )}
         <Button
           variant="danger"
           onClick={() => setDeleteModal(true)}
@@ -150,7 +166,21 @@ export default function TrashDetailPage() {
           </svg>
           Permanent Delete
         </Button>
+        </div>
       </div>
+
+      {/* Restore availability */}
+      {item.restorable ? (
+        item.restore_note && (
+          <div className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs text-amber-800 dark:border-amber-900/40 dark:bg-amber-950/20 dark:text-amber-300">
+            <span className="font-semibold">Restore puts this record back.</span> {item.restore_note}
+          </div>
+        )
+      ) : (
+        <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600 dark:border-surface-700 dark:bg-surface-850 dark:text-neutral-300">
+          <span className="font-semibold">Can’t be restored.</span> {item.restore_blocked_reason}
+        </div>
+      )}
 
       {/* Hero Header Card */}
       <div className="relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-6 shadow-sm dark:border-surface-700 dark:bg-surface-800">
@@ -378,12 +408,21 @@ export default function TrashDetailPage() {
         </div>
       </div>
 
+      {/* Restore Modal */}
+      {restoreModal && (
+        <RestoreModal
+          item={item}
+          onClose={() => setRestoreModal(false)}
+          onRestored={() => navigate('/trash')}
+        />
+      )}
+
       {/* Permanent Delete Modal */}
       {deleteModal && (
         <ConfirmModal
           open={deleteModal}
           title="Permanently Delete Item?"
-          description={`Are you sure you want to completely purge this ${cfg.label.toLowerCase()} from the trash bin? This permanently removes the audit archive record.`}
+          message={`Are you sure you want to completely purge this ${cfg.label.toLowerCase()} from the trash bin? This permanently removes the audit archive record.`}
           confirmLabel="Permanently Delete"
           cancelLabel="Cancel"
           tone="critical"
