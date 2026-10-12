@@ -77,6 +77,9 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
 
   const [result, setResult] = useState(null); // { tone, message } of the last scan
   const [problem, setProblem] = useState(null); // { title, message, value } → popup
+  // reader problems during a sweep: kept (newest first) until dismissed, so a
+  // later successful read can't hide them
+  const [readerIssues, setReaderIssues] = useState([]);
   const resultTimer = useRef(null);
   const queueRef = useRef(Promise.resolve()); // scans are handled one at a time, in order
   const recentRef = useRef(new Map()); // value → when it was last taken
@@ -101,9 +104,13 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     }
     if (!res?.tone) {
       setResult({ tone: 'info', message: `Scanned ${v}` });
-    } else if ((res.tone === 'bad' || res.tone === 'error') && !fromReader) {
-      setResult(null);
-      setProblem({ title: problemTitle(res.message), message: res.message, value: v });
+    } else if (res.tone === 'bad' || res.tone === 'error') {
+      if (fromReader) {
+        setReaderIssues((list) => [{ id: `${Date.now()}-${v}`, message: res.message }, ...list.filter((x) => x.message !== res.message)].slice(0, 5));
+      } else {
+        setResult(null);
+        setProblem({ title: problemTitle(res.message), message: res.message, value: v });
+      }
     } else {
       setResult(res);
     }
@@ -304,6 +311,21 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
         <Text className={`mt-2 rounded-xl border px-3 py-2 text-[11px] font-semibold ${tones[feedback.tone] || tones.bad}`}>
           {feedback.message}
         </Text>
+      ) : null}
+      {readerIssues.length ? (
+        <View className="mt-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] font-extrabold text-red-700">
+              {readerIssues.length === 1 ? 'Could not add 1 tag' : `Could not add ${readerIssues.length} tags`}
+            </Text>
+            <TouchableOpacity onPress={() => setReaderIssues([])} hitSlop={10}>
+              <Text className="text-[11px] font-bold text-red-700">Dismiss</Text>
+            </TouchableOpacity>
+          </View>
+          {readerIssues.map((x) => (
+            <Text key={x.id} className="mt-1 text-xs text-red-700">• {x.message}</Text>
+          ))}
+        </View>
       ) : null}
 
       {/* refused scan: has to be acknowledged so it can't be missed */}
