@@ -20,7 +20,22 @@ app.options('*', cors({ origin: corsOrigin, credentials: true, optionsSuccessSta
 app.use(compression());
 app.use(express.json({ limit: '20mb' }));
 app.use(express.urlencoded({ extended: true, limit: '20mb' }));
+// File links carry the login token as ?token= (an <img>/<a href> can't send
+// a header), so request logs print the URL with the token masked.
+morgan.token('url', (req) => (req.originalUrl || req.url).replace(/([?&]token=)[^&]*/gi, '$1***'));
 app.use(morgan(env.nodeEnv === 'development' ? 'dev' : 'combined'));
+
+// Basic security headers for a JSON API (no helmet dependency needed).
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Referrer-Policy', 'no-referrer');
+  if (env.nodeEnv === 'production') {
+    res.setHeader('Strict-Transport-Security', 'max-age=15552000; includeSubDomains');
+  }
+  next();
+});
+app.disable('x-powered-by');
 
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
@@ -53,6 +68,12 @@ app.use(
       return requireAuth(req, res, () => requireOfficeRole(req, res, next));
     }
     return res.status(404).json({ message: 'Not found' });
+  },
+  // Uploaded files are shown, never run: an SVG logo or a renamed HTML file
+  // can't execute script from the API's origin.
+  (req, res, next) => {
+    res.setHeader('Content-Security-Policy', "default-src 'none'; img-src 'self' data:; style-src 'unsafe-inline'; sandbox");
+    next();
   },
   express.static(UPLOADS_DIR)
 );

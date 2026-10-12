@@ -104,7 +104,7 @@ export default function ProfileScreen() {
                     : user?.role === 'staff'
                       ? 'Office Staff'
                       : user?.role === 'recycle_client'
-                        ? 'Recycling Partner'
+                        ? 'Recycle Partner'
                         : user?.staff_role
                           ? user.staff_role.charAt(0).toUpperCase() + user.staff_role.slice(1)
                           : 'Technician'}

@@ -1,6 +1,7 @@
 const ratingModel = require('../models/rating.model');
 const clientModel = require('../models/client.model');
 const batteryModel = require('../models/battery.model');
+const returnModel = require('../models/return.model');
 
 function isClientRole(role) {
   return role === 'client' || role === 'recycle_client';
@@ -15,13 +16,22 @@ async function create(req, res, next) {
     }
 
     let clientId = null;
+    let ownClient = null;
     if (isClientRole(req.user?.role)) {
-      const client = await clientModel.findByUserId(req.user.id);
-      if (client) {
-        clientId = client.id;
+      ownClient = await clientModel.findByUserId(req.user.id);
+      if (ownClient) {
+        clientId = ownClient.id;
       }
     } else if (req.body.clientId) {
       clientId = req.body.clientId;
+    }
+
+    // A client may only rate its own return shipment / its own battery.
+    if (isClientRole(req.user?.role) && returnId) {
+      const ret = await returnModel.findById(returnId);
+      if (!ret || !ownClient || Number(ret.client_id) !== Number(ownClient.id)) {
+        return res.status(404).json({ message: 'Return shipment not found.' });
+      }
     }
 
     let batteryId = null;
@@ -29,6 +39,12 @@ async function create(req, res, next) {
       try {
         const battery = await batteryModel.findByCode(batteryCode.trim().toUpperCase());
         if (battery) batteryId = battery.id;
+        const ownsBattery =
+          battery && ownClient &&
+          String(battery.client_name || '').trim().toLowerCase() === String(ownClient.name || '').trim().toLowerCase();
+        if (isClientRole(req.user?.role) && battery && !ownsBattery) {
+          return res.status(404).json({ message: 'Battery not found.' });
+        }
       } catch {
         // non-fatal if battery lookup by code doesn't exist
       }

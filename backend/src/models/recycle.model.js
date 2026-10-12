@@ -8,6 +8,32 @@ async function create({ vehicleNumber, driverName, batteryIds, recycleClientId, 
   try {
     await client.query('BEGIN');
 
+    // Only unserviceable batteries (parts removed or not) can be recycled;
+    // anything still in the workshop or with the client stays out.
+    const ids = Array.isArray(batteryIds) ? batteryIds : [];
+    if (ids.length === 0) {
+      const err = new Error('Add at least one unserviceable battery to the shipment.');
+      err.status = 400;
+      throw err;
+    }
+    const { rows: invalid } = await client.query(
+      `SELECT battery_code, status FROM batteries
+        WHERE id = ANY($1::int[])
+          AND status NOT IN ('unserviceable', 'tested_parts_removed')
+        FOR UPDATE`,
+      [ids]
+    );
+    const { rows: found } = await client.query('SELECT count(*)::int AS n FROM batteries WHERE id = ANY($1::int[])', [ids]);
+    if (invalid.length > 0 || found[0].n !== new Set(ids.map(Number)).size) {
+      const err = new Error(
+        invalid.length > 0
+          ? `Only unserviceable batteries can be recycled (${invalid.map((b) => `${b.battery_code}: ${b.status}`).join(', ')}).`
+          : 'One or more batteries were not found.'
+      );
+      err.status = 400;
+      throw err;
+    }
+
     const { rows } = await client.query(
       `INSERT INTO recycle_batches (vehicle_number, driver_name, battery_count, recycle_client_id, total_weight_kg, price_per_kg)
        VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,

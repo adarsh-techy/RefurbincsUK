@@ -27,6 +27,13 @@ process.on('unhandledRejection', (reason) => {
 });
 
 async function start() {
+  // Without a signing secret every login fails (and a weak default would let
+  // anyone forge tokens), so refuse to start rather than run half-broken.
+  if (!env.jwt.secret || (env.nodeEnv === 'production' && env.jwt.secret.length < 32)) {
+    console.error('❌ JWT_SECRET is missing (or shorter than 32 characters in production). Set it in the environment.');
+    process.exit(1);
+  }
+
   try {
     const { rows } = await db.query(
       'SELECT current_database() AS db_name, current_user AS user_name, inet_server_addr() AS host, inet_server_port() AS port'

@@ -1,31 +1,37 @@
-import { useCallback, useEffect, useState } from 'react';
-import { FlatList, RefreshControl, Text, TouchableOpacity, View } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import { useSelector } from 'react-redux';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
-import Icon from '../../components/ui/Icon';
+import ShipmentRow, { formatDateTime } from '../../components/recycle/ShipmentRow';
 
-// Recycling partner (role recycle_client) home — the shipments delivered to
-// them (GET /recycle-client/me/shipments → { data: batches }). Mirrors the
-// web Recycle Shipments page; tap a shipment for its batteries (GET
-// /recycle/:id, scoped to the partner's own batches by the backend).
+// Recycling partner (role recycle_client) shipments — mirrors the web
+// RecycleClientShipmentsPage: GET /recycle-client/me/shipments → { data },
+// searched by driver / vehicle and filtered by the received date. Tap a
+// shipment for its batteries (GET /recycle/:id, scoped to the partner's own
+// batches by the backend).
 
-function formatDate(v) {
-  return v ? new Date(v).toLocaleDateString([], { day: 'numeric', month: 'short', year: 'numeric' }) : '';
+// YYYY-MM-DD in the phone's own timezone, like the web date input
+function localDateKey(value) {
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
+const input = 'rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900';
+
 export default function RecycleShipmentsScreen() {
-  const user = useSelector((s) => s.auth.user);
   const navigation = useNavigation();
   const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const [search, setSearch] = useState('');
+  const [date, setDate] = useState('');
 
   const load = useCallback(async () => {
     try {
       const { data } = await apiClient.get('/recycle-client/me/shipments');
-      setRows(data.data || []);
+      setRows(data?.data || data || []);
       setError(null);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -35,40 +41,60 @@ export default function RecycleShipmentsScreen() {
     }
   }, []);
 
-  useEffect(() => {
-    load();
-  }, [load]);
+  useFocusEffect(useCallback(() => { load(); }, [load]));
 
-  const totalBatteries = rows.reduce((s, r) => s + (Number(r.battery_count) || 0), 0);
-  const totalWeight = rows.reduce((s, r) => s + (Number(r.total_weight_kg) || 0), 0);
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    const day = /^\d{4}-\d{2}-\d{2}$/.test(date.trim()) ? date.trim() : '';
+    return rows.filter((row) => {
+      const matchesSearch =
+        !q ||
+        row.driver_name?.toLowerCase().includes(q) ||
+        row.vehicle_number?.toLowerCase().includes(q);
+      const matchesDate = !day || localDateKey(row.recycled_at) === day;
+      return matchesSearch && matchesDate;
+    });
+  }, [rows, search, date]);
 
   return (
     <FlatList
       className="flex-1 bg-slate-50"
-      data={rows}
+      data={loading || error ? [] : filtered}
       keyExtractor={(r) => String(r.id)}
       contentContainerClassName="p-4 gap-2.5 pb-16"
+      keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       ListHeaderComponent={
         <View className="mb-2 gap-3">
-          <View className="rounded-3xl border border-slate-200 bg-white p-4">
-            <Text className="text-lg font-extrabold text-slate-900" numberOfLines={1}>{user?.name || 'Recycling partner'}</Text>
-            <Text className="text-xs text-slate-500">Recycle shipments received from the workshop</Text>
-            <View className="mt-3 flex-row gap-2">
-              <View className="flex-1 rounded-2xl border border-emerald-200 bg-emerald-50/70 p-3">
-                <Text className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Shipments</Text>
-                <Text className="text-xl font-black text-emerald-700">{rows.length}</Text>
-              </View>
-              <View className="flex-1 rounded-2xl border border-blue-200 bg-blue-50/70 p-3">
-                <Text className="text-[10px] font-bold uppercase tracking-wide text-blue-700">Batteries</Text>
-                <Text className="text-xl font-black text-blue-700">{totalBatteries}</Text>
-              </View>
-              <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3">
-                <Text className="text-[10px] font-bold uppercase tracking-wide text-slate-600">Weight</Text>
-                <Text className="text-xl font-black text-slate-700">{totalWeight ? `${totalWeight.toFixed(0)}kg` : '—'}</Text>
-              </View>
-            </View>
+          <View>
+            <Text className="text-xl font-extrabold text-slate-900">Recycle Shipments</Text>
+            <Text className="text-xs text-slate-500">All unserviceable battery shipments dispatched to your facility.</Text>
           </View>
+          <TextInput
+            value={search}
+            onChangeText={setSearch}
+            placeholder="Search by driver or vehicle..."
+            placeholderTextColor="#94a3b8"
+            className={input}
+          />
+          <View className="flex-row items-center gap-2">
+            <TextInput
+              value={date}
+              onChangeText={setDate}
+              placeholder="Date (YYYY-MM-DD)"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              className={`flex-1 ${input}`}
+            />
+            <TouchableOpacity onPress={() => setDate(localDateKey(new Date()))} className="rounded-xl border border-slate-300 bg-white px-3 py-2.5">
+              <Text className="text-xs font-semibold text-slate-700">Today</Text>
+            </TouchableOpacity>
+          </View>
+          {(search || date) ? (
+            <TouchableOpacity onPress={() => { setSearch(''); setDate(''); }} className="self-start">
+              <Text className="text-xs font-medium text-slate-500">Clear filters</Text>
+            </TouchableOpacity>
+          ) : null}
           {error && (
             <View className="rounded-2xl border border-red-200 bg-red-50 p-3">
               <Text className="text-xs font-semibold text-red-700">{error}</Text>
@@ -77,36 +103,23 @@ export default function RecycleShipmentsScreen() {
         </View>
       }
       ListEmptyComponent={
-        <View className="items-center rounded-2xl border border-slate-200 bg-white p-8">
-          <Icon name="package" color="#94a3b8" size={24} />
-          <Text className="mt-2 text-sm font-semibold text-slate-800">{loading ? 'Loading shipments…' : 'No shipments yet'}</Text>
-        </View>
+        loading ? (
+          <Text className="py-6 text-center text-sm text-slate-500">Loading shipments…</Text>
+        ) : error ? null : (
+          <View className="items-center rounded-2xl border border-slate-200 bg-white p-8">
+            <Text className="text-sm text-slate-500">No recycle shipments match your filter criteria.</Text>
+          </View>
+        )
       }
-      renderItem={({ item: r }) => (
-        <TouchableOpacity activeOpacity={0.85} onPress={() => navigation.navigate('AdminDetail', { kind: 'recycle', id: r.id })} className="rounded-2xl border border-slate-200 bg-white p-4">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-base font-extrabold text-slate-900">Vehicle {r.vehicle_number || `#${r.id}`}</Text>
-            <Text className="text-[11px] font-semibold text-slate-400">{formatDate(r.recycled_at)}</Text>
-          </View>
-          <Text className="mt-0.5 text-xs text-slate-600">Driver: {r.driver_name || '—'}</Text>
-          <View className="mt-3 flex-row gap-4">
-            <View>
-              <Text className="text-[10px] font-bold uppercase text-slate-400">Batteries</Text>
-              <Text className="text-sm font-bold text-slate-800">{r.battery_count || 0}</Text>
-            </View>
-            <View>
-              <Text className="text-[10px] font-bold uppercase text-slate-400">Weight</Text>
-              <Text className="text-sm font-bold text-slate-800">{r.total_weight_kg ? `${Number(r.total_weight_kg).toFixed(1)} kg` : '—'}</Text>
-            </View>
-            {r.price_per_kg && r.total_weight_kg ? (
-              <View>
-                <Text className="text-[10px] font-bold uppercase text-slate-400">Value</Text>
-                <Text className="text-sm font-bold text-emerald-700">£{(Number(r.total_weight_kg) * Number(r.price_per_kg)).toFixed(2)}</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text className="mt-2 text-[11px] font-bold text-violet-700">View batteries ›</Text>
-        </TouchableOpacity>
+      renderItem={({ item: r, index }) => (
+        <ShipmentRow
+          row={r}
+          index={index + 1}
+          dateLabel="Received At"
+          dateValue={formatDateTime(r.recycled_at)}
+          linkLabel="View shipment →"
+          onPress={() => navigation.navigate('AdminRecycleDetail', { id: r.id })}
+        />
       )}
     />
   );

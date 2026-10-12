@@ -17,6 +17,7 @@ import AdminDashboardScreen from '../screens/admin/AdminDashboardScreen';
 import AdminBatteriesScreen from '../screens/admin/AdminBatteriesScreen';
 import AdminIntakesScreen from '../screens/admin/AdminIntakesScreen';
 import RecycleShipmentsScreen from '../screens/recycle/RecycleShipmentsScreen';
+import RecycleDashboardScreen from '../screens/recycle/RecycleDashboardScreen';
 import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import { useTheme } from '../context/ThemeContext';
 
@@ -252,6 +253,7 @@ export default function MainTabs() {
           </>
         ) : isRecycle ? (
           <>
+            <Tab.Screen name="Dashboard" component={RecycleDashboardScreen} />
             <Tab.Screen name="Shipments" component={RecycleShipmentsScreen} />
             {/* "SupportTab": the stack already has a "Support" route */}
             <Tab.Screen name="SupportTab" component={ClientSupportScreen} options={{ title: 'Support' }} />

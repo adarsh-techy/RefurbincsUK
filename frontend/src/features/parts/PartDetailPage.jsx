@@ -220,7 +220,7 @@ function PartDetailPage() {
 
   // Stock status determination
   const isOutOfStock = quantity <= 0;
-  const isLowStock = quantity > 0 && quantity <= 10;
+  const isLowStock = quantity > 0 && quantity <= 5; // same line as the dashboard / Low Stock filter
 
   // Monthly breakdown
   const monthlyBreakdown = buildMonthlyBreakdown(usageHistory, stockHistory);

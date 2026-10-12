@@ -32,6 +32,14 @@ const uploadRfidSheet = multer({
 const uploadIssuePhotos = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 10 * 1024 * 1024 }, // 10MB per file, up to 3 files
+  fileFilter: (req, file, cb) => {
+    if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(file.mimetype)) {
+      const err = new Error('Only JPEG, PNG, WEBP or HEIC photos are supported.');
+      err.status = 400;
+      return cb(err);
+    }
+    cb(null, true);
+  },
 });
 
 // Must precede '/:code' below, or these would be swallowed as battery code

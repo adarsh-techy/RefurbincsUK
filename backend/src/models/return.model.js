@@ -5,6 +5,34 @@ async function create({ truckNumber, driverName, clientId, batteryIds, returnedA
   try {
     await client.query('BEGIN');
 
+    // Only repaired batteries belonging to this client can go out on its
+    // return truck (the forms only offer those; the server enforces it).
+    const ids = Array.isArray(batteryIds) ? batteryIds : [];
+    if (ids.length === 0) {
+      const err = new Error('Add at least one repaired battery to the return.');
+      err.status = 400;
+      throw err;
+    }
+    const { rows: invalid } = await client.query(
+      `SELECT b.battery_code, b.status
+         FROM batteries b
+        WHERE b.id = ANY($1::int[])
+          AND (b.status <> 'repaired'
+               OR lower(COALESCE(b.client_name, '')) <> lower((SELECT name FROM clients WHERE id = $2)))
+        FOR UPDATE`,
+      [ids, clientId]
+    );
+    const { rows: found } = await client.query('SELECT count(*)::int AS n FROM batteries WHERE id = ANY($1::int[])', [ids]);
+    if (invalid.length > 0 || found[0].n !== new Set(ids.map(Number)).size) {
+      const err = new Error(
+        invalid.length > 0
+          ? `Only this client's repaired batteries can be returned (${invalid.map((b) => `${b.battery_code}: ${b.status}`).join(', ')}).`
+          : 'One or more batteries were not found.'
+      );
+      err.status = 400;
+      throw err;
+    }
+
     const finalReturnedAt = returnedAt ? new Date(returnedAt) : new Date();
 
     const { rows } = await client.query(

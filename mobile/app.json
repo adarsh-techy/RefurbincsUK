@@ -19,7 +19,9 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "permissions": [
-        "android.permission.CAMERA",
+        "android.permission.CAMERA"
+      ],
+      "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
     },
@@ -31,7 +33,9 @@
       [
         "expo-camera",
         {
-          "cameraPermission": "Refurbinics needs camera access to scan battery QR codes."
+          "cameraPermission": "Refurbinics needs camera access to scan battery QR codes.",
+          "recordAudioAndroid": false,
+          "microphonePermission": false
         }
       ],
       "expo-sharing",

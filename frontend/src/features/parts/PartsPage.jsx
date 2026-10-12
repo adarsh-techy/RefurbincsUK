@@ -83,8 +83,9 @@ function PartsPage() {
       key: 'in_stock',
       label: 'Status',
       render: (row) => (
-        <Badge tone={row.in_stock ? 'good' : 'critical'}>
-          {row.in_stock ? 'In Stock' : 'Out of Stock'}
+        // in_stock is false at 5 units or fewer; only 0 is actually out
+        <Badge tone={row.in_stock ? 'good' : Number(row.quantity) > 0 ? 'warning' : 'critical'}>
+          {row.in_stock ? 'In Stock' : Number(row.quantity) > 0 ? `Low Stock (${row.quantity} left)` : 'Out of Stock'}
         </Badge>
       ),
     },

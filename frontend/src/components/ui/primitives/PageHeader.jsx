@@ -16,7 +16,12 @@ function PageHeader({ title, description, children, titleClassName, titleStyle }
           {title}
         </h1>
         {description && (
-          <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 dark:text-neutral-400">{description}</p>
+          // a rich description (e.g. a <div> of chips) can't live inside a <p>
+          typeof description === 'string' ? (
+            <p className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 dark:text-neutral-400">{description}</p>
+          ) : (
+            <div className="mt-0.5 sm:mt-1 text-xs sm:text-sm text-slate-500 dark:text-neutral-400">{description}</div>
+          )
         )}
       </div>
       {children && <div className="flex shrink-0 items-center gap-2 flex-wrap self-start sm:self-auto">{children}</div>}

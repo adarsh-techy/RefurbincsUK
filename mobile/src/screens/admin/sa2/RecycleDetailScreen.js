@@ -106,7 +106,7 @@ export default function RecycleDetailScreen() {
                   ['Dispatched Date', `📅 ${new Date(batch.recycled_at).toLocaleDateString()}`],
                   ['Dispatched Time', `⏰ ${shortTime(batch.recycled_at)}`],
                   // mobile extra: weight / payout recorded on the shipment
-                  ...(batch.total_weight_kg
+                  ...(batch.total_weight_kg && !isRecycleClient
                     ? [['Weight / Payout', `⚖ ${Number(batch.total_weight_kg).toFixed(1)} kg · ${money(Number(batch.total_weight_kg) * Number(batch.price_per_kg || 0))}`]]
                     : []),
                 ].map(([label, value]) => (

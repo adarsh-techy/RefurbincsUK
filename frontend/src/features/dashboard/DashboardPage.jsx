@@ -362,7 +362,7 @@ function DashboardPage() {
 
         {/* 4. Critical Stock Watch */}
         <Link
-          to="/parts?lowStock=true"
+          to={hasPermission(user, 'parts') ? '/parts?lowStock=true' : '/notifications'}
           className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
             totals?.lowStockParts > 0
               ? 'border-rose-300 bg-linear-to-b from-rose-50/50 to-white dark:border-rose-900/50 dark:from-rose-950/20 dark:to-surface-900'
@@ -416,9 +416,10 @@ function DashboardPage() {
           </div>
         </Link>
 
-        {/* 6. Recycled Batteries */}
+        {/* 6. Recycled Batteries — the shipments page needs the recycle
+            permission; everyone else gets the recycled-batteries list */}
         <Link
-          to="/recycle"
+          to={hasPermission(user, 'recycle') ? '/recycle' : '/batteries/recycled'}
           className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
         >
           <div className="flex items-center justify-between">

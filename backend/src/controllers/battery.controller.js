@@ -146,8 +146,16 @@ async function getByCode(req, res, next) {
     // a signed-in super admin, so don't put it — or internal staff/user ids —
     // in the JSON an anonymous visitor receives: battery codes are sequential
     // and would let anyone scrape every client's repair pricing. Nulled
-    // rather than removed so the page's Number(...) sums stay at 0.
-    if (!req.user) {
+    // rather than removed so the page's Number(...) sums stay at 0. A signed-in
+    // client looking at another client's battery gets the same public view.
+    let fullView = Boolean(req.user) && !['client', 'recycle_client'].includes(req.user.role);
+    if (req.user?.role === 'client') {
+      const own = await clientModel.findByUserId(req.user.id);
+      fullView =
+        Boolean(own) &&
+        String(battery.client_name || '').trim().toLowerCase() === String(own.name || '').trim().toLowerCase();
+    }
+    if (!fullView) {
       const publicHistory = history.map((h) => ({
         ...h,
         price: null,
@@ -563,7 +571,10 @@ async function reportIssue(req, res, next) {
     const photoUrls = [];
     if (req.files && Array.isArray(req.files)) {
       for (const file of req.files.slice(0, 3)) {
-        const ext = path.extname(file.originalname || '') || '.jpg';
+        // Extension from a fixed list, never from the uploaded name, so a
+        // file can't be stored as .html/.svg and served back as a page.
+        const rawExt = path.extname(file.originalname || '').toLowerCase();
+        const ext = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'].includes(rawExt) ? rawExt : '.jpg';
         const safeName = `issue-${Date.now()}-${Math.random().toString(36).substring(2, 7)}${ext}`;
         fs.writeFileSync(path.join(ISSUE_PHOTOS_DIR, safeName), file.buffer);
         photoUrls.push(`/uploads/issue-photos/${safeName}`);

@@ -1,3 +1,4 @@
+const db = require('../config/db');
 const ticketModel = require('../models/ticket.model');
 const clientModel = require('../models/client.model');
 const batteryModel = require('../models/battery.model');
@@ -100,8 +101,22 @@ async function create(req, res, next) {
     const code = typeof batteryCode === 'string' ? batteryCode.trim().toUpperCase() : '';
     if (code) {
       const battery = await batteryModel.findByCode(code);
-      if (!battery || (isClientRole(req.user.role) && String(battery.client_name || '').trim().toLowerCase() !== String(finalClientName || '').trim().toLowerCase())) {
-        return res.status(400).json({ message: `Battery ${code} was not found in your fleet.` });
+      let owned = Boolean(battery);
+      if (battery && req.user.role === 'client') {
+        owned = String(battery.client_name || '').trim().toLowerCase() === String(finalClientName || '').trim().toLowerCase();
+      } else if (battery && req.user.role === 'recycle_client') {
+        // a recycling partner can link a battery it received in a shipment
+        const { rows } = await db.query(
+          `SELECT 1 FROM recycle_batteries rbt
+             JOIN recycle_batches rb ON rb.id = rbt.recycle_id
+            WHERE rbt.battery_id = $1 AND rb.recycle_client_id = $2 LIMIT 1`,
+          [battery.id, finalClientId]
+        );
+        owned = rows.length > 0;
+      }
+      if (!owned) {
+        const where = req.user.role === 'recycle_client' ? 'your recycle shipments' : 'your fleet';
+        return res.status(400).json({ message: `Battery ${code} was not found in ${where}.` });
       }
     }
 
