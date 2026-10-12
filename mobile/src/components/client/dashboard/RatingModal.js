@@ -68,7 +68,7 @@ export default function RatingModal({ batteryCode, clientId, onClose, onSuccess 
   return (
     <Modal visible={Boolean(batteryCode)} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end bg-black/50">
-        <View className="max-h-[90%] rounded-t-3xl bg-white p-5 dark:bg-slate-900">
+        <View className="max-h-[90%] w-full max-w-2xl self-center rounded-t-3xl bg-white p-5 pb-8 dark:bg-slate-900">
           <View className="flex-row items-start justify-between">
             <View className="flex-1">
               <Text className="text-lg font-black text-slate-900 dark:text-white">Rate Workshop Service Quality</Text>

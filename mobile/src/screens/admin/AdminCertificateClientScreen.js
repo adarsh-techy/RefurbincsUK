@@ -139,7 +139,7 @@ export default function AdminCertificateClientScreen() {
         contentContainerClassName="gap-4 p-4 pb-16"
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
       >
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row flex-wrap items-center justify-between gap-x-4 gap-y-2">
           <TouchableOpacity onPress={() => navigation.goBack()} hitSlop={6}>
             <Text className="text-xs font-bold text-blue-600">← Back to Milestone Certificates</Text>
           </TouchableOpacity>

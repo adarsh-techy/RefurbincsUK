@@ -107,18 +107,23 @@ function DataTable({
     );
   }
 
+  // fixed column widths only from lg up; on phones/tablets a fixed table
+  // keeps a readable minimum width and scrolls sideways in its container
   const isFixed = tableLayout === 'fixed';
 
   return (
     <div
       onScroll={handleTableScroll}
-      style={maxHeight ? { maxHeight, overflowY: 'auto' } : undefined}
+      // On short screens (phones in landscape) a viewport-based limit such as
+      // calc(100vh - 340px) would shrink the table to just its header — never
+      // let it go below ~18rem.
+      style={maxHeight ? { maxHeight: typeof maxHeight === 'number' ? maxHeight : `max(${maxHeight}, 18rem)`, overflowY: 'auto' } : undefined}
       className={`table-responsive-container rounded-xl shadow-xs ${header.body} ${
         bordered ? `border ${header.outerBorder}` : ''
       } ${className}`}
     >
       <table
-        className={`w-full text-xs sm:text-sm ${isFixed ? 'table-fixed' : 'min-w-full'} ${
+        className={`w-full text-xs sm:text-sm ${isFixed ? 'min-w-[48rem] lg:min-w-0 lg:table-fixed' : 'min-w-full'} ${
           bordered ? `divide-y ${header.tableDivide}` : ''
         }`}
       >

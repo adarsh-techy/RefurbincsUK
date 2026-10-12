@@ -1,0 +1,111 @@
+import { isLikelyRfidTag, normalizeRfidTag, splitScanInput } from './scan-input';
+
+// RFID readers in keyboard mode type the tag into the focused scan box. Most
+// end it with Enter, which the pages already handle. Some send no Enter (or
+// a space between tags), and those tags would just sit in the box. For any
+// input marked data-rfid-scan, a burst typed at reader speed that then goes
+// quiet is submitted as if Enter had been pressed — one tag at a time. A
+// person typing is far slower than this, so manual typing is untouched.
+
+const QUIET_MS = 700;
+const READER_GAP_MS = 90; // average gap between keystrokes of a reader burst (people type slower)
+const MIN_TAG_LENGTH = 8;
+
+const REPEAT_READ_MS = 2500; // the same tag again this soon is a repeated read
+
+const state = new WeakMap(); // input → { timer, first, last, count }
+const recent = new WeakMap(); // input → Map(tag → time last taken)
+const valueSetter = Object.getOwnPropertyDescriptor(window.HTMLInputElement.prototype, 'value')?.set;
+
+function pressEnter(input) {
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', code: 'Enter', keyCode: 13, which: 13, bubbles: true, cancelable: true }));
+}
+
+function setValue(input, value) {
+  valueSetter?.call(input, value);
+  input.dispatchEvent(new Event('input', { bubbles: true }));
+}
+
+function flush(input) {
+  const s = state.get(input);
+  state.delete(input);
+  if (!s || !input.isConnected) return;
+  const typedFast = s.count > 1 && (s.last - s.first) / (s.count - 1) <= READER_GAP_MS;
+  const value = input.value || '';
+  if (!typedFast || normalizeRfidTag(value).length < MIN_TAG_LENGTH) return;
+  const pieces = splitScanInput(value);
+  if (!pieces.every((p) => isLikelyRfidTag(p))) return;
+  feed(input, pieces);
+}
+
+// Hands the page one tag at a time (box filled with that tag, then Enter),
+// letting it update between tags; repeated reads of a tag just taken are
+// dropped and the box is cleared.
+function feed(input, pieces) {
+  const seen = recent.get(input) || new Map();
+  recent.set(input, seen);
+  const now = Date.now();
+  const fresh = pieces.filter((p) => {
+    const key = normalizeRfidTag(p);
+    if (now - (seen.get(key) || 0) < REPEAT_READ_MS) return false;
+    seen.set(key, now);
+    return true;
+  });
+  if (!fresh.length) {
+    setValue(input, '');
+    return;
+  }
+  fresh.forEach((piece, i) => {
+    setTimeout(() => {
+      if (!input.isConnected) return;
+      setValue(input, piece);
+      pressEnter(input);
+    }, i * 120);
+  });
+}
+
+function onInput(e) {
+  const input = e.target;
+  if (!(input instanceof HTMLInputElement) || !input.matches('[data-rfid-scan]') || !e.isTrusted) return;
+  const now = Date.now();
+  const s = state.get(input) || { first: now, count: 0 };
+  clearTimeout(s.timer);
+  s.count += 1;
+  s.last = now;
+  s.timer = setTimeout(() => flush(input), QUIET_MS);
+  state.set(input, s);
+}
+
+// A real Enter ends the burst: the page handles it, nothing to do later.
+// A real Enter ends the burst. Usually the page handles it; but when the box
+// holds several tags typed back to back (no separator) or a tag just taken,
+// the Enter is taken over and the tags are handed over one by one instead.
+function onKeyDown(e) {
+  if (e.key !== 'Enter' || !e.isTrusted) return;
+  const input = e.target;
+  const s = state.get(input);
+  if (s) {
+    clearTimeout(s.timer);
+    state.delete(input);
+  }
+  if (!(input instanceof HTMLInputElement) || !input.matches('[data-rfid-scan]')) return;
+  const pieces = splitScanInput(input.value || '');
+  if (!pieces.length || !pieces.every((p) => isLikelyRfidTag(p))) return;
+  const seen = recent.get(input);
+  const repeated = pieces.length === 1 && seen && Date.now() - (seen.get(normalizeRfidTag(pieces[0])) || 0) < REPEAT_READ_MS;
+  if (pieces.length === 1 && !repeated) {
+    (seen || recent.set(input, new Map()).get(input)).set(normalizeRfidTag(pieces[0]), Date.now());
+    return; // one fresh tag: the page's own Enter handling takes it
+  }
+  e.preventDefault();
+  e.stopPropagation();
+  feed(input, pieces);
+}
+
+let installed = false;
+export function installRfidKeystrokeSupport() {
+  if (installed || typeof document === 'undefined') return;
+  installed = true;
+  document.addEventListener('input', onInput, true);
+  document.addEventListener('keydown', onKeyDown, true);
+}

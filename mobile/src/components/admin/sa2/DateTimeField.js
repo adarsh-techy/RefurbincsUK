@@ -38,7 +38,7 @@ export default function DateTimeField({ value, onChange, autoLabel }) {
         </TouchableOpacity>
       ) : null}
       <View className="flex-row items-start gap-2">
-        <View className="flex-1">
+        <View className="min-w-0 flex-1">
           <DateField value={day} onChange={(d) => { setDay(d); emit(d, time); }} quick={false} clearable={false} />
         </View>
         <TextInput

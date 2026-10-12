@@ -35,6 +35,16 @@ function localDateKey(value) {
 }
 
 function InvoicesPage() {
+  // Percentage column widths only work with room to spare; below lg the
+  // table sizes to its content and scrolls sideways instead of squashing.
+  const [wideScreen, setWideScreen] = useState(() => typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onChange = () => setWideScreen(mq.matches);
+    mq.addEventListener('change', onChange);
+    return () => mq.removeEventListener('change', onChange);
+  }, []);
+
   const user = useSelector((state) => state.auth.user);
   const isSuperAdmin = user?.role === 'super_admin';
   const { customTheme } = useTheme();
@@ -422,7 +432,7 @@ function InvoicesPage() {
               <div className={`font-semibold flex items-center gap-1 ${overdue ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-neutral-400'}`}>
                 <span className="text-[10px] uppercase font-bold">Due:</span>
                 <span>{new Date(row.due_date).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                {overdue && <span className="text-[10px] px-1 py-0.2 rounded bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-bold">Overdue</span>}
+                {overdue && <span className="text-[10px] px-1 py-[0.05rem] rounded bg-rose-100 dark:bg-rose-900/50 text-rose-700 dark:text-rose-300 font-bold">Overdue</span>}
               </div>
             )}
           </div>
@@ -455,7 +465,7 @@ function InvoicesPage() {
                   className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100 hover:text-emerald-600 dark:text-neutral-400 dark:hover:bg-white/10 dark:hover:text-emerald-400 transition-colors cursor-pointer"
                   title="View Invoice"
                 >
-                  <FiEye className="h-4.5 w-4.5" />
+                  <FiEye className="h-[1.125rem] w-[1.125rem]" />
                 </button>
 
                 <button
@@ -468,7 +478,7 @@ function InvoicesPage() {
                   }`}
                   title="Download Invoice"
                 >
-                  <FiDownload className="h-4.5 w-4.5" />
+                  <FiDownload className="h-[1.125rem] w-[1.125rem]" />
                 </button>
               </>
             )}
@@ -479,7 +489,7 @@ function InvoicesPage() {
               className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-colors cursor-pointer"
               title="Delete Invoice"
             >
-              <FiTrash2 className="h-4.5 w-4.5" />
+              <FiTrash2 className="h-[1.125rem] w-[1.125rem]" />
             </button>
           </div>
         );
@@ -516,14 +526,14 @@ function InvoicesPage() {
           />
         </div>
 
-        <div>
+        <div className="w-full min-w-0 sm:w-auto">
           <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
             Client
           </label>
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+            className="w-full sm:w-auto sm:max-w-[16rem] truncate rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
           >
             <option value="">All Fleet Clients</option>
             {clients.map((c) => (
@@ -594,7 +604,7 @@ function InvoicesPage() {
 
       {!loading && !error && (
         <DataTable
-          tableLayout="fixed"
+          tableLayout={wideScreen ? 'fixed' : 'auto'}
           headerColor="blue"
           columns={columns}
           rows={filtered}

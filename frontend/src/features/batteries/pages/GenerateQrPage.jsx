@@ -813,8 +813,8 @@ function GenerateQrPage() {
               </strong>
             </div>
           </div>
-          <div className="flex flex-nowrap items-center gap-6 pr-4">
-            <div className="relative max-w-sm w-full">
+          <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-6 sm:pr-4">
+            <div className="relative w-full sm:max-w-sm">
               <input
                 type="text"
                 value={listSearchInput}
@@ -838,7 +838,7 @@ function GenerateQrPage() {
             <select
               value={listClientFilter}
               onChange={(e) => setListClientFilter(e.target.value)}
-              className="w-full max-w-[10rem] shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-blue-800/40 dark:bg-black dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/30"
+              className="min-w-0 flex-1 sm:w-full sm:flex-none sm:max-w-[10rem] shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-blue-800/40 dark:bg-black dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/30"
             >
               <option value="">All Clients</option>
               {fleetClients.map((c) => (

@@ -75,7 +75,7 @@ function DashboardLayout() {
               <img
                 src={brandLogo}
                 alt="Refurbinics"
-                className="h-10 sm:h-11 w-auto max-w-[200px] object-contain"
+                className="h-9 sm:h-11 w-auto max-w-[120px] min-[400px]:max-w-[160px] sm:max-w-[200px] object-contain"
               />
             </Link>
             <span
@@ -86,7 +86,7 @@ function DashboardLayout() {
               Battery Tracking & History
             </span>
           </div>
-          <div className="flex items-center gap-2 sm:gap-4">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-4">
             <UkClock />
             <ThemeCustomizerButton />
             <ThemeToggle />
@@ -127,16 +127,16 @@ function DashboardLayout() {
   if (isWorkshopStaff) {
     return (
       <div
-        className={`${isDark ? 'dark' : ''} flex min-h-screen flex-col overflow-x-hidden text-slate-900 dark:text-neutral-100 transition-colors`}
+        className={`${isDark ? 'dark' : ''} flex min-h-screen flex-col overflow-x-clip text-slate-900 dark:text-neutral-100 transition-colors`}
         style={{ backgroundColor: pageBgColor }}
       >
         <PortalHeader />
-        <main className="flex-1 p-2.5 pb-16 sm:p-6 md:pb-8">
+        <main className="flex-1 p-2.5 pb-20 sm:p-6 sm:pb-20 lg:pb-8">
           <Suspense fallback={<PageFallback />}>
             <Outlet />
           </Suspense>
         </main>
-        <AppFooter className="mb-14 md:mb-0" />
+        <AppFooter className="mb-14 lg:mb-0" />
         {isCustomizerOpen && <ThemeCustomizerModal onClose={closeCustomizer} />}
       </div>
     );
@@ -150,7 +150,7 @@ function DashboardLayout() {
         style={{ backgroundColor: wrapperBgColor }}
       >
         <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-        <div className="flex min-h-screen min-w-0 flex-1 flex-col md:pl-64">
+        <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-64">
           <Navbar onMenuClick={() => setMobileNavOpen(true)} />
           <main
             className="min-w-0 flex-1 p-3 sm:p-6 transition-colors pb-safe"
@@ -175,7 +175,7 @@ function DashboardLayout() {
       style={{ backgroundColor: wrapperBgColor }}
     >
       <Sidebar mobileOpen={mobileNavOpen} onClose={() => setMobileNavOpen(false)} />
-      <div className="flex min-h-screen min-w-0 flex-1 flex-col md:pl-64">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col lg:pl-64">
         <Navbar onMenuClick={() => setMobileNavOpen(true)} />
         <main
           className="min-w-0 flex-1 p-3 sm:p-6 transition-colors pb-safe"

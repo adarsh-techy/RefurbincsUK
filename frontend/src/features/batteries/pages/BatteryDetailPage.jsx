@@ -718,7 +718,9 @@ function ClientBatteryDetailView({
   return (
     <div className="space-y-6 pb-12">
       {/* ── Top Navigation Bar ──────────────────────────────────────── */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className={`flex items-center gap-4 flex-wrap ${authUser ? 'justify-between' : 'justify-end'}`}>
+        {/* a logged-out visitor (QR scan) has no fleet overview to go back to */}
+        {authUser && (
         <button
           type="button"
           onClick={() => {
@@ -745,6 +747,7 @@ function ClientBatteryDetailView({
               : 'Back to Fleet Overview'}
           </span>
         </button>
+        )}
 
         <div className="flex items-center gap-2.5">
           <button
@@ -890,7 +893,7 @@ function ClientBatteryDetailView({
                   <span>Recycled on: <strong className="text-emerald-700 dark:text-emerald-300">{new Date(recycleBatch.recycled_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</strong></span>
                 </span>
               )}
-              {isReturned && !battery.already_rated && (
+              {isReturned && !battery.already_rated && authUser?.role === 'client' && (
                 <button
                   type="button"
                   onClick={() => setShowRatingModal(true)}

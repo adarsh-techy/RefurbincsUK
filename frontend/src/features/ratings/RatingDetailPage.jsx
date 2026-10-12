@@ -220,7 +220,7 @@ function RatingDetailPage() {
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 block">
                 Current Status
               </span>
-              <div className="mt-1">
+              <div className="mt-1 min-w-0 [&>*]:max-w-full [&>*]:whitespace-normal">
                 <StatusBadge status={ratingItem.battery_current_status} />
               </div>
             </div>

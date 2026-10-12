@@ -1,9 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Text, TouchableOpacity, View } from 'react-native';
-import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
-import extractBatteryCode from '../../../utils/extract-battery-code';
-import { isLikelyRfidTag, normalizeRfidTag, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryScan, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
 import { Feedback, SearchBox } from './ui';
 
 // The left/right halves of the web ReturnForm / RecycleForm on one phone
@@ -15,22 +13,9 @@ import { Feedback, SearchBox } from './ui';
 // an RFID tag is looked up (first in `candidates`, then the battery search,
 // which matches rfid_tag). Returns { code } or { error }.
 export async function resolveScan(raw, candidates = []) {
-  const extracted = (extractBatteryCode(raw) || raw || '').trim();
-  if (!extracted) return { code: '' };
-  const upper = extracted.toUpperCase();
-  if (candidates.some((b) => (b.battery_code || '').toUpperCase() === upper)) return { code: upper };
-  if (!isLikelyRfidTag(extracted)) return { code: upper };
-  const tag = normalizeRfidTag(extracted);
-  const local = candidates.find((b) => b.rfid_tag && String(b.rfid_tag).toUpperCase() === tag);
-  if (local) return { code: local.battery_code };
-  try {
-    const { data } = await apiClient.get('/batteries', { params: { search: tag, limit: 5, offset: 0 } });
-    const hit = (data?.data || []).find((b) => b.rfid_tag && String(b.rfid_tag).toUpperCase() === tag);
-    if (hit) return { code: hit.battery_code };
-  } catch {
-    // fall through — treat as unassigned
-  }
-  return { error: `${UNASSIGNED_TAG_MESSAGE} (tag ${tag})` };
+  const resolved = await resolveBatteryScan(raw, candidates);
+  if (resolved.unassignedTag) return { error: `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})` };
+  return { code: (resolved.code || '').toUpperCase() };
 }
 
 export default function ManifestPicker({

@@ -76,8 +76,8 @@ function SectionTitle({ title, sub, action, onAction }) {
         {sub ? <Text className="mt-0.5 text-[11px] text-slate-500">{sub}</Text> : null}
       </View>
       {action && onAction ? (
-        <TouchableOpacity onPress={onAction} hitSlop={6}>
-          <Text className="text-xs font-bold text-emerald-700">{action}</Text>
+        <TouchableOpacity onPress={onAction} hitSlop={6} className="shrink">
+          <Text className="text-right text-xs font-bold text-emerald-700">{action}</Text>
         </TouchableOpacity>
       ) : null}
     </View>
@@ -531,7 +531,7 @@ export default function ClientDashboardScreen() {
               autoCapitalize="characters"
               placeholder="Quick Search: Battery ID or serial number…"
               placeholderTextColor="#94a3b8"
-              className="flex-1 py-3 text-sm text-slate-900 dark:text-white"
+              className="min-w-0 flex-1 py-3 text-sm text-slate-900 dark:text-white"
             />
           </View>
           <TouchableOpacity disabled={!inlineSearch.trim()} onPress={submitInlineSearch} className={`h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 ${inlineSearch.trim() ? '' : 'opacity-50'}`}>
@@ -634,7 +634,7 @@ export default function ClientDashboardScreen() {
                 })}
               </View>
             )}
-            <View className="mt-3 flex-row justify-between">
+            <View className="mt-3 flex-row flex-wrap justify-between gap-x-4 gap-y-2">
               {can('client_transactions') ? (
                 <TouchableOpacity onPress={() => navigation.navigate('Transactions')}>
                   <Text className="text-[11px] font-bold text-emerald-700">View Detailed Billing History →</Text>

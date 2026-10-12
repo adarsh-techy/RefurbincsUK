@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE, scanThen } from '../../../utils/scan-input';
 import { apiError, Feedback, GhostButton, PrimaryButton, SearchBox } from './ui';
 
 // "Scan to Verify Shipment Arrival" — the phone version of the web
@@ -24,6 +25,7 @@ const dateTimeText = (v) => (v ? new Date(v).toLocaleDateString('en-GB', { day: 
 const ordinal = (n) => (n === 2 ? '2nd' : `${n}th`);
 
 export default function TruckVerifyModal({ visible, intakeId, initialData = null, onClose, onSuccess, onInspect }) {
+  const insets = useSafeAreaInsets();
   const [data, setData] = useState(initialData);
   const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState(null);
@@ -173,7 +175,7 @@ export default function TruckVerifyModal({ visible, intakeId, initialData = null
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View className="flex-1 bg-slate-50">
-        <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-12">
+        <View className="border-b border-slate-200 bg-white px-4 pb-3" style={{ paddingTop: Math.max(48, insets.top + 12) }}>
           <View className="flex-row items-center justify-between gap-3">
             <Text className="flex-1 text-base font-extrabold text-slate-900">Scan to Verify Shipment Arrival</Text>
             <TouchableOpacity onPress={onClose} hitSlop={10}>
@@ -192,7 +194,7 @@ export default function TruckVerifyModal({ visible, intakeId, initialData = null
         ) : error ? (
           <Text className="m-4 rounded-xl bg-red-50 p-3 text-sm font-semibold text-red-700">{error}</Text>
         ) : (
-          <ScrollView contentContainerClassName="p-4 gap-4 pb-8" keyboardShouldPersistTaps="handled">
+          <ScrollView contentContainerClassName="w-full max-w-2xl self-center p-4 gap-4 pb-8" keyboardShouldPersistTaps="handled">
             {/* metadata + progress */}
             <View className="rounded-2xl border border-slate-200 bg-white p-3.5">
               <View className="flex-row flex-wrap items-center gap-2">
@@ -218,7 +220,7 @@ export default function TruckVerifyModal({ visible, intakeId, initialData = null
             {/* scan box */}
             <View>
               <Text className="mb-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">Scan Barcode / QR or Type Battery ID</Text>
-              <ScanBatteryInput onSubmit={handleScan} submitLabel="Verify" placeholder="Scan QR or enter battery ID / serial…" startInRfidMode />
+              <ScanBatteryInput onSubmit={(raw) => scanThen(raw, batteries, handleScan)} submitLabel="Verify" placeholder="Scan QR or enter battery ID / serial…" startInRfidMode />
               {note ? <View className="mt-2"><Feedback feedback={note} /></View> : null}
             </View>
 
@@ -309,7 +311,7 @@ export default function TruckVerifyModal({ visible, intakeId, initialData = null
         )}
 
         {!loading && !error ? (
-          <View className="gap-3 border-t border-slate-200 bg-white p-4 pb-8">
+          <View className="gap-3 border-t border-slate-200 bg-white p-4" style={{ paddingBottom: Math.max(32, insets.bottom + 12) }}>
             <Text className={`text-xs ${allScanned ? 'font-bold text-emerald-700' : 'font-medium text-slate-500'}`}>
               {allScanned
                 ? `✓ All ${expected.length} batteries verified · Ready to confirm arrival`
@@ -351,7 +353,7 @@ function RepeatIntakePopup({ data, intake, currentId, onClose, onInspect }) {
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View className="flex-1 justify-center bg-black/50 px-4">
-        <ScrollView className="max-h-[88%] rounded-3xl bg-white" contentContainerClassName="p-4 gap-3.5">
+        <ScrollView className="max-h-[88%] w-full max-w-lg self-center rounded-3xl bg-white" contentContainerClassName="p-4 gap-3.5">
           <View className="rounded-2xl border border-amber-300 bg-amber-50 p-4">
             <View className="flex-row flex-wrap items-center gap-2">
               <Text className="rounded-full border border-amber-300 bg-amber-200 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-950">↻ Repeat Intake Flag</Text>

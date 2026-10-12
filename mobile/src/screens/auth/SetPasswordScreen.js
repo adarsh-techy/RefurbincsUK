@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import { logout, setUser, setToken } from '../../store/auth-slice';
@@ -33,7 +33,11 @@ export default function SetPasswordScreen() {
   }
 
   return (
-    <View className="flex-1 justify-center bg-slate-50 px-6">
+    // scrolls (short screens, landscape, keyboard open) and stays a readable
+    // width on tablets
+    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-slate-50">
+    <ScrollView contentContainerClassName="grow justify-center px-6 py-10" keyboardShouldPersistTaps="handled">
+    <View className="w-full max-w-md self-center">
       <View className="mb-6 items-center">
         <Text className="text-lg font-semibold text-slate-900">Set Your Password</Text>
         <Text className="mt-1 text-center text-sm text-slate-500">
@@ -77,5 +81,7 @@ export default function SetPasswordScreen() {
         </TouchableOpacity>
       </View>
     </View>
+    </ScrollView>
+    </KeyboardAvoidingView>
   );
 }

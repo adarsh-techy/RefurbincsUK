@@ -169,7 +169,7 @@ export default function ClientInvoicesScreen() {
             onChangeText={setSearch}
             placeholder="Search title, file name or notes…"
             placeholderTextColor="#94a3b8"
-            className="flex-1 text-xs text-slate-900"
+            className="min-w-0 flex-1 text-xs text-slate-900"
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>

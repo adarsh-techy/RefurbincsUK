@@ -47,7 +47,7 @@ function ConfirmModal({
               />
             </svg>
           </span>
-          <p className="pt-1.5 text-sm text-slate-600 dark:text-neutral-300">{message}</p>
+          <p className="min-w-0 break-words pt-1.5 text-sm text-slate-600 dark:text-neutral-300">{message}</p>
         </div>
 
         {requireTyping && (
@@ -69,11 +69,11 @@ function ConfirmModal({
           </div>
         )}
 
-        <div className="flex justify-end gap-2 border-t border-slate-100 pt-4 dark:border-surface-700">
+        <div className="flex flex-col-reverse gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end dark:border-surface-700">
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800"
+            className="rounded-md px-4 py-2.5 sm:py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-surface-800"
           >
             Cancel
           </button>
@@ -81,7 +81,7 @@ function ConfirmModal({
             type="button"
             onClick={handleConfirm}
             disabled={!isMatch || submitting}
-            className="rounded-md bg-critical-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-critical-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-red-600 dark:hover:bg-red-500"
+            className="rounded-md bg-critical-600 px-4 py-2.5 sm:py-2 text-sm font-medium text-white shadow-sm hover:bg-critical-700 disabled:cursor-not-allowed disabled:opacity-40 dark:bg-red-600 dark:hover:bg-red-500"
           >
             {submitting ? 'Deleting…' : confirmLabel}
           </button>

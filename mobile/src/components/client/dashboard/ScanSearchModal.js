@@ -20,7 +20,7 @@ export default function ScanSearchModal({ visible, onClose, onOpenCamera, onOpen
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end bg-black/50">
-        <View className="rounded-t-3xl bg-white p-5 pb-8 dark:bg-slate-900">
+        <View className="w-full max-w-2xl self-center rounded-t-3xl bg-white p-5 pb-8 dark:bg-slate-900">
           <View className="flex-row items-center justify-between">
             <Text className="text-lg font-black text-slate-900 dark:text-white">Scan Battery QR Code</Text>
             <TouchableOpacity onPress={onClose} hitSlop={10}><Icon name="x" color="#64748b" size={20} /></TouchableOpacity>

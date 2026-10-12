@@ -79,7 +79,7 @@ export default function CreateAccountScreen() {
               secureTextEntry={!showPassword}
               autoCapitalize="none"
               autoCorrect={false}
-              className="flex-1 px-3.5 py-3 text-sm text-slate-900"
+              className="min-w-0 flex-1 px-3.5 py-3 text-sm text-slate-900"
             />
             <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8} accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}>
               <Icon name="eye" color={showPassword ? '#0d5c3a' : '#94a3b8'} size={16} />

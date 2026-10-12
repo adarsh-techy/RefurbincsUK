@@ -293,7 +293,7 @@ export default function ClientBatteriesScreen() {
             onChangeText={setSearch}
             placeholder={isBatchBucket ? 'Search Driver / Truck — e.g. John or TRK-102' : 'Search Code, Serial, Notes…'}
             placeholderTextColor="#64748b"
-            className="flex-1 text-xs text-slate-900 dark:text-white"
+            className="min-w-0 flex-1 text-xs text-slate-900 dark:text-white"
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>

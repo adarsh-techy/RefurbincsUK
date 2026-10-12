@@ -5,6 +5,7 @@ import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
+import { isLikelyRfidTag } from '../../utils/scan-input';
 import { statusLabel } from '../../components/ui/primitives/Badge';
 
 const inputClasses =
@@ -85,6 +86,11 @@ function RecycleForm({ onCreated, onCancel }) {
       setScanInput('');
       setShowScanSuggestions(false);
     } catch (err) {
+      // an RFID tag that isn't assigned to any battery is ignored quietly
+      if (err.response?.status === 404 && isLikelyRfidTag(code)) {
+        setScanInput('');
+        return;
+      }
       flashFeedback(
         'bad',
         err.response?.status === 404

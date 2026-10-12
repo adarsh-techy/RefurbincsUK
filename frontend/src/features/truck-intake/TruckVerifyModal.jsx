@@ -14,7 +14,7 @@ import apiClient from '../../services/api-client';
 import Modal from '../../components/ui/overlays/Modal';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import TableState from '../../components/ui/table/TableState';
-import { resolveBatteryInput } from '../../utils/scan-input';
+import { resolveBatteryInput, recheckUnassignedTag } from '../../utils/scan-input';
 import extractBatteryCode from '../../utils/extract-battery-code';
 
 function formatDateTime(dt) {
@@ -228,6 +228,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
     if (resolved.unassignedTag) {
       setScanInput('');
       setShowSuggestions(false); // unregistered RFID tag: ignored quietly
+      recheckUnassignedTag(raw, batteriesList, (c) => handleScan(c));
       return;
     }
     const rawVal = (resolved.code || '').trim();
@@ -324,7 +325,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
         ) : error ? (
           <TableState tone="error">{error}</TableState>
         ) : (
-          <div className="flex flex-col flex-1 min-h-0 h-full">
+          <div className="flex flex-col flex-1 min-h-0 h-full overflow-y-auto">
             {/* 1. Top Metadata & Progress Banner */}
             <div className="shrink-0 mb-4 rounded-2xl border border-slate-200/90 bg-gradient-to-r from-slate-50 via-white to-slate-50 p-4 dark:border-white/10 dark:from-surface-800/80 dark:via-surface-900 dark:to-surface-800/80 shadow-2xs">
               <div className="flex flex-wrap items-center justify-between gap-3">
@@ -376,7 +377,7 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
             </div>
 
             {/* 2. Middle 2-Column Work Area (Scrollable) */}
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto pr-1 pb-4 lg:grid-cols-12">
+            <div className="grid min-h-[16rem] flex-1 grid-cols-1 gap-5 overflow-y-auto pr-1 pb-4 lg:grid-cols-12">
               {/* Left Column: Input & Live Controls (7 cols) */}
               <div className="flex min-h-0 flex-col space-y-4 lg:col-span-7">
                 {/* Search / Scan Input */}
@@ -384,8 +385,8 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                   <label className="block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300 mb-1.5">
                     Scan Barcode / QR or Type Battery ID
                   </label>
-                  <div className="flex gap-2">
-                    <div className="relative flex-1">
+                  <div className="flex flex-wrap items-start gap-2 sm:flex-nowrap">
+                    <div className="relative w-full min-w-0 sm:w-auto sm:flex-1">
                       <input data-rfid-scan="intake-verify"
                         ref={scanInputRef}
                         type="text"
@@ -466,14 +467,14 @@ function TruckVerifyModal({ intakeId, initialData = null, onClose, onSuccess }) 
                       type="button"
                       onClick={() => handleScan(scanInput)}
                       disabled={!scanInput.trim()}
-                      className="shrink-0 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors cursor-pointer"
+                      className="flex-1 sm:flex-none shrink-0 inline-flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50 transition-colors cursor-pointer"
                     >
                       Verify
                     </button>
                     <button
                       type="button"
                       onClick={() => setCameraOpen((v) => !v)}
-                      className={`shrink-0 inline-flex items-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-bold shadow-2xs transition-colors cursor-pointer ${
+                      className={`flex-1 sm:flex-none shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl border px-3.5 py-2.5 text-xs font-bold shadow-2xs transition-colors cursor-pointer ${
                         cameraOpen
                           ? 'border-red-300 bg-red-50 text-red-700 hover:bg-red-100 dark:border-red-800/40 dark:bg-red-950/30 dark:text-red-300'
                           : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700'

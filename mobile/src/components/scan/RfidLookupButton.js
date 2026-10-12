@@ -13,14 +13,15 @@ import { useHardwareScan } from '../../services/hardware-scanner';
 // device the trigger works on the screen directly, no panel needed.
 // Checks the battery / tag exists before the screen navigates, so an
 // unassigned tag gets a clear popup instead of an empty detail page.
+// Returns { code } (the battery's real code, also for a tag) or { problem }.
 async function checkBattery(raw) {
   const code = extractBatteryCode(raw) || String(raw).trim();
   try {
-    await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
-    return null;
+    const { data } = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
+    return { code: data?.battery?.battery_code || code };
   } catch (err) {
-    if (!err.response) return "Can't reach the server to look this up. Check the Wi-Fi / server address.";
-    return err.response.data?.message || `No battery found for ${code}.`;
+    if (!err.response) return { problem: "Can't reach the server to look this up. Check the Wi-Fi / server address." };
+    return { problem: err.response.data?.message || `No battery found for ${code}.` };
   }
 }
 
@@ -28,19 +29,22 @@ export default function RfidLookupButton({ onScan, label = 'Scan RFID tag', clas
   const [open, setOpen] = useState(false);
   // Zebra trigger on this screen opens the battery directly (the panel's own
   // scan box takes over while it is open)
-  // One trigger pull can read several tags — open only the first.
+  // One trigger pull can read several tags (often unassigned neighbours
+  // first) — open the first one that is a battery; the lock is only taken
+  // once a battery is found, so an ignored tag never blocks the real one.
   const lockRef = useRef(0);
   useHardwareScan(async (raw) => {
     if (Date.now() - lockRef.current < 1500) return;
-    lockRef.current = Date.now();
-    const problem = await checkBattery(raw);
+    const { code, problem } = await checkBattery(raw);
+    if (Date.now() - lockRef.current < 1500) return;
     if (problem && /not assigned/i.test(problem)) return; // unregistered tag: ignored
+    lockRef.current = Date.now();
     if (problem) {
       Vibration.vibrate([0, 160, 90, 160]);
       Alert.alert('Battery not found', `${problem}\n\nScanned: ${raw}`);
       return;
     }
-    onScan?.(raw);
+    onScan?.(code);
   }, !open);
   return (
     <>
@@ -55,7 +59,7 @@ export default function RfidLookupButton({ onScan, label = 'Scan RFID tag', clas
 
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <View className="flex-1 items-center justify-center bg-black/60 px-5">
-          <View className="w-full rounded-3xl bg-white p-5 dark:bg-slate-900">
+          <View className="w-full max-w-md rounded-3xl bg-white p-5 dark:bg-slate-900">
             <View className="flex-row items-center gap-2">
               <Icon name="rfid" color="#047857" size={20} />
               <Text className="flex-1 text-base font-extrabold text-slate-900 dark:text-white">Scan RFID tag</Text>
@@ -72,10 +76,10 @@ export default function RfidLookupButton({ onScan, label = 'Scan RFID tag', clas
               compact
               submitLabel="Open"
               onSubmit={async (raw) => {
-                const problem = await checkBattery(raw);
+                const { code, problem } = await checkBattery(raw);
                 if (problem) return { tone: 'bad', message: problem };
                 setOpen(false);
-                onScan?.(raw);
+                onScan?.(code);
                 return { tone: 'good', message: 'Opening battery…' };
               }}
             />

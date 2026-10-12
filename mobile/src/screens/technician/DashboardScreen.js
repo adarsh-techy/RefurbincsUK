@@ -291,7 +291,7 @@ export default function DashboardScreen() {
     >
       {/* ── Executive Hero Card ─────────────────────────────────────────── */}
       <View className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
-        <View className="flex-row items-center justify-between">
+        <View className="flex-row flex-wrap items-center justify-between gap-2">
           <View className="flex-row items-center gap-2">
             <View
               className={`h-2.5 w-2.5 rounded-full ${
@@ -323,9 +323,9 @@ export default function DashboardScreen() {
             <Text className="text-lg font-black text-slate-900 tracking-tight" numberOfLines={1}>
               {greeting()}, {staffDisplayName}
             </Text>
-            <View className="mt-1 flex-row items-center gap-2">
+            <View className="mt-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
               <View
-                className={`rounded-lg px-2 py-0.5 border ${
+                className={`max-w-full shrink rounded-lg px-2 py-0.5 border ${
                   isSupervisor
                     ? 'bg-violet-50 border-violet-200'
                     : 'bg-blue-50 border-blue-200'
@@ -353,8 +353,8 @@ export default function DashboardScreen() {
 
       {/* ── Core 4 KPI Status Breakdown ──────────────────────────────────── */}
       <View>
-        <View className="mb-2.5 flex-row items-center justify-between">
-          <Text className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+        <View className="mb-2.5 flex-row items-center justify-between gap-2">
+          <Text className="shrink text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
             {isSupervisor ? 'QA Verification Overview' : 'Workshop Repairs & Status Overview'}
           </Text>
           <Text className="text-[11px] font-bold text-slate-400">Live Breakdown</Text>
@@ -572,8 +572,8 @@ export default function DashboardScreen() {
 
       {/* ── 14-Day Activity Chart ─────────────────────────────────────── */}
       <View className="rounded-3xl border border-slate-200/90 bg-white p-4 shadow-xs">
-        <View className="mb-3 flex-row items-center justify-between">
-          <View>
+        <View className="mb-3 flex-row flex-wrap items-center justify-between gap-2">
+          <View className="shrink">
             <Text className="text-sm font-black text-slate-900">
               {isSupervisor ? 'QA Testing 14-Day Output' : 'Repair Output Activity (14 Days)'}
             </Text>
@@ -670,8 +670,8 @@ export default function DashboardScreen() {
 
       {/* ── Workshop Activity Feed with Filter Tabs ─────────────────────── */}
       <View>
-        <View className="mb-2.5 flex-row items-center justify-between">
-          <Text className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
+        <View className="mb-2.5 flex-row items-center justify-between gap-2">
+          <Text className="shrink text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
             Workshop Activity Details
           </Text>
           <TouchableOpacity
@@ -693,7 +693,7 @@ export default function DashboardScreen() {
               className={`rounded-xl px-3 py-1.5 ${
                 activeTab === 'all'
                   ? 'bg-slate-900 shadow-xs'
-                  : 'bg-white border border-slate-200'
+                  : 'bg-white border border-slate-200 shadow-none'
               }`}
             >
               <Text
@@ -712,7 +712,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'testing'
                       ? 'bg-blue-600 shadow-xs'
-                      : 'bg-white border border-blue-200'
+                      : 'bg-white border border-blue-200 shadow-none'
                   }`}
                 >
                   <Text
@@ -729,7 +729,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'completed'
                       ? 'bg-emerald-600 shadow-xs'
-                      : 'bg-white border border-emerald-200'
+                      : 'bg-white border border-emerald-200 shadow-none'
                   }`}
                 >
                   <Text
@@ -746,7 +746,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'unserviceable'
                       ? 'bg-rose-600 shadow-xs'
-                      : 'bg-white border border-rose-200'
+                      : 'bg-white border border-rose-200 shadow-none'
                   }`}
                 >
                   <Text
@@ -763,7 +763,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'removed'
                       ? 'bg-amber-600 shadow-xs'
-                      : 'bg-white border border-amber-200'
+                      : 'bg-white border border-amber-200 shadow-none'
                   }`}
                 >
                   <Text
@@ -782,7 +782,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'passed'
                       ? 'bg-emerald-600 shadow-xs'
-                      : 'bg-white border border-emerald-200'
+                      : 'bg-white border border-emerald-200 shadow-none'
                   }`}
                 >
                   <Text
@@ -799,7 +799,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'passed_back'
                       ? 'bg-amber-600 shadow-xs'
-                      : 'bg-white border border-amber-200'
+                      : 'bg-white border border-amber-200 shadow-none'
                   }`}
                 >
                   <Text
@@ -816,7 +816,7 @@ export default function DashboardScreen() {
                   className={`rounded-xl px-3 py-1.5 ${
                     activeTab === 'unserviceable'
                       ? 'bg-rose-600 shadow-xs'
-                      : 'bg-white border border-rose-200'
+                      : 'bg-white border border-rose-200 shadow-none'
                   }`}
                 >
                   <Text

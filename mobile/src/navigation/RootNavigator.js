@@ -97,7 +97,14 @@ const ADMIN_SCREENS = [
   ['AdminTrashDetail', TrashDetailScreen, 'Trash Record'],
   ['AdminPartDetail', PartDetailScreen, 'Part'],
 ];
-import MainTabs from './MainTabs';
+import MainTabs, { TABLET_CONTENT_MAX_WIDTH } from './MainTabs';
+
+// Tablets: stack screens are centred at a readable width (the tab screens do
+// the same inside MainTabs, which itself stays full width). A fixed style, not
+// useWindowDimensions: re-rendering the root navigator whenever the Android
+// keyboard resizes the window crashes with "Couldn't find a navigation
+// context" (see App.js). maxWidth does nothing on phones.
+const contentStyle = { width: '100%', maxWidth: TABLET_CONTENT_MAX_WIDTH, alignSelf: 'center' };
 import { navigationRef } from './navigationRef';
 
 const Stack = createNativeStackNavigator();
@@ -141,7 +148,7 @@ export default function RootNavigator() {
 
   return (
     <NavigationContainer ref={navigationRef} theme={navTheme}>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Navigator screenOptions={{ headerShown: false, contentStyle }}>
         {!bootstrapped || (token && !authChecked) ? (
           <Stack.Screen name="Loading" component={LoadingScreen} />
         ) : !user ? (
@@ -150,7 +157,7 @@ export default function RootNavigator() {
           <Stack.Screen name="SetPassword" component={SetPasswordScreen} />
         ) : (
           <>
-            <Stack.Screen name="Main" component={MainTabs} />
+            <Stack.Screen name="Main" component={MainTabs} options={{ contentStyle: { flex: 1 } }} />
             <Stack.Screen
               name="BatteryDetail"
               component={BatteryDetailScreen}

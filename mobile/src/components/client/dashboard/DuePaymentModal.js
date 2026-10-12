@@ -27,7 +27,7 @@ export default function DuePaymentModal({ visible, invoices, onDismiss, onOpenIn
   return (
     <Modal visible={visible && unpaid.length > 0} transparent animationType="slide" onRequestClose={onDismiss}>
       <View className="flex-1 justify-end bg-black/50">
-        <View className="max-h-[88%] rounded-t-3xl bg-white p-5 dark:bg-slate-900">
+        <View className="max-h-[88%] w-full max-w-2xl self-center rounded-t-3xl bg-white p-5 pb-8 dark:bg-slate-900">
           <View className="flex-row items-start justify-between gap-3">
             <View className="flex-1">
               <Text className="text-lg font-black text-slate-900 dark:text-white">

@@ -4,7 +4,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import apiClient from '../../services/api-client';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import { isLikelyRfidTag, resolveBatteryInput, resolveBatteryScan } from '../../utils/scan-input';
 import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 import { exportSortGroup } from '../../utils/export-sort-group';
 import Icon from '../../components/ui/Icon';
@@ -314,9 +314,11 @@ export default function ClientSortingScreen() {
           };
         }
         list = fresh;
-        resolved = resolveBatteryInput(rawCode, fresh);
+        // not in the fleet list: ask the server, so an assigned tag whose
+        // battery can't be sorted gets its real reason below
+        resolved = await resolveBatteryScan(rawCode, fresh);
       }
-      if (resolved.unassignedTag) return { tone: 'bad', message: `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})` };
+      if (resolved.unassignedTag) return { ignore: true }; // unregistered tag: ignored
       if (!resolved.code) return { tone: 'bad', message: 'Please enter a valid battery code or scan a QR code.' };
 
       // a serial number typed in the box
@@ -334,6 +336,9 @@ export default function ClientSortingScreen() {
       const latest = groupsRef.current;
       const owner = latest.find((g) => (g.batteries || []).some((c) => String(c).toUpperCase() === code));
       if (owner) {
+        // the reader sweeps the whole battery area and keeps re-reading tags
+        // already added — those are skipped quietly; a typed code still says so
+        if (owner.id === group.id && isLikelyRfidTag(rawCode)) return { ignore: true };
         return owner.id === group.id
           ? { tone: 'warn', message: `Battery ${code} is already in this sort group.` }
           : { tone: 'bad', message: `Battery ${code} is already sorted in the "${owner.name}" group.` };
@@ -460,7 +465,7 @@ export default function ClientSortingScreen() {
               onPress={saveActiveGroup}
               disabled={saving || Boolean(loadError)}
               className={`flex-row items-center gap-1.5 rounded-xl px-4 py-2.5 ${
-                hasUnsavedChanges ? 'bg-emerald-600 shadow-md shadow-emerald-600/40' : 'border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800'
+                hasUnsavedChanges ? 'bg-emerald-600 shadow-md shadow-emerald-600/40' : 'border border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800 shadow-none'
               } ${saving ? 'opacity-60' : ''}`}
             >
               {saving ? (
@@ -554,6 +559,7 @@ export default function ClientSortingScreen() {
     return (
       <View className="flex-1 bg-slate-50 dark:bg-slate-950">
         <FlatList
+          automaticallyAdjustKeyboardInsets
           data={activeGroup.batteries}
           keyExtractor={(code) => code}
           keyboardShouldPersistTaps="handled"
@@ -649,7 +655,7 @@ export default function ClientSortingScreen() {
               placeholder="Search sort group name or battery code…"
               placeholderTextColor="#94a3b8"
               autoCorrect={false}
-              className="flex-1 px-2 py-2.5 text-xs text-slate-900 dark:text-white"
+              className="min-w-0 flex-1 px-2 py-2.5 text-xs text-slate-900 dark:text-white"
             />
             {groupSearch.trim() ? (
               <TouchableOpacity onPress={() => setGroupSearch('')} hitSlop={8}>
@@ -684,6 +690,7 @@ export default function ClientSortingScreen() {
   return (
     <View className="flex-1 bg-slate-50 dark:bg-slate-950">
       <FlatList
+        automaticallyAdjustKeyboardInsets
         data={loaded && !loadError ? filteredGroups : []}
         keyExtractor={(item) => item.id}
         keyboardShouldPersistTaps="handled"

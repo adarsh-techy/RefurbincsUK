@@ -241,7 +241,7 @@ export default function AdminDashboardScreen() {
 
       {/* Date filter (the web's mini calendar) */}
       <View className="rounded-3xl border border-slate-200 bg-white p-4">
-        <TouchableOpacity onPress={() => setPickDate((v) => !v)} className="flex-row items-center justify-between">
+        <TouchableOpacity onPress={() => setPickDate((v) => !v)} className="flex-row flex-wrap items-center justify-between gap-2">
           <View className="flex-row items-center gap-2">
             <Icon name="calendar" color="#2563eb" size={16} />
             <Text className="text-xs font-bold text-slate-900">Filter Date Scoped Data</Text>

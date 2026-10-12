@@ -51,7 +51,7 @@ function SearchBox({ value, onChange, placeholder }) {
         placeholder={placeholder}
         placeholderTextColor="#94a3b8"
         autoCapitalize="none"
-        className="flex-1 py-2.5 text-sm text-slate-900 dark:text-white"
+        className="min-w-0 flex-1 py-2.5 text-sm text-slate-900 dark:text-white"
       />
       {value ? (
         <TouchableOpacity onPress={() => onChange('')} hitSlop={8}>

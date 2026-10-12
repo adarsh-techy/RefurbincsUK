@@ -47,7 +47,7 @@ export function statusLabel(status) {
 export function Badge({ tone = 'neutral', children }) {
   const { bg, text } = TONES[tone] || TONES.neutral;
   return (
-    <View className={`self-start rounded-full px-2.5 py-1 ${bg}`}>
+    <View className={`max-w-full shrink self-start rounded-full px-2.5 py-1 ${bg}`}>
       <Text className={`text-xs font-medium ${text}`}>{children}</Text>
     </View>
   );

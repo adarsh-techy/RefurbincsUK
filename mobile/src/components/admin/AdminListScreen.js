@@ -179,7 +179,7 @@ export default function AdminListScreen({
                 placeholder={searchPlaceholder}
                 placeholderTextColor="#94a3b8"
                 autoCorrect={false}
-                className="flex-1 text-sm text-slate-900"
+                className="min-w-0 flex-1 text-sm text-slate-900"
               />
               {search ? (
                 <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>

@@ -117,7 +117,7 @@ function ClientsPage() {
             formTarget === 'new' ? 'Add a new client.' : 'Update this client’s details.'
           }
           size="5xl"
-          className="min-h-[580px] md:min-h-[640px]"
+          className="[@media(min-height:720px)]:min-h-[580px] [@media(min-height:800px)]:md:min-h-[640px]"
           onClose={() => setFormTarget(null)}
         >
           <ClientForm

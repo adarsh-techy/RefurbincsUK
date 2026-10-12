@@ -613,7 +613,7 @@ function RatingsPage() {
         </div>
       ) : (
         /* ── Executive Classic Grid Cards ── */
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4.5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-[1.125rem]">
           {ratings.map((r) => {
             const logo = getLogoUrl(r.client_logo_path);
             const tags = Array.isArray(r.preset_tags)
@@ -643,7 +643,7 @@ function RatingsPage() {
             return (
               <div
                 key={r.id}
-                className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 md:p-5.5 shadow-xs hover:shadow-md hover:border-blue-400/50 dark:border-white/10 dark:bg-surface-850 dark:hover:border-blue-500/40 transition-all duration-300 overflow-hidden"
+                className="group relative flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 md:p-[1.375rem] shadow-xs hover:shadow-md hover:border-blue-400/50 dark:border-white/10 dark:bg-surface-850 dark:hover:border-blue-500/40 transition-all duration-300 overflow-hidden"
               >
                 {/* Top Subtle Gradient Accent Line */}
                 <div className={`absolute top-0 left-0 right-0 h-1 bg-gradient-to-r ${theme.gradient}`} />

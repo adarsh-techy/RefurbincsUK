@@ -96,7 +96,7 @@ function Navbar({ onMenuClick }) {
           type="button"
           onClick={onMenuClick}
           aria-label="Open menu"
-          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl md:hidden transition-colors ${
+          className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl lg:hidden transition-colors ${
             isAccentHeader
               ? 'text-white hover:bg-white/15 active:bg-white/20'
               : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white'
@@ -108,7 +108,7 @@ function Navbar({ onMenuClick }) {
         </button>
 
         {/* Mobile brand logo */}
-        <Link to="/" className="flex shrink-0 items-center md:hidden">
+        <Link to="/" className="flex shrink-0 items-center lg:hidden">
           <img
             src={clientLogo || brandLogo}
             alt={user?.name || 'Refurbnics'}
@@ -117,7 +117,7 @@ function Navbar({ onMenuClick }) {
         </Link>
 
         {/* Desktop Breadcrumb Navigation */}
-        <div className="hidden md:flex items-center gap-2 min-w-0">
+        <div className="hidden lg:flex items-center gap-2 min-w-0">
           <span className={`text-[11px] font-extrabold uppercase tracking-wider shrink-0 ${
             isAccentHeader ? 'text-white/70' : 'text-slate-400 dark:text-neutral-500'
           }`}>
@@ -143,14 +143,17 @@ function Navbar({ onMenuClick }) {
 
       {/* ── Right Side: Clock, Alerts, Widgets & User Chip ── */}
       <div className="ml-auto flex items-center gap-1 sm:gap-2">
-        <UkClock isAccentHeader={isAccentHeader} />
+        <UkClock isAccentHeader={isAccentHeader} className="hidden md:block" />
 
         <div className="flex items-center gap-1">
           {!isClient && <RepeatIntakeAlert />}
           {user?.role === 'client' ? <ClientNotificationBell /> : user?.role === 'recycle_client' ? null : <NotificationBell />}
           <MessagesHeaderIcon />
-          <ThemeCustomizerButton />
-          <ThemeToggle />
+          {/* phones: these two move into the menu drawer */}
+          <div className="hidden sm:flex items-center gap-1">
+            <ThemeCustomizerButton />
+            <ThemeToggle />
+          </div>
         </div>
 
         {/* Desktop User Profile Chip */}

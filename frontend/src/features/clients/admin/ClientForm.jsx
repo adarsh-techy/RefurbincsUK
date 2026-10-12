@@ -102,7 +102,7 @@ function ClientForm({ client, onSaved, onCancel }) {
   }, {});
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-5 max-h-[80vh] overflow-y-auto pr-1">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div>
           <label className={labelClasses}>Client Name <span className="text-rose-500">*</span></label>

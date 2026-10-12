@@ -46,16 +46,16 @@ function StatCard({ label, value, delta, deltaGoodDirection = 'up', trend, tone 
     <div className={`h-full rounded-2xl ${bg} p-3 sm:p-3.5 flex flex-col justify-between transition-all border shadow-2xs`}>
       <div>
         <div className="mb-1 flex items-center justify-between gap-1 text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">
-          <span className="flex items-center gap-1.5 truncate">
+          <span className="flex min-w-0 items-start gap-1.5">
             {icon && <span aria-hidden="true" className="shrink-0">{icon}</span>}
-            <span className="truncate">{label}</span>
+            <span className="min-w-0 break-words leading-snug">{label}</span>
           </span>
         </div>
         <div className={`text-lg sm:text-xl font-black tracking-tight leading-tight ${text}`}>{value}</div>
       </div>
 
       {sub && (
-        <div className="mt-1 text-[9.5px] sm:text-[10px] font-medium text-slate-500 dark:text-neutral-400 leading-tight truncate" title={sub}>
+        <div className="mt-1 text-[9.5px] sm:text-[10px] font-medium text-slate-500 dark:text-neutral-400 leading-tight break-words" title={sub}>
           {sub}
         </div>
       )}

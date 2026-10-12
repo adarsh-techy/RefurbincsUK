@@ -209,7 +209,7 @@ export default function TrashPage() {
             <Button
               variant="danger"
               onClick={() => setEmptyTrashModal(true)}
-              className="flex items-center gap-1.5 border border-red-300 dark:border-red-800"
+              className="flex items-center gap-1.5 whitespace-nowrap border border-red-300 dark:border-red-800"
             >
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
                 <path d="M3 6h18" />
@@ -248,7 +248,7 @@ export default function TrashPage() {
                   : 'border-slate-200 bg-white hover:border-slate-300 dark:border-surface-700 dark:bg-surface-800'
               }`}
             >
-              <div className="text-xs font-medium text-slate-500 dark:text-neutral-400">{cfg.label}s</div>
+              <div className="text-xs font-medium text-slate-500 dark:text-neutral-400">{cfg.label === 'Battery' ? 'Batteries' : `${cfg.label}s`}</div>
               <div className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{count}</div>
             </div>
           );

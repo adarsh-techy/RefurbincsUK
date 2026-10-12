@@ -113,7 +113,7 @@ function PortalHeader() {
           </Link>
 
           {isStaffRole && (
-            <nav className="hidden items-center gap-1 md:flex">
+            <nav className="hidden items-center gap-1 lg:flex">
               {TECHNICIAN_TABS.map((tab) => {
                 const IconComp = tab.icon;
                 return (
@@ -150,7 +150,7 @@ function PortalHeader() {
           {/* User Info & Role Badge */}
           <div className="flex items-center gap-2 pl-1 sm:pl-2.5 border-l border-slate-200 dark:border-white/10">
             <div
-              className={`flex h-8 w-8 sm:h-8.5 sm:w-8.5 shrink-0 items-center justify-center rounded-full text-xs font-bold ring-1 transition-all ${
+              className={`flex h-8 w-8 sm:h-[2.125rem] sm:w-[2.125rem] shrink-0 items-center justify-center rounded-full text-xs font-bold ring-1 transition-all ${
                 isSupervisor
                   ? 'bg-amber-100 text-amber-900 ring-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700/60'
                   : 'bg-emerald-100 text-emerald-900 ring-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700/60'
@@ -160,7 +160,7 @@ function PortalHeader() {
               {initials(user?.name)}
             </div>
 
-            <div className="hidden sm:flex flex-col text-left leading-tight min-w-0 max-w-[110px] md:max-w-[150px]">
+            <div className="hidden sm:flex lg:hidden xl:flex flex-col text-left leading-tight min-w-0 max-w-[110px] md:max-w-[150px]">
               <span className="truncate text-xs font-bold text-slate-800 dark:text-white">
                 {user?.name || 'Staff User'}
               </span>
@@ -210,7 +210,7 @@ function PortalHeader() {
 
       {/* Mobile Bottom Tab Bar */}
       {isStaffRole && (
-        <div className="fixed bottom-0 inset-x-0 z-40 flex h-14 items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md px-1.5 py-0.5 shadow-lg dark:border-white/10 dark:bg-black/95 md:hidden">
+        <div className="fixed bottom-0 inset-x-0 z-40 flex h-14 items-center justify-around border-t border-slate-200 bg-white/95 backdrop-blur-md px-1.5 py-0.5 shadow-lg dark:border-white/10 dark:bg-black/95 lg:hidden">
           {TECHNICIAN_TABS.map((tab) => {
             const IconComp = tab.icon;
             return (

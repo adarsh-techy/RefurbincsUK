@@ -226,7 +226,7 @@ export default function AdminDirectoryScreen() {
               <TouchableOpacity
                 key={t.id}
                 onPress={() => { setTab(t.id); setSearch(''); }}
-                className={`flex-1 items-center rounded-xl py-2 ${active ? 'bg-white shadow-sm' : ''}`}
+                className={`flex-1 items-center rounded-xl py-2 ${active ? 'bg-white shadow-sm' : 'shadow-none'}`}
               >
                 <Text className={`text-xs font-bold ${active ? 'text-blue-700' : 'text-slate-500'}`}>{t.label} ({counts[t.id]})</Text>
               </TouchableOpacity>

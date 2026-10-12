@@ -117,6 +117,34 @@ async function list(req, res, next) {
 
 // Look up a battery by its unique code and return its full lifecycle: every
 // truck/driver that's ever brought it in, every repair, and every return.
+const UNASSIGNED_TAG_MESSAGE =
+  'This RFID tag is not assigned to any battery yet. Assign it on the RFID Assignment page first.';
+
+// Scan boxes resolve a reader's tag here when it isn't in the list they
+// already hold, so an assigned tag is never mistaken for an unassigned one.
+// Scoped like everything else: a client only finds its own batteries, a
+// recycling partner only batteries it received; office and workshop logins
+// find any battery. Anything else answers 404, which the apps ignore quietly.
+async function resolveTag(req, res, next) {
+  try {
+    const hit = await batteryModel.findTagMatch(req.params.tag);
+    let visible = Boolean(hit);
+    if (hit && req.user.role === 'client') {
+      const own = await clientModel.findByUserId(req.user.id);
+      visible =
+        Boolean(own) &&
+        String(hit.client_name || '').trim().toLowerCase() === String(own.name || '').trim().toLowerCase();
+    } else if (hit && req.user.role === 'recycle_client') {
+      const own = await clientModel.findByUserId(req.user.id);
+      visible = Boolean(own) && (await recycleModel.partnerHasBattery(own.id, hit.id));
+    }
+    if (!visible) return res.status(404).json({ message: UNASSIGNED_TAG_MESSAGE });
+    res.json({ battery_code: hit.battery_code, status: hit.status });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function getByCode(req, res, next) {
   try {
     const battery = await batteryModel.findByCode(req.params.code);
@@ -859,6 +887,7 @@ async function assignRfidSheet(req, res, next) {
 
 module.exports = {
   list,
+  resolveTag,
   assignRfidSheet,
   listRfidAssignments,
   rfidTemplate,

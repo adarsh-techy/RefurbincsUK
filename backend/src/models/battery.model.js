@@ -1,5 +1,6 @@
 const db = require('../config/db');
 const serviceModel = require('./service.model');
+const { normalizeTag } = require('../utils/parse-rfid-sheet');
 
 // Fetches one page of batteries, newest first. Requests limit+1 rows so the
 // caller can tell whether there's another page without a separate COUNT(*).
@@ -279,7 +280,35 @@ async function findByCode(batteryCode) {
         OR (b.rfid_tag IS NOT NULL AND b.rfid_tag = upper(regexp_replace($1, '[^0-9A-Za-z]', '', 'g')))`,
     [batteryCode]
   );
-  return rows[0];
+  if (rows[0]) return rows[0];
+  // a reader's version of an assigned tag (prefix, PC bits, CRC…)
+  const hit = await findTagMatch(batteryCode);
+  return hit && hit.battery_code !== batteryCode ? findByCode(hit.battery_code) : undefined;
+}
+
+// Resolves whatever an RFID reader sent to the battery whose tag it is.
+// Exact match on the cleaned tag first. Readers don't always send exactly the
+// stored value — an EPC can come with its PC bits in front (3000E280…) or a
+// CRC behind it, and a sheet may hold a longer read of the same chip — so for
+// long values a tag that contains the read (or is contained in it) also
+// matches, but only when exactly one battery fits.
+async function findTagMatch(raw) {
+  const tag = normalizeTag(raw);
+  if (tag.length < 8) return null;
+  const exact = await db.query(
+    'SELECT id, battery_code, client_name, status FROM batteries WHERE rfid_tag = $1',
+    [tag]
+  );
+  if (exact.rows[0]) return exact.rows[0];
+  if (tag.length < 16) return null;
+  const { rows } = await db.query(
+    `SELECT id, battery_code, client_name, status FROM batteries
+      WHERE rfid_tag IS NOT NULL AND length(rfid_tag) >= 16
+        AND (strpos($1, rfid_tag) > 0 OR strpos(rfid_tag, $1) > 0)
+      LIMIT 2`,
+    [tag]
+  );
+  return rows.length === 1 ? rows[0] : null;
 }
 
 async function findById(id) {
@@ -1412,6 +1441,7 @@ async function findTimeline(batteryId) {
 module.exports = {
   findPage,
   findByCode,
+  findTagMatch,
   findById,
   findByIds,
   findByTruckIntakeId,

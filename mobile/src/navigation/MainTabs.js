@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useSelector } from 'react-redux';
 import { Image, StyleSheet, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import Svg, { Circle, Line, Path, Polyline, Rect } from 'react-native-svg';
 import ServiceScreen from '../screens/technician/ServiceScreen';
@@ -22,6 +23,47 @@ import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import { useTheme } from '../context/ThemeContext';
 
 const Tab = createBottomTabNavigator();
+
+// From this width (tablets, large landscape phones) screen content is centred
+// at a readable width; the header and tab bar stay full width. bottom-tabs
+// renders the header inside the scene container, so the centring wraps each
+// tab's screen component instead of using sceneContainerStyle.
+export const TABLET_MIN_WIDTH = 768;
+export const TABLET_CONTENT_MAX_WIDTH = 920;
+
+// No useWindowDimensions here: on Android the window resizes whenever the
+// keyboard opens, and re-rendering every mounted screen at once on that is
+// what throws "Couldn't find a navigation context" (see App.js). maxWidth
+// alone centres the content on tablets and does nothing on phones.
+function TabletWidth({ children }) {
+  return (
+    <View style={{ flex: 1, alignItems: 'center', backgroundColor: '#f8fafc' }}>
+      <View style={{ flex: 1, width: '100%', maxWidth: TABLET_CONTENT_MAX_WIDTH }}>{children}</View>
+    </View>
+  );
+}
+
+const withTabletWidth = (Screen) => function TabletWidthScreen(props) {
+  return (
+    <TabletWidth>
+      <Screen {...props} />
+    </TabletWidth>
+  );
+};
+
+const ServiceTab = withTabletWidth(ServiceScreen);
+const TechDashboardTab = withTabletWidth(DashboardScreen);
+const HistoryTab = withTabletWidth(HistoryScreen);
+const ProfileTab = withTabletWidth(ProfileScreen);
+const ClientDashboardTab = withTabletWidth(ClientDashboardScreen);
+const ClientBatteriesTab = withTabletWidth(ClientBatteriesScreen);
+const ScanTab = withTabletWidth(ClientScanScreen);
+const AdminDashboardTab = withTabletWidth(AdminDashboardScreen);
+const AdminBatteriesTab = withTabletWidth(AdminBatteriesScreen);
+const AdminIntakesTab = withTabletWidth(AdminIntakesScreen);
+const RecycleDashboardTab = withTabletWidth(RecycleDashboardScreen);
+const RecycleShipmentsTab = withTabletWidth(RecycleShipmentsScreen);
+const SupportTabScreen = withTabletWidth(ClientSupportScreen);
 
 function iconProps(color, size) {
   return { width: size, height: size, viewBox: '0 0 24 24', fill: 'none', stroke: color, strokeWidth: 2, strokeLinecap: 'round', strokeLinejoin: 'round' };
@@ -142,17 +184,23 @@ function MenuIcon({ color }) {
 // itself. bottom-tabs calls this once per tab (all four mount at once, not
 // just the focused one), so anything stateful or context-sensitive placed
 // here runs four times over.
+// Height follows the device: status bar / notch inset on top of a fixed
+// 56pt bar (it used to be a flat 92, which sat under tall notches and left
+// a gap on devices and in landscape where the status bar is short or gone).
+export const HEADER_BAR_HEIGHT = 56;
+
 function Header({ showMenu, onMenuPress }) {
+  const insets = useSafeAreaInsets();
   return (
     <View
       style={{
-        height: 92,
+        height: insets.top + HEADER_BAR_HEIGHT,
+        paddingTop: insets.top,
         flexDirection: 'row',
-        alignItems: 'flex-end',
+        alignItems: 'center',
         justifyContent: 'space-between',
-        paddingLeft: 16,
-        paddingRight: 14,
-        paddingBottom: 12,
+        paddingLeft: Math.max(16, insets.left),
+        paddingRight: Math.max(14, insets.right),
         backgroundColor: '#ffffff',
         borderBottomWidth: StyleSheet.hairlineWidth,
         borderBottomColor: '#e2e8f0',
@@ -160,7 +208,7 @@ function Header({ showMenu, onMenuPress }) {
     >
       <Image
         source={require('../../assets/LogoREFURBNICSBlack.png')}
-        style={{ width: 140, height: 38 }}
+        style={{ width: 140, maxWidth: '40%', height: 34 }}
         resizeMode="contain"
       />
 
@@ -179,6 +227,7 @@ export default function MainTabs() {
   const isOffice = OFFICE_ROLES.includes(user?.role);
   const isRecycle = user?.role === 'recycle_client';
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const insets = useSafeAreaInsets();
 
   return (
     <>
@@ -193,8 +242,8 @@ export default function MainTabs() {
             backgroundColor: '#ffffff',
             borderTopColor: '#e2e8f0',
             borderTopWidth: StyleSheet.hairlineWidth,
-            height: 60,
-            paddingBottom: 8,
+            height: 60 + insets.bottom,
+            paddingBottom: 8 + insets.bottom,
             paddingTop: 6,
           },
           tabBarLabelStyle: {
@@ -214,7 +263,7 @@ export default function MainTabs() {
             {hasClientPermission(user, 'client_dashboard') && (
               <Tab.Screen
                 name="Dashboard"
-                component={ClientDashboardScreen}
+                component={ClientDashboardTab}
                 options={{ title: 'Dashboard' }}
               />
             )}
@@ -223,7 +272,7 @@ export default function MainTabs() {
               hasClientPermission(user, 'client_received')) && (
               <Tab.Screen
                 name="MyBatteries"
-                component={ClientBatteriesScreen}
+                component={ClientBatteriesTab}
                 options={{ title: 'My Batteries' }}
                 initialParams={{
                   initialBucket: hasClientPermission(user, 'client_all_batteries')
@@ -234,37 +283,37 @@ export default function MainTabs() {
             )}
             <Tab.Screen
               name="ScanQR"
-              component={ClientScanScreen}
+              component={ScanTab}
               options={{ title: 'Scan QR' }}
             />
             <Tab.Screen
               name="Profile"
-              component={ProfileScreen}
+              component={ProfileTab}
               options={{ title: 'Profile' }}
             />
           </>
         ) : isOffice ? (
           <>
-            <Tab.Screen name="Dashboard" component={AdminDashboardScreen} />
-            <Tab.Screen name="Batteries" component={AdminBatteriesScreen} />
-            <Tab.Screen name="Scan" component={ClientScanScreen} options={{ title: 'Scan' }} />
-            <Tab.Screen name="Intakes" component={AdminIntakesScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
+            <Tab.Screen name="Dashboard" component={AdminDashboardTab} />
+            <Tab.Screen name="Batteries" component={AdminBatteriesTab} />
+            <Tab.Screen name="Scan" component={ScanTab} options={{ title: 'Scan' }} />
+            <Tab.Screen name="Intakes" component={AdminIntakesTab} />
+            <Tab.Screen name="Profile" component={ProfileTab} />
           </>
         ) : isRecycle ? (
           <>
-            <Tab.Screen name="Dashboard" component={RecycleDashboardScreen} />
-            <Tab.Screen name="Shipments" component={RecycleShipmentsScreen} />
+            <Tab.Screen name="Dashboard" component={RecycleDashboardTab} />
+            <Tab.Screen name="Shipments" component={RecycleShipmentsTab} />
             {/* "SupportTab": the stack already has a "Support" route */}
-            <Tab.Screen name="SupportTab" component={ClientSupportScreen} options={{ title: 'Support' }} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
+            <Tab.Screen name="SupportTab" component={SupportTabScreen} options={{ title: 'Support' }} />
+            <Tab.Screen name="Profile" component={ProfileTab} />
           </>
         ) : (
           <>
-            <Tab.Screen name="Service" component={ServiceScreen} />
-            <Tab.Screen name="Dashboard" component={DashboardScreen} />
-            <Tab.Screen name="History" component={HistoryScreen} />
-            <Tab.Screen name="Profile" component={ProfileScreen} />
+            <Tab.Screen name="Service" component={ServiceTab} />
+            <Tab.Screen name="Dashboard" component={TechDashboardTab} />
+            <Tab.Screen name="History" component={HistoryTab} />
+            <Tab.Screen name="Profile" component={ProfileTab} />
           </>
         )}
       </Tab.Navigator>

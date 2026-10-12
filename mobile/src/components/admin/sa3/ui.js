@@ -175,7 +175,7 @@ export function SearchBox({ value, onChangeText, placeholder, label }) {
           placeholderTextColor="#94a3b8"
           autoCorrect={false}
           autoCapitalize="none"
-          className="flex-1 text-sm text-slate-900"
+          className="min-w-0 flex-1 text-sm text-slate-900"
         />
         {value ? (
           <TouchableOpacity onPress={() => onChangeText('')} hitSlop={8}><Icon name="x" color="#94a3b8" size={14} /></TouchableOpacity>

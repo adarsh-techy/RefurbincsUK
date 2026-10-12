@@ -247,11 +247,11 @@ export default function AdminMessagesPage() {
       </div>
 
       {/* ── Modern 2-Pane Unified Workspace ─────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 min-h-[640px] items-stretch">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 lg:min-h-[640px] items-stretch">
         {/* ── Left Pane: Inbox Queue ─────────────────────────────────── */}
         <div className="lg:col-span-5 flex flex-col rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
           {/* Status Tabs */}
-          <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-surface-800 mb-3">
+          <div className="flex items-center gap-1 overflow-x-auto no-scrollbar rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-surface-800 mb-3">
             {[
               { id: 'all', label: 'All', count: stats.total || 0 },
               { id: 'open', label: 'Open', count: stats.open || 0 },
@@ -265,7 +265,7 @@ export default function AdminMessagesPage() {
                   type="button"
                   onClick={() => setFilterStatus(tab.id)}
                   style={isActive ? { backgroundColor: accent, color: '#ffffff' } : {}}
-                  className={`flex-1 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
+                  className={`flex-1 shrink-0 whitespace-nowrap px-2 flex items-center justify-center gap-1.5 rounded-xl py-2 text-xs font-bold transition-all ${
                     isActive
                       ? 'shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white'
@@ -413,7 +413,7 @@ export default function AdminMessagesPage() {
         </div>
 
         {/* ── Right Pane: Active Thread & Reply Studio ───────────────── */}
-        <div className="lg:col-span-7 flex flex-col rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-900 justify-between">
+        <div className={`lg:col-span-7 ${activeTicket ? 'flex' : 'hidden lg:flex'} flex-col rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-900 justify-between`}>
           {loadingActive ? (
             <div className="flex flex-1 flex-col items-center justify-center gap-2">
               <div className="h-8 w-8 animate-spin rounded-full border-3 border-emerald-500 border-t-transparent" />

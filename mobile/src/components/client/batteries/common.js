@@ -1,4 +1,5 @@
-import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { KeyboardAvoidingView, Modal, Platform, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Badge, clientBatteryStatus } from '../../ui/Badge';
 import SharedDateField from '../../ui/DateField';
 
@@ -126,10 +127,11 @@ export function FieldLabel({ children, required, optional }) {
 // Full-screen sheet with a title bar — the phone version of the web Modal.
 // `footer` stays pinned at the bottom (the web's sticky actions bar).
 export function Sheet({ visible, title, description, onClose, children, footer }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-        <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-12 dark:border-slate-800 dark:bg-slate-900">
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-slate-50 dark:bg-slate-950">
+        <View className="border-b border-slate-200 bg-white px-4 pb-3 dark:border-slate-800 dark:bg-slate-900" style={{ paddingTop: Math.max(48, insets.top + 12) }}>
           <View className="flex-row items-start justify-between gap-3">
             <Text className="flex-1 text-base font-extrabold text-slate-900 dark:text-white">{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={10}>
@@ -138,13 +140,15 @@ export function Sheet({ visible, title, description, onClose, children, footer }
           </View>
           {description ? <Text className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">{description}</Text> : null}
         </View>
-        <ScrollView className="flex-1" contentContainerClassName="p-4 gap-4 pb-10" keyboardShouldPersistTaps="handled">
+        <ScrollView className="flex-1" contentContainerClassName="w-full max-w-2xl self-center p-4 gap-4 pb-10" keyboardShouldPersistTaps="handled">
           {children}
         </ScrollView>
         {footer ? (
-          <View className="border-t border-slate-200 bg-white px-4 pb-8 pt-3 dark:border-slate-800 dark:bg-slate-900">{footer}</View>
+          <View className="border-t border-slate-200 bg-white px-4 pt-3 dark:border-slate-800 dark:bg-slate-900" style={{ paddingBottom: Math.max(32, insets.bottom + 12) }}>
+            <View className="w-full max-w-2xl self-center">{footer}</View>
+          </View>
         ) : null}
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

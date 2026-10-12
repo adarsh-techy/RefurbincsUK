@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE, scanThen } from '../../../utils/scan-input';
 import { Badge, statusLabel } from '../../ui/Badge';
 import Icon from '../../ui/Icon';
 import {
@@ -215,7 +215,7 @@ export function EditBatchModal({ batch, fleet = [], onClose, onChanged }) {
         <TextInput value={notes} onChangeText={setNotes} placeholder="Fault / Defect Note (Optional)" placeholderTextColor="#94a3b8" className="mt-2 rounded-xl border border-slate-300 bg-slate-50 px-3 py-2.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
         <View className="mt-2">
           <ScanBatteryInput
-            onSubmit={(raw) => addBattery(raw)}
+            onSubmit={(raw) => scanThen(raw, fleet, (code) => addBattery(code))}
             disabled={adding}
             submitLabel={adding ? 'Adding…' : 'Add to Intake'}
             placeholder="Type battery ID (e.g. UBE-0012) or scan QR / RFID…"
@@ -334,7 +334,7 @@ export function AddMoreModal({ batch, fleet = [], onClose, onChanged }) {
           <Badge tone="info">{staged.length} selected</Badge>
         </View>
         <Text className="mb-3 mt-1 text-[11px] text-slate-500">Type or scan a battery code to add to Truck {batch?.truckNumber || 'Batch'}.</Text>
-        <ScanBatteryInput onSubmit={stage} placeholder="Scan, type code or pick from suggestions…" />
+        <ScanBatteryInput onSubmit={(raw) => scanThen(raw, fleet, stage)} placeholder="Scan, type code or pick from suggestions…" />
         {showSuggestions ? (
           <View className="mt-3 rounded-xl border border-slate-200 dark:border-slate-800">
             <View className="flex-row items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
@@ -382,8 +382,8 @@ export function AddMoreModal({ batch, fleet = [], onClose, onChanged }) {
             </TouchableOpacity>
           </View>
           <View className="mt-1.5 flex-row gap-2">
-            <TextInput value={b.serial} onChangeText={(t) => update(b.id, 'serial', t)} placeholder="Serial (optional)" placeholderTextColor="#94a3b8" className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
-            <TextInput value={b.issue} onChangeText={(t) => update(b.id, 'issue', t)} placeholder="Defect reason (optional)" placeholderTextColor="#94a3b8" className="flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+            <TextInput value={b.serial} onChangeText={(t) => update(b.id, 'serial', t)} placeholder="Serial (optional)" placeholderTextColor="#94a3b8" className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
+            <TextInput value={b.issue} onChangeText={(t) => update(b.id, 'issue', t)} placeholder="Defect reason (optional)" placeholderTextColor="#94a3b8" className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white" />
           </View>
         </View>
       ))}

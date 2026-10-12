@@ -432,7 +432,7 @@ export default function ClientTruckBatches({
                   onChangeText={setBatchSearch}
                   placeholder="Search Battery ID, Serial, Status…"
                   placeholderTextColor="#94a3b8"
-                  className="flex-1 text-xs text-slate-900 dark:text-white"
+                  className="min-w-0 flex-1 text-xs text-slate-900 dark:text-white"
                 />
               </View>
             </View>

@@ -1,13 +1,17 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import Svg, { Path } from 'react-native-svg';
 import { logout } from '../../store/auth-slice';
 import { navigate } from '../../navigation/navigationRef';
 import { hasClientPermission } from '../../utils/permissions';
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PANEL_WIDTH = Math.min(300, SCREEN_WIDTH * 0.82);
+// panel width is read from the window when the menu renders (rotation,
+// split screen, tablets) — not subscribed: this sits in MainTabs, and on
+// Android the keyboard resizes the window, which must not re-render the
+// navigation tree (see App.js).
+const panelWidthFor = (width) => Math.min(300, width * 0.82);
 
 // Same groups, labels and order as the web client Sidebar
 // (frontend/src/components/layout/shell/Sidebar.jsx CLIENT_NAV_GROUPS);
@@ -60,6 +64,8 @@ function MenuCloseIcon() {
 export default function ClientSidebar({ visible, onClose }) {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const insets = useSafeAreaInsets();
+  const PANEL_WIDTH = panelWidthFor(Dimensions.get('window').width);
   const translateX = useRef(new Animated.Value(PANEL_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
@@ -76,7 +82,7 @@ export default function ClientSidebar({ visible, onClose }) {
         useNativeDriver: true,
       }),
     ]).start();
-  }, [visible, translateX, backdropOpacity]);
+  }, [visible, translateX, backdropOpacity, PANEL_WIDTH]);
 
   function go(link) {
     onClose();
@@ -97,7 +103,7 @@ export default function ClientSidebar({ visible, onClose }) {
           style={{ width: PANEL_WIDTH, transform: [{ translateX }] }}
           className="h-full border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950"
         >
-          <View className="flex-row items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 px-5 pb-4 pt-14">
+          <View className="flex-row items-center justify-between border-b border-slate-200/80 dark:border-slate-800/80 px-5 pb-4" style={{ paddingTop: Math.max(56, insets.top + 16) }}>
             <View>
               <Text className="text-sm font-extrabold text-slate-900 dark:text-white" numberOfLines={1}>
                 {user?.name || 'Client'}
@@ -136,7 +142,7 @@ export default function ClientSidebar({ visible, onClose }) {
             })}
           </ScrollView>
 
-          <View className="border-t border-slate-200/80 dark:border-slate-800/80 p-4">
+          <View className="border-t border-slate-200/80 dark:border-slate-800/80 p-4" style={{ paddingBottom: 16 + insets.bottom }}>
             <TouchableOpacity
               onPress={() => {
                 onClose();

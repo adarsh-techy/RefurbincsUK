@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
+import { clearTagCache, normalizeRfidTag } from '../../../utils/scan-input';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
 import Button from '../../../components/ui/primitives/Button';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
@@ -82,6 +83,7 @@ function RfidAssignmentPage() {
     const { data } = await apiClient.post(`/batteries/rfid-assign${params.toString() ? `?${params}` : ''}`, formData, {
       headers: { 'Content-Type': 'multipart/form-data' },
     });
+    if (!dryRun) clearTagCache();
     return data;
   }
 
@@ -520,6 +522,7 @@ function AssignedTagsTable({ version }) {
     }
     const hadTag = Boolean(row.rfid_tag);
     setRows((list) => list.map((x) => (x.id === row.id ? { ...x, rfid_tag: res.rfidTag } : x)));
+    clearTagCache(); // scan boxes must see the new tag straight away
     if (!hadTag) setCounts((c) => ({ assigned: c.assigned + 1, unassigned: Math.max(0, c.unassigned - 1) }));
     return res;
   }
@@ -549,7 +552,7 @@ function AssignedTagsTable({ version }) {
               </svg>
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <p className="text-base font-black tracking-tight text-slate-900 dark:text-white">RFID Tags by Battery</p>
                 <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">LIVE REGISTER</span>
               </div>
@@ -576,7 +579,7 @@ function AssignedTagsTable({ version }) {
             <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 shadow-2xs backdrop-blur-xs dark:border-white/10 dark:bg-surface-800/70">
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">Coverage</p>
-                <span className="text-[10px] font-bold text-slate-400">Target 100%</span>
+                <span className="hidden text-[10px] font-bold text-slate-400 sm:inline">Target 100%</span>
               </div>
               <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{loading ? '…' : `${pct}%`}</p>
             </div>
@@ -773,8 +776,8 @@ function TagCell({ row, editing, onEdit, onCancel, onSave, onSaved, copied, onCo
   }, [editing]);
 
   async function verifyAndSave() {
-    const clean1 = tag1.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
-    const clean2 = tag2.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const clean1 = normalizeRfidTag(tag1);
+    const clean2 = normalizeRfidTag(tag2);
 
     if (!clean1) {
       setError('Enter tag in 1st box first.');
@@ -806,8 +809,8 @@ function TagCell({ row, editing, onEdit, onCancel, onSave, onSaved, copied, onCo
   }
 
   if (editing) {
-    const clean1 = tag1.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
-    const clean2 = tag2.trim().replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    const clean1 = normalizeRfidTag(tag1);
+    const clean2 = normalizeRfidTag(tag2);
     const isMatching = clean1 && clean2 && clean1 === clean2;
     const isMismatch = clean1 && clean2 && clean1 !== clean2;
 

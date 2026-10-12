@@ -4,7 +4,7 @@ import apiClient from '../../../services/api-client';
 import Modal from '../../../components/ui/overlays/Modal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import TableState from '../../../components/ui/table/TableState';
-import { resolveBatteryInput } from '../../../utils/scan-input';
+import { resolveBatteryInput, recheckUnassignedTag } from '../../../utils/scan-input';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 
 function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSuccess }) {
@@ -126,6 +126,7 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
     if (resolved.unassignedTag) {
       setScanInput('');
       setShowSuggestions(false); // unregistered RFID tag: ignored quietly
+      recheckUnassignedTag(raw, batteriesList, (c) => handleScan(c));
       return;
     }
     const rawVal = (resolved.code || '').trim();

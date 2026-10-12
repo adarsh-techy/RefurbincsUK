@@ -43,7 +43,7 @@ function RatingDetailModal({ ratingItem, onClose }) {
     >
       <div className="space-y-5 py-1">
         {/* ── Client & Score Hero Card ──────────────────────────────────── */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-4.5 dark:border-white/10 dark:bg-surface-850">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 rounded-2xl border border-slate-200/80 bg-slate-50/70 p-[1.125rem] dark:border-white/10 dark:bg-surface-850">
           <div className="flex items-center gap-3.5 min-w-0">
             {logo ? (
               <img
@@ -92,7 +92,7 @@ function RatingDetailModal({ ratingItem, onClose }) {
         </div>
 
         {/* ── Battery Information Card ──────────────────────────────────── */}
-        <div className="rounded-2xl border border-slate-200 bg-white p-4.5 dark:border-white/10 dark:bg-surface-850 shadow-2xs">
+        <div className="rounded-2xl border border-slate-200 bg-white p-[1.125rem] dark:border-white/10 dark:bg-surface-850 shadow-2xs">
           <div className="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-white/10">
             <div className="flex items-center gap-2">
               <span className="text-base">🔋</span>

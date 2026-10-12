@@ -49,6 +49,7 @@ router.get('/serial-numbers', requireAuth, requireRole('super_admin', 'admin', '
 router.get('/repeat-intakes-this-month', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.repeatIntakesThisMonth);
 router.get('/rfid-assignments', requireAuth, requireRole('super_admin', 'admin', 'staff'), batteryController.listRfidAssignments);
 router.get('/rfid-template', requireAuth, requireRole('super_admin', 'admin', 'staff'), batteryController.rfidTemplate);
+router.get('/resolve-tag/:tag', requireAuth, batteryController.resolveTag);
 router.get('/unserviceable-count', requireAuth, requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), batteryController.unserviceableCount);
 
 // Public / client QR code tracking endpoint — anyone scanning a QR code can see

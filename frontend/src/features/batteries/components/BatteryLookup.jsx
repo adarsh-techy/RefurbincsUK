@@ -53,7 +53,7 @@ function BatteryLookup() {
 
   return (
     <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 w-full sm:w-auto">
-      <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[16rem] flex-1 sm:flex-none">
+      <div className="relative w-full sm:w-auto min-w-0 sm:min-w-[16rem] basis-full sm:basis-auto">
         <label className="mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200">
           Look Up Battery by ID
         </label>

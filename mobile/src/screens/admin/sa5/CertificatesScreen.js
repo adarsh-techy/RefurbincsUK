@@ -289,7 +289,7 @@ export default function CertificatesScreen() {
                 returnKeyType="search"
                 placeholder="Search certificates by client name, code, or title..."
                 placeholderTextColor="#94a3b8"
-                className="flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900"
+                className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-xs text-slate-900"
               />
               <SmallButton label="Search" tone="primary" onPress={() => { setLoading(true); fetchCertificates(); }} />
             </View>

@@ -51,7 +51,7 @@ export default function BatteryLookup() {
           autoCapitalize="characters"
           autoCorrect={false}
           returnKeyType="go"
-          className="flex-1 rounded-xl border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900"
+          className="min-w-0 flex-1 rounded-xl border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900"
         />
         <TouchableOpacity disabled={!code.trim()} onPress={() => goTo(code.trim())} className={`justify-center rounded-xl bg-violet-700 px-3.5 ${code.trim() ? '' : 'opacity-50'}`}>
           <Text className="text-xs font-bold text-white">View Battery</Text>

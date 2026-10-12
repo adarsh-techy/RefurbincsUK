@@ -98,7 +98,7 @@ export default function DateField({ label, value = '', onChange, clearable = tru
           keyboardType="numbers-and-punctuation"
           maxLength={10}
           autoCorrect={false}
-          className={`flex-1 rounded-xl border bg-white px-3 py-2 text-center text-sm font-semibold text-slate-900 ${invalid ? 'border-red-400' : 'border-slate-300'}`}
+          className={`min-w-0 flex-1 rounded-xl border bg-white px-3 py-2 text-center text-sm font-semibold text-slate-900 ${invalid ? 'border-red-400' : 'border-slate-300'}`}
         />
         <TouchableOpacity disabled={!isValidYmd(value)} onPress={() => commit(shiftYmd(value, 1))} hitSlop={6} className={`rounded-lg border border-slate-200 bg-white px-2.5 py-2 ${isValidYmd(value) ? '' : 'opacity-40'}`}>
           <Text className="text-xs font-bold text-slate-600">›</Text>
@@ -112,7 +112,7 @@ export default function DateField({ label, value = '', onChange, clearable = tru
       {iosOpen && Picker ? (
         <Modal transparent animationType="fade" onRequestClose={() => setIosOpen(false)}>
           <View className="flex-1 justify-end bg-black/40">
-            <View className="rounded-t-2xl bg-white p-4">
+            <View className="w-full max-w-2xl self-center rounded-t-2xl bg-white p-4 pb-8">
               <Picker.default value={iosDraft} mode="date" display="inline" onChange={(e, d) => d && setIosDraft(d)} />
               <View className="mt-2 flex-row gap-2">
                 <TouchableOpacity onPress={() => setIosOpen(false)} className="flex-1 items-center rounded-xl border border-slate-200 py-3">

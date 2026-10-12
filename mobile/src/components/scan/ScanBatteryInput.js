@@ -3,7 +3,7 @@ import { Modal, Text, TextInput, TouchableOpacity, Vibration, View } from 'react
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Icon from '../ui/Icon';
 import { hardwareScannerAvailable, useHardwareScan } from '../../services/hardware-scanner';
-import { isUnassignedTagMessage } from '../../utils/scan-input';
+import { isUnassignedTagMessage, normalizeRfidTag, splitScanInput } from '../../utils/scan-input';
 
 // One scan box for every place a battery is scanned (sorting, intake,
 // returns, recycle, verify, technician lookup) — the mobile twin of the web
@@ -27,7 +27,14 @@ import { isUnassignedTagMessage } from '../../utils/scan-input';
 // UHF tags (EPC "E280…") can't be read by a phone's own NFC, so the reader
 // is always an external device.
 
-const RFID_IDLE_SUBMIT_MS = 300; // readers type a whole tag in well under this
+// Readers that end a tag with Enter/Tab submit at once. Without one, the tag
+// is submitted after this much quiet — long enough that a slow Bluetooth/HID
+// reader can't be cut mid-tag, and never for a fragment under 8 characters.
+const RFID_IDLE_SUBMIT_MS = 700;
+const MIN_TAG_LENGTH = 8;
+// A reader repeats the tag it is pointed at many times a second; the same
+// value again within this window is the same scan, not a new one.
+const REPEAT_READ_MS = 2500;
 
 const VIBRATE = { good: 60, warn: 180, bad: [0, 160, 90, 160] };
 
@@ -54,6 +61,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     showCamera = true,
     startInRfidMode = false,
     compact = false,
+    multiple = true, // false: a read holding several tags is refused (tag assignment)
   },
   ref
 ) {
@@ -70,9 +78,14 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
   const [result, setResult] = useState(null); // { tone, message } of the last scan
   const [problem, setProblem] = useState(null); // { title, message, value } → popup
   const resultTimer = useRef(null);
+  const queueRef = useRef(Promise.resolve()); // scans are handled one at a time, in order
+  const recentRef = useRef(new Map()); // value → when it was last taken
 
   // Every scan (typed, reader, camera, Zebra trigger) ends here.
-  async function deliver(v) {
+  // fromReader: an RFID/QR reader read (trigger or keystroke burst). Its
+  // problems show as a banner instead of a popup, so the reader can keep
+  // sweeping without a dialog swallowing the next tags.
+  async function deliver(v, fromReader = false) {
     setLastRead(v);
     let res;
     try {
@@ -88,7 +101,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     }
     if (!res?.tone) {
       setResult({ tone: 'info', message: `Scanned ${v}` });
-    } else if (res.tone === 'bad' || res.tone === 'error') {
+    } else if ((res.tone === 'bad' || res.tone === 'error') && !fromReader) {
       setResult(null);
       setProblem({ title: problemTitle(res.message), message: res.message, value: v });
     } else {
@@ -106,7 +119,33 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
   useEffect(() => () => clearTimeout(resultTimer.current), []);
 
   const zebra = hardwareScannerAvailable();
-  useHardwareScan((v) => deliver(v), !disabled && !problem);
+  // A new trigger pull while a problem popup is open replaces the popup
+  // instead of being dropped (and never falls through to another screen).
+  useHardwareScan((v) => {
+    if (problem) setProblem(null);
+    deliverAll(splitScanInput(v), true);
+  }, !disabled);
+
+  function deliverAll(pieces, fromReader = false) {
+    if (!multiple && pieces.length > 1) {
+      setProblem({
+        title: 'Several tags read at once',
+        message: `The reader picked up ${pieces.length} tags. Hold only one sticker near the reader and scan again.`,
+        value: pieces.join(', '),
+      });
+      Vibration.vibrate(VIBRATE.bad);
+      return;
+    }
+    const now = Date.now();
+    pieces.forEach((piece) => {
+      const key = normalizeRfidTag(piece) || piece;
+      if (now - (recentRef.current.get(key) || 0) < REPEAT_READ_MS) return; // repeated read
+      recentRef.current.set(key, now);
+      // queued: a fast second tag waits for the first to be added, so both
+      // count and the page always sees the latest list
+      queueRef.current = queueRef.current.then(() => deliver(piece, fromReader)).catch(() => {});
+    });
+  }
 
   const setText = (t) => {
     valueRef.current = t;
@@ -124,25 +163,35 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     return () => clearTimeout(t);
   }, [rfidMode]);
 
+  // Each piece is delivered on its own: one burst can hold several tags.
   function submit(raw) {
     clearTimeout(idleRef.current);
-    const v = String(raw ?? valueRef.current).replace(/[\t\r\n]+/g, '').trim();
-    if (!v) return;
+    const pieces = String(raw ?? valueRef.current)
+      .split(/[\t\r\n]+/)
+      .flatMap((p) => splitScanInput(p));
+    if (!pieces.length) return;
     setText('');
-    deliver(v);
+    deliverAll(pieces, rfidMode); // in RFID mode the text came from the reader
     if (rfidMode) setTimeout(() => inputRef.current?.focus(), 30);
   }
 
   function handleChange(text) {
-    // a reader that ends with Tab/Enter inside the text
+    // a reader that ends each tag with Tab/Enter: deliver every finished
+    // tag and keep whatever is still being typed after the last one
     if (/[\t\r\n]/.test(text)) {
-      submit(text);
+      const endsWithBreak = /[\t\r\n]$/.test(text);
+      const parts = text.split(/[\t\r\n]+/);
+      const rest = endsWithBreak ? '' : parts.pop();
+      submit(parts.join('\n'));
+      if (rest) handleChange(rest);
       return;
     }
     setText(text);
     if (rfidMode) {
       clearTimeout(idleRef.current);
-      if (text.trim().length >= 4) idleRef.current = setTimeout(() => submit(text), RFID_IDLE_SUBMIT_MS);
+      if (normalizeRfidTag(text).length >= MIN_TAG_LENGTH) {
+        idleRef.current = setTimeout(() => submit(valueRef.current), RFID_IDLE_SUBMIT_MS);
+      }
     }
   }
 
@@ -260,7 +309,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
       {/* refused scan: has to be acknowledged so it can't be missed */}
       <Modal visible={Boolean(problem)} transparent animationType="fade" onRequestClose={closeProblem}>
         <View className="flex-1 items-center justify-center bg-black/60 px-6">
-          <View className="w-full items-center rounded-3xl bg-white p-6 dark:bg-slate-900">
+          <View className="w-full max-w-md items-center rounded-3xl bg-white p-6 dark:bg-slate-900">
             <View className="h-16 w-16 items-center justify-center rounded-full bg-red-100">
               <Text className="text-3xl font-black text-red-600">✕</Text>
             </View>

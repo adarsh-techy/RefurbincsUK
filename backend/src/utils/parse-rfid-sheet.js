@@ -53,9 +53,18 @@ function tagLostDigits(value) {
 }
 
 // Tags are stored as upper-case alphanumerics only: readers report the same
-// UID with colons, spaces or lower-case hex depending on the device.
+// UID with colons, spaces or lower-case hex depending on the device. Some
+// readers also put a symbology id (]Q1, ]C0…) or a label (EPC:, TID:) in
+// front of the tag — that isn't part of the tag, so it's dropped first.
+function cleanTagText(text) {
+  return String(text ?? '')
+    .trim()
+    .replace(/^\][A-Za-z][0-9A-Za-z]/, '')
+    .replace(/^(?:epc|tid|uii|tag|rfid)\s*[:=#]\s*/i, '');
+}
+
 function normalizeTag(value) {
-  return cellText(value).replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+  return cleanTagText(cellText(value)).replace(/[^0-9A-Za-z]/g, '').toUpperCase();
 }
 
 // Excel saves CSV with ';' (and some tools with tabs) depending on the
@@ -164,4 +173,4 @@ async function parseRfidSheet(buffer, filename) {
   return rows;
 }
 
-module.exports = { parseRfidSheet, normalizeTag };
+module.exports = { parseRfidSheet, normalizeTag, cleanTagText };

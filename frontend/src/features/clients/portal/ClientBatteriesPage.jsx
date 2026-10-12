@@ -11,7 +11,7 @@ import { fetchSortGroups } from '../../../utils/sort-groups';
 import Modal from '../../../components/ui/overlays/Modal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../../utils/extract-battery-code';
-import { resolveBatteryInput } from '../../../utils/scan-input';
+import { resolveBatteryInput, recheckUnassignedTag } from '../../../utils/scan-input';
 
 import { useTheme } from '../../../context/ThemeContext';
 import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter, FiRefreshCw } from 'react-icons/fi';
@@ -538,6 +538,7 @@ function ClientBatteriesPage() {
     const resolved = resolveBatteryInput(raw, allRegisteredBatteries);
     if (resolved.unassignedTag) {
       setEditBatchAddInput(''); // unregistered RFID tag: ignored quietly
+      recheckUnassignedTag(raw, allRegisteredBatteries, (c) => handleEditModalAddBattery(c, customSerial, customNotes));
       return;
     }
     const code = resolved.code;
@@ -739,6 +740,7 @@ function ClientBatteriesPage() {
     const resolved = resolveBatteryInput(rawCode, allRegisteredBatteries);
     if (resolved.unassignedTag) {
       setAddMoreScanInput(''); // unregistered RFID tag: ignored quietly
+      recheckUnassignedTag(rawCode, allRegisteredBatteries, (c) => handleAddMoreBattery(c, initialSerial));
       return;
     }
     const code = resolved.code;
@@ -790,6 +792,7 @@ function ClientBatteriesPage() {
     if (addMoreScanInput.trim()) {
       const resolved = resolveBatteryInput(addMoreScanInput, allRegisteredBatteries);
       if (resolved.unassignedTag) {
+        recheckUnassignedTag(addMoreScanInput, allRegisteredBatteries, (c) => handleAddMoreBattery(c));
         setAddMoreScanInput(''); // unregistered RFID tag: ignored quietly
         return;
       }
@@ -837,6 +840,7 @@ function ClientBatteriesPage() {
     const resolved = resolveBatteryInput(rawCode, allRegisteredBatteries);
     if (resolved.unassignedTag) {
       setScanInput(''); // unregistered RFID tag: ignored quietly
+      recheckUnassignedTag(rawCode, allRegisteredBatteries, (c) => handleAddBattery(c, initialSerial));
       return;
     }
     const code = resolved.code;
@@ -2226,8 +2230,8 @@ function ClientBatteriesPage() {
                   Type or scan a battery code to add to Truck {selectedBatch.truckNumber || 'Batch'}.
                 </p>
 
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
+                <div className="flex flex-wrap gap-2 sm:flex-nowrap">
+                  <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
                     <input data-rfid-scan="client-add-more"
                       type="text"
                       value={addMoreScanInput}
@@ -2252,14 +2256,14 @@ function ClientBatteriesPage() {
                     type="button"
                     onClick={() => handleAddMoreBattery(addMoreScanInput)}
                     disabled={!addMoreScanInput.trim()}
-                    className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    className="flex-1 sm:flex-none shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   >
                     Add
                   </button>
                   <button
                     type="button"
                     onClick={() => setAddMoreCameraOpen((prev) => !prev)}
-                    className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+                    className="flex-1 sm:flex-none shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
                   >
                     {addMoreCameraOpen ? 'Close Camera' : 'Use Camera'}
                   </button>
@@ -3033,8 +3037,8 @@ function ClientBatteriesPage() {
       )}
 
       {/* ── Search & Filter Bar ────────────────────────────────────────── */}
-      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-        <div className="w-full sm:w-auto min-w-0 sm:min-w-[14rem] flex-1 sm:flex-none">
+      <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        <div className="w-full sm:w-auto min-w-0 sm:min-w-[14rem] sm:flex-none">
           <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
             {effectiveBucket === 'packed' ? 'Search Driver / Truck' : 'Search Battery / Serial'}
           </label>
@@ -3055,7 +3059,7 @@ function ClientBatteriesPage() {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
+              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
             >
               <option value="">All Statuses</option>
               <option value="in_fleet">Active in Fleet</option>
@@ -3070,8 +3074,8 @@ function ClientBatteriesPage() {
           </div>
         )}
 
-        <div className="flex items-center gap-2">
-          <div>
+        <div className="flex items-end gap-2">
+          <div className="min-w-0 flex-1 sm:flex-none">
             <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
               {effectiveBucket === 'packed' ? 'Intake Date' : 'Date'}
             </label>
@@ -3079,7 +3083,7 @@ function ClientBatteriesPage() {
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
+              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
             />
           </div>
           {date && (
@@ -3398,9 +3402,9 @@ function ClientBatteriesPage() {
               </div>
             )}
 
-            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 lg:grid-cols-12">
+            <div className="grid min-h-0 flex-1 grid-cols-1 gap-5 overflow-y-auto lg:grid-cols-12 lg:overflow-visible">
               {/* Left: truck details + scan controls */}
-              <div className="flex min-h-0 flex-col gap-4 lg:col-span-7">
+              <div className="flex flex-col gap-4 lg:min-h-0 lg:col-span-7">
               <div className="shrink-0">
                 <label className={labelClasses}>
                   Truck Number <span className="text-rose-500 font-bold">*</span>
@@ -3456,8 +3460,8 @@ function ClientBatteriesPage() {
                   </div>
                 )}
 
-                <div className="flex shrink-0 gap-2">
-                  <div className="relative flex-1">
+                <div className="flex shrink-0 flex-wrap gap-2 sm:flex-nowrap">
+                  <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
                     <input data-rfid-scan="client-pack"
                       type="text"
                       disabled={!isLogisticsReady}
@@ -3486,7 +3490,7 @@ function ClientBatteriesPage() {
                     type="button"
                     onClick={() => handleAddBattery(scanInput)}
                     disabled={!isLogisticsReady || !scanInput.trim()}
-                    className="shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                    className="flex-1 sm:flex-none shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                   >
                     Add
                   </button>
@@ -3494,7 +3498,7 @@ function ClientBatteriesPage() {
                     type="button"
                     disabled={!isLogisticsReady}
                     onClick={() => setCameraOpen((prev) => !prev)}
-                    className="shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+                    className="flex-1 sm:flex-none shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
                   >
                     {cameraOpen ? 'Close Camera' : 'Use Camera'}
                   </button>
@@ -3502,7 +3506,7 @@ function ClientBatteriesPage() {
                     type="button"
                     disabled={!isLogisticsReady}
                     onClick={openPickFromSort}
-                    className="shrink-0 rounded-md border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
+                    className="flex-1 sm:flex-none shrink-0 whitespace-nowrap rounded-md border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
                     title={
                       isLogisticsReady
                         ? 'Import batteries from a pre-built Battery Sorting group'
@@ -3594,7 +3598,7 @@ function ClientBatteriesPage() {
               </div>
 
               {/* Right: added batteries list — its own scroll area */}
-              <div className="flex min-h-0 flex-col lg:col-span-5">
+              <div className="flex flex-col lg:min-h-0 lg:col-span-5">
                 <div className="mb-2 flex shrink-0 items-center justify-between">
                   <h3 className="text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">
                     Added Batteries

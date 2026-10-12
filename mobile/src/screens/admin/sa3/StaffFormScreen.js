@@ -235,7 +235,7 @@ export default function StaffFormScreen() {
                       secureTextEntry={!showPassword}
                       autoCapitalize="none"
                       autoCorrect={false}
-                      className="flex-1 px-3.5 py-3 font-mono text-sm text-slate-900"
+                      className="min-w-0 flex-1 px-3.5 py-3 font-mono text-sm text-slate-900"
                     />
                     <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
                       <Icon name="eye" color={showPassword ? '#2563eb' : '#94a3b8'} size={16} />

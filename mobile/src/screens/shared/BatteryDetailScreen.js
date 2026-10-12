@@ -1922,7 +1922,7 @@ export default function BatteryDetailScreen() {
       .map((h) => h.batch_id)
   ).size;
   return (
-    <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-5 pb-16">
+    <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-5 pb-16" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
       {/* ── Executive Header ─────────────────────────────────────────────── */}
       <View className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <View className="flex-row items-center justify-between">
@@ -2680,29 +2680,29 @@ export default function BatteryDetailScreen() {
           )}
 
           {/* ── Summary Stats ────────────────────────────────────────────────── */}
-          <View className="mb-5 flex-row gap-3">
-        <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+          <View className="mb-5 flex-row flex-wrap gap-3">
+        <View className="min-w-[40%] flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
           <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Repairs Logged' : 'Repairs'}</Text>
           <Text className="mt-0.5 text-lg font-black text-slate-900">{isAdminRole || isWorkshopRole ? repairVisits : history.length}</Text>
         </View>
-        <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
+        <View className="min-w-[40%] flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
           <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Return Shipments' : 'Returns'}</Text>
           <Text className="mt-0.5 text-lg font-black text-slate-900">{returns.length}</Text>
         </View>
         {isSuperAdmin && (
-          <View className="flex-1 rounded-2xl border border-violet-200 bg-violet-50/70 p-3.5 shadow-sm">
+          <View className="min-w-[40%] flex-1 rounded-2xl border border-violet-200 bg-violet-50/70 p-3.5 shadow-sm">
             <Text className="text-[10px] font-bold uppercase tracking-wider text-violet-700">Total Repair Time</Text>
             <Text className="mt-0.5 text-sm font-black text-violet-900">{totalRepairDurationSeconds > 0 ? formatDuration(totalRepairDurationSeconds) : '—'}</Text>
           </View>
         )}
         {isSuperAdmin && !isWorkshopRole && (
-          <View className="flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
+          <View className="min-w-[40%] flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
             <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Price</Text>
             <Text className="mt-0.5 text-sm font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
           </View>
         )}
         {isClient && (
-          <View className="flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
+          <View className="min-w-[40%] flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
             <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Spent</Text>
             <Text className="mt-0.5 text-lg font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
           </View>

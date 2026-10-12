@@ -3,6 +3,7 @@ import { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { enableScreens } from 'react-native-screens';
 import { Provider, useDispatch } from 'react-redux';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { store } from './src/store/store';
 import { bootstrap, verifySession } from './src/store/auth-slice';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -34,13 +35,15 @@ function Bootstrapper() {
 
 export default function App() {
   return (
-    <Provider store={store}>
-      <ThemeProvider>
-        <Bootstrapper />
-        <RootNavigator />
-        {/* Dark icons/text — the app is light-only. */}
-        <StatusBar style="dark" />
-      </ThemeProvider>
-    </Provider>
+    <SafeAreaProvider>
+      <Provider store={store}>
+        <ThemeProvider>
+          <Bootstrapper />
+          <RootNavigator />
+          {/* Dark icons/text — the app is light-only. */}
+          <StatusBar style="dark" />
+        </ThemeProvider>
+      </Provider>
+    </SafeAreaProvider>
   );
 }

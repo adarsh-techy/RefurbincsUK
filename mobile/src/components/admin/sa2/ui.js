@@ -1,4 +1,5 @@
 import { Linking, Modal, ScrollView, Text, TextInput, TouchableOpacity, View, KeyboardAvoidingView, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSelector } from 'react-redux';
 import Icon from '../../ui/Icon';
 import { resolveImageUrl } from '../../../utils/imageUrl';
@@ -103,7 +104,7 @@ export function SearchBox({ value, onChangeText, placeholder }) {
         placeholder={placeholder}
         placeholderTextColor="#94a3b8"
         autoCorrect={false}
-        className="flex-1 text-xs text-slate-900"
+        className="min-w-0 flex-1 text-xs text-slate-900"
       />
       {value ? (
         <TouchableOpacity onPress={() => onChangeText('')} hitSlop={8}>
@@ -160,7 +161,7 @@ export function Dialog({ visible, title, message, confirmLabel, cancelLabel = 'C
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
       <View className="flex-1 items-center justify-center bg-black/50 px-5">
-        <View className="w-full rounded-3xl bg-white p-5">
+        <View className="w-full max-w-md rounded-3xl bg-white p-5">
           <Text className="text-base font-extrabold text-slate-900">{title}</Text>
           {message ? <Text className="mt-2 text-sm leading-5 text-slate-600">{message}</Text> : null}
           {children}
@@ -178,10 +179,11 @@ export function Dialog({ visible, title, message, confirmLabel, cancelLabel = 'C
 
 // Full-screen form sheet (the web Modal with title + description)
 export function Sheet({ visible, title, description, onClose, children, footer }) {
+  const insets = useSafeAreaInsets();
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 bg-slate-50">
-        <View className="border-b border-slate-200 bg-white px-4 pb-3 pt-12">
+        <View className="border-b border-slate-200 bg-white px-4 pb-3" style={{ paddingTop: Math.max(48, insets.top + 12) }}>
           <View className="flex-row items-center justify-between gap-3">
             <Text className="flex-1 text-base font-extrabold text-slate-900">{title}</Text>
             <TouchableOpacity onPress={onClose} hitSlop={10}>
@@ -190,8 +192,8 @@ export function Sheet({ visible, title, description, onClose, children, footer }
           </View>
           {description ? <Text className="mt-0.5 text-xs text-slate-500">{description}</Text> : null}
         </View>
-        <ScrollView contentContainerClassName="p-4 gap-4 pb-10" keyboardShouldPersistTaps="handled">{children}</ScrollView>
-        {footer ? <View className="border-t border-slate-200 bg-white p-4 pb-8">{footer}</View> : null}
+        <ScrollView contentContainerClassName="w-full max-w-2xl self-center p-4 gap-4 pb-10" keyboardShouldPersistTaps="handled">{children}</ScrollView>
+        {footer ? <View className="border-t border-slate-200 bg-white p-4" style={{ paddingBottom: Math.max(32, insets.bottom + 12) }}><View className="w-full max-w-2xl self-center">{footer}</View></View> : null}
       </KeyboardAvoidingView>
     </Modal>
   );

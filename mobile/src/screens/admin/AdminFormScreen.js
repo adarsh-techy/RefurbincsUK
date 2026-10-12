@@ -39,7 +39,7 @@ function SelectField({ field, value, onChange, options }) {
       </TouchableOpacity>
       <Modal visible={open} transparent animationType="fade" onRequestClose={() => setOpen(false)}>
         <TouchableOpacity activeOpacity={1} onPress={() => setOpen(false)} className="flex-1 justify-end bg-black/50">
-          <View className="max-h-[70%] rounded-t-3xl bg-white p-4">
+          <View className="max-h-[70%] w-full max-w-2xl self-center rounded-t-3xl bg-white p-4 pb-8">
             <Text className="mb-2 text-base font-extrabold text-slate-900">{field.label}</Text>
             <ScrollView>
               {options.map((o) => (

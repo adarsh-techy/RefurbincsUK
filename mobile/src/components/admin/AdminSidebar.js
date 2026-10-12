@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Dimensions, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import Svg, { Path } from 'react-native-svg';
 import { logout } from '../../store/auth-slice';
@@ -9,8 +10,11 @@ import { navigate } from '../../navigation/navigationRef';
 // super_admin / admin / staff. Items marked superAdminOnly / adminOnly /
 // permission are hidden exactly like the web (super_admin sees everything).
 
-const { width: SCREEN_WIDTH } = Dimensions.get('window');
-const PANEL_WIDTH = Math.min(310, SCREEN_WIDTH * 0.84);
+// panel width is read from the window when the menu renders (rotation,
+// split screen, tablets) — not subscribed: this sits in MainTabs, and on
+// Android the keyboard resizes the window, which must not re-render the
+// navigation tree (see App.js).
+const panelWidthFor = (width) => Math.min(310, width * 0.84);
 
 const NAV_GROUPS = [
   {
@@ -96,6 +100,8 @@ function MenuCloseIcon() {
 export default function AdminSidebar({ visible, onClose }) {
   const dispatch = useDispatch();
   const user = useSelector((state) => state.auth.user);
+  const insets = useSafeAreaInsets();
+  const PANEL_WIDTH = panelWidthFor(Dimensions.get('window').width);
   const translateX = useRef(new Animated.Value(PANEL_WIDTH)).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
@@ -104,7 +110,7 @@ export default function AdminSidebar({ visible, onClose }) {
       Animated.timing(translateX, { toValue: visible ? 0 : PANEL_WIDTH, duration: 240, useNativeDriver: true }),
       Animated.timing(backdropOpacity, { toValue: visible ? 1 : 0, duration: 240, useNativeDriver: true }),
     ]).start();
-  }, [visible, translateX, backdropOpacity]);
+  }, [visible, translateX, backdropOpacity, PANEL_WIDTH]);
 
   function go(link) {
     onClose();
@@ -126,7 +132,7 @@ export default function AdminSidebar({ visible, onClose }) {
           style={{ width: PANEL_WIDTH, transform: [{ translateX }] }}
           className="h-full border-l border-slate-200 bg-slate-50"
         >
-          <View className="flex-row items-center justify-between border-b border-slate-200/80 px-5 pb-4 pt-14">
+          <View className="flex-row items-center justify-between border-b border-slate-200/80 px-5 pb-4" style={{ paddingTop: Math.max(56, insets.top + 16) }}>
             <View className="flex-1 pr-2">
               <Text className="text-sm font-extrabold text-slate-900" numberOfLines={1}>{user?.name || 'Admin'}</Text>
               <View className="mt-1 flex-row items-center gap-2">
@@ -160,7 +166,7 @@ export default function AdminSidebar({ visible, onClose }) {
             })}
           </ScrollView>
 
-          <View className="border-t border-slate-200/80 p-4">
+          <View className="border-t border-slate-200/80 p-4" style={{ paddingBottom: 16 + insets.bottom }}>
             <TouchableOpacity
               onPress={() => { onClose(); dispatch(logout()); }}
               className="items-center rounded-2xl border border-red-200 bg-red-50 py-3 active:bg-red-100"

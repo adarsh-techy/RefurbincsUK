@@ -299,7 +299,7 @@ function PartDetailPage() {
               className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-2 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer"
             >
               <FiPlus className="w-3.5 h-3.5" />
-              <span>+ Restock Stock</span>
+              <span>Restock Stock</span>
             </button>
           )}
 
@@ -412,7 +412,7 @@ function PartDetailPage() {
           <button
             type="button"
             onClick={() => setRestocking(true)}
-            className="self-start md:self-auto inline-flex items-center gap-2 rounded-2xl border border-emerald-300 bg-emerald-50/80 px-4 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 transition-all shadow-2xs cursor-pointer"
+            className="self-start md:self-auto inline-flex shrink-0 items-center gap-2 whitespace-nowrap rounded-2xl border border-emerald-300 bg-emerald-50/80 px-4 py-2.5 text-xs font-bold text-emerald-800 hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 transition-all shadow-2xs cursor-pointer"
           >
             <FiPackage className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
             <span>Manage Inventory ({quantity} on hand)</span>
@@ -571,7 +571,7 @@ function PartDetailPage() {
           </div>
           <p className="mt-2 text-2xl font-black text-amber-900 dark:text-amber-300">{totalRemovedQuantity}</p>
           <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-medium">
-            From {removedHistory.length} battery{removedHistory.length === 1 ? '' : 'ies'} (View →)
+            From {removedHistory.length} batter{removedHistory.length === 1 ? 'y' : 'ies'} (View →)
           </p>
         </div>
 
@@ -1115,7 +1115,7 @@ function PartDetailPage() {
                 className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-all cursor-pointer"
               >
                 <FiPlus className="w-3.5 h-3.5" />
-                <span>+ Add Restock Receipt</span>
+                <span>Add Restock Receipt</span>
               </button>
             )}
           </div>

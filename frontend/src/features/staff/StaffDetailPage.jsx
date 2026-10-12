@@ -433,11 +433,11 @@ function StaffDetailPage() {
       {/* ── Executive Hero Card ──────────────────────────────────────────────── */}
       <div className="rounded-3xl border border-slate-200/90 bg-white p-6 md:p-8 shadow-xs dark:border-white/10 dark:bg-surface-900 transition-all relative overflow-hidden">
         {/* Subtle decorative glow */}
-        <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
+        <div className="absolute top-0 right-0 w-60 h-60 sm:w-80 sm:h-80 bg-gradient-to-br from-emerald-500/5 via-teal-500/5 to-transparent rounded-full blur-3xl pointer-events-none" />
 
-        <div className="flex flex-col md:flex-row md:items-start justify-between gap-6 relative">
+        <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-6 relative">
           {/* Avatar and Identity */}
-          <div className="flex flex-col sm:flex-row sm:items-center gap-5">
+          <div className="flex min-w-0 flex-col sm:flex-row sm:items-center gap-5">
             <div className="relative">
               <div
                 className={`flex h-20 w-20 shrink-0 items-center justify-center rounded-3xl text-3xl font-black shadow-inner tracking-wider ${
@@ -498,10 +498,10 @@ function StaffDetailPage() {
                 {(staff.email || staff.linked_user_email) && (
                   <a
                     href={`mailto:${staff.email || staff.linked_user_email}`}
-                    className="inline-flex items-center gap-1.5 font-mono hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors font-medium"
+                    className="inline-flex min-w-0 max-w-full items-start gap-1.5 font-mono hover:text-emerald-600 dark:hover:text-emerald-400 transition-colors font-medium"
                   >
-                    <FiMail className="w-3.5 h-3.5 text-slate-400" />
-                    <span>{staff.email || staff.linked_user_email}</span>
+                    <FiMail className="mt-0.5 w-3.5 h-3.5 shrink-0 text-slate-400" />
+                    <span className="min-w-0 break-all">{staff.email || staff.linked_user_email}</span>
                   </a>
                 )}
                 {staff.created_at && (
@@ -521,7 +521,7 @@ function StaffDetailPage() {
           </div>
 
           {/* Quick Output Highlights Pill */}
-          <div className="flex md:flex-col items-end gap-2 shrink-0">
+          <div className="flex lg:flex-col items-end gap-2 shrink-0">
             <div className="rounded-2xl bg-slate-50 p-3.5 border border-slate-100 dark:bg-surface-850 dark:border-white/5 text-right w-full sm:w-auto">
               <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 block">
                 Total Output

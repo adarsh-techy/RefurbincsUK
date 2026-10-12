@@ -200,4 +200,15 @@ async function getClientDashboard(recycleClientId) {
   return { stats: rows[0], recentShipments: recent.slice(0, 10) };
 }
 
-module.exports = { create, findAll, findById, findBatteries, findByBatteryId, update, remove, getClientDashboard };
+// Whether a battery went out in one of this recycling partner's shipments.
+async function partnerHasBattery(recycleClientId, batteryId) {
+  const { rows } = await db.query(
+    `SELECT 1 FROM recycle_batteries rbt
+       JOIN recycle_batches rb ON rb.id = rbt.recycle_id
+      WHERE rbt.battery_id = $1 AND rb.recycle_client_id = $2 LIMIT 1`,
+    [batteryId, recycleClientId]
+  );
+  return rows.length > 0;
+}
+
+module.exports = { create, findAll, findById, findBatteries, findByBatteryId, update, remove, getClientDashboard, partnerHasBattery };

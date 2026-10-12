@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Text, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE, scanThen } from '../../../utils/scan-input';
 import { Btn, Notice, Sheet } from './common';
 
 // "Scan to Verify Receipt" — the web ClientReturnVerifyModal. Loads the
@@ -170,7 +170,7 @@ export default function ReturnVerifyModal({ batch, onClose, onSuccess }) {
           </View>
 
           <ScanBatteryInput
-            onSubmit={handleScan}
+            onSubmit={(raw) => scanThen(raw, list, handleScan)}
             feedback={feedback}
             submitLabel="Verify"
             placeholder="Scan QR / RFID or type battery code"

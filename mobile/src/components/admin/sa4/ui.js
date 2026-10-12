@@ -22,7 +22,7 @@ export function Sheet({ visible, title, description, onClose, children }) {
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} className="flex-1 justify-end bg-black/50">
-        <View className="max-h-[92%] rounded-t-3xl bg-white">
+        <View className="max-h-[92%] w-full max-w-2xl self-center rounded-t-3xl bg-white">
           <View className="flex-row items-start gap-3 border-b border-slate-100 px-5 pb-3 pt-5">
             <View className="flex-1">
               <Text className="text-base font-extrabold text-slate-900">{title}</Text>
@@ -49,7 +49,7 @@ export function ConfirmDialog({ visible, title, message, confirmLabel = 'Delete'
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
       <View className="flex-1 items-center justify-center bg-black/60 px-6">
-        <View className="w-full rounded-3xl bg-white p-5">
+        <View className="w-full max-w-md rounded-3xl bg-white p-5">
           <View className="mb-2 h-10 w-10 items-center justify-center rounded-full bg-red-100">
             <Icon name="alertTriangle" color="#dc2626" size={20} />
           </View>
@@ -92,7 +92,7 @@ export function AlertDialog({ visible, title, message, onClose }) {
   return (
     <Modal visible={visible} transparent animationType="fade" onRequestClose={onClose}>
       <View className="flex-1 items-center justify-center bg-black/60 px-6">
-        <View className="w-full rounded-3xl bg-white p-5">
+        <View className="w-full max-w-md rounded-3xl bg-white p-5">
           <Text className="text-base font-extrabold text-slate-900">{title}</Text>
           <Text className="mt-1 text-sm text-slate-600">{message}</Text>
           <TouchableOpacity onPress={onClose} className="mt-4 items-center rounded-2xl bg-slate-900 py-3">
@@ -203,7 +203,7 @@ export function SearchBox({ value, onChangeText, placeholder }) {
         placeholderTextColor="#94a3b8"
         autoCorrect={false}
         autoCapitalize="none"
-        className="flex-1 text-sm text-slate-900"
+        className="min-w-0 flex-1 text-sm text-slate-900"
       />
       {value ? (
         <TouchableOpacity onPress={() => onChangeText('')} hitSlop={10}>

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE, scanThen } from '../../../utils/scan-input';
 import { Badge, statusLabel } from '../../ui/Badge';
 import Icon from '../../ui/Icon';
 import {
@@ -102,7 +102,7 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
     return { tone: 'good', message: `✓ ${code} added (${list.length} on this truck)` };
   }
 
-  const scanAdd = (raw) => addBattery(raw, '', [...items]);
+  const scanAdd = (raw) => scanThen(raw, fleet, (code) => addBattery(code, '', [...items]));
 
   function pickSuggestion(b) {
     const res = addBattery(b.battery_code, b.serial_number, [...items]);

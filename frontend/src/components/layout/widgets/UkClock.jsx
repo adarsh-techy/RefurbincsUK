@@ -69,7 +69,7 @@ function UkClock({ className = '', compact = false, isAccentHeader = false }) {
   if (compact) {
     return (
       <div
-        className={`inline-flex items-center gap-1.5 text-xs font-mono font-bold text-slate-700 dark:text-neutral-200 ${className}`}
+        className={`inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap text-xs font-mono font-bold text-slate-700 dark:text-neutral-200 ${className}`}
         title={syncTitle}
       >
         <span
@@ -85,7 +85,7 @@ function UkClock({ className = '', compact = false, isAccentHeader = false }) {
 
   return (
     <div
-      className={`hidden text-right leading-tight sm:block select-none ${className}`}
+      className={`shrink-0 whitespace-nowrap text-right leading-tight select-none ${className || 'hidden sm:block'}`}
       title={syncTitle}
     >
       <div className="flex items-center justify-end gap-1.5">

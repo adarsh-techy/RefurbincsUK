@@ -510,7 +510,7 @@ export default function AdminGenerateQrScreen() {
         </View>
         <View className="flex-row items-center gap-2 rounded-xl border border-slate-300 px-3">
           <Icon name="search" color="#94a3b8" size={14} />
-          <TextInput value={listSearchInput} onChangeText={setListSearchInput} placeholder="Search by Battery ID or Client Name" placeholderTextColor="#94a3b8" autoCorrect={false} className="flex-1 py-2 text-sm text-slate-900" />
+          <TextInput value={listSearchInput} onChangeText={setListSearchInput} placeholder="Search by Battery ID or Client Name" placeholderTextColor="#94a3b8" autoCorrect={false} className="min-w-0 flex-1 py-2 text-sm text-slate-900" />
           {listSearchInput ? (
             <TouchableOpacity onPress={() => { setListSearchInput(''); setListSearch(''); }} hitSlop={8}>
               <Icon name="x" color="#64748b" size={14} />

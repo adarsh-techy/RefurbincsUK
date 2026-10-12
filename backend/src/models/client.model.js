@@ -1416,7 +1416,14 @@ async function replaceSortGroups(clientId, userId, groups) {
         const rawName = String(g.name).trim();
         const formattedName = rawName ? rawName.charAt(0).toUpperCase() + rawName.slice(1) : '';
         if (!formattedName) continue;
-        const groupBatteries = Array.isArray(g.batteries) ? g.batteries : [];
+        // stored as plain upper-case battery codes ({code} objects / blanks
+        // from older or third-party callers are normalised, duplicates dropped)
+        const groupBatteries = [...new Set(
+          (Array.isArray(g.batteries) ? g.batteries : [])
+            .map((b) => (typeof b === 'string' ? b : b?.code || b?.battery_code || ''))
+            .map((c) => String(c).trim().toUpperCase())
+            .filter(Boolean)
+        )];
         await client.query(
           `INSERT INTO client_sort_groups (id, client_id, user_id, name, batteries, created_at, updated_at)
            VALUES ($1, $2, $3, $4, $5, COALESCE($6::timestamptz, now()), now())`,

@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE, scanThen } from '../../utils/scan-input';
 import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 import Icon from '../../components/ui/Icon';
 
@@ -142,7 +142,7 @@ export default function ClientTruckIntakeScreen() {
           </View>
         </Field>
         <Field label="Specific Battery Codes" optional>
-          <ScanBatteryInput onSubmit={addScanned} placeholder="Scan RFID / QR or type a code (e.g. HF-001)" />
+          <ScanBatteryInput onSubmit={(raw) => scanThen(raw, fleet, addScanned)} placeholder="Scan RFID / QR or type a code (e.g. HF-001)" />
           {codes.length > 0 && (
             <View className="mt-2 gap-1.5">
               {codes.map((c) => (

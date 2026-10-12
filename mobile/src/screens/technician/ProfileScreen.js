@@ -79,7 +79,7 @@ export default function ProfileScreen() {
   const clientLinks = CLIENT_LINKS.filter((l) => !l.permission || hasClientPermission(user, l.permission));
 
   return (
-    <ScrollView className="flex-1 bg-slate-50 dark:bg-slate-950" contentContainerClassName="p-5 pb-16">
+    <ScrollView className="flex-1 bg-slate-50 dark:bg-slate-950" contentContainerClassName="p-5 pb-16" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
       <Text className="text-2xl font-black text-slate-900 dark:text-white">Account Profile</Text>
       <Text className="mb-6 text-xs text-slate-500 dark:text-slate-400">Manage your portal credentials and security settings.</Text>
 

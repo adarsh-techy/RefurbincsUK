@@ -330,7 +330,7 @@ export default function LoginScreen() {
                   autoComplete="email"
                   placeholder="you@company.com"
                   placeholderTextColor="#94a3b8"
-                  className="flex-1 py-3 text-sm font-medium text-slate-900"
+                  className="min-w-0 flex-1 py-3 text-sm font-medium text-slate-900"
                 />
               </View>
             </View>
@@ -353,7 +353,7 @@ export default function LoginScreen() {
                   secureTextEntry={!showPassword}
                   placeholder="••••••••"
                   placeholderTextColor="#94a3b8"
-                  className="flex-1 py-3 text-sm font-medium text-slate-900"
+                  className="min-w-0 flex-1 py-3 text-sm font-medium text-slate-900"
                 />
                 <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
                   <EyeIcon open={showPassword} />

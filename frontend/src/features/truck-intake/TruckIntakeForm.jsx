@@ -15,6 +15,7 @@ import useFetchList from '../../utils/use-fetch-list';
 import AlertModal from '../../components/ui/overlays/AlertModal';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
+import { isLikelyRfidTag } from '../../utils/scan-input';
 import { statusLabel } from '../../components/ui/primitives/Badge';
 
 const inputClasses =
@@ -131,6 +132,11 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
         });
       }
     } catch (err) {
+      // an RFID tag that isn't assigned to any battery is ignored quietly
+      if (err.response?.status === 404 && isLikelyRfidTag(code)) {
+        setScanInput('');
+        return;
+      }
       flashFeedback(
         'bad',
         err.response?.status === 404

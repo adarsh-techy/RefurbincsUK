@@ -518,7 +518,7 @@ export default function HistoryScreen() {
                 : 'Search battery code, parts, notes…'
             }
             placeholderTextColor="#94a3b8"
-            className="flex-1 ml-2 text-xs text-slate-800 p-0"
+            className="min-w-0 flex-1 ml-2 text-xs text-slate-800 p-0"
           />
           {search ? (
             <TouchableOpacity onPress={() => setSearch('')} hitSlop={5}>
@@ -546,7 +546,7 @@ export default function HistoryScreen() {
                       ? isSupervisor
                         ? 'bg-white shadow-2xs'
                         : 'bg-white shadow-2xs'
-                      : 'bg-transparent'
+                      : 'bg-transparent shadow-none'
                   }`}
                 >
                   <Text
@@ -935,7 +935,7 @@ export default function HistoryScreen() {
         onRequestClose={() => setCustomModalOpen(false)}
       >
         <View className="flex-1 justify-end bg-black/60">
-          <View className="rounded-t-3xl border-t border-slate-200 bg-white p-5 pb-8 shadow-2xl">
+          <View className="w-full max-w-2xl self-center rounded-t-3xl border-t border-slate-200 bg-white p-5 pb-8 shadow-2xl">
             {/* Modal Header */}
             <View className="flex-row items-center justify-between pb-3 border-b border-slate-100">
               <View>
@@ -1036,9 +1036,9 @@ export default function HistoryScreen() {
                               : 'bg-blue-600 shadow-sm'
                             : inRange
                               ? isSupervisor
-                                ? 'bg-violet-100'
-                                : 'bg-blue-100'
-                              : 'bg-transparent'
+                                ? 'bg-violet-100 shadow-none'
+                                : 'bg-blue-100 shadow-none'
+                              : 'bg-transparent shadow-none'
                         }`}
                       >
                         <Text

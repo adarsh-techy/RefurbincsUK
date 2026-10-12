@@ -10,6 +10,8 @@ import { socket } from '../../../services/socket-client';
 import refurbnicsDarkLogo from '../../../assets/REFURBNICS.png';
 import refurbnicsLightLogo from '../../../assets/LogoREFURBNICSBlack.png';
 import logoUrl from '../../../utils/logo-url';
+import ThemeToggle from '../theme/ThemeToggle';
+import ThemeCustomizerButton from '../theme/ThemeCustomizerButton';
 
 // ── SVG Icon Registry for Classic Visual Polish ─────────────────────────────
 const Icons = {
@@ -686,7 +688,7 @@ function Sidebar({ mobileOpen = false, onClose = () => {} }) {
   return (
     <>
       <aside
-        className={`fixed inset-y-0 left-0 z-30 hidden h-screen w-64 shrink-0 flex-col md:flex transition-all shadow-md ${
+        className={`fixed inset-y-0 left-0 z-30 hidden h-screen w-64 shrink-0 flex-col lg:flex transition-all shadow-md ${
           isAccentBg ? '' : 'dark:border-r dark:border-white/10'
         }`}
         style={{ backgroundColor: sidebarBgColor }}
@@ -701,7 +703,7 @@ function Sidebar({ mobileOpen = false, onClose = () => {} }) {
 
       {createPortal(
         <div
-          className={`fixed inset-0 z-50 md:hidden transition-opacity duration-300 ${
+          className={`fixed inset-0 z-50 lg:hidden transition-opacity duration-300 ${
             mobileOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'
           }`}
         >
@@ -728,13 +730,29 @@ function Sidebar({ mobileOpen = false, onClose = () => {} }) {
                 <path d="m6 6 12 12" />
               </svg>
             </button>
-            <SidebarNav
-              visibleGroups={visibleGroups}
-              user={user}
-              onLinkClick={onClose}
-              onLogout={handleLogout}
-              customTheme={customTheme}
-            />
+            <div className="min-h-0 flex-1">
+              <SidebarNav
+                visibleGroups={visibleGroups}
+                user={user}
+                onLinkClick={onClose}
+                onLogout={handleLogout}
+                customTheme={customTheme}
+              />
+            </div>
+            {/* On phones the theme buttons live here — the top bar has no room */}
+            <div
+              className={`flex shrink-0 items-center justify-between gap-2 border-t px-4 py-2.5 sm:hidden ${
+                customTheme?.applyToSidebar ? 'border-white/20 text-white/80' : 'border-slate-200 text-slate-500 dark:border-white/10 dark:text-neutral-400'
+              }`}
+            >
+              <span className="text-[11px] font-bold uppercase tracking-wider">Appearance</span>
+              <div className="flex items-center gap-1">
+                <span onClickCapture={onClose}>
+                  <ThemeCustomizerButton />
+                </span>
+                <ThemeToggle />
+              </div>
+            </div>
           </aside>
         </div>,
         document.body

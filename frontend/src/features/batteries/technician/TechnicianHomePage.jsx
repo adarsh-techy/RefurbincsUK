@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
+import { isLikelyRfidTag } from '../../../utils/scan-input';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
 import { canTestBatteries, isIntakeUnverified } from '../../../utils/permissions';
@@ -106,9 +107,11 @@ function TechnicianHomePage() {
     setShowSuggestions(false);
     setCheckingScan(true);
 
+    let openCode = code;
     try {
       const { data } = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
       const b = data.battery;
+      openCode = b?.battery_code || code; // a scanned tag opens its battery
       if (isIntakeUnverified(b)) {
         setCameraOpen(false);
         setUnverifiedModalBattery(b);
@@ -116,15 +119,21 @@ function TechnicianHomePage() {
         scanInFlightRef.current = false; // staying on this page — accept new scans
         return;
       }
-    } catch {
-      // If lookup fails or battery does not exist, let detail page handle it
+    } catch (err) {
+      // an RFID tag that isn't assigned to any battery is ignored quietly;
+      // anything else goes on to the detail page, which shows the error
+      if (err?.response?.status === 404 && isLikelyRfidTag(code)) {
+        setCheckingScan(false);
+        scanInFlightRef.current = false;
+        return;
+      }
     }
 
     // Navigating away: keep the lock held so a late decode from the same QR
     // frame burst can't push a second /batteries/:code entry before unmount.
     setCheckingScan(false);
     setCameraOpen(false);
-    navigate(`/batteries/${encodeURIComponent(code)}?fromScan=true`);
+    navigate(`/batteries/${encodeURIComponent(openCode)}?fromScan=true`);
   }
 
   function handleManualKeyDown(e) {

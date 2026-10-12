@@ -5,7 +5,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
-import { isLikelyRfidTag, resolveBatteryInput } from '../../utils/scan-input';
+import { isLikelyRfidTag, resolveBatteryScan } from '../../utils/scan-input';
 import { StatusBadge, clientBatteryStatus } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import RfidLookupButton from '../../components/scan/RfidLookupButton';
@@ -59,7 +59,7 @@ export default function ClientScanScreen() {
     if (isClient && isLikelyRfidTag(value)) {
       try {
         const { data } = await apiClient.get('/clients/me/batteries');
-        const resolved = resolveBatteryInput(value, data?.data || []);
+        const resolved = await resolveBatteryScan(value, data?.data || []);
         if (resolved.unassignedTag) return; // unregistered tag: ignored
         goToBattery(resolved.code);
         return;

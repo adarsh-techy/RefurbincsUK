@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useIsFocused } from '@react-navigation/native';
 import * as DataWedge from '../../modules/zebra-datawedge';
+import { splitScanInput } from '../utils/scan-input';
 
 // Hardware scanner reads (Zebra DataWedge: RFID sled trigger or the built-in
 // QR imager) go to the scan box on the screen the user is looking at — no
@@ -17,9 +18,8 @@ function ensureSubscribed() {
     const top = handlers[handlers.length - 1];
     if (!top) return;
     String(data || '')
-      .split(/[\r\n]+/)
-      .map((v) => v.trim())
-      .filter(Boolean)
+      .split(/[\r\n\t]+/)
+      .flatMap((v) => splitScanInput(v))
       // meta tells an RFID read (source "rfid") from a barcode / QR read
       .forEach((v) => top.handle(v, { source, labelType }));
   });

@@ -484,9 +484,9 @@ function TruckIntakeDetailPage() {
               🚚
             </span>
             <div>
-              <h3 className="text-sm font-bold text-amber-950 dark:text-amber-100 flex items-center gap-2">
+              <h3 className="text-sm font-bold text-amber-950 dark:text-amber-100 flex flex-wrap items-center gap-x-2 gap-y-1">
                 Truck In Transit — Pending Arrival Verification
-                <span className="rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900 dark:bg-amber-900/80 dark:text-amber-200">
+                <span className="whitespace-nowrap rounded-full bg-amber-200/70 px-2 py-0.5 text-[10px] font-black uppercase text-amber-900 dark:bg-amber-900/80 dark:text-amber-200">
                   {batteries.length} Batteries Expected
                 </span>
               </h3>

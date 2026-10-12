@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
+import { installRfidKeystrokeSupport } from '../../../utils/rfid-keystroke';
+
+// readers that type without a final Enter still submit (see rfid-keystroke)
+installRfidKeystrokeSupport();
 
 // "Scan RFID tag" button for any scan box. An RFID reader in keyboard mode
 // types the tag ID into whichever field has the cursor and presses Enter, so
@@ -42,9 +46,11 @@ function RfidScanButton({ target, className = '' }) {
     const input = findInput();
     if (!input) return undefined;
     const done = () => { stop(); };
-    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') done(); });
+    const onKey = (e) => { if (e.key === 'Enter') done(); };
+    input.addEventListener('keydown', onKey);
     input.addEventListener('blur', done);
     return () => {
+      input.removeEventListener('keydown', onKey);
       input.removeEventListener('blur', done);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

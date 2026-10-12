@@ -39,7 +39,7 @@ export default function CertificateModal({ certificate, clientName, mode = 'prev
   return (
     <Modal visible transparent animationType="fade" onRequestClose={onClose}>
       <View className="flex-1 items-center justify-center bg-black/60 p-4">
-        <View className="max-h-[90%] w-full rounded-3xl bg-white p-5 dark:bg-slate-900">
+        <View className="max-h-[90%] w-full max-w-lg rounded-3xl bg-white p-5 dark:bg-slate-900">
           <View className="flex-row items-start justify-between gap-3">
             <View className="flex-1">
               <Text className="text-lg font-black text-slate-900 dark:text-white">

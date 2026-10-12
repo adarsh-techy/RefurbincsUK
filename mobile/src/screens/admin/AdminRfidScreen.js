@@ -8,6 +8,7 @@ import * as Sharing from 'expo-sharing';
 import apiClient from '../../services/api-client';
 import Icon from '../../components/ui/Icon';
 import { StatusBadge } from '../../components/ui/Badge';
+import { clearTagCache, normalizeRfidTag } from '../../utils/scan-input';
 import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 import { shareCsv } from '../../utils/share-csv';
 import CopyButton from '../../components/ui/CopyButton';
@@ -140,7 +141,8 @@ export default function AdminRfidScreen() {
 
   // Manual assign — same endpoint and checks as the sheet upload, one row.
   async function saveTag(row, raw) {
-    const tag = String(raw || '').replace(/[^0-9A-Za-z]/g, '').toUpperCase();
+    // same cleanup as the server (drops a reader's ]Q1 / EPC: prefix)
+    const tag = normalizeRfidTag(raw);
     if (!tag) return { tone: 'warn', message: 'Type or scan the tag first.' };
     try {
       const { data } = await apiClient.post('/batteries/rfid-assign', {
@@ -152,6 +154,7 @@ export default function AdminRfidScreen() {
         return { tone: 'bad', message: res?.message || 'Could not assign this tag.' };
       }
       setRows((list) => list.map((x) => (x.id === row.id ? { ...x, rfid_tag: res.rfidTag } : x)));
+      clearTagCache(); // scan boxes must see the new tag straight away
       if (!row.rfid_tag) setCounts((c) => ({ assigned: c.assigned + 1, unassigned: Math.max(0, c.unassigned - 1) }));
       const i = rows.findIndex((x) => x.id === row.id);
       const next = rows.slice(i + 1).find((x) => !x.rfid_tag) || null;
@@ -206,6 +209,7 @@ export default function AdminRfidScreen() {
     setError(null);
     try {
       setResult(await send(false));
+      clearTagCache();
       setStage('done');
       setListLoading(true);
       fetchList(0, true);
@@ -526,7 +530,7 @@ export default function AdminRfidScreen() {
         }
         renderItem={({ item: r, index }) => (
           <View className="rounded-2xl border border-slate-200 bg-white p-3">
-            <View className="flex-row items-center justify-between gap-2">
+            <View className="flex-row flex-wrap items-center justify-between gap-2">
               <View className="flex-row items-center gap-2">
                 <Text className="font-mono text-xs font-bold text-slate-400">#{index + 1}</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: r.battery_code, fromScan: false })}>
@@ -555,7 +559,7 @@ export default function AdminRfidScreen() {
 
       <Modal visible={Boolean(assigning)} transparent animationType="slide" onRequestClose={() => setAssigning(null)}>
         <View className="flex-1 justify-end bg-black/50">
-          <View className="rounded-t-3xl bg-white p-5 pb-8 dark:bg-slate-900">
+          <View className="w-full max-w-2xl self-center rounded-t-3xl bg-white p-5 pb-8 dark:bg-slate-900">
             <View className="flex-row items-center gap-2">
               <Icon name="rfid" color="#6d28d9" size={20} />
               <Text className="flex-1 text-base font-extrabold text-slate-900 dark:text-white">
@@ -576,6 +580,7 @@ export default function AdminRfidScreen() {
                 showCamera={false}
                 submitLabel="Save"
                 placeholder={assigning.rfid_tag ? 'New tag — type or scan' : 'Type or scan tag…'}
+                multiple={false}
                 onSubmit={(raw) => saveTag(assigning, raw)}
               />
             )}
