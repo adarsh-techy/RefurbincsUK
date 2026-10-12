@@ -79,14 +79,21 @@ function AuditLogPage() {
       {error && <TableState tone="error">{error}</TableState>}
       {items.length === 0 && loading ? (
         <TableState>Loading…</TableState>
-      ) : (
-        !error && (
-          <>
-            <DataTable columns={columns} rows={items} bordered={false} headerColor="blue" />
+      ) : !error ? (
+          <div className="overflow-hidden rounded-xl border border-slate-200/80 shadow-xs dark:border-white/10">
+            <DataTable
+              columns={columns}
+              rows={items}
+              showRowNumber
+              headerColor="blue"
+              maxHeight="calc(100vh - 280px)"
+              onScrollBottom={hasMore && !loading ? loadMore : null}
+              stickyHeader
+              emptyMessage="No audit logs recorded."
+            />
             <InfiniteScrollTrigger hasMore={hasMore} loading={loading} onVisible={loadMore} />
-          </>
-        )
-      )}
+          </div>
+      ) : null}
     </div>
   );
 }

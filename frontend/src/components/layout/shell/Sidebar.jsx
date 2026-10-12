@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { hasPermission, hasClientPermission } from '../../../utils/permissions';
 import { logout } from '../../../features/auth/auth-slice';
@@ -13,6 +13,11 @@ import logoUrl from '../../../utils/logo-url';
 
 // ── SVG Icon Registry for Classic Visual Polish ─────────────────────────────
 const Icons = {
+  chevron: (
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 transition-transform duration-200">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  ),
   dashboard: (
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5 shrink-0">
       <rect width="7" height="9" x="3" y="3" rx="1" />
@@ -230,7 +235,7 @@ const Icons = {
 };
 
 // ── Role-Specific Categorized Navigation Menus ──────────────────────────────
-const CLIENT_NAV_GROUPS = [
+export const CLIENT_NAV_GROUPS = [
   {
     heading: 'Overview',
     links: [
@@ -265,7 +270,7 @@ const CLIENT_NAV_GROUPS = [
   },
 ];
 
-const RECYCLE_CLIENT_NAV_GROUPS = [
+export const RECYCLE_CLIENT_NAV_GROUPS = [
   {
     heading: 'Overview',
     links: [
@@ -287,7 +292,7 @@ const RECYCLE_CLIENT_NAV_GROUPS = [
   },
 ];
 
-const NAV_GROUPS = [
+export const NAV_GROUPS = [
   {
     heading: 'Overview',
     links: [
@@ -301,8 +306,8 @@ const NAV_GROUPS = [
     links: [
       { to: '/truck-intakes', label: 'Truck Intake', icon: Icons.intake, permission: 'truck_intakes' },
       { to: '/batteries', label: 'Battery Fleet', icon: Icons.battery, end: true },
-      { to: '/batteries-qr-code', label: 'Print QR Codes', icon: Icons.qrcode },
       { to: '/rfid-assignment', label: 'RFID Assignment', icon: Icons.qrcode },
+      { to: '/batteries-qr-code', label: 'Print QR Codes', icon: Icons.qrcode },
       { to: '/returns', label: 'Returns Dispatch', icon: Icons.returns, permission: 'returns' },
     ],
   },
@@ -317,13 +322,13 @@ const NAV_GROUPS = [
   {
     heading: 'Recycling & Scrap',
     links: [
-      { to: '/batteries/unserviceable', label: 'Unserviceable Units', icon: Icons.unserviceable },
+      { to: '/batteries/unserviceable', label: 'Unserviceable Scrap', icon: Icons.unserviceable },
       { to: '/batteries/recycled', label: 'Recycled Batteries', icon: Icons.recycle },
       { to: '/recycle', label: 'Recycling Shipments', icon: Icons.intake, permission: 'recycle' },
     ],
   },
   {
-    heading: 'Clients & Team',
+    heading: 'Clients & Staff',
     links: [
       { to: '/clients', label: 'Fleet Clients', icon: Icons.clients, permission: 'clients' },
       { to: '/recycle-clients', label: 'Recycling Partners', icon: Icons.clients, permission: 'clients' },
@@ -331,7 +336,7 @@ const NAV_GROUPS = [
     ],
   },
   {
-    heading: 'Billing & Impact',
+    heading: 'Finance & Impact',
     links: [
       { to: '/invoices', label: 'Client Invoices', icon: Icons.invoice, superAdminOnly: true },
       { to: '/finance', label: 'Financial Reports', icon: Icons.finance, superAdminOnly: true },
@@ -361,14 +366,61 @@ function initials(name) {
 
 function SidebarNav({ visibleGroups, user, onLinkClick, onLogout, customTheme }) {
   const { theme } = useTheme();
+  const location = useLocation();
+  const [collapsedGroups, setCollapsedGroups] = useState(() => {
+    try {
+      const saved = localStorage.getItem('refurbnics_sidebar_collapsed_groups');
+      return saved ? JSON.parse(saved) : {};
+    } catch {
+      return {};
+    }
+  });
+
   const isDark = theme === 'dark';
   const isAccentBg = !isDark && !!customTheme?.applyToSidebar;
   const accent = customTheme?.accentColor || '#10b981';
-  // A client with their own uploaded logo sees that instead of the
-  // Refurbinics brand mark, every page, not just their dashboard — that's
-  // the one place every client actually looks at repeatedly.
   const clientLogo = user?.role === 'client' ? logoUrl(user?.client_logo_path) : null;
   const brandLogo = isDark || isAccentBg ? refurbnicsDarkLogo : refurbnicsLightLogo;
+
+  const toggleGroup = useCallback((heading) => {
+    setCollapsedGroups((prev) => {
+      const next = { ...prev, [heading]: !prev[heading] };
+      try {
+        localStorage.setItem('refurbnics_sidebar_collapsed_groups', JSON.stringify(next));
+      } catch {}
+      return next;
+    });
+  }, []);
+
+  const collapseAll = useCallback(() => {
+    const all = {};
+    visibleGroups.forEach((g) => {
+      if (g.heading) all[g.heading] = true;
+    });
+    setCollapsedGroups(all);
+    try {
+      localStorage.setItem('refurbnics_sidebar_collapsed_groups', JSON.stringify(all));
+    } catch {}
+  }, [visibleGroups]);
+
+  const expandAll = useCallback(() => {
+    setCollapsedGroups({});
+    try {
+      localStorage.removeItem('refurbnics_sidebar_collapsed_groups');
+    } catch {}
+  }, []);
+
+  const headingGroups = useMemo(() => visibleGroups.filter((g) => g.heading), [visibleGroups]);
+
+  const allCollapsed = useMemo(() => {
+    if (!headingGroups.length) return false;
+    return headingGroups.every((g) => !!collapsedGroups[g.heading]);
+  }, [headingGroups, collapsedGroups]);
+
+  const isGroupOpen = useCallback((group) => {
+    if (!group.heading) return true;
+    return !collapsedGroups[group.heading];
+  }, [collapsedGroups]);
 
   return (
     <div className="flex h-full flex-col justify-between">
@@ -393,83 +445,147 @@ function SidebarNav({ visibleGroups, user, onLinkClick, onLogout, customTheme })
         </div>
 
         <div className={`mx-5 border-t ${isAccentBg ? 'border-white/20' : 'border-slate-100 dark:border-white/5'}`} />
+
+        {/* ── Quick Collapse / Expand All Action (No Navigation text) ── */}
+        {headingGroups.length > 1 && (
+          <div className="flex items-center justify-end px-5 pt-2.5 pb-0.5">
+            <button
+              type="button"
+              onClick={allCollapsed ? expandAll : collapseAll}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold transition-all ${
+                isAccentBg
+                  ? 'text-white/80 hover:bg-white/15 hover:text-white'
+                  : 'text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-neutral-400 dark:hover:bg-white/5 dark:hover:text-neutral-200'
+              }`}
+              title={allCollapsed ? 'Expand All' : 'Collapse All'}
+            >
+              <span>{allCollapsed ? 'Expand All' : 'Collapse All'}</span>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className={`h-3.5 w-3.5 transition-transform duration-200 ${allCollapsed ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+                strokeWidth={2.2}
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Navigation Links Scroll List ─────────────────────────────── */}
-      <nav className="no-scrollbar flex-1 space-y-6 overflow-y-auto px-3.5 py-4">
-        {visibleGroups.map((group, i) => (
-          <div key={group.heading || `group-${i}`}>
-            {group.heading && (
-              <p
-                className={`mb-2 px-3 text-[11px] font-extrabold uppercase tracking-wider ${
-                  isAccentBg ? 'text-white/80' : 'text-slate-400 dark:text-neutral-500'
-                }`}
-              >
-                {group.heading}
-              </p>
-            )}
-            <div className="flex flex-col gap-1">
-              {group.links.map((link) => (
-                <NavLink
-                  key={link.to}
-                  to={link.to}
-                  end={link.end}
-                  onClick={onLinkClick}
-                  style={({ isActive }) =>
+      <nav className="no-scrollbar flex-1 space-y-4 overflow-y-auto px-3.5 py-3">
+        {visibleGroups.map((group, i) => {
+          const open = isGroupOpen(group);
+          return (
+            <div key={group.heading || `group-${i}`} className="space-y-1">
+              {group.heading ? (
+                <button
+                  type="button"
+                  onClick={() => toggleGroup(group.heading)}
+                  className={`group/heading flex w-full items-center justify-between rounded-lg px-2.5 py-1 text-left transition-colors ${
                     isAccentBg
-                      ? isActive
-                        ? { backgroundColor: 'rgba(255, 255, 255, 0.22)', color: '#ffffff' }
-                        : {}
-                      : isActive
-                        ? { backgroundColor: `${accent}18`, color: accent }
-                        : {}
-                  }
-                  className={({ isActive }) =>
-                    `group relative flex items-center rounded-xl px-3.5 py-2.5 text-sm font-semibold transition-all ${
-                      isAccentBg
-                        ? isActive
-                          ? 'text-white shadow-xs font-bold'
-                          : 'text-white/85 hover:bg-white/10 hover:text-white'
-                        : isActive
-                          ? 'text-slate-900 dark:text-white shadow-2xs font-bold'
-                          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/5 dark:hover:text-white'
-                    }`
-                  }
+                      ? 'hover:bg-white/10'
+                      : 'hover:bg-slate-100 dark:hover:bg-white/5'
+                  }`}
                 >
-                  {({ isActive }) => (
-                    <>
-                      {/* Active Left Indicator Pill */}
-                      {isActive && (
-                        <span
-                          className="absolute left-0 top-2 bottom-2 w-1.5 rounded-r-full"
-                          style={{ backgroundColor: isAccentBg ? '#ffffff' : accent }}
-                        />
-                      )}
+                  <span
+                    className={`text-[11px] font-extrabold uppercase tracking-wider ${
+                      isAccentBg
+                        ? 'text-white/90'
+                        : 'text-slate-400 dark:text-neutral-500 group-hover/heading:text-slate-600 dark:group-hover/heading:text-neutral-300'
+                    }`}
+                  >
+                    {group.heading}
+                  </span>
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                        isAccentBg
+                          ? 'bg-white/20 text-white'
+                          : 'bg-slate-100 text-slate-500 dark:bg-white/10 dark:text-neutral-400'
+                      }`}
+                    >
+                      {group.links.length}
+                    </span>
+                    <span
+                      className={`transition-transform duration-200 ${open ? 'rotate-0' : '-rotate-90'} ${
+                        isAccentBg ? 'text-white/70' : 'text-slate-400 dark:text-neutral-500'
+                      }`}
+                    >
+                      {Icons.chevron}
+                    </span>
+                  </div>
+                </button>
+              ) : null}
 
-                      {/* Icon */}
-                      {link.icon && (
-                        <span
-                          className={`mr-3 shrink-0 transition-colors ${
+              {open && (
+                <div className="flex flex-col gap-0.5 pt-0.5">
+                    {group.links.map((link) => (
+                      <NavLink
+                        key={link.to}
+                        to={link.to}
+                        end={link.end}
+                        onClick={onLinkClick}
+                        style={({ isActive }) =>
+                          isAccentBg
+                            ? isActive
+                              ? { backgroundColor: 'rgba(255, 255, 255, 0.22)', color: '#ffffff' }
+                              : {}
+                            : isActive
+                              ? { backgroundColor: `${accent}18`, color: accent }
+                              : {}
+                        }
+                        className={({ isActive }) =>
+                          `group relative flex items-center rounded-xl px-3.5 py-2 text-sm font-semibold transition-all ${
                             isAccentBg
-                              ? 'text-white'
+                              ? isActive
+                                ? 'text-white shadow-xs font-bold'
+                                : 'text-white/85 hover:bg-white/10 hover:text-white'
                               : isActive
-                                ? 'text-emerald-500 dark:text-emerald-400'
-                                : 'text-slate-400 group-hover:text-slate-600 dark:text-neutral-400 dark:group-hover:text-neutral-200'
-                          }`}
-                        >
-                          {link.icon}
-                        </span>
-                      )}
+                                ? 'text-slate-900 dark:text-white shadow-2xs font-bold'
+                                : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/5 dark:hover:text-white'
+                          }`
+                        }
+                      >
+                        {({ isActive }) => (
+                          <>
+                            {/* Active Left Indicator Pill */}
+                            {isActive && (
+                              <span
+                                className="absolute left-0 top-1.5 bottom-1.5 w-1.5 rounded-r-full"
+                                style={{ backgroundColor: isAccentBg ? '#ffffff' : accent }}
+                              />
+                            )}
 
-                      {/* Label */}
-                      <span className="truncate">{link.label}</span>
-                    </>
-                  )}
-                </NavLink>
-              ))}
-            </div>
-          </div>
-        ))}
+                            {/* Icon */}
+                            {link.icon && (
+                              <span
+                                className={`mr-3 shrink-0 transition-colors ${
+                                  isAccentBg
+                                    ? 'text-white'
+                                    : isActive
+                                      ? 'text-emerald-500 dark:text-emerald-400'
+                                      : 'text-slate-400 group-hover:text-slate-600 dark:text-neutral-400 dark:group-hover:text-neutral-200'
+                                }`}
+                              >
+                                {link.icon}
+                              </span>
+                            )}
+
+                            {/* Label */}
+                            <span className="truncate">{link.label}</span>
+                          </>
+                        )}
+                      </NavLink>
+                    ))}
+                  </div>
+                )}
+              </div>
+            );
+          })}
       </nav>
 
       {/* ── User Profile Footer ──────────────────────────────────────── */}

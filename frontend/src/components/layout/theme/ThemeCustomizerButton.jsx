@@ -1,7 +1,9 @@
 import { useTheme } from '../../../context/ThemeContext';
 
 export default function ThemeCustomizerButton() {
-  const { openCustomizer, customTheme } = useTheme();
+  const { openCustomizer, customTheme, theme } = useTheme();
+  const isDark = theme === 'dark';
+  const isAccentHeader = !isDark && !!customTheme?.applyToHeader;
 
   return (
     <button
@@ -9,7 +11,11 @@ export default function ThemeCustomizerButton() {
       onClick={openCustomizer}
       title="Customize Theme Colors"
       aria-label="Customize Theme Colors"
-      className="group relative flex items-center justify-center rounded-xl p-2 text-emerald-700 transition-all hover:bg-emerald-50 hover:text-emerald-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white"
+      className={`group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-all ${
+        isAccentHeader
+          ? 'text-white hover:bg-white/15'
+          : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white'
+      }`}
     >
       {/* Dynamic miniature palette icon with current accent color dot */}
       <svg
@@ -23,7 +29,7 @@ export default function ThemeCustomizerButton() {
       {/* Current accent indicator dot */}
       <span
         className="absolute bottom-1 right-1 h-2 w-2 rounded-full ring-1 ring-white dark:ring-black"
-        style={{ backgroundColor: customTheme.accentColor }}
+        style={{ backgroundColor: customTheme?.accentColor || '#10b981' }}
       />
     </button>
   );

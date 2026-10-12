@@ -84,7 +84,7 @@ export default function ClientNotificationBell() {
         </svg>
 
         {notifications.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-xs">
+          <span className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-xs">
             {notifications.length > 99 ? '99+' : notifications.length}
           </span>
         )}
@@ -92,7 +92,7 @@ export default function ClientNotificationBell() {
 
       {/* ── Dropdown Popover ───────────────────────────────────────────── */}
       {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-x-3.5 top-[4.5rem] z-50 max-w-sm mx-auto sm:mx-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
           <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-white/5">
             <div className="flex items-center gap-2">
               <span className="text-xs font-bold text-slate-900 dark:text-white">

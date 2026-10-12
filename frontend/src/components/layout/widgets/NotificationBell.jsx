@@ -4,6 +4,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
 import { socket } from '../../../services/socket-client';
 import { hasPermission } from '../../../utils/permissions';
+import { useTheme } from '../../../context/ThemeContext';
 
 function timeAgo(ts) {
   if (!ts) return '';
@@ -20,6 +21,9 @@ function timeAgo(ts) {
 function NotificationBell() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
+  const { customTheme, theme } = useTheme();
+  const isDark = theme === 'dark';
+  const isAccentHeader = !isDark && !!customTheme?.applyToHeader;
   const canViewInventory = hasPermission(user, 'parts');
   const canViewReturns = hasPermission(user, 'returns');
 
@@ -95,20 +99,24 @@ function NotificationBell() {
         type="button"
         onClick={handleToggle}
         aria-label="Notifications"
-        className="relative rounded-xl p-2 text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/5 dark:hover:text-white"
+        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+          isAccentHeader
+            ? 'text-white hover:bg-white/15'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white'
+        }`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-6 w-6">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
           <path d="M10 2a6 6 0 0 0-6 6c0 1.887-.454 3.665-1.257 5.234a.75.75 0 0 0 .515 1.076c1.65.351 3.32.618 5.008.799a3 3 0 1 0 5.468 0 41.7 41.7 0 0 0 5.008-.799.75.75 0 0 0 .515-1.076A11.45 11.45 0 0 1 16 8a6 6 0 0 0-6-6ZM8.05 14.943a33.54 33.54 0 0 0 3.9 0 1.5 1.5 0 0 1-3.9 0Z" />
         </svg>
         {totalCount > 0 && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-xs">
+          <span className="absolute -top-0.5 -right-0.5 flex h-[1.125rem] min-w-[1.125rem] items-center justify-center rounded-full bg-red-600 px-1 text-[10px] font-black text-white shadow-xs">
             {outOfStock.length > 0 ? outOfStock.length : clientReturns.length}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
+        <div className="fixed inset-x-3.5 top-[4.5rem] z-50 max-w-sm mx-auto sm:mx-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
           {/* Header with Switcher Tabs */}
           <div className="flex items-center justify-between border-b border-slate-100 p-3 dark:border-white/5">
             <div className="flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-white/5">

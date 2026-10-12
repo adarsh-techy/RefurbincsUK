@@ -337,9 +337,10 @@ async function getAdminNotificationById(req, res, next) {
       const { rows } = await db.query(
         `SELECT st.id, st.ticket_number, st.client_id, st.client_name, st.subject, st.category, st.priority, st.status,
                 st.battery_code, st.created_at, st.updated_at,
-                c.email AS client_email, c.phone AS client_phone
+                COALESCE(c.invoice_email, uc.email) AS client_email
          FROM support_tickets st
          LEFT JOIN clients c ON c.id = st.client_id
+         LEFT JOIN users uc ON uc.id = c.user_id
          WHERE st.id = $1`,
         [ticketId]
       );
@@ -385,9 +386,10 @@ async function getAdminNotificationById(req, res, next) {
       const intakeId = Number(id.replace('intake_', ''));
       const { rows } = await db.query(
         `SELECT ti.id, ti.truck_number, ti.driver_name, ti.battery_count, ti.status, ti.intake_at, ti.created_at, ti.verified_at,
-                c.id AS client_id, c.name AS client_name, c.email AS client_email
+                c.id AS client_id, c.name AS client_name, COALESCE(c.invoice_email, uc.email) AS client_email
          FROM truck_intakes ti
          LEFT JOIN clients c ON c.id = ti.client_id
+         LEFT JOIN users uc ON uc.id = c.user_id
          WHERE ti.id = $1`,
         [intakeId]
       );
@@ -424,9 +426,10 @@ async function getAdminNotificationById(req, res, next) {
       const returnId = Number(id.replace('return_', ''));
       const { rows } = await db.query(
         `SELECT ret.id, ret.truck_number, ret.driver_name, ret.battery_count, ret.returned_at, ret.created_at,
-                c.id AS client_id, c.name AS client_name, c.email AS client_email
+                c.id AS client_id, c.name AS client_name, COALESCE(c.invoice_email, uc.email) AS client_email
          FROM returns ret
          LEFT JOIN clients c ON c.id = ret.client_id
+         LEFT JOIN users uc ON uc.id = c.user_id
          WHERE ret.id = $1`,
         [returnId]
       );
@@ -462,9 +465,10 @@ async function getAdminNotificationById(req, res, next) {
       const ratingId = Number(id.replace('rating_', ''));
       const { rows } = await db.query(
         `SELECT br.id, br.client_id, br.battery_code, br.rating, br.preset_tags, br.custom_feedback, br.created_at,
-                c.name AS client_name, c.email AS client_email
+                c.name AS client_name, COALESCE(c.invoice_email, uc.email) AS client_email
          FROM battery_ratings br
          LEFT JOIN clients c ON c.id = br.client_id
+         LEFT JOIN users uc ON uc.id = c.user_id
          WHERE br.id = $1`,
         [ratingId]
       );
@@ -502,9 +506,10 @@ async function getAdminNotificationById(req, res, next) {
       const { rows } = await db.query(
         `SELECT mc.id, mc.client_id, mc.milestone_tier, mc.milestone_count, mc.title, mc.co2_saved_kg, mc.ewaste_diverted_kg,
                 mc.certificate_code, mc.issued_at,
-                c.name AS client_name, c.email AS client_email
+                c.name AS client_name, COALESCE(c.invoice_email, uc.email) AS client_email
          FROM milestone_certificates mc
          LEFT JOIN clients c ON c.id = mc.client_id
+         LEFT JOIN users uc ON uc.id = c.user_id
          WHERE mc.id = $1`,
         [milestoneId]
       );

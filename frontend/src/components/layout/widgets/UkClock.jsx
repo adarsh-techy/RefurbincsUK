@@ -18,7 +18,7 @@ const TIME_FORMATTER = new Intl.DateTimeFormat('en-GB', {
 });
 
 // Live UK (Europe/London) date and time synchronized with Free Time API
-function UkClock({ className = '', compact = false }) {
+function UkClock({ className = '', compact = false, isAccentHeader = false }) {
   const [now, setNow] = useState(getSyncedDate());
   const [status, setStatus] = useState(getSyncStatus());
 
@@ -95,14 +95,20 @@ function UkClock({ className = '', compact = false }) {
           }`}
           title={status.isSynced ? `Synced with ${status.syncSource}` : 'Syncing…'}
         />
-        <p className="text-sm font-bold tabular-nums text-emerald-700 dark:text-emerald-400 tracking-tight">
+        <p className={`text-sm font-bold tabular-nums tracking-tight ${
+          isAccentHeader ? 'text-white' : 'text-emerald-700 dark:text-emerald-400'
+        }`}>
           {formattedTime}{' '}
-          <span className="text-[11px] font-semibold text-emerald-600/80 dark:text-emerald-500/80">
+          <span className={`text-[11px] font-semibold ${
+            isAccentHeader ? 'text-white/80' : 'text-emerald-600/80 dark:text-emerald-500/80'
+          }`}>
             UK
           </span>
         </p>
       </div>
-      <p className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
+      <p className={`text-[11px] font-medium mt-0.5 ${
+        isAccentHeader ? 'text-white/70' : 'text-slate-500 dark:text-neutral-400'
+      }`}>
         {formattedDate}
       </p>
     </div>

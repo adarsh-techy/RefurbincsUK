@@ -87,10 +87,13 @@ export default function AuditLogScreen() {
       onEndReached={loadMore}
       onEndReachedThreshold={0.4}
       ItemSeparatorComponent={() => <View className="h-2" />}
-      renderItem={({ item: row }) => (
+      renderItem={({ item: row, index }) => (
         <View className="rounded-2xl border border-slate-200 bg-white p-3.5">
           <View className="flex-row items-center justify-between gap-2">
-            <Text className="flex-1 text-sm font-bold text-slate-900" numberOfLines={1}>{row.user_name || 'System'}</Text>
+            <View className="flex-1 flex-row items-center gap-2">
+              <Text className="font-mono text-xs font-bold text-slate-400">#{index + 1}</Text>
+              <Text className="flex-1 text-sm font-bold text-slate-900" numberOfLines={1}>{row.user_name || 'System'}</Text>
+            </View>
             <Badge tone={ACTION_TONES[row.action] || 'neutral'}>{label(row.action)}</Badge>
           </View>
           <View className="mt-2 flex-row flex-wrap gap-x-4 gap-y-1">

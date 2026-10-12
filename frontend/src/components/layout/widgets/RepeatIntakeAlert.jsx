@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
 import { socket } from '../../../services/socket-client';
 import { hasPermission } from '../../../utils/permissions';
+import { useTheme } from '../../../context/ThemeContext';
 
 // Repeat-arrow icon with a badge count of batteries that have come in on
 // more than one truck intake this calendar month. Opening it lists each
@@ -14,6 +15,9 @@ import { hasPermission } from '../../../utils/permissions';
 function RepeatIntakeAlert() {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
+  const { customTheme, theme } = useTheme();
+  const isDark = theme === 'dark';
+  const isAccentHeader = !isDark && !!customTheme?.applyToHeader;
   const canViewIntakes = hasPermission(user, 'truck_intakes');
   const [repeats, setRepeats] = useState([]);
   const [open, setOpen] = useState(false);
@@ -67,9 +71,13 @@ function RepeatIntakeAlert() {
         type="button"
         onClick={handleToggle}
         aria-label="Repeat intakes this month"
-        className="relative rounded-md p-2.5 text-emerald-700 hover:bg-emerald-50 hover:text-emerald-900 dark:text-neutral-300 dark:hover:bg-neutral-900 dark:hover:text-white"
+        className={`relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-colors ${
+          isAccentHeader
+            ? 'text-white hover:bg-white/15'
+            : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-neutral-300 dark:hover:bg-white/10 dark:hover:text-white'
+        }`}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-7 w-7">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-5 w-5">
           <path
             fillRule="evenodd"
             d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z"
@@ -77,17 +85,17 @@ function RepeatIntakeAlert() {
           />
         </svg>
         {repeats.length > 0 && (
-          <span className="absolute right-0.5 top-0.5 flex h-5 min-w-[1.25rem] animate-pulse items-center justify-center rounded-full bg-warning-600 px-1 text-xs font-semibold text-white ring-2 ring-white dark:ring-black">
+          <span className="absolute -right-0.5 -top-0.5 flex h-[1.125rem] min-w-[1.125rem] animate-pulse items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold text-white ring-2 ring-white dark:ring-black">
             {repeats.length}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-sm sm:w-96 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900">
+        <div className="fixed inset-x-3.5 top-[4.5rem] z-50 max-w-sm mx-auto sm:mx-0 sm:absolute sm:inset-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
           <div className="flex items-center gap-2.5 border-b border-slate-100 bg-gradient-to-r from-warning-50 to-white px-4 py-3 dark:border-surface-700 dark:from-amber-500/10 dark:to-surface-900">
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-warning-100 text-warning-700 dark:bg-amber-500/15 dark:text-amber-300">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4.5 w-4.5">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-[1.125rem] w-[1.125rem]">
                 <path
                   fillRule="evenodd"
                   d="M15.312 11.424a5.5 5.5 0 0 1-9.201 2.466l-.312-.311h2.433a.75.75 0 0 0 0-1.5H3.989a.75.75 0 0 0-.75.75v4.242a.75.75 0 0 0 1.5 0v-2.43l.31.31a7 7 0 0 0 11.712-3.138.75.75 0 0 0-1.449-.39Zm1.23-3.723a.75.75 0 0 0 .219-.53V2.929a.75.75 0 0 0-1.5 0V5.36l-.31-.31A7 7 0 0 0 3.239 8.188a.75.75 0 1 0 1.448.389A5.5 5.5 0 0 1 13.89 6.11l.311.31h-2.432a.75.75 0 0 0 0 1.5h4.243a.75.75 0 0 0 .53-.219Z"
