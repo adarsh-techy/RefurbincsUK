@@ -172,7 +172,13 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     clear: () => setText(''),
     // a tag the reader typed into another field on the screen
     scan: (raw) => {
-      if (!disabled) deliverAll(splitScanInput(raw), true);
+      if (!disabled) {
+        deliverAll(splitScanInput(raw), true);
+        return;
+      }
+      // the box isn't ready yet (e.g. no client picked): say so, don't drop it silently
+      setReaderIssues([{ id: `${Date.now()}-off`, message: 'RFID tag read — pick the client (and fill the form above) first, then scan again.' }]);
+      Vibration.vibrate(VIBRATE.bad);
     },
   }));
 

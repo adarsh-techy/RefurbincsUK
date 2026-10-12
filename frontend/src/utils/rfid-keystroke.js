@@ -106,30 +106,63 @@ function scanBoxFor(field) {
   return box && box !== field ? box : null;
 }
 
-function onStrayInput(field, e) {
+const lastValue = new WeakMap(); // field → its value after the previous input event
+
+// What an input event added at the end of the field, worked out from the
+// value itself — Android keyboards / DataWedge send composition events whose
+// e.data isn't one typed character, so e.data can't be trusted.
+function appendedText(field) {
+  const prev = lastValue.has(field) ? lastValue.get(field) : null;
+  const next = field.value || '';
+  lastValue.set(field, next);
+  if (prev === null) return { prev: '', added: next };
+  if (next.length > prev.length && next.startsWith(prev)) return { prev, added: next.slice(prev.length) };
+  return null; // an edit somewhere else, a deletion, a replacement
+}
+
+function showHint(field, text) {
+  const tip = document.createElement('div');
+  tip.textContent = text;
+  tip.setAttribute('role', 'status');
+  tip.style.cssText =
+    'position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:9999;max-width:90vw;' +
+    'background:#b91c1c;color:#fff;font:600 13px/1.4 system-ui,sans-serif;padding:10px 14px;border-radius:12px;' +
+    'box-shadow:0 8px 24px rgba(0,0,0,.25)';
+  document.body.appendChild(tip);
+  setTimeout(() => tip.remove(), 3500);
+  field.focus();
+}
+
+function onStrayInput(field) {
   const box = scanBoxFor(field);
+  const change = appendedText(field);
   if (!box) return;
   const now = Date.now();
-  const typed = e.inputType === 'insertText' || e.inputType === 'insertFromPaste' ? e.data || '' : '';
   let run = stray.get(field);
-  if (!typed) {
+  if (!change || !change.added) {
     stray.delete(field);
     return;
   }
   if (!run || now - run.last > STRAY_GAP_MS) {
-    run = { before: field.value.slice(0, Math.max(0, field.value.length - typed.length)), text: '', last: now, captured: false };
+    run = { before: change.prev, text: '', last: now, captured: false };
   }
-  run.text += typed;
+  run.text += change.added;
   run.last = now;
   stray.set(field, run);
   const clean = normalizeRfidTag(run.text);
+  // a whole tag arriving in one event (Android) or a fast run of keys
   if (!run.captured && !(clean.length >= STRAY_MIN_LENGTH && /^[0-9A-F]+$/.test(clean) && run.text.length > 1)) return;
   run.captured = true;
   setValue(field, run.before); // give the field its text back
+  lastValue.set(field, run.before);
   clearTimeout(run.timer);
   run.timer = setTimeout(() => {
     stray.delete(field);
-    if (box.disabled || !box.isConnected) return;
+    if (!box.isConnected) return;
+    if (box.disabled) {
+      showHint(field, 'RFID tag read — pick the client (and fill the form above) first, then scan again.');
+      return;
+    }
     box.focus();
     feed(box, splitScanInput(run.text));
   }, QUIET_MS / 3);
@@ -139,7 +172,7 @@ function onInput(e) {
   const input = e.target;
   if (!e.isTrusted) return;
   if (input instanceof HTMLInputElement && !input.matches('[data-rfid-scan]') && /^(text|search|tel|)$/.test(input.type)) {
-    onStrayInput(input, e);
+    onStrayInput(input);
     return;
   }
   if (!(input instanceof HTMLInputElement) || !input.matches('[data-rfid-scan]')) return;
@@ -183,6 +216,11 @@ let installed = false;
 export function installRfidKeystrokeSupport() {
   if (installed || typeof document === 'undefined') return;
   installed = true;
+  // remember each field's value when the cursor enters it, so the first
+  // input event already knows what was there before
+  document.addEventListener('focusin', (e) => {
+    if (e.target instanceof HTMLInputElement) lastValue.set(e.target, e.target.value || '');
+  }, true);
   document.addEventListener('input', onInput, true);
   document.addEventListener('keydown', onKeyDown, true);
 }
