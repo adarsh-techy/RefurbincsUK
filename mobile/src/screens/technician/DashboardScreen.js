@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -7,20 +7,22 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import formatDuration from '../../utils/format-duration';
+import {
+  isCompletedRepair,
+  isActiveRepair,
+  isVerifiedRepair,
+  isPartsRemoved,
+  repairBadgeStatus,
+} from '../../components/technician/work-outcome';
 
 const DAYS_SHOWN = 14;
 
-const FAILED_STATUSES = [
-  'unserviceable',
-  'tested_parts_removed',
-  'unserviceable_parts_removed',
-  'recycled',
-];
 
 // Fixed-window bucketing for the last 14 days
 function buildDailyCounts(jobs) {
@@ -78,29 +80,11 @@ function timeAgo(dateString) {
   return `${days}d ago`;
 }
 
-function isPartsRemoved(r) {
-  if (!r) return false;
-  return Boolean(
-    r.parts_removed ||
-    r.removed_at ||
-    r.removed_by_me ||
-    r.battery_status === 'tested_parts_removed' ||
-    r.battery_status === 'unserviceable_parts_removed'
-  );
-}
 
-function getRepairBadgeStatus(r) {
-  if (!r) return 'repaired';
-  if (isPartsRemoved(r)) return 'tested_parts_removed';
-  if (r.outcome === 'completed') return r.battery_status === 'returned' ? 'returned' : 'repaired';
-  if (r.outcome === 'failed') {
-    return FAILED_STATUSES.includes(r.battery_status) ? r.battery_status : 'tested_parts_removed';
-  }
-  return r.battery_status || 'repaired';
-}
 
 export default function DashboardScreen() {
   const navigation = useNavigation();
+  const user = useSelector((s) => s.auth.user);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -124,6 +108,19 @@ export default function DashboardScreen() {
     loadData().finally(() => setLoading(false));
   }, [loadData]);
 
+  // The tab stays mounted, so re-read when it comes back into view (the web
+  // page reloads each time it is opened) — work just logged shows up.
+  const firstFocus = useRef(true);
+  useFocusEffect(
+    useCallback(() => {
+      if (firstFocus.current) {
+        firstFocus.current = false;
+        return;
+      }
+      loadData();
+    }, [loadData])
+  );
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await loadData();
@@ -133,8 +130,9 @@ export default function DashboardScreen() {
   const { staff = {}, repairs = [], issues = [], tests = [] } = data || {};
 
   const isSupervisor = useMemo(() => {
-    return (staff?.role || '').toLowerCase() === 'supervisor';
-  }, [staff?.role]);
+    const role = (staff?.role || user?.staff_role || user?.role || '').toLowerCase();
+    return role === 'supervisor';
+  }, [staff?.role, user?.staff_role, user?.role]);
 
   // Completed jobs:
   // - Supervisor: all tests
@@ -151,12 +149,7 @@ export default function DashboardScreen() {
         .sort((a, b) => new Date(b.doneAt || 0) - new Date(a.doneAt || 0));
     }
     return repairs
-      .filter((r) => {
-        if (!r) return false;
-        if (r.outcome === 'failed' || r.parts_removed) return false;
-        if (FAILED_STATUSES.includes(r.battery_status)) return false;
-        return Boolean(r.repaired_at || r.id);
-      })
+      .filter(isCompletedRepair)
       .map((r) => ({
         ...r,
         kind: 'repair',
@@ -167,18 +160,7 @@ export default function DashboardScreen() {
   }, [isSupervisor, tests, repairs]);
 
   // Pillar 2: Passed to Testing / In Testing
-  const inTestingRepairs = useMemo(
-    () =>
-      repairs.filter(
-        (r) =>
-          !r.parts_removed &&
-          r.outcome !== 'failed' &&
-          (r.battery_status === 'in_testing' ||
-            r.battery_status === 'in_progress' ||
-            r.outcome === 'active')
-      ),
-    [repairs]
-  );
+  const inTestingRepairs = useMemo(() => repairs.filter(isActiveRepair), [repairs]);
 
   // Pillar 3: Marked Unserviceable
   const unserviceableIssues = issues || [];
@@ -190,18 +172,7 @@ export default function DashboardScreen() {
   );
 
   // Verified QA complete
-  const verifiedRepairs = useMemo(
-    () =>
-      repairs.filter(
-        (r) =>
-          !r.parts_removed &&
-          r.outcome !== 'failed' &&
-          (r.battery_status === 'repaired' ||
-            r.battery_status === 'returned' ||
-            r.outcome === 'completed')
-      ),
-    [repairs]
-  );
+  const verifiedRepairs = useMemo(() => repairs.filter(isVerifiedRepair), [repairs]);
 
   // Supervisor metrics
   const passedTests = useMemo(() => tests.filter((t) => !t.passed_back), [tests]);
@@ -263,7 +234,7 @@ export default function DashboardScreen() {
     // 'all': blend repairs and issues
     const repairItems = repairs.map((r) => ({
       ...r,
-      entryType: isPartsRemoved(r) ? 'removed' : (r.battery_status === 'in_testing' || r.outcome === 'active') ? 'testing' : 'completed',
+      entryType: isPartsRemoved(r) ? 'removed' : isActiveRepair(r) ? 'testing' : 'completed',
       date: r.removed_at || r.repaired_at,
     }));
     const issueItems = unserviceableIssues.map((i) => ({
@@ -292,7 +263,7 @@ export default function DashboardScreen() {
     month: 'short',
   });
 
-  const staffDisplayName = staff.name || (isSupervisor ? 'Supervisor' : 'Technician');
+  const staffDisplayName = staff.name || user?.name || (isSupervisor ? 'Supervisor' : 'Technician');
 
   if (loading) {
     return (
@@ -365,10 +336,10 @@ export default function DashboardScreen() {
                     isSupervisor ? 'text-violet-700' : 'text-blue-700'
                   }`}
                 >
-                  {isSupervisor ? 'SUPERVISOR · QA TESTING' : 'TECHNICIAN · WORKSHOP REPAIRS'}
+                  {isSupervisor ? 'Supervisor · QA Testing' : 'Technician · Workshop Repairs'}
                 </Text>
               </View>
-              <Text className="text-xs text-slate-400">Refurbnics Workshop</Text>
+              <Text className="text-xs text-slate-400">• Refurbnics Workshop</Text>
             </View>
           </View>
         </View>
@@ -432,7 +403,7 @@ export default function DashboardScreen() {
                   isSupervisor ? 'text-violet-600' : 'text-emerald-600'
                 }`}
               >
-                {isSupervisor ? 'Tests signed off' : 'Completed today'}
+                {isSupervisor ? 'Tests signed off today' : 'Completed today'}
               </Text>
             </View>
 
@@ -476,7 +447,7 @@ export default function DashboardScreen() {
                   isSupervisor ? 'text-emerald-600' : 'text-blue-600'
                 }`}
               >
-                {isSupervisor ? 'Passed inspection' : 'In testing queue'}
+                {isSupervisor ? 'Passed inspection' : 'In QA testing queue'}
               </Text>
             </View>
           </View>
@@ -567,7 +538,7 @@ export default function DashboardScreen() {
                   isSupervisor ? 'text-rose-600' : 'text-amber-600'
                 }`}
               >
-                {isSupervisor ? 'Marked failed' : 'Restocked to stock'}
+                {isSupervisor ? 'Marked failed tests' : 'Restocked to stock'}
               </Text>
             </View>
           </View>
@@ -582,20 +553,20 @@ export default function DashboardScreen() {
         </View>
         <View className="h-5 w-px bg-slate-200" />
         <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Lifetime</Text>
+          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Lifetime Completed</Text>
           <Text className="text-sm font-black text-slate-800 mt-0.5">{completedJobs.length} done</Text>
         </View>
         <View className="h-5 w-px bg-slate-200" />
         <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Avg Speed</Text>
+          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Avg Service Speed</Text>
           <Text className="text-sm font-black text-slate-800 mt-0.5">
             {avgDuration != null ? formatDuration(avgDuration) : '—'}
           </Text>
         </View>
         <View className="h-5 w-px bg-slate-200" />
         <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Pass Rate</Text>
-          <Text className="text-sm font-black text-emerald-600 mt-0.5">{approvalRate}%</Text>
+          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Approval Rate</Text>
+          <Text className="text-sm font-black text-emerald-600 mt-0.5">{approvalRate}% pass</Text>
         </View>
       </View>
 
@@ -604,9 +575,9 @@ export default function DashboardScreen() {
         <View className="mb-3 flex-row items-center justify-between">
           <View>
             <Text className="text-sm font-black text-slate-900">
-              {isSupervisor ? 'QA Testing Activity (14 Days)' : 'Repair Activity (14 Days)'}
+              {isSupervisor ? 'QA Testing 14-Day Output' : 'Repair Output Activity (14 Days)'}
             </Text>
-            <Text className="text-[11px] font-medium text-slate-400">Past {DAYS_SHOWN} days output</Text>
+            <Text className="text-[11px] font-medium text-slate-400">Daily output timeline · Past {DAYS_SHOWN} days</Text>
           </View>
           <View
             className={`rounded-full px-2.5 py-1 ${
@@ -618,7 +589,7 @@ export default function DashboardScreen() {
                 isSupervisor ? 'text-violet-700' : 'text-blue-700'
               }`}
             >
-              {weekCount} this week
+              {weekCount} units this week
             </Text>
           </View>
         </View>
@@ -661,8 +632,10 @@ export default function DashboardScreen() {
                         isHighlight ? 'text-emerald-700' : 'text-slate-400'
                       }`}
                       numberOfLines={1}
+                      adjustsFontSizeToFit
+                      minimumFontScale={0.6}
                     >
-                      {isHighlight ? 'TD' : d.dayName}
+                      {isHighlight ? 'TODAY' : d.dayName}
                     </Text>
                   </View>
                 );
@@ -699,14 +672,14 @@ export default function DashboardScreen() {
       <View>
         <View className="mb-2.5 flex-row items-center justify-between">
           <Text className="text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-            Workshop Activity Feed
+            Workshop Activity Details
           </Text>
           <TouchableOpacity
             onPress={() => navigation.navigate('History')}
             className="flex-row items-center gap-1"
           >
             <Text className="text-[11px] font-bold text-blue-600">
-              View All ({completedJobs.length})
+              View Full Log ({completedJobs.length})
             </Text>
             <Icon name="arrowRight" color="#2563eb" size={12} />
           </TouchableOpacity>
@@ -867,7 +840,7 @@ export default function DashboardScreen() {
             </View>
             <Text className="text-sm font-black text-slate-800">No entries in this view</Text>
             <Text className="text-xs text-slate-400 text-center mt-1">
-              All workshop actions and battery updates will appear here automatically.
+              All workshop actions, completed jobs, and battery updates will appear here automatically.
             </Text>
           </View>
         ) : (
@@ -945,7 +918,7 @@ export default function DashboardScreen() {
                             </Text>
                           </View>
                         ) : (
-                          <StatusBadge status={getRepairBadgeStatus(j)} />
+                          <StatusBadge status={repairBadgeStatus(j)} />
                         )}
 
                         <Text className="text-[10px] font-medium text-slate-400 ml-auto">

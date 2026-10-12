@@ -8,21 +8,30 @@ import extractBatteryCode from '../../utils/extract-battery-code';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import RfidLookupButton from '../../components/scan/RfidLookupButton';
+import { isIntakeUnverified } from '../../utils/intake';
+import UnverifiedIntakeModal from '../../components/technician/t1/UnverifiedIntakeModal';
+import { canTestBatteries, hasPermission, useLiveStaffUser } from '../../components/technician/t1/staff-role';
 
 const SUGGESTION_LIMIT = 8;
 const DEBOUNCE_MS = 250;
 
 // A technician's entry point to start work: scan a battery's QR code with
 // the camera, or search/type its code, then jump to its detail screen.
+// Mirrors the web TechnicianHomePage: the battery is looked up first, and one
+// still on an unverified truck intake gets a popup instead of opening.
 export default function ServiceScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const currentUser = useSelector((state) => state.auth.user);
-  const staffRole = (currentUser?.staff_role || currentUser?.role || '').toLowerCase();
-  const canTest =
-    currentUser?.role === 'super_admin' ||
-    currentUser?.role === 'admin' ||
-    staffRole === 'supervisor';
+  // live staff role from /auth/me, like the web (a promotion to supervisor
+  // takes effect without signing out)
+  const effectiveUser = useLiveStaffUser(currentUser);
+  const canTest = canTestBatteries(effectiveUser);
+  // the intake page is admin-only on the web; on mobile it needs the
+  // truck_intakes permission the backend checks
+  const canOpenIntake = hasPermission(currentUser, 'truck_intakes');
+  const [checkingScan, setCheckingScan] = useState(false);
+  const [unverifiedBattery, setUnverifiedBattery] = useState(null);
 
   const [permission, requestPermission] = useCameraPermissions();
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -32,6 +41,9 @@ export default function ServiceScreen() {
   // Camera fires onBarcodeScanned repeatedly while the code stays in frame —
   // pause after a hit instead of navigating more than once.
   const scanLockRef = useRef(false);
+  // one lookup at a time (camera frames, scanner trigger and typing can all
+  // fire at once)
+  const checkingRef = useRef(false);
 
   useEffect(() => {
     if (route.params?.autoScan) {
@@ -64,12 +76,30 @@ export default function ServiceScreen() {
     return () => clearTimeout(debounceRef.current);
   }, [manualCode, canTest]);
 
-  function goToBattery(raw) {
+  async function goToBattery(raw) {
     const code = extractBatteryCode(raw);
     if (!code) return;
-    setCameraOpen(false);
+    if (checkingRef.current) return;
+    checkingRef.current = true;
     setSuggestions([]);
     setManualCode('');
+    setCheckingScan(true);
+
+    try {
+      const { data } = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
+      if (isIntakeUnverified(data.battery)) {
+        setCameraOpen(false);
+        setUnverifiedBattery(data.battery);
+        return; // staying here — accept new scans
+      }
+    } catch {
+      // not found / offline: the detail screen shows its own error
+    } finally {
+      setCheckingScan(false);
+      checkingRef.current = false;
+    }
+
+    setCameraOpen(false);
     // fromScan tells BatteryDetailScreen to only allow entry for a fresh
     // intake battery ('in_repair') and show a blocking popup for anything
     // else — unlike History, which legitimately opens already-worked
@@ -125,9 +155,12 @@ export default function ServiceScreen() {
           <View className="mt-6 w-full max-w-xs gap-3">
             <TouchableOpacity
               onPress={handleOpenCamera}
-              className="items-center rounded-md bg-blue-600 px-4 py-3.5"
+              disabled={checkingScan}
+              className={`items-center rounded-md bg-blue-600 px-4 py-3.5 ${checkingScan ? 'opacity-50' : ''}`}
             >
-              <Text className="text-base font-semibold text-white">Scan with Camera</Text>
+              <Text className="text-base font-semibold text-white">
+                {checkingScan ? 'Checking Battery…' : 'Scan with Camera'}
+              </Text>
             </TouchableOpacity>
 
             <RfidLookupButton onScan={goToBattery} />
@@ -169,6 +202,26 @@ export default function ServiceScreen() {
           </View>
         </View>
       )}
+
+      <UnverifiedIntakeModal
+        battery={unverifiedBattery}
+        canOpenIntake={canOpenIntake}
+        onScanAnother={() => {
+          setUnverifiedBattery(null);
+          setManualCode('');
+          handleOpenCamera();
+        }}
+        onOpenIntake={() => {
+          const id = unverifiedBattery.truck_intake_id;
+          setUnverifiedBattery(null);
+          navigation.navigate('AdminIntakeDetail', { id });
+        }}
+        onViewBattery={() => {
+          const code = unverifiedBattery.battery_code;
+          setUnverifiedBattery(null);
+          navigation.navigate('BatteryDetail', { code });
+        }}
+      />
     </View>
   );
 }

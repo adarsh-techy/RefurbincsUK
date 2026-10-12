@@ -71,6 +71,10 @@ export default function ProfileScreen() {
   }
 
   const isClient = user?.role === 'client';
+  // workshop logins (technician / supervisor): the web's TechnicianProfilePage
+  const isWorkshop = !isClient && !['super_admin', 'admin', 'staff', 'recycle_client'].includes(user?.role);
+  // same rule as the web canTestBatteries(): supervisors may run testing / QA
+  const canTest = (user?.staff_role || user?.staffRole || user?.role || '').trim().toLowerCase() === 'supervisor';
   const clientLinks = CLIENT_LINKS.filter((l) => !l.permission || hasClientPermission(user, l.permission));
 
   return (
@@ -83,7 +87,7 @@ export default function ProfileScreen() {
         <Text className="mb-4 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Account Details</Text>
         
         <View className="mb-3.5 flex-row justify-between items-center border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
-          <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">Name / Company</Text>
+          <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">{isWorkshop ? 'Name / Staff Member' : 'Name / Company'}</Text>
           <Text className="text-sm font-bold text-slate-900 dark:text-white">{user?.name}</Text>
         </View>
 
@@ -109,17 +113,17 @@ export default function ProfileScreen() {
         </View>
 
         {/* testing sign-off is a workshop thing — not shown to office or partner logins */}
-        {!isClient && !['super_admin', 'admin', 'staff', 'recycle_client'].includes(user?.role) && (
+        {isWorkshop && (
           <View className="mb-3.5 flex-row justify-between items-center border-b border-slate-200/80 dark:border-slate-800/80 pb-3">
             <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">Testing Access</Text>
             <Text
               className={`text-xs font-bold ${
-                user?.staff_role === 'supervisor'
+                canTest
                   ? 'text-emerald-600 dark:text-emerald-400'
                   : 'text-amber-600 dark:text-amber-400'
               }`}
             >
-              {user?.staff_role === 'supervisor'
+              {canTest
                 ? 'Authorized'
                 : 'Supervisors only'}
             </Text>

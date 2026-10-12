@@ -41,6 +41,9 @@ function TechnicianHomePage() {
     staff_role: liveStaffRole || user?.staff_role,
   };
   const canTest = canTestBatteries(effectiveUser);
+  // /truck-intakes is an admin page (see AppRoutes): a technician following
+  // this link was bounced straight back to "/".
+  const canOpenIntake = user?.role === 'super_admin' || user?.role === 'admin';
 
   const [cameraOpen, setCameraOpen] = useState(false);
   const [manualCode, setManualCode] = useState('');
@@ -279,7 +282,7 @@ function TechnicianHomePage() {
               >
                 <span>📷 Scan Another Battery</span>
               </button>
-              {unverifiedModalBattery.truck_intake_id && (
+              {unverifiedModalBattery.truck_intake_id && canOpenIntake && (
                 <button
                   type="button"
                   onClick={() => {

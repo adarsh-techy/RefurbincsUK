@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Modal,
   RefreshControl,
   ScrollView,
@@ -16,7 +15,7 @@ import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import formatDuration from '../../utils/format-duration';
-import { resolveImageUrl } from '../../utils/imageUrl';
+import { repairBadgeStatus } from '../../components/technician/work-outcome';
 
 const DATE_FILTERS = [
   { id: 'all', label: 'All' },
@@ -202,9 +201,7 @@ function groupTimelineByDate(items) {
 
 export default function HistoryScreen() {
   const navigation = useNavigation();
-  const [rawTimeline, setRawTimeline] = useState(null);
-  const [staffInfo, setStaffInfo] = useState(null);
-  const [summaryStats, setSummaryStats] = useState(null);
+  const [data, setData] = useState(null);
   const [error, setError] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -221,6 +218,7 @@ export default function HistoryScreen() {
   const [viewMonth, setViewMonth] = useState(new Date().getMonth());
 
   const currentUser = useSelector((state) => state.auth?.user);
+  const staffInfo = data?.staff;
   const isSupervisor = useMemo(() => {
     return (
       (staffInfo?.role || currentUser?.staff_role || currentUser?.staffRole || currentUser?.role || '')
@@ -234,36 +232,7 @@ export default function HistoryScreen() {
     setError(null);
     return apiClient
       .get('/staff/me')
-      .then(({ data }) => {
-        setStaffInfo(data.staff);
-        const supervisor = (data.staff?.role || '').toLowerCase() === 'supervisor';
-        setRawTimeline(
-          buildTimeline(data.repairs || [], data.issues || [], data.tests || [], supervisor)
-        );
-        if (supervisor) {
-          const tests = data.tests || [];
-          const issues = data.issues || [];
-          const passed = tests.filter((t) => !t.passed_back);
-          const passedBack = tests.filter((t) => t.passed_back);
-          setSummaryStats({
-            total: tests.length + issues.length,
-            passed: passed.length,
-            passedBack: passedBack.length,
-            issues: issues.length,
-          });
-        } else {
-          const repairs = data.repairs || [];
-          const issues = data.issues || [];
-          const completed = repairs.filter(
-            (r) => !r.parts_removed && (r.repaired_at || r.id)
-          );
-          setSummaryStats({
-            total: repairs.length + issues.length,
-            completed: completed.length,
-            issues: issues.length,
-          });
-        }
-      })
+      .then(({ data: res }) => setData(res))
       .catch((err) => setError(err.response?.data?.message || err.message));
   }, []);
 
@@ -276,6 +245,40 @@ export default function HistoryScreen() {
     await load();
     setRefreshing(false);
   }
+
+  // Same figures as the web history header: tests / repairs only in the
+  // first card (issues have their own), pass rate, average repair time.
+  const summaryStats = useMemo(() => {
+    if (!data) return null;
+    const issues = data.issues || [];
+    if (isSupervisor) {
+      const tests = data.tests || [];
+      const passed = tests.filter((t) => !t.passed_back);
+      return {
+        totalTests: tests.length,
+        passed: passed.length,
+        passedBack: tests.length - passed.length,
+        issues: issues.length,
+        passRate: tests.length ? Math.round((passed.length / tests.length) * 100) : 0,
+      };
+    }
+    const repairs = data.repairs || [];
+    const completed = repairs.filter((r) => !r.parts_removed && (r.repaired_at || r.id));
+    const timed = repairs.filter((r) => typeof r.duration_seconds === 'number' && r.duration_seconds > 0);
+    return {
+      totalRepairs: repairs.length,
+      completed: completed.length,
+      avgDuration: timed.length
+        ? Math.round(timed.reduce((sum, r) => sum + r.duration_seconds, 0) / timed.length)
+        : null,
+      issues: issues.length,
+    };
+  }, [data, isSupervisor]);
+
+  const rawTimeline = useMemo(
+    () => (data ? buildTimeline(data.repairs, data.issues, data.tests, isSupervisor) : null),
+    [data, isSupervisor]
+  );
 
   // Filtered timeline computation
   const filteredTimeline = useMemo(() => {
@@ -440,11 +443,11 @@ export default function HistoryScreen() {
       {/* ── Top Header & Stats Summary Banner ────────────────────────── */}
       <View className="bg-white px-4 pt-3 pb-3 border-b border-slate-200/80 shadow-2xs">
         {/* Role Title & Staff Badge */}
-        <View className="flex-row items-center justify-between mb-2.5">
+        <View className="mb-2.5 gap-2">
           <View>
             <View className="flex-row items-center gap-2">
               <Text className="text-lg font-black text-slate-900 tracking-tight">
-                {isSupervisor ? 'Testing History' : 'Repair History'}
+                {isSupervisor ? 'QA Testing & Sign-off History' : 'Repair & Service History'}
               </Text>
               <View
                 className={`rounded-full px-2 py-0.5 ${
@@ -462,65 +465,44 @@ export default function HistoryScreen() {
             </View>
             <Text className="text-xs text-slate-400">
               {isSupervisor
-                ? 'QA testing sign-offs and rework passes'
-                : 'Completed repairs and replaced parts'}
+                ? 'Battery testing sign-offs, QA services, and technician rework passes'
+                : 'Battery repairs, fitted parts, and workshop service logs'}
             </Text>
           </View>
 
-          {staffInfo?.name && (
-            <View className="flex-row items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1">
+          {(staffInfo?.name || currentUser?.name) && (
+            <View className="flex-row items-center gap-1.5 self-start rounded-lg bg-slate-100 px-2.5 py-1">
               <View className="h-2 w-2 rounded-full bg-emerald-500" />
-              <Text className="text-[11px] font-bold text-slate-700">{staffInfo.name}</Text>
+              <Text className="text-[11px] font-semibold text-slate-700">
+                Staff: {staffInfo?.name || currentUser?.name}
+              </Text>
             </View>
           )}
         </View>
 
-        {/* 3-Column Metrics Strip */}
+        {/* Stats: the web's four cards, two per row */}
         {summaryStats && (
-          <View className="flex-row gap-2 mt-1 mb-2.5">
-            {isSupervisor ? (
-              <>
-                <View className="flex-1 rounded-xl bg-violet-50/80 p-2.5 border border-violet-100">
-                  <Text className="text-[10px] font-bold text-violet-700">Total Tested</Text>
-                  <Text className="text-base font-black text-violet-950 mt-0.5">
-                    {summaryStats.total}
-                  </Text>
-                </View>
-                <View className="flex-1 rounded-xl bg-emerald-50/80 p-2.5 border border-emerald-100">
-                  <Text className="text-[10px] font-bold text-emerald-700">Passed QA</Text>
-                  <Text className="text-base font-black text-emerald-950 mt-0.5">
-                    {summaryStats.passed}
-                  </Text>
-                </View>
-                <View className="flex-1 rounded-xl bg-amber-50/80 p-2.5 border border-amber-100">
-                  <Text className="text-[10px] font-bold text-amber-700">Passed Back</Text>
-                  <Text className="text-base font-black text-amber-950 mt-0.5">
-                    {summaryStats.passedBack}
-                  </Text>
-                </View>
-              </>
-            ) : (
-              <>
-                <View className="flex-1 rounded-xl bg-blue-50/80 p-2.5 border border-blue-100">
-                  <Text className="text-[10px] font-bold text-blue-700">Total Repairs</Text>
-                  <Text className="text-base font-black text-blue-950 mt-0.5">
-                    {summaryStats.total}
-                  </Text>
-                </View>
-                <View className="flex-1 rounded-xl bg-emerald-50/80 p-2.5 border border-emerald-100">
-                  <Text className="text-[10px] font-bold text-emerald-700">Completed</Text>
-                  <Text className="text-base font-black text-emerald-950 mt-0.5">
-                    {summaryStats.completed}
-                  </Text>
-                </View>
-                <View className="flex-1 rounded-xl bg-rose-50/80 p-2.5 border border-rose-100">
-                  <Text className="text-[10px] font-bold text-rose-700">Issues</Text>
-                  <Text className="text-base font-black text-rose-950 mt-0.5">
-                    {summaryStats.issues}
-                  </Text>
-                </View>
-              </>
-            )}
+          <View className="mt-1 mb-2.5 flex-row flex-wrap gap-2">
+            {(isSupervisor
+              ? [
+                  { label: 'Total Tested', value: summaryStats.totalTests, sub: 'Sign-offs logged', box: 'bg-violet-50/80 border-violet-100', head: 'text-violet-700', num: 'text-violet-950', foot: 'text-violet-600' },
+                  { label: 'Passed QA', value: summaryStats.passed, sub: `${summaryStats.passRate}% pass rate`, box: 'bg-emerald-50/80 border-emerald-100', head: 'text-emerald-700', num: 'text-emerald-950', foot: 'text-emerald-600 font-semibold' },
+                  { label: 'Passed Back', value: summaryStats.passedBack, sub: 'Returned for rework', box: 'bg-amber-50/80 border-amber-100', head: 'text-amber-700', num: 'text-amber-950', foot: 'text-amber-600' },
+                  { label: 'Unserviceable', value: summaryStats.issues, sub: 'Failed testing', box: 'bg-rose-50/80 border-rose-100', head: 'text-rose-700', num: 'text-rose-950', foot: 'text-rose-600' },
+                ]
+              : [
+                  { label: 'Total Repairs', value: summaryStats.totalRepairs, sub: 'Batteries repaired', box: 'bg-blue-50/80 border-blue-100', head: 'text-blue-700', num: 'text-blue-950', foot: 'text-blue-600' },
+                  { label: 'Completed', value: summaryStats.completed, sub: 'Submitted for test', box: 'bg-emerald-50/80 border-emerald-100', head: 'text-emerald-700', num: 'text-emerald-950', foot: 'text-emerald-600' },
+                  { label: 'Avg Duration', value: summaryStats.avgDuration ? formatDuration(summaryStats.avgDuration) : '—', sub: 'Per battery', box: 'bg-indigo-50/80 border-indigo-100', head: 'text-indigo-700', num: 'text-indigo-950', foot: 'text-indigo-600' },
+                  { label: 'Issues', value: summaryStats.issues, sub: 'Unserviceable', box: 'bg-rose-50/80 border-rose-100', head: 'text-rose-700', num: 'text-rose-950', foot: 'text-rose-600' },
+                ]
+            ).map((card) => (
+              <View key={card.label} className={`w-[48.5%] rounded-xl border p-2.5 ${card.box}`}>
+                <Text className={`text-[10px] font-bold uppercase tracking-wider ${card.head}`}>{card.label}</Text>
+                <Text className={`mt-0.5 text-lg font-black ${card.num}`}>{card.value}</Text>
+                <Text className={`text-[10px] ${card.foot}`}>{card.sub}</Text>
+              </View>
+            ))}
           </View>
         )}
 
@@ -532,8 +514,8 @@ export default function HistoryScreen() {
             onChangeText={setSearch}
             placeholder={
               isSupervisor
-                ? 'Search battery code, tested services…'
-                : 'Search battery code, parts fitted…'
+                ? 'Search battery code, services, notes…'
+                : 'Search battery code, parts, notes…'
             }
             placeholderTextColor="#94a3b8"
             className="flex-1 ml-2 text-xs text-slate-800 p-0"
@@ -542,7 +524,11 @@ export default function HistoryScreen() {
             <TouchableOpacity onPress={() => setSearch('')} hitSlop={5}>
               <Icon name="close" color="#64748b" size={12} />
             </TouchableOpacity>
-          ) : null}
+          ) : (
+            <Text className="text-[10px] font-medium text-slate-400">
+              {filteredTimeline.length} {filteredTimeline.length === 1 ? 'unit' : 'units'}
+            </Text>
+          )}
         </View>
 
         {/* Type Filter Segmented Control & Reset */}
@@ -698,12 +684,12 @@ export default function HistoryScreen() {
           />
         }
       >
-        {rawTimeline === null ? (
+        {rawTimeline === null && !error ? (
           <View className="items-center justify-center p-12">
             <ActivityIndicator size="small" color={isSupervisor ? '#7c3aed' : '#2563eb'} />
             <Text className="text-xs font-semibold text-slate-400 mt-2">Loading history…</Text>
           </View>
-        ) : dateGroups.length === 0 ? (
+        ) : rawTimeline === null ? null : dateGroups.length === 0 ? (
           hasActiveFilters ? (
             <View className="items-center rounded-3xl border border-slate-200/80 bg-white p-8 shadow-2xs mt-4">
               <View className="mb-1.5">
@@ -727,10 +713,10 @@ export default function HistoryScreen() {
               <View className="mb-1.5">
                 <Icon name="clock" color="#94a3b8" size={22} />
               </View>
-              <Text className="text-sm font-bold text-slate-800">Nothing logged yet</Text>
+              <Text className="text-sm font-bold text-slate-800">No history logged yet</Text>
               <Text className="text-xs text-slate-400 text-center mt-1">
                 {isSupervisor
-                  ? 'Completed testing sign-offs and passes will appear here date-wise.'
+                  ? 'Signed-off tests and test inspections will appear here date-wise.'
                   : 'Completed repairs and reported workshop issues will appear here date-wise.'}
               </Text>
             </View>
@@ -830,12 +816,12 @@ export default function HistoryScreen() {
                           item.testing_duration_seconds > 0 ? (
                             <View className="rounded-md bg-violet-50 px-2 py-0.5 border border-violet-100">
                               <Text className="text-[10px] font-bold text-violet-700">
-                                ⏱️ Test: {formatDuration(item.testing_duration_seconds)}
+                                ⏱️ Testing Time: {formatDuration(item.testing_duration_seconds)}
                               </Text>
                             </View>
                           ) : (
                             <Text className="text-[10px] font-bold uppercase text-slate-400">
-                              {isPassedBack ? 'Rework Pass-Back' : 'QA Sign-off'}
+                              {isPassedBack ? 'Rework Pass-Back' : 'QA Testing Sign-off'}
                             </Text>
                           )}
                           <Text className="text-xs font-bold text-violet-600">View Battery Details ›</Text>
@@ -863,7 +849,7 @@ export default function HistoryScreen() {
                             <Text className="font-mono text-sm font-extrabold text-blue-700">
                               {item.battery_code}
                             </Text>
-                            <StatusBadge status={item.battery_status || 'repaired'} />
+                            <StatusBadge status={repairBadgeStatus(item)} />
                           </View>
                           <Text className="text-[11px] font-medium text-slate-400">
                             {item.repaired_at
@@ -880,7 +866,7 @@ export default function HistoryScreen() {
                           item.duration_seconds > 0 ? (
                             <View className="rounded-md bg-blue-50 px-2 py-0.5 border border-blue-100">
                               <Text className="text-[10px] font-bold text-blue-700">
-                                ⏱️ Duration: {formatDuration(item.duration_seconds)}
+                                ⏱️ Repair Time: {formatDuration(item.duration_seconds)}
                               </Text>
                             </View>
                           ) : (

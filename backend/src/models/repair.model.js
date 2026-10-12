@@ -1,9 +1,38 @@
 const db = require('../config/db');
 
-async function create({ batteryId, staffId, partId, quantityUsed, notes, laborCharge, batchId }) {
+async function create({ batteryId, staffId, partId, quantityUsed, notes, laborCharge, batchId, startedByUserId = null }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
+
+    // Work can only be logged on a battery someone pressed Start Work on
+    // (which itself requires a verified intake). The first part of a visit
+    // needs 'in_progress'; later parts of the same batch arrive after the
+    // first one moved it to 'in_testing'. startedByUserId (technicians)
+    // also requires the caller to be the one who started it.
+    const { rows: batteryState } = await client.query(
+      `SELECT status, started_by_user_id,
+              EXISTS (SELECT 1 FROM repairs WHERE batch_id = $2 AND battery_id = $1) AS batch_open
+         FROM batteries WHERE id = $1 FOR UPDATE`,
+      [batteryId, batchId]
+    );
+    const state = batteryState[0];
+    if (!state) {
+      const err = new Error('Battery not found');
+      err.status = 404;
+      throw err;
+    }
+    const allowed = state.batch_open ? ['in_progress', 'in_testing'] : ['in_progress'];
+    if (!allowed.includes(state.status)) {
+      const err = new Error('Start work on this battery before logging a repair.');
+      err.status = 409;
+      throw err;
+    }
+    if (startedByUserId && !state.batch_open && state.started_by_user_id && state.started_by_user_id !== startedByUserId) {
+      const err = new Error('Another technician is working on this battery.');
+      err.status = 409;
+      throw err;
+    }
 
     // Guard against overselling stock: only deduct if enough is on hand.
     const partResult = await client.query(

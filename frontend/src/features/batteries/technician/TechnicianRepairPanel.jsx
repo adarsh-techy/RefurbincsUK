@@ -77,6 +77,8 @@ function TechnicianRepairPanel({
     staff_role: liveStaffRole || user?.staff_role,
   };
   const canTest = canTestBatteries(effectiveUser);
+  // The truck intake pages are admin-only routes, so workshop logins get no link
+  const isOfficeAdmin = user?.role === 'super_admin' || user?.role === 'admin';
 
   const { data: partsList } = useFetchList('/parts');
   const parts = partsList || [];
@@ -292,6 +294,7 @@ function TechnicianRepairPanel({
 
   // Parts removal state
   const [selectedRemovalIds, setSelectedRemovalIds] = useState([]);
+  const [partsRemovedForRework, setPartsRemovedForRework] = useState(false);
   const [removingParts, setRemovingParts] = useState(false);
   const [removePartsError, setRemovePartsError] = useState(null);
 
@@ -643,10 +646,11 @@ function TechnicianRepairPanel({
     setRemovingParts(true);
     setRemovePartsError(null);
     try {
-      await apiClient.patch(`/batteries/${battery.id}/remove-parts`, {
+      const { data } = await apiClient.patch(`/batteries/${battery.id}/remove-parts`, {
         repairIds: selectedRemovalIds,
       });
       setSelectedRemovalIds([]);
+      setPartsRemovedForRework(data?.battery?.status === 'in_repair');
       setModalType('parts_removed');
       if (onUpdated) onUpdated();
     } catch (err) {
@@ -915,7 +919,7 @@ function TechnicianRepairPanel({
                 This battery arrived under Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot be started until arrival is verified.
               </p>
               <div className="flex flex-col sm:flex-row gap-2 sm:gap-2.5 justify-center">
-                {battery.truck_intake_id && (
+                {battery.truck_intake_id && isOfficeAdmin && (
                   <button
                     type="button"
                     onClick={() => navigate(`/truck-intakes/${battery.truck_intake_id}`)}
@@ -1564,8 +1568,13 @@ function TechnicianRepairPanel({
                 <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">Parts Removed & Restocked!</h3>
                 <p className="mb-5 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
                   All fitted parts have been successfully removed from{' '}
-                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> and restocked back into inventory. The battery status is now{' '}
-                  <span className="font-bold text-rose-600 dark:text-rose-400">Unserviceable · Test Failed</span>.
+                  <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> and restocked back into inventory.{' '}
+                  {partsRemovedForRework ? (
+                    <>It is back in the <span className="font-bold text-amber-600 dark:text-amber-400">repair queue</span> — press Start Work to redo the repair.</>
+                  ) : (
+                    <>The battery status is now{' '}
+                    <span className="font-bold text-rose-600 dark:text-rose-400">Unserviceable · Test Failed</span>.</>
+                  )}
                 </p>
                 <div className="flex flex-col gap-2.5">
                   <button
@@ -1798,7 +1807,7 @@ function TechnicianRepairPanel({
               >
                 <span>📷 Scan Another Battery</span>
               </button>
-              {battery.truck_intake_id && (
+              {battery.truck_intake_id && isOfficeAdmin && (
                 <button
                   type="button"
                   onClick={() => {

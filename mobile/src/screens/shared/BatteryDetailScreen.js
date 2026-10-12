@@ -303,9 +303,14 @@ function buildCycles(events) {
 export default function BatteryDetailScreen() {
   const { code, fromScan, fromHistory } = useRoute().params || {};
   const navigation = useNavigation();
-  const currentUser = useSelector((state) => state.auth.user);
+  const storedUser = useSelector((state) => state.auth.user);
+  // The web re-reads the login's staff role (and staff id) from /auth/me, so
+  // a technician promoted to supervisor gets testing without logging out.
+  const [liveStaff, setLiveStaff] = useState(null);
+  const currentUser = liveStaff ? { ...storedUser, ...liveStaff } : storedUser;
   const currentUserId = currentUser?.id;
   const isClient = currentUser?.role === 'client';
+  const isRecycleClient = currentUser?.role === 'recycle_client';
   const isStaff = !isClient;
   const staffRole = (currentUser?.staff_role || currentUser?.staffRole || currentUser?.role || '').trim().toLowerCase();
   const canTest =
@@ -313,10 +318,15 @@ export default function BatteryDetailScreen() {
     currentUser?.role === 'admin' ||
     staffRole === 'supervisor';
   const isTechnicianOnly = isStaff && !canTest;
+  // web: technician / supervisor / staff logins (and a supervisor by staff role)
+  const isWorkshopRole = ['technician', 'staff', 'supervisor'].includes(currentUser?.role) || staffRole === 'supervisor';
   // office admins get the web page's admin extras (client, RFID tag, QR,
   // battery number override); the super admin also prices and status fixes
   const isAdminRole = currentUser?.role === 'super_admin' || currentUser?.role === 'admin';
   const isSuperAdmin = currentUser?.role === 'super_admin';
+  // Where the web mounts its TechnicianRepairPanel: workshop logins always,
+  // office admins only when they scanned the battery.
+  const showRepairPanel = !isClient && !isRecycleClient && (isWorkshopRole || (isAdminRole && Boolean(fromScan)));
   const [adminSerialOpen, setAdminSerialOpen] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [showStatusForm, setShowStatusForm] = useState(false);
@@ -377,6 +387,7 @@ export default function BatteryDetailScreen() {
   // during repair before it failed testing) — see renderIssueReportSection
   // and reportIssue on the backend.
   const [selectedRemovalIds, setSelectedRemovalIds] = useState([]);
+  const [partsRemovedForRework, setPartsRemovedForRework] = useState(false);
   const [removingParts, setRemovingParts] = useState(false);
   const [removePartsError, setRemovePartsError] = useState(null);
 
@@ -410,13 +421,16 @@ export default function BatteryDetailScreen() {
   // Intercept back navigation when a battery is scanned or active in repair
   useEffect(() => {
     const unsubscribe = navigation.addListener('beforeRemove', (e) => {
-      if (allowExitRef.current || isClient) {
+      if (allowExitRef.current || !showRepairPanel) {
         return;
       }
 
-      // Check if user has an active session (running timer) or unsaved repair progress
+      // Check if user has an active session (own running repair timer, or a
+      // running testing timer) or unsaved repair progress — same as the web
       const isWorkSessionActive =
-        (result?.battery?.status === 'in_progress' && Boolean(result?.battery?.work_started_at)) ||
+        (result?.battery?.status === 'in_progress' &&
+          result?.battery?.started_by_user_id === currentUserId &&
+          Boolean(result?.battery?.work_started_at)) ||
         (result?.battery?.status === 'in_testing' && Boolean(result?.battery?.testing_started_at));
       const hasUnsavedProgress =
         selectedPartIds.length > 0 ||
@@ -439,9 +453,11 @@ export default function BatteryDetailScreen() {
     return unsubscribe;
   }, [
     navigation,
-    isClient,
+    showRepairPanel,
+    currentUserId,
     fromScan,
     result?.battery?.status,
+    result?.battery?.started_by_user_id,
     selectedPartIds.length,
     selectedServiceIds.length,
     notes,
@@ -468,7 +484,7 @@ export default function BatteryDetailScreen() {
     setError(null);
     try {
       const { data } = await apiClient.get(`/batteries/${encodeURIComponent(code)}`);
-      if (isInitialLoad.current && !isClient) {
+      if (isInitialLoad.current && !isClient && !isRecycleClient) {
         isInitialLoad.current = false;
         const isOwnInProgress =
           data.battery?.status === 'in_progress' &&
@@ -506,7 +522,7 @@ export default function BatteryDetailScreen() {
             setShowUnverifiedIntakeModal(true);
           } else if (
             isPassedBack ||
-            (data.battery?.status === 'unserviceable' && hasPendingPartsRemoval)
+            ((data.battery?.status === 'in_repair' || data.battery?.status === 'unserviceable') && hasPendingPartsRemoval)
           ) {
           const fittedParts = hasPendingPartsRemoval
             ? data.pendingPartsRemoval
@@ -530,6 +546,8 @@ export default function BatteryDetailScreen() {
 
           setCantServiceAlertData({
             mode: 'pending_removal',
+            scannedAt: new Date().toISOString(),
+            markedOn: latestPassBack?.completed_at || null,
             batteryCode: data.battery.battery_code,
             serialNumber: data.battery.serial_number,
             status: data.battery.status,
@@ -556,10 +574,10 @@ export default function BatteryDetailScreen() {
           setShowCantServiceAlertModal(true);
         } else if (
           fromScan &&
-          (data.battery?.status === 'unserviceable' ||
-            data.battery?.status === 'tested_parts_removed' ||
-            data.battery?.status === 'recycled')
+          (data.battery?.status === 'unserviceable' || data.battery?.status === 'recycled')
         ) {
+          // tested_parts_removed is NOT here: rework is never allowed once the
+          // parts were reclaimed, so (as on the web) it gets "Not Available".
           const latestIssue = (data.issues || [])[0];
           const latestReturn = (data.returns || [])[0];
           const latestPassBack = (data.services || []).find(
@@ -628,7 +646,10 @@ export default function BatteryDetailScreen() {
             isTestedByMe,
           });
           setShowUnserviceableAlertModal(true);
-        } else if (fromScan && isTestingStatus && !isSubmittedSuccess) {
+        } else if (fromScan && isTestingStatus) {
+          // Only a plain technician gets the "already repaired" card; a
+          // supervisor goes straight to the testing controls (web behaviour).
+          if (currentUser?.role === 'technician' && !canTest && !isSubmittedSuccess) {
           const activeHistory = (data.history || []).filter((h) => !h.removed_at);
           const latestBatchId = activeHistory[0]?.batch_id;
           const latestRepairs = latestBatchId
@@ -665,6 +686,7 @@ export default function BatteryDetailScreen() {
             isRepairedByMe: isRepByMe,
           });
           setShowRepairedByModal(true);
+          }
           } else if (
             data.battery?.status !== 'in_repair' &&
             !isOwnInProgress &&
@@ -681,7 +703,7 @@ export default function BatteryDetailScreen() {
     } finally {
       setLoading(false);
     }
-  }, [code, fromScan, currentUserId, isClient, canTest]);
+  }, [code, fromScan, currentUserId, isClient, isRecycleClient, canTest]);
 
   useEffect(() => {
     if (result?.pendingPartsRemoval && result.pendingPartsRemoval.length > 0) {
@@ -692,6 +714,22 @@ export default function BatteryDetailScreen() {
   useEffect(() => {
     load();
   }, [load]);
+
+  useEffect(() => {
+    if (!storedUser || storedUser.role === 'client' || storedUser.role === 'recycle_client') return undefined;
+    let cancelled = false;
+    apiClient
+      .get('/auth/me')
+      .then(({ data }) => {
+        const u = data?.user;
+        if (cancelled || !u) return;
+        if (u.staff_role || u.staff_id) setLiveStaff({ staff_role: u.staff_role || storedUser.staff_role, staff_id: u.staff_id || null });
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [storedUser]);
 
   useEffect(() => {
     if (result?.battery?.status !== 'in_progress' || isClient) return;
@@ -921,6 +959,37 @@ export default function BatteryDetailScreen() {
     }
   }
 
+  // Testing failed and the tester chose "remove fitted parts": report the
+  // battery unserviceable (with the tester's notes/photos) and go straight to
+  // the mandatory parts-removal section — no success screen, as on the web.
+  async function handleContinueToRemoveParts() {
+    setSubmitting(true);
+    setActionError(null);
+    try {
+      const photosPayload = issuePhotos.map((p) => p.dataUri);
+      await apiClient.patch(`/batteries/${result.battery.id}/report-issue`, {
+        reasonId: selectedReasonId,
+        note: issueNote || 'Test failed - removing fitted parts',
+        photos: photosPayload.length > 0 ? photosPayload : undefined,
+      });
+      setElapsedSeconds(0);
+      setTestingElapsedSeconds(0);
+      setShowTestingUnserviceableForm(false);
+      setShowTestingDecisionModal(false);
+      setShowConfirmRemovePartsModal(false);
+      setShowCantServiceAlertModal(false);
+      scanAlertHandledRef.current = true;
+      setSelectedServiceIds([]);
+      setIssueNote('');
+      setIssuePhotos([]);
+      await load();
+    } catch (err) {
+      setActionError(err.response?.data?.message || err.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   async function handlePassToTech() {
     setPassToTechSubmitting(true);
     setActionError(null);
@@ -959,6 +1028,26 @@ export default function BatteryDetailScreen() {
     return () => clearTimeout(timer);
   }, [showPassToTechSuccessModal, navigation]);
 
+  // Web: "submitted" always, and an unserviceable report by a plain
+  // technician, jump back to the scanner after 2 seconds.
+  const technicianAutoRedirect = currentUser?.role === 'technician' && !canTest;
+  const autoRedirectToScan =
+    isSubmittedSuccess || showSubmittedModal || (showUnserviceableSuccessModal && technicianAutoRedirect);
+  useEffect(() => {
+    if (!autoRedirectToScan) return undefined;
+    const timer = setTimeout(() => {
+      setShowSubmittedModal(false);
+      setIsSubmittedSuccess(false);
+      setShowUnserviceableSuccessModal(false);
+      allowExitRef.current = true;
+      navigation.navigate('Main', {
+        screen: 'Service',
+        params: { autoScan: Date.now() },
+      });
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, [autoRedirectToScan, navigation]);
+
   async function handleConfirmTestingUnserviceable() {
     setShowTestingDecisionModal(false);
     setConfirmRemoveMode('testing_decision');
@@ -978,17 +1067,22 @@ export default function BatteryDetailScreen() {
   }
 
   async function handleRemoveParts() {
-    if (selectedRemovalIds.length !== pendingPartsRemoval.length) {
-      setRemovePartsError('All mandatory fitted parts must be selected to confirm removal.');
+    if (selectedRemovalIds.length === 0) {
+      setRemovePartsError('Please select fitted parts to remove.');
+      return;
+    }
+    if (selectedRemovalIds.length < pendingPartsRemoval.length) {
+      setRemovePartsError('Mandatory: All fitted parts must be removed before proceeding.');
       return;
     }
     setRemovingParts(true);
     setRemovePartsError(null);
     try {
-      await apiClient.patch(`/batteries/${result.battery.id}/remove-parts`, {
+      const { data } = await apiClient.patch(`/batteries/${result.battery.id}/remove-parts`, {
         repairIds: selectedRemovalIds,
       });
       setSelectedRemovalIds([]);
+      setPartsRemovedForRework(data?.battery?.status === 'in_repair');
       await load();
       setShowRemovePartsSuccessModal(true);
     } catch (err) {
@@ -1454,7 +1548,7 @@ export default function BatteryDetailScreen() {
 
             {/* Title */}
             <Text className="text-xl font-black text-slate-900 dark:text-white text-center">
-              Work Submitted!
+              Work Completed &amp; Submitted!
             </Text>
 
             {/* Battery Code Badge */}
@@ -1466,7 +1560,7 @@ export default function BatteryDetailScreen() {
 
             {/* Message */}
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              Your repair work on this battery is done. It has been successfully submitted for testing.
+              <Text className="font-bold text-slate-800 dark:text-white">{displayCode}</Text> repair work is completed and time is stopped. It has been submitted for testing.
             </Text>
 
             {/* Action Buttons */}
@@ -1501,6 +1595,9 @@ export default function BatteryDetailScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            <Text className="mt-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400 text-center">
+              Redirecting to scan page in 2s…
+            </Text>
           </View>
         </View>
       </SafeAreaView>
@@ -1518,7 +1615,7 @@ export default function BatteryDetailScreen() {
               <Icon name="checkCircle" color="#059669" size={30} />
             </View>
             <Text className="text-xl font-black text-slate-900 dark:text-white text-center">
-              Testing Completed!
+              Testing Work Completed!
             </Text>
             <View className="my-3 rounded-full bg-emerald-100/70 dark:bg-emerald-950 px-3.5 py-1 border border-emerald-200 dark:border-emerald-800">
               <Text className="text-xs font-mono font-extrabold text-emerald-800 dark:text-emerald-300">
@@ -1526,7 +1623,7 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              Test work is completed and testing timer has stopped. This battery has been successfully tested and marked as repaired. Ready for return to client.
+              <Text className="font-bold text-slate-800 dark:text-white">{displayCode}</Text> test work is completed and testing timer has stopped. It has been marked repaired and is ready for return to the client.
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -1555,6 +1652,17 @@ export default function BatteryDetailScreen() {
                   Back to Service List
                 </Text>
               </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  allowExitRef.current = true;
+                  setShowCompletedModal(false);
+                }}
+                className="items-center py-2"
+              >
+                <Text className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                  Stay on Battery Page
+                </Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -1573,7 +1681,7 @@ export default function BatteryDetailScreen() {
               <Icon name="alertTriangle" color="#dc2626" size={30} />
             </View>
             <Text className="text-xl font-black text-slate-900 dark:text-white text-center">
-              Marked Unserviceable
+              Reported Successfully!
             </Text>
             <View className="my-3 rounded-full bg-red-100/70 dark:bg-red-950 px-3.5 py-1 border border-red-200 dark:border-red-800">
               <Text className="text-xs font-mono font-extrabold text-red-800 dark:text-red-300">
@@ -1581,7 +1689,7 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              Work on this battery is completed and the timer has stopped. This unit has been declared unserviceable and moved to the recycling queue.
+              <Text className="font-bold text-slate-800 dark:text-white">{displayCode}</Text> has been marked unserviceable. Work on this battery is completed and the timer has stopped.
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -1619,6 +1727,11 @@ export default function BatteryDetailScreen() {
                 </Text>
               </TouchableOpacity>
             </View>
+            {technicianAutoRedirect ? (
+              <Text className="mt-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400 text-center">
+                Redirecting to scan page in 2s…
+              </Text>
+            ) : null}
           </View>
         </View>
       </SafeAreaView>
@@ -1636,7 +1749,7 @@ export default function BatteryDetailScreen() {
               <Icon name="checkCircle" color="#2563eb" size={30} />
             </View>
             <Text className="text-xl font-black text-slate-900 dark:text-white text-center">
-              Passed to Technician
+              Passed to Technician!
             </Text>
             <View className="my-3 rounded-full bg-blue-100/70 dark:bg-blue-950 px-3.5 py-1 border border-blue-200 dark:border-blue-800">
               <Text className="text-xs font-mono font-extrabold text-blue-800 dark:text-blue-300">
@@ -1644,7 +1757,7 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              This unit has been returned to the repair queue for technician rework.
+              Testing has stopped and this unit has been moved back to the repair queue for technician rework.
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -1705,7 +1818,7 @@ export default function BatteryDetailScreen() {
               <Icon name="checkCircle" color="#059669" size={30} />
             </View>
             <Text className="text-xl font-black text-slate-900 dark:text-white text-center">
-              Parts Removed &amp; Restocked
+              Parts Removed &amp; Restocked!
             </Text>
             <View className="my-3 rounded-full bg-emerald-100/70 dark:bg-emerald-950 px-3.5 py-1 border border-emerald-200 dark:border-emerald-800">
               <Text className="text-xs font-mono font-extrabold text-emerald-800 dark:text-emerald-300">
@@ -1713,7 +1826,9 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              All fitted parts have been successfully removed and restocked back into inventory stock.
+              All fitted parts have been successfully removed from <Text className="font-bold text-slate-800 dark:text-white">{displayCode}</Text> and restocked back into inventory. {partsRemovedForRework
+                ? <>It is back in the <Text className="font-bold text-amber-600">repair queue</Text> — press Start Work to redo the repair.</>
+                : <>The battery status is now <Text className="font-bold text-rose-600">Unserviceable · Test Failed</Text>.</>}
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -1769,6 +1884,18 @@ export default function BatteryDetailScreen() {
   } = result || {};
   const cycles = buildCycles(buildEvents(visits, history, returns, issues, services, battery, isClient, isStaff));
   const isOwnInProgress = battery?.status === 'in_progress' && battery?.started_by_user_id === currentUserId;
+  // web BatteryDetailPage: a pass-back service from the current cycle on an
+  // in_repair battery
+  const latestVisitTime = (visits || []).reduce(
+    (max, v) => (v.created_at && new Date(v.created_at) > new Date(max) ? v.created_at : max),
+    battery?.created_at || '1970-01-01'
+  );
+  const cycleStartedAt = new Date(new Date(latestVisitTime).getTime() - 60000);
+  const isPassedBackNow =
+    battery?.status === 'in_repair' &&
+    services.some(
+      (s) => s.service_name === 'Passed back to Technician' && (!s.completed_at || new Date(s.completed_at) >= cycleStartedAt)
+    );
   const isClientLocked = battery.serial_number_added_by_role === 'client';
   const totalSpent =
     history.reduce((sum, h) => {
@@ -1790,8 +1917,6 @@ export default function BatteryDetailScreen() {
       })
       .map((h) => h.batch_id)
   ).size;
-  const isWorkshopRole = ['technician', 'staff', 'supervisor'].includes(currentUser?.role) || staffRole === 'supervisor';
-
   return (
     <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-5 pb-16">
       {/* ── Executive Header ─────────────────────────────────────────────── */}
@@ -1800,10 +1925,15 @@ export default function BatteryDetailScreen() {
           <Text className="text-2xl font-black text-slate-900">{battery.battery_code}</Text>
           {isAdminRole ? (
             <FleetStatusBadge status={battery.status} isPassedBack={battery.is_passed_back} hasPendingParts={pendingPartsRemoval.length > 0} />
+          ) : isWorkshopRole ? (
+            <FleetStatusBadge status={battery.status} isPassedBack={isPassedBackNow} hasPendingParts={pendingPartsRemoval.length > 0} />
           ) : (
             <StatusBadge status={battery.status} />
           )}
         </View>
+        {fromScan && isWorkshopRole ? (
+          <Text className="mt-0.5 text-xs font-semibold text-slate-500">Workshop Service &amp; Repair</Text>
+        ) : null}
         {isAdminRole && (
           <View className="mt-2 flex-row flex-wrap items-center gap-1.5">
             {battery.client_name ? (
@@ -1846,7 +1976,7 @@ export default function BatteryDetailScreen() {
       </View>
 
       {/* ── Unserviceable Banner (if unserviceable, tested_parts_removed, or recycled) ─── */}
-      {!(fromScan && isStaff) && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && issues?.[0] && (
+      {!isWorkshopRole && !(fromScan && isStaff) && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && issues?.[0] && (
         <View className="mb-5 rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-sm">
           <View className="flex-row items-center gap-2 mb-1">
             <Icon name="alertTriangle" color="#991b1b" size={16} />
@@ -1901,7 +2031,7 @@ export default function BatteryDetailScreen() {
       )}
 
       {/* ── Passed Back To Technician Banner (if in_repair and was passed back from testing) ─────────── */}
-      {!isClient &&
+      {showRepairPanel &&
         battery.status === 'in_repair' &&
         (() => {
           const passBack = services.find((s) => s.service_name === 'Passed back to Technician');
@@ -1939,7 +2069,7 @@ export default function BatteryDetailScreen() {
         })()}
 
       {/* ── Parts Pending Removal (Only active when scanning via camera) ────── */}
-      {!isClient &&
+      {showRepairPanel &&
         fromScan &&
         (battery.status === 'unserviceable' || battery.status === 'in_repair') &&
         pendingPartsRemoval.length > 0 && (
@@ -2094,7 +2224,7 @@ export default function BatteryDetailScreen() {
       )}
 
       {/* ── Workshop Staff Action Panels ─────────────────────────────────── */}
-      {isStaff && (
+      {showRepairPanel && (
         <>
           {actionError && <Text className="mb-3 text-xs text-red-600 font-medium">{actionError}</Text>}
 
@@ -2108,7 +2238,7 @@ export default function BatteryDetailScreen() {
                   Battery Not Verified at Intake
                 </Text>
                 <Text className="mt-1 mb-4 text-xs text-amber-800 text-center leading-relaxed">
-                  This battery arrived on Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot begin until verified.
+                  This battery arrived under Truck #{battery.intake_truck_number || 'N/A'}, but shipment arrival has not been verified yet by workshop intake. Work cannot be started until arrival is verified.
                 </Text>
                 {isAdminRole && battery.truck_intake_id ? (
                   <TouchableOpacity
@@ -2162,7 +2292,7 @@ export default function BatteryDetailScreen() {
             )
           )}
 
-          {['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status) && pendingPartsRemoval.length === 0 && (
+          {['unserviceable', 'tested_parts_removed', 'recycled'].includes(battery.status) && (!fromScan || pendingPartsRemoval.length === 0) && (
             <View className="mb-5 rounded-3xl border border-rose-200 bg-rose-50/70 p-5 shadow-sm">
               <View className="flex-row items-start gap-3 mb-3 pb-3 border-b border-rose-100">
                 <View className="h-11 w-11 rounded-2xl bg-rose-100 border border-rose-200 items-center justify-center">
@@ -2236,8 +2366,21 @@ export default function BatteryDetailScreen() {
                 </View>
               )}
 
+              {history.some((h) => h.removed_at) && (
+                <View className="mb-3 rounded-xl border border-slate-200 bg-white/80 p-3">
+                  <Text className="mb-1 text-[11px] font-bold uppercase tracking-wider text-slate-500">Restocked Components:</Text>
+                  {history
+                    .filter((h) => h.removed_at)
+                    .map((h, idx) => (
+                      <Text key={h.id || idx} className="text-xs text-slate-600">
+                        • <Text className="font-semibold text-slate-900">{h.part_name}</Text> (Qty {h.quantity_used || 1}) — restocked to workshop inventory
+                      </Text>
+                    ))}
+                </View>
+              )}
+
               <Text className="text-[11px] text-slate-500 leading-relaxed mb-4">
-                This battery has been retired from workshop repair. No further parts or rework can be logged on this unit.
+                This battery ({battery.battery_code}) was marked unserviceable and retired. No further repair work can be performed.
               </Text>
 
               {fromScan && !fromHistory && (
@@ -2329,6 +2472,21 @@ export default function BatteryDetailScreen() {
               <Text className="mt-1 text-center text-xs text-amber-800 leading-relaxed">
                 This battery is currently being repaired by {battery.started_by_name || 'another technician'}{battery.work_started_at ? ` (started at ${new Date(battery.work_started_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})` : ''}.
               </Text>
+              {fromScan && !fromHistory && (
+                <TouchableOpacity
+                  onPress={() => {
+                    allowExitRef.current = true;
+                    navigation.navigate('Main', {
+                      screen: 'Service',
+                      params: { autoScan: Date.now() },
+                    });
+                  }}
+                  className="mt-4 w-full flex-row items-center justify-center gap-2 rounded-xl bg-blue-600 py-3 shadow-md"
+                >
+                  <Icon name="camera" color="#ffffff" size={16} />
+                  <Text className="text-xs font-bold text-white">Scan Next Battery</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
 
@@ -2412,7 +2570,7 @@ export default function BatteryDetailScreen() {
                           <TextInput
                             value={testingNotes}
                             onChangeText={setTestingNotes}
-                            placeholder="Testing notes (optional)"
+                            placeholder="Testing Notes (optional)"
                             placeholderTextColor="#94a3b8"
                             className="mb-3 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs text-slate-900"
                           />
@@ -2426,7 +2584,7 @@ export default function BatteryDetailScreen() {
                               <ActivityIndicator color="#fff" />
                             ) : (
                               <Text className="text-sm font-bold text-white">
-                                Complete Testing
+                                Complete Testing &amp; Approve
                               </Text>
                             )}
                           </TouchableOpacity>
@@ -2442,11 +2600,11 @@ export default function BatteryDetailScreen() {
                   <View className="flex-row items-center gap-2 mb-1.5">
                     <Icon name="check" color="#047857" size={14} strokeWidth={3} />
                     <Text className="text-xs font-bold text-emerald-800">
-                      Repair Completed · In Testing Queue
+                      Work Completed &amp; Submitted for Testing
                     </Text>
                   </View>
                   <Text className="text-[11px] text-slate-600 mb-3 leading-relaxed">
-                    Your repair work on this battery is finished. QA / Supervisors will test and approve.
+                    Your repair work on <Text className="font-semibold text-slate-800">{battery.battery_code}</Text> is done and your repair timer has stopped. This battery is awaiting verification by a Supervisor.
                   </Text>
                   {fromScan && !fromHistory && (
                     <TouchableOpacity
@@ -2516,11 +2674,11 @@ export default function BatteryDetailScreen() {
           {/* ── Summary Stats ────────────────────────────────────────────────── */}
           <View className="mb-5 flex-row gap-3">
         <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole ? 'Repairs Logged' : 'Repairs'}</Text>
-          <Text className="mt-0.5 text-lg font-black text-slate-900">{isAdminRole ? repairVisits : history.length}</Text>
+          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Repairs Logged' : 'Repairs'}</Text>
+          <Text className="mt-0.5 text-lg font-black text-slate-900">{isAdminRole || isWorkshopRole ? repairVisits : history.length}</Text>
         </View>
         <View className="flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole ? 'Return Shipments' : 'Returns'}</Text>
+          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Return Shipments' : 'Returns'}</Text>
           <Text className="mt-0.5 text-lg font-black text-slate-900">{returns.length}</Text>
         </View>
         {isSuperAdmin && (
@@ -3089,14 +3247,14 @@ export default function BatteryDetailScreen() {
           <View className="w-full max-w-sm rounded-3xl bg-white dark:bg-slate-900 p-5 shadow-2xl border border-slate-200 dark:border-slate-800">
             <View className="flex-row items-center gap-3 mb-3">
               <View className="h-11 w-11 items-center justify-center rounded-2xl bg-blue-100 dark:bg-blue-900/40">
-                <Icon name="check-circle" size={22} color="#2563eb" />
+                <Icon name="checkCircle" size={22} color="#2563eb" />
               </View>
               <View className="flex-1">
                 <Text className="text-base font-extrabold text-slate-900 dark:text-white">
                   Submit for Testing?
                 </Text>
                 <Text className="text-xs text-slate-500 dark:text-slate-400">
-                  Please verify fitted parts
+                  Please verify the fitted parts before submitting this battery to the testing queue.
                 </Text>
               </View>
             </View>
@@ -3120,7 +3278,7 @@ export default function BatteryDetailScreen() {
 
               {elapsedSeconds > 0 ? (
                 <View className="flex-row justify-between py-2 border-b border-slate-200 dark:border-slate-700">
-                  <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">Repair Duration</Text>
+                  <Text className="text-xs text-slate-500 dark:text-slate-400 font-medium">Repair Time</Text>
                   <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">
                     {formatDuration(elapsedSeconds)}
                   </Text>
@@ -3199,10 +3357,10 @@ export default function BatteryDetailScreen() {
             </View>
 
             <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
-              Repair Submitted
+              Repair Work Logged!
             </Text>
-            <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400">
-              Battery is ready for testing. Choose an action:
+            <Text className="mt-1 mb-4 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+              <Text className="font-bold text-slate-800 dark:text-white">{battery?.battery_code}</Text> repair is complete. As a Supervisor, you can proceed directly to testing or step away.
             </Text>
 
             {/* Battery Summary Box */}
@@ -3215,10 +3373,23 @@ export default function BatteryDetailScreen() {
 
             <View className="gap-2.5">
               <TouchableOpacity
-                onPress={() => setShowTestChoiceModal(false)}
-                className="items-center rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
+                disabled={submitting}
+                onPress={async () => {
+                  setShowTestChoiceModal(false);
+                  await handleStartTesting();
+                }}
+                className="flex-row items-center justify-center gap-2 rounded-2xl bg-blue-600 py-3.5 shadow-md active:bg-blue-700"
               >
-                <Text className="text-sm font-bold text-white">Test Now</Text>
+                <Text className="text-sm font-bold text-white">▶ Test This Battery Now</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowTestChoiceModal(false);
+                  load();
+                }}
+                className="items-center rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+              >
+                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-200">Stay on Battery Page</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 onPress={() => {
@@ -3229,20 +3400,10 @@ export default function BatteryDetailScreen() {
                     params: { autoScan: Date.now() },
                   });
                 }}
-                className="flex-row items-center justify-center gap-2 rounded-2xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700 active:bg-slate-200"
+                className="flex-row items-center justify-center gap-2 rounded-2xl py-2.5"
               >
-                <Icon name="camera" color="#ffffff" size={16} />
-                <Text className="text-xs font-semibold text-slate-700 dark:text-slate-200">Exit &amp; Scan Next</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={() => {
-                  setShowTestChoiceModal(false);
-                  allowExitRef.current = true;
-                  navigation.goBack();
-                }}
-                className="items-center rounded-2xl py-2.5"
-              >
-                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Exit to Service List</Text>
+                <Icon name="camera" color="#64748b" size={15} />
+                <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Scan Next Battery</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3291,13 +3452,7 @@ export default function BatteryDetailScreen() {
 
             <View className="gap-2.5">
               <TouchableOpacity
-                onPress={async () => {
-                  setShowTestingDecisionModal(false);
-                  setShowConfirmRemovePartsModal(false);
-                  setShowCantServiceAlertModal(false);
-                  scanAlertHandledRef.current = true;
-                  await handleReportIssue();
-                }}
+                onPress={handleContinueToRemoveParts}
                 disabled={submitting || passToTechSubmitting}
                 className="items-center rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700 disabled:opacity-50"
               >
@@ -3359,7 +3514,7 @@ export default function BatteryDetailScreen() {
               Battery Not Verified at Intake
             </Text>
             <Text className="mt-0.5 mb-3 text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
-              This battery has not been verified at truck intake yet. Work or testing cannot begin until the workshop verifies arrival.
+              This battery has not been verified at intake yet. Work or testing cannot begin until the workshop verifies the truck shipment arrival.
             </Text>
 
             <View className="mb-4 rounded-2xl border border-amber-200 dark:border-amber-900/40 bg-amber-50/70 dark:bg-slate-950/60 p-3.5 space-y-2">
@@ -3383,7 +3538,7 @@ export default function BatteryDetailScreen() {
               ) : null}
               <View className="flex-row justify-between items-center">
                 <Text className="text-xs text-slate-500 dark:text-slate-400">Shipment Status</Text>
-                <Text className="text-xs font-bold text-amber-700 dark:text-amber-400">Pending Arrival</Text>
+                <Text className="text-xs font-bold text-amber-700 dark:text-amber-400">Pending Arrival Verification</Text>
               </View>
             </View>
 
@@ -3401,6 +3556,18 @@ export default function BatteryDetailScreen() {
                 <Icon name="camera" color="#ffffff" size={16} />
                 <Text className="text-sm font-bold text-white">Scan Another Battery</Text>
               </TouchableOpacity>
+              {isAdminRole && unverifiedIntakeData?.intakeId ? (
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowUnverifiedIntakeModal(false);
+                    allowExitRef.current = true;
+                    navigation.navigate('AdminIntakeDetail', { id: unverifiedIntakeData.intakeId });
+                  }}
+                  className="items-center rounded-xl border border-amber-300 bg-amber-50 py-3"
+                >
+                  <Text className="text-xs font-bold text-amber-800">Go to Truck Intake Shipment</Text>
+                </TouchableOpacity>
+              ) : null}
               <TouchableOpacity
                 onPress={() => setShowUnverifiedIntakeModal(false)}
                 className="items-center rounded-xl bg-slate-100 dark:bg-slate-800 py-3 border border-slate-200 dark:border-slate-700"
@@ -3738,18 +3905,16 @@ export default function BatteryDetailScreen() {
                 </View>
                 <View className="rounded-full bg-white/20 px-3 py-1 border border-white/30">
                   <Text className="text-[10px] font-black text-white uppercase tracking-wider">
-                    {cantServiceAlertData?.isPassedBack
-                      ? 'Passed to Tech'
-                      : 'Unserviceable · Remove Parts'}
+                    Marked Can't Service · Passed to Technician
                   </Text>
                 </View>
               </View>
 
               <Text className="text-lg font-black text-white tracking-tight">
-                Already Marked Unserviceable &amp; Passed to Tech
+                Passed Back for Rework
               </Text>
               <Text className="mt-0.5 text-xs text-amber-100 font-medium leading-relaxed">
-                This battery failed testing and was returned for technician parts removal &amp; rework.
+                This battery failed testing and was passed back for rework. Please remove any fitted parts before restarting repair work.
               </Text>
             </View>
 
@@ -3776,6 +3941,30 @@ export default function BatteryDetailScreen() {
                     </Text>
                     <Text className="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">
                       {cantServiceAlertData.serialNumber}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* Scan time (web: Scan Time / Scan Date / Marked On) */}
+              <View className="mb-3 rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950/60 p-3">
+                <View className="flex-row items-center justify-between py-0.5">
+                  <Text className="text-xs text-slate-500">Scan Time</Text>
+                  <Text className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    {new Date(cantServiceAlertData?.scannedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                  </Text>
+                </View>
+                <View className="flex-row items-center justify-between py-0.5">
+                  <Text className="text-xs text-slate-500">Scan Date</Text>
+                  <Text className="text-xs font-medium text-slate-700 dark:text-slate-300">
+                    {new Date(cantServiceAlertData?.scannedAt || Date.now()).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}
+                  </Text>
+                </View>
+                {cantServiceAlertData?.markedOn ? (
+                  <View className="flex-row items-center justify-between py-0.5">
+                    <Text className="text-xs text-slate-500">Marked On</Text>
+                    <Text className="text-xs text-slate-700 dark:text-slate-300">
+                      {new Date(cantServiceAlertData.markedOn).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' })}
                     </Text>
                   </View>
                 ) : null}
@@ -4082,7 +4271,7 @@ export default function BatteryDetailScreen() {
                   onPress={async () => {
                     setShowConfirmRemovePartsModal(false);
                     if (confirmRemoveMode === 'testing_decision') {
-                      await handleReportIssue();
+                      await handleContinueToRemoveParts();
                     }
                   }}
                   disabled={submitting}

@@ -2433,7 +2433,7 @@ function BatteryDetailPage() {
               <p className="mt-1 text-xs text-amber-800 dark:text-amber-300 leading-relaxed">
                 This battery arrived under Truck #{battery.intake_truck_number || 'N/A'}{battery.intake_driver_name ? ` (Driver: ${battery.intake_driver_name})` : ''}, but this truck shipment has not been verified yet by workshop staff. Work and testing cannot be started on this battery until arrival is verified.
               </p>
-              {battery.truck_intake_id && (
+              {battery.truck_intake_id && isAdmin && (
                 <div className="mt-2.5">
                   <Link
                     to={`/truck-intakes/${battery.truck_intake_id}`}

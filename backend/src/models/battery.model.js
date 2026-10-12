@@ -647,14 +647,21 @@ async function removeParts(batteryId, repairIds = [], staffId) {
       );
     }
 
-    // Set battery status to 'tested_parts_removed'
+    // A battery the supervisor passed back for rework ('in_repair') stays in
+    // the repair queue so the technician can Start Work again; anything else
+    // (failed testing / unserviceable) becomes 'tested_parts_removed'.
+    const isRework = current[0]?.status === 'in_repair';
     const { rows: batteryRows } = await client.query(
       `UPDATE batteries
-       SET status = 'tested_parts_removed'
+       SET status = $2
        WHERE id = $1
        RETURNING *`,
-      [batteryId]
+      [batteryId, isRework ? 'in_repair' : 'tested_parts_removed']
     );
+    if (isRework) {
+      await client.query('COMMIT');
+      return { removedCount: targets.length, battery: batteryRows[0] };
+    }
 
     // If no issue record exists yet for this battery, record that it failed testing / was marked unserviceable with parts removed
     const { rows: existingIssue } = await client.query(

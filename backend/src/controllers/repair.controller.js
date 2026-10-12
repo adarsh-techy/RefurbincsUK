@@ -67,6 +67,7 @@ async function create(req, res, next) {
       notes,
       laborCharge,
       batchId,
+      startedByUserId: req.user.role === 'technician' ? req.user.id : null,
     });
 
     await auditLogModel.record({
