@@ -10,6 +10,9 @@ import { isLikelyRfidTag, normalizeRfidTag, splitScanInput } from './scan-input'
 const QUIET_MS = 700;
 const READER_GAP_MS = 90; // average gap between keystrokes of a reader burst (people type slower)
 const MIN_TAG_LENGTH = 8;
+// UHF EPC-96 tags are 24 hex characters: a run typed with no separator is cut
+// into complete tags as it grows, so the box never holds two tag numbers.
+const EPC_TAG_LENGTH = 24;
 
 const REPEAT_READ_MS = 2500; // the same tag again this soon is a repeated read
 
@@ -64,9 +67,34 @@ function feed(input, pieces) {
   });
 }
 
+// Hands complete tags to the page right away, one at a time (box = that tag,
+// then Enter), and leaves only the tag still arriving in the box.
+function takeCompleteTags(input) {
+  const clean = normalizeRfidTag(input.value || '');
+  if (clean.length <= EPC_TAG_LENGTH || !/^[0-9A-F]+$/.test(clean)) return false;
+  const pieces = [];
+  let rest = clean;
+  while (rest.length > EPC_TAG_LENGTH) {
+    pieces.push(rest.slice(0, EPC_TAG_LENGTH));
+    rest = rest.slice(EPC_TAG_LENGTH);
+  }
+  const seen = recent.get(input) || new Map();
+  recent.set(input, seen);
+  const now = Date.now();
+  for (const piece of pieces) {
+    if (now - (seen.get(piece) || 0) < REPEAT_READ_MS) continue; // repeated read
+    seen.set(piece, now);
+    setValue(input, piece);
+    pressEnter(input);
+  }
+  setValue(input, rest);
+  return true;
+}
+
 function onInput(e) {
   const input = e.target;
   if (!(input instanceof HTMLInputElement) || !input.matches('[data-rfid-scan]') || !e.isTrusted) return;
+  if (takeCompleteTags(input)) return;
   const now = Date.now();
   const s = state.get(input) || { first: now, count: 0 };
   clearTimeout(s.timer);

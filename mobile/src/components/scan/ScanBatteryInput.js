@@ -32,6 +32,13 @@ import { isUnassignedTagMessage, normalizeRfidTag, splitScanInput } from '../../
 // reader can't be cut mid-tag, and never for a fragment under 8 characters.
 const RFID_IDLE_SUBMIT_MS = 700;
 const MIN_TAG_LENGTH = 8;
+// UHF EPC-96 tags are 24 hex characters. A reader typing tag after tag with
+// no suffix gives no boundary at all, so in RFID mode a hex run is cut into
+// complete tags as it grows (pass tagLength for readers set up otherwise).
+const EPC_TAG_LENGTH = 24;
+// a complete tag with nothing after it is submitted after this short pause
+const COMPLETE_TAG_SUBMIT_MS = 150;
+const isHexRun = (s) => /^[0-9A-F]+$/.test(s);
 // A reader repeats the tag it is pointed at many times a second; the same
 // value again within this window is the same scan, not a new one.
 const REPEAT_READ_MS = 2500;
@@ -62,6 +69,7 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     startInRfidMode = false,
     compact = false,
     multiple = true, // false: a read holding several tags is refused (tag assignment)
+    tagLength = EPC_TAG_LENGTH, // characters in one tag, for cutting a run of tags typed back to back
   },
   ref
 ) {
@@ -171,33 +179,59 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
   }, [rfidMode]);
 
   // Each piece is delivered on its own: one burst can hold several tags.
-  function submit(raw) {
+  // keep: text left in the box afterwards (the part of the next tag that has
+  // already arrived), so nothing typed meanwhile is lost
+  function submit(raw, keep = '') {
     clearTimeout(idleRef.current);
     const pieces = String(raw ?? valueRef.current)
       .split(/[\t\r\n]+/)
       .flatMap((p) => splitScanInput(p));
     if (!pieces.length) return;
-    setText('');
+    setText(keep);
     deliverAll(pieces, rfidMode); // in RFID mode the text came from the reader
     if (rfidMode) setTimeout(() => inputRef.current?.focus(), 30);
   }
 
   function handleChange(text) {
-    // a reader that ends each tag with Tab/Enter: deliver every finished
-    // tag and keep whatever is still being typed after the last one
-    if (/[\t\r\n]/.test(text)) {
-      const endsWithBreak = /[\t\r\n]$/.test(text);
-      const parts = text.split(/[\t\r\n]+/);
+    // a reader that ends each tag with Tab/Enter (or, in RFID mode, a comma
+    // or semicolon): deliver every finished tag and keep whatever is still
+    // being typed after the last one. Spaces aren't a boundary — an EPC
+    // grouped in fours or "EPC: E280…" contains them.
+    const boundary = rfidMode ? /[\t\r\n,;]/ : /[\t\r\n]/;
+    if (boundary.test(text)) {
+      const splitter = rfidMode ? /[\t\r\n,;]+/ : /[\t\r\n]+/;
+      const endsWithBreak = new RegExp(`${boundary.source}$`).test(text);
+      const parts = text.split(splitter);
       const rest = endsWithBreak ? '' : parts.pop();
-      submit(parts.join('\n'));
-      if (rest) handleChange(rest);
+      if (parts.some((p) => p.trim())) submit(parts.join('\n'), rest);
+      if (rest || !parts.some((p) => p.trim())) handleChange(rest || '');
       return;
+    }
+    if (rfidMode && multiple && tagLength > 0) {
+      // no boundary from the reader: cut complete tags off the front as the
+      // run grows, so the box only ever holds the tag still arriving
+      const clean = normalizeRfidTag(text);
+      if (clean.length > tagLength && isHexRun(clean)) {
+        const complete = [];
+        let rest = clean;
+        while (rest.length > tagLength) {
+          complete.push(rest.slice(0, tagLength));
+          rest = rest.slice(tagLength);
+        }
+        submit(complete.join('\n'), rest);
+        handleChange(rest);
+        return;
+      }
     }
     setText(text);
     if (rfidMode) {
       clearTimeout(idleRef.current);
-      if (normalizeRfidTag(text).length >= MIN_TAG_LENGTH) {
-        idleRef.current = setTimeout(() => submit(valueRef.current), RFID_IDLE_SUBMIT_MS);
+      const clean = normalizeRfidTag(text);
+      if (clean.length >= MIN_TAG_LENGTH) {
+        // a whole tag that stops here goes quickly; anything else waits for
+        // the reader to go quiet (a slow reader mid-tag is never cut)
+        const wait = multiple && clean.length === tagLength && isHexRun(clean) ? COMPLETE_TAG_SUBMIT_MS : RFID_IDLE_SUBMIT_MS;
+        idleRef.current = setTimeout(() => submit(valueRef.current), wait);
       }
     }
   }
