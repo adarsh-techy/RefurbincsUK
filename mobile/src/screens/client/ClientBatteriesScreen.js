@@ -1,609 +1,476 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
-  Modal,
   RefreshControl,
+  ScrollView,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from 'react-native';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
-import extractBatteryCode from '../../utils/extract-battery-code';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
-import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
-import { StatusBadge, clientBatteryStatus } from '../../components/ui/Badge';
 import ClientTruckBatches from '../../components/client/ClientTruckBatches';
 import { hasClientPermission } from '../../utils/permissions';
-import { useSelector } from 'react-redux';
 import Icon from '../../components/ui/Icon';
+import { ClientStatusBadge, DateField, toLocalDateValue } from '../../components/client/batteries/common';
+import SerialNumberModal from '../../components/client/batteries/SerialNumberModal';
+import AddIntakeModal from '../../components/client/batteries/AddIntakeModal';
+
+// The client's battery lists — the web ClientBatteriesPage (/my/batteries/:bucket):
+//   all       five tappable stat cards, status / date filters, the fleet
+//             sorted by battery ID, "+ Add Serial" and Previous Repair Date
+//   packed    truck batches (Table / Cards view) + "+ Add Intake"
+//   received  return dispatches (verify receipt, rate)
+//   pending   In Service & Testing — reached from the dashboard
+// Lists load 20 at a time as you scroll, like the web tables.
+
+const BUCKET_META = {
+  all: {
+    title: 'All Batteries',
+    description: 'Complete inventory of your registered battery fleet across all service stages.',
+    empty: 'No batteries registered in your fleet.',
+  },
+  packed: {
+    title: 'Battery Packed to Repair',
+    description: 'Batteries delivered and logged by truck for workshop repair.',
+    empty: 'No truck intake batches found.',
+  },
+  pending: {
+    title: 'In Service & Testing',
+    description: 'Batteries currently undergoing cell diagnostics, repair, or cycle testing.',
+    empty: 'No batteries in service right now.',
+  },
+  received: {
+    title: 'Battery Received',
+    description: 'Batteries restored and returned back to your operational fleet.',
+    empty: 'No batteries have been returned to you yet.',
+  },
+};
 
 const BUCKET_TABS = [
-  { id: 'all', label: 'All' },
+  { id: 'all', label: 'All Batteries' },
   { id: 'packed', label: 'Packed' },
   { id: 'received', label: 'Received' },
 ];
 
-const DATE_FILTERS = [
-  { id: 'all', label: 'All Dates' },
-  { id: 'today', label: 'Today' },
-  { id: 'week', label: 'Last 7 Days' },
-  { id: 'month', label: 'Last 30 Days' },
+const BUCKET_PERMISSION = {
+  all: 'client_all_batteries',
+  packed: 'client_packed',
+  pending: 'client_in_service',
+  received: 'client_received',
+};
+
+const STATUS_OPTIONS = [
+  { id: '', label: 'All Statuses' },
+  { id: 'in_fleet', label: 'Active in Fleet' },
+  { id: 'registered', label: 'Registered (Not Serviced)' },
+  { id: 'returned', label: 'Returned to Client' },
+  { id: 'in_service', label: 'In Workshop Repair' },
+  { id: 'in_repair', label: 'Packed for Repair' },
+  { id: 'repaired', label: 'Repair Complete' },
+  { id: 'unserviceable', label: 'Unserviceable' },
+  { id: 'recycled', label: 'Recycled' },
 ];
 
-// The date that best represents "when this happened" for a given bucket —
-// e.g. a battery in the Received bucket should be filtered by when it was
-// actually returned, not when it was first registered.
-function relevantDate(item, bucket) {
-  if (bucket === 'received' && item.return_date) return item.return_date;
+const PAGE = 20;
+
+// the date a client filters "All Batteries" by — last return / repair /
+// intake, not the (often identical) registration date
+function relevantDate(item) {
+  if (item.status === 'returned' && item.return_date) return item.return_date;
+  if (item.last_repaired_at) return item.last_repaired_at;
+  if (item.intake_at) return item.intake_at;
   return item.created_at;
 }
 
-function matchesDateFilter(dateStr, filter) {
-  if (filter === 'all') return true;
-  if (!dateStr) return false;
-  const d = new Date(dateStr);
-  const now = new Date();
-  if (filter === 'today') {
-    return (
-      d.getFullYear() === now.getFullYear() &&
-      d.getMonth() === now.getMonth() &&
-      d.getDate() === now.getDate()
-    );
-  }
-  if (filter === 'week') {
-    const sevenDaysAgo = new Date(now);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-    return d >= sevenDaysAgo;
-  }
-  if (filter === 'month') {
-    const thirtyDaysAgo = new Date(now);
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-    return d >= thirtyDaysAgo;
-  }
-  return true;
+function matchesStatus(item, filter) {
+  if (!filter) return true;
+  if (filter === 'in_fleet') return ['registered', 'returned'].includes(item.status);
+  if (filter === 'in_service') return ['in_progress', 'in_testing', 'testing', 'repair_testing', 'in_repair', 'repaired'].includes(item.status);
+  if (filter === 'unserviceable') return ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed', 'recycled'].includes(item.status);
+  return item.status === filter;
+}
+
+function StatCard({ label, value, note, active, onPress, tone }) {
+  const ring = {
+    slate: 'border-slate-400 bg-slate-100',
+    emerald: 'border-emerald-500 bg-emerald-50',
+    amber: 'border-amber-500 bg-amber-50',
+    rose: 'border-rose-500 bg-rose-50',
+    purple: 'border-purple-500 bg-purple-50',
+  }[tone];
+  const text = { slate: 'text-slate-600', emerald: 'text-emerald-700', amber: 'text-amber-700', rose: 'text-rose-700', purple: 'text-purple-700' }[tone];
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      className={`w-[31.5%] rounded-2xl border p-2.5 ${active ? ring : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}
+    >
+      <Text className={`text-[10px] font-bold uppercase ${text}`} numberOfLines={1}>{label}</Text>
+      <Text className="mt-1 text-xl font-extrabold text-slate-900 dark:text-white">{value}</Text>
+      {note ? <Text className="text-[10px] text-slate-500" numberOfLines={1}>{note}</Text> : null}
+    </TouchableOpacity>
+  );
 }
 
 export default function ClientBatteriesScreen() {
   const navigation = useNavigation();
   const route = useRoute();
-  const initialBucket = route.params?.initialBucket || 'all';
-
-  const [activeTab, setActiveTab] = useState(initialBucket);
   const user = useSelector((state) => state.auth.user);
-  // Same module gating as the web ClientBatteriesPage bucketPermissionMap
-  const BUCKET_PERMISSION = { all: 'client_all_batteries', packed: 'client_packed', received: 'client_received' };
+
+  const [activeTab, setActiveTab] = useState(route.params?.initialBucket || 'all');
+  const meta = BUCKET_META[activeTab] || BUCKET_META.all;
   const bucketAllowed = hasClientPermission(user, BUCKET_PERMISSION[activeTab]);
+
   const [search, setSearch] = useState('');
-  const [dateFilter, setDateFilter] = useState('all');
-  // ?status= on the web "All Batteries" page (dashboard cards link with it)
+  const [date, setDate] = useState('');
   const [statusFilter, setStatusFilter] = useState(route.params?.initialStatus || '');
-  const [batteries, setBatteries] = useState([]);
+  const [showFilters, setShowFilters] = useState(false);
+  const [viewMode, setViewMode] = useState('batch_table');
+  const [visible, setVisible] = useState(PAGE);
+
+  const [data, setData] = useState([]);
+  const [fleet, setFleet] = useState([]); // every battery the client owns (suggestions, RFID tags, batch pages)
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+  const requestId = useRef(0);
 
-  // Battery Number assign/edit modal state
-  const [serialModalTarget, setSerialModalTarget] = useState(null);
-  const [serialInput, setSerialInput] = useState('');
-  const [serialSaving, setSerialSaving] = useState(false);
-  const [serialError, setSerialError] = useState(null);
+  const [serialTarget, setSerialTarget] = useState(null);
+  const [intakeOpen, setIntakeOpen] = useState(false);
 
-  // Pack-for-repair intake modal state
-  const [packModalOpen, setPackModalOpen] = useState(false);
-  const [truckNumber, setTruckNumber] = useState('');
-  const [driverName, setDriverName] = useState('');
-  const [fleet, setFleet] = useState([]); // every battery the client owns — resolves RFID tags while packing
-  const [scannedBatteries, setScannedBatteries] = useState([]);
-  const [packing, setPacking] = useState(false);
-  const [packError, setPackError] = useState(null);
-  const [packSuccess, setPackSuccess] = useState(null);
-
+  // the newest request wins — a slow older response can't overwrite fresh data
   const fetchBatteries = useCallback(async () => {
+    const id = ++requestId.current;
     setError(null);
     try {
-      const params = {};
-      if (activeTab !== 'all') {
-        params.bucket = activeTab;
-      }
-      const { data } = await apiClient.get('/clients/me/batteries', { params });
-      // packed/received come back as one row per battery per truck visit;
-      // ClientTruckBatches groups them by truck exactly like the web page.
-      setBatteries(data.data || []);
+      const [bucketRes, fleetRes] = await Promise.all([
+        apiClient.get('/clients/me/batteries', { params: activeTab === 'all' ? {} : { bucket: activeTab } }),
+        activeTab === 'all' ? null : apiClient.get('/clients/me/batteries').catch(() => null),
+      ]);
+      if (id !== requestId.current) return;
+      const rows = bucketRes.data?.data || [];
+      setData(rows);
+      setFleet(activeTab === 'all' ? rows : fleetRes?.data?.data || []);
     } catch (err) {
+      if (id !== requestId.current) return;
       setError(err.response?.data?.message || err.message);
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      if (id === requestId.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
     }
   }, [activeTab]);
 
+  // opened from the dashboard / drawer with a bucket (and maybe ?status=)
   useEffect(() => {
-    if (route.params?.initialBucket) {
-      setActiveTab(route.params.initialBucket);
-    }
+    if (route.params?.initialBucket) setActiveTab(route.params.initialBucket);
     setStatusFilter(route.params?.initialStatus || '');
+    setSearch('');
+    setDate('');
   }, [route.params?.initialBucket, route.params?.initialStatus]);
 
   useEffect(() => {
     setLoading(true);
+    setData([]);
     fetchBatteries();
   }, [fetchBatteries]);
+
+  useEffect(() => setVisible(PAGE), [activeTab, search, date, statusFilter]);
+
+  // a new bucket starts with clean filters, like the web page
+  function switchTab(id) {
+    if (id === activeTab) return;
+    setActiveTab(id);
+    setSearch('');
+    setDate('');
+    setStatusFilter('');
+  }
 
   function onRefresh() {
     setRefreshing(true);
     fetchBatteries();
   }
 
-  function openSerialModal(battery) {
-    setSerialModalTarget(battery);
-    setSerialInput(battery.serial_number || '');
-    setSerialError(null);
-  }
+  const counts = useMemo(() => ({
+    total: data.length,
+    inFleet: data.filter((b) => b.status === 'returned' || b.status === 'registered').length,
+    notServiced: data.filter((b) => b.status === 'registered').length,
+    workshop: data.filter((b) => ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)).length,
+    unserviceable: data.filter((b) => ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(b.status)).length,
+    recycled: data.filter((b) => b.status === 'recycled').length,
+  }), [data]);
 
-  async function handleSerialSave() {
-    if (!serialModalTarget) return;
-    setSerialSaving(true);
-    setSerialError(null);
-    try {
-      await apiClient.patch(`/batteries/${serialModalTarget.id}/serial-number`, {
-        serialNumber: serialInput.trim(),
-      });
-      setSerialModalTarget(null);
-      fetchBatteries();
-    } catch (err) {
-      setSerialError(err.response?.data?.message || err.message);
-    } finally {
-      setSerialSaving(false);
-    }
-  }
+  const filteredAll = useMemo(() => {
+    if (activeTab !== 'all') return [];
+    const q = search.trim().toLowerCase();
+    return data
+      .filter((item) => {
+        const matchesSearch =
+          !q ||
+          (item.battery_code && item.battery_code.toLowerCase().includes(q)) ||
+          (item.serial_number && item.serial_number.toLowerCase().includes(q)) ||
+          (item.truck_number && item.truck_number.toLowerCase().includes(q)) ||
+          (item.notes && item.notes.toLowerCase().includes(q));
+        const matchesDate = !date || toLocalDateValue(relevantDate(item)) === date;
+        return matchesSearch && matchesStatus(item, statusFilter) && matchesDate;
+      })
+      .sort((a, b) => (a.battery_code || '').localeCompare(b.battery_code || '', undefined, { numeric: true, sensitivity: 'base' }));
+  }, [data, activeTab, search, statusFilter, date]);
 
-  // the whole fleet (not just the open tab) so a scanned RFID tag can be
-  // matched to its battery, and a tag nobody assigned refused straight away
-  useEffect(() => {
-    if (!packModalOpen) return;
-    apiClient.get('/clients/me/batteries').then(({ data }) => setFleet(data.data || [])).catch(() => {});
-  }, [packModalOpen]);
+  const filteredPending = useMemo(() => {
+    if (activeTab !== 'pending') return [];
+    const q = search.trim().toLowerCase();
+    return data.filter((item) => {
+      const matchesSearch =
+        !q ||
+        (item.battery_code && item.battery_code.toLowerCase().includes(q)) ||
+        (item.serial_number && item.serial_number.toLowerCase().includes(q)) ||
+        (item.truck_number && item.truck_number.toLowerCase().includes(q));
+      return matchesSearch && (!date || toLocalDateValue(item.intake_at || item.created_at) === date);
+    });
+  }, [data, activeTab, search, date]);
 
-  function addScanned(rawCode) {
-    if (!truckNumber.trim() || !driverName.trim()) {
-      const message = 'Please enter Truck Number and Driver Name first.';
-      setPackError(message);
-      return { tone: 'warn', message };
-    }
-    const resolved = resolveBatteryInput(rawCode, fleet);
-    if (resolved.unassignedTag) {
-      return { tone: 'bad', message: `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})` };
-    }
-    const code = (resolved.code || extractBatteryCode(rawCode) || rawCode || '').trim().toUpperCase();
-    if (!code) return undefined;
-    if (scannedBatteries.some((b) => b.code === code)) {
-      return { tone: 'warn', message: `Battery ${code} has already been added to this list.` };
-    }
-    setScannedBatteries((prev) => [...prev, { id: Date.now() + Math.random(), code }]);
-    setPackError(null);
-    return { tone: 'good', message: `✓ ${code} added (${scannedBatteries.length + 1} on this truck)` };
-  }
+  const toggleStatus = (id) => setStatusFilter((cur) => (cur === id ? '' : id));
+  const anyFilter = Boolean(search || date || statusFilter);
+  const isBatchBucket = activeTab === 'packed' || activeTab === 'received';
+  const tabs = activeTab === 'pending' ? [...BUCKET_TABS, { id: 'pending', label: 'In Service' }] : BUCKET_TABS;
+  const goDetail = (item) => navigation.navigate('BatteryDetail', { code: item.battery_code, fromScan: false });
 
+  const header = (
+    <View className="border-b border-slate-200/80 bg-white/90 px-4 pb-3 pt-3 dark:border-slate-800/80 dark:bg-slate-900/90">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
+        {tabs.map((tab) => {
+          const active = activeTab === tab.id;
+          return (
+            <TouchableOpacity
+              key={tab.id}
+              onPress={() => switchTab(tab.id)}
+              className={`rounded-xl px-3.5 py-1.5 ${active ? 'bg-blue-600' : 'bg-slate-100/80 dark:bg-slate-800/80'}`}
+            >
+              <Text className={`text-xs font-bold ${active ? 'text-white' : 'text-slate-500 dark:text-slate-400'}`}>{tab.label}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
 
-  function removeScanned(id) {
-    setScannedBatteries((prev) => prev.filter((b) => b.id !== id));
-  }
+      <Text className="mt-3 text-lg font-extrabold text-slate-900 dark:text-white">{meta.title}</Text>
+      <Text className="text-[11px] text-slate-500 dark:text-slate-400">{meta.description}</Text>
 
-  function closePackModal() {
-    setPackModalOpen(false);
-    setTruckNumber('');
-    setDriverName('');
-    setScannedBatteries([]);
-    setPackError(null);
-    setPackSuccess(null);
-  }
+      {activeTab === 'packed' && bucketAllowed && (
+        <View className="mt-3 flex-row gap-2">
+          <View className="flex-1 flex-row rounded-xl bg-slate-100 p-1 dark:bg-slate-800">
+            {[['batch_table', 'Table View'], ['cards', 'Cards View']].map(([id, label]) => (
+              <TouchableOpacity key={id} onPress={() => setViewMode(id)} className={`flex-1 items-center rounded-lg py-1.5 ${viewMode === id ? 'bg-emerald-600' : ''}`}>
+                <Text className={`text-[11px] font-bold ${viewMode === id ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+          <TouchableOpacity onPress={() => setIntakeOpen(true)} className="items-center justify-center rounded-xl bg-emerald-600 px-4">
+            <Text className="text-xs font-bold text-white">+ Add Intake</Text>
+          </TouchableOpacity>
+        </View>
+      )}
 
-  async function handlePackSubmit() {
-    const finalBatteries = [...scannedBatteries];
-    if (!truckNumber.trim()) {
-      setPackError('Truck Number is required.');
-      return;
-    }
-    if (!driverName.trim()) {
-      setPackError('Driver Name is required.');
-      return;
-    }
-    if (finalBatteries.length === 0) {
-      setPackError('Please scan or add at least one battery to intake.');
-      return;
-    }
+      {activeTab === 'all' && bucketAllowed && (
+        <View className="mt-3 flex-row flex-wrap gap-2">
+          <StatCard label="Total Fleet" value={counts.total} tone="slate" active={statusFilter === ''} onPress={() => setStatusFilter('')} />
+          <StatCard label="Active in Fleet" value={counts.inFleet} note={`${counts.notServiced} not serviced yet`} tone="emerald" active={statusFilter === 'in_fleet'} onPress={() => toggleStatus('in_fleet')} />
+          <StatCard label="In Workshop Repair" value={counts.workshop} tone="amber" active={['in_service', 'in_repair', 'repaired'].includes(statusFilter)} onPress={() => toggleStatus('in_service')} />
+          <StatCard label="Unserviceable" value={counts.unserviceable} tone="rose" active={statusFilter === 'unserviceable'} onPress={() => toggleStatus('unserviceable')} />
+          <StatCard label="Recycled" value={counts.recycled} tone="purple" active={statusFilter === 'recycled'} onPress={() => toggleStatus('recycled')} />
+        </View>
+      )}
 
-    setPacking(true);
-    setPackError(null);
-    try {
-      const res = await apiClient.post('/clients/me/batteries/pack-to-repair', {
-        truckNumber: truckNumber.trim(),
-        driverName: driverName.trim(),
-        batteries: finalBatteries.map((b) => ({ batteryCode: b.code })),
-      });
-      setPackSuccess(res.data?.message || `${finalBatteries.length} batteries recorded for repair intake!`);
-      fetchBatteries();
-      setTimeout(closePackModal, 1200);
-    } catch (err) {
-      setPackError(err.response?.data?.message || err.message);
-    } finally {
-      setPacking(false);
-    }
-  }
-
-  const filteredBatteries = batteries.filter((b) => {
-    if (statusFilter && activeTab === 'all') {
-      const shown = clientBatteryStatus(b);
-      const match = statusFilter === 'unserviceable'
-        ? ['unserviceable', 'tested_parts_removed', 'recycled'].includes(shown)
-        : statusFilter === 'in_fleet'
-          ? ['registered', 'returned'].includes(shown)
-          : shown === statusFilter;
-      if (!match) return false;
-    }
-    if (!matchesDateFilter(relevantDate(b, activeTab), dateFilter)) return false;
-    if (!search.trim()) return true;
-    const q = search.toLowerCase().trim();
-    return (
-      b.battery_code?.toLowerCase().includes(q) ||
-      b.serial_number?.toLowerCase().includes(q)
-    );
-  });
-
-  return (
-    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
-      {/* ── Search & Filter Header ────────────────────────────────────────── */}
-      <View className="border-b border-slate-200/80 dark:border-slate-800/80 bg-white/90 dark:bg-slate-900/90 px-4 pt-3 pb-3">
-        {/* Search Bar */}
-        <View className="flex-row items-center gap-2 rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-3.5 py-2">
+      <View className="mt-3 flex-row items-center gap-2">
+        <View className="flex-1 flex-row items-center gap-2 rounded-2xl border border-slate-300 bg-slate-50 px-3.5 py-2 dark:border-slate-700 dark:bg-slate-950">
           <Icon name="search" color="#64748b" size={15} />
           <TextInput
             value={search}
             onChangeText={setSearch}
-            placeholder="Search by Battery ID or Serial Number…"
+            placeholder={isBatchBucket ? 'Search Driver / Truck — e.g. John or TRK-102' : 'Search Code, Serial, Notes…'}
             placeholderTextColor="#64748b"
-            autoCapitalize="characters"
             className="flex-1 text-xs text-slate-900 dark:text-white"
           />
-          {search.length > 0 && (
+          {search ? (
             <TouchableOpacity onPress={() => setSearch('')}>
               <Icon name="close" color="#64748b" size={13} />
             </TouchableOpacity>
-          )}
+          ) : null}
         </View>
-
-        {/* Tab Filters */}
-        <View className="mt-3 flex-row gap-1.5">
-          {BUCKET_TABS.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <TouchableOpacity
-                key={tab.id}
-                onPress={() => setActiveTab(tab.id)}
-                className={`rounded-xl px-3.5 py-1.5 ${
-                  active
-                    ? 'bg-blue-600 shadow-sm shadow-blue-600/30'
-                    : 'bg-slate-100/80 dark:bg-slate-800/80'
-                }`}
-              >
-                <Text
-                  className={`text-xs font-bold ${
-                    active ? 'text-white' : 'text-slate-500 dark:text-slate-400'
-                  }`}
-                >
-                  {tab.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {/* Date Filter */}
-        <View className="mt-2.5 flex-row gap-1.5">
-          {DATE_FILTERS.map((f) => {
-            const active = dateFilter === f.id;
-            return (
-              <TouchableOpacity
-                key={f.id}
-                onPress={() => setDateFilter(f.id)}
-                className={`rounded-xl px-3 py-1.5 ${
-                  active ? 'bg-emerald-600 shadow-sm shadow-emerald-600/30' : 'bg-slate-100/80 dark:bg-slate-800/80'
-                }`}
-              >
-                <Text
-                  className={`text-[11px] font-bold ${
-                    active ? 'text-white' : 'text-slate-500 dark:text-slate-400'
-                  }`}
-                >
-                  {f.label}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </View>
-
-        {statusFilter && activeTab === 'all' ? (
-          <View className="mt-2 flex-row items-center gap-2">
-            <Text className="text-[11px] font-bold text-slate-500">Showing:</Text>
-            <TouchableOpacity onPress={() => setStatusFilter('')} className="flex-row items-center gap-1 rounded-full bg-blue-600 px-2.5 py-1">
-              <Text className="text-[11px] font-bold capitalize text-white">{statusFilter === 'in_fleet' ? 'In your fleet' : statusFilter === 'registered' ? 'Not serviced yet' : statusFilter.replace(/_/g, ' ')}</Text>
-              <Text className="text-[11px] font-bold text-white">✕</Text>
-            </TouchableOpacity>
-          </View>
-        ) : null}
-
-        {activeTab === 'packed' && (
-          <TouchableOpacity
-            onPress={() => setPackModalOpen(true)}
-            className="mt-3 items-center rounded-xl bg-blue-600 py-2.5 active:bg-blue-700"
-          >
-            <Text className="text-xs font-bold text-white">+ Pack Batteries for Repair</Text>
-          </TouchableOpacity>
-        )}
+        <TouchableOpacity
+          onPress={() => setShowFilters((v) => !v)}
+          className={`rounded-2xl border px-3 py-2 ${showFilters || date || statusFilter ? 'border-blue-500 bg-blue-50' : 'border-slate-300 bg-white dark:border-slate-700 dark:bg-slate-900'}`}
+        >
+          <Text className="text-xs font-bold text-blue-700">Filters{date || statusFilter ? ' •' : ''}</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* ── Body List ─────────────────────────────────────────────────────── */}
-      {loading ? (
+      {showFilters && (
+        <View className="mt-2.5 gap-2.5">
+          {activeTab === 'all' && (
+            <View>
+              <Text className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">Filter Status</Text>
+              <View className="flex-row flex-wrap gap-1.5">
+                {STATUS_OPTIONS.map((o) => {
+                  const on = statusFilter === o.id;
+                  return (
+                    <TouchableOpacity key={o.id || 'all'} onPress={() => setStatusFilter(o.id)} className={`rounded-xl px-2.5 py-1.5 ${on ? 'bg-blue-600' : 'bg-slate-100 dark:bg-slate-800'}`}>
+                      <Text className={`text-[11px] font-bold ${on ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{o.label}</Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </View>
+          )}
+          <DateField label={activeTab === 'packed' ? 'Intake Date' : 'Date'} value={date} onChange={setDate} />
+        </View>
+      )}
+
+      {anyFilter && (
+        <View className="mt-2 flex-row items-center justify-between gap-2">
+          <Text className="flex-1 text-[11px] text-slate-500" numberOfLines={1}>
+            {[statusFilter && (STATUS_OPTIONS.find((o) => o.id === statusFilter)?.label || statusFilter), date, search && `"${search}"`].filter(Boolean).join(' · ')}
+          </Text>
+          <TouchableOpacity onPress={() => { setSearch(''); setDate(''); setStatusFilter(''); }}>
+            <Text className="text-[11px] font-bold text-red-600">Clear all</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+    </View>
+  );
+
+  function body() {
+    if (loading) {
+      return (
         <View className="flex-1 items-center justify-center">
           <ActivityIndicator color="#38bdf8" />
-          <Text className="mt-2 text-xs text-slate-500 dark:text-slate-400 font-medium">Loading fleet batteries…</Text>
+          <Text className="mt-2 text-xs font-medium text-slate-500 dark:text-slate-400">Loading batteries…</Text>
         </View>
-      ) : error ? (
+      );
+    }
+    if (error) {
+      return (
         <View className="flex-1 items-center justify-center p-6">
-          <Text className="text-center text-sm text-red-600 dark:text-red-400 font-medium">{error}</Text>
-          <TouchableOpacity
-            onPress={fetchBatteries}
-            className="mt-3 rounded-xl bg-blue-600 px-5 py-2.5 shadow-sm"
-          >
+          <Text className="text-center text-sm font-medium text-red-600 dark:text-red-400">{error}</Text>
+          <TouchableOpacity onPress={fetchBatteries} className="mt-3 rounded-xl bg-blue-600 px-5 py-2.5">
             <Text className="text-xs font-bold text-white">Retry</Text>
           </TouchableOpacity>
         </View>
-      ) : !bucketAllowed ? (
+      );
+    }
+    if (isBatchBucket) {
+      return (
+        <ClientTruckBatches
+          bucket={activeTab}
+          rows={data}
+          fleet={fleet}
+          search={search}
+          date={date}
+          viewMode={activeTab === 'packed' ? viewMode : 'batch_table'}
+          onChanged={fetchBatteries}
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+        />
+      );
+    }
+    const list = activeTab === 'pending' ? filteredPending : filteredAll;
+    const shown = list.slice(0, visible);
+    return (
+      <FlatList
+        data={shown}
+        keyExtractor={(item) => `${item.id}-${item.intake_id ?? item.return_id ?? 'none'}`}
+        contentContainerClassName="p-4 gap-2.5 pb-16"
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor="#38bdf8" colors={['#38bdf8']} />}
+        onEndReached={() => visible < list.length && setVisible((v) => v + PAGE)}
+        onEndReachedThreshold={0.4}
+        ListEmptyComponent={
+          <View className="items-center justify-center py-16">
+            <Icon name="battery" color="#94a3b8" size={22} />
+            <Text className="mt-3 text-sm font-bold text-slate-900 dark:text-white">{meta.empty}</Text>
+            {anyFilter ? <Text className="mt-1 text-xs text-slate-400">Try a different search, status or date</Text> : null}
+          </View>
+        }
+        ListFooterComponent={
+          list.length > PAGE ? (
+            <Text className="pt-2 text-center text-[11px] text-slate-400">
+              Showing {shown.length} of {list.length} batteries • Scroll to load more (20 per page)
+            </Text>
+          ) : null
+        }
+        renderItem={({ item, index }) => (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => goDetail(item)}
+            className="rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900"
+          >
+            <View className="flex-row items-start justify-between gap-2">
+              <View className="flex-1 flex-row items-center gap-2">
+                <Text className="text-sm font-extrabold text-emerald-700 dark:text-emerald-400">
+                  <Text className="text-xs font-semibold text-slate-400">{index + 1}. </Text>
+                  {item.battery_code}
+                </Text>
+                {item.is_blocked ? (
+                  <View className="rounded-full border border-red-200 bg-red-50 px-2 py-0.5">
+                    <Text className="text-[10px] font-bold text-red-600">Blocked</Text>
+                  </View>
+                ) : null}
+              </View>
+              <ClientStatusBadge row={item} />
+            </View>
+            <View className="mt-2 flex-row items-center justify-between gap-2">
+              <Text className="text-[10px] font-bold uppercase text-slate-400">Physical Serial Number</Text>
+              {item.serial_number ? (
+                <Text className="text-xs font-semibold text-slate-800 dark:text-slate-100">{item.serial_number}</Text>
+              ) : activeTab === 'pending' ? (
+                <Text className="text-xs italic text-slate-400">Not set</Text>
+              ) : (
+                <TouchableOpacity onPress={() => setSerialTarget(item)} hitSlop={6}>
+                  <Text className="text-xs font-bold text-blue-600">+ Add Serial</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+            {activeTab === 'pending' ? (
+              <>
+                <View className="mt-1 flex-row justify-between">
+                  <Text className="text-[10px] font-bold uppercase text-slate-400">Arrived On</Text>
+                  <Text className="text-xs text-slate-700 dark:text-slate-200">{item.truck_number || '—'}</Text>
+                </View>
+                <View className="mt-1 flex-row justify-between">
+                  <Text className="text-[10px] font-bold uppercase text-slate-400">Time in Workshop</Text>
+                  <Text className="text-xs text-slate-700 dark:text-slate-200">{new Date(item.intake_at || item.created_at).toLocaleString()}</Text>
+                </View>
+              </>
+            ) : (
+              <View className="mt-1 flex-row justify-between">
+                <Text className="text-[10px] font-bold uppercase text-slate-400">Previous Repair Date</Text>
+                <Text className="text-xs text-slate-700 dark:text-slate-200">{item.last_repaired_at ? new Date(item.last_repaired_at).toLocaleString() : '—'}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        )}
+      />
+    );
+  }
+
+  return (
+    <View className="flex-1 bg-slate-50 dark:bg-slate-950">
+      {header}
+      {bucketAllowed ? (
+        body()
+      ) : (
         <View className="flex-1 items-center justify-center p-6">
           <Text className="text-center text-sm font-medium text-slate-600">
             You do not have permission to view this section. Please contact your Refurbinics administrator if you need access.
           </Text>
         </View>
-      ) : activeTab === 'packed' || activeTab === 'received' ? (
-        <ClientTruckBatches bucket={activeTab} rows={filteredBatteries} onChanged={fetchBatteries} />
-      ) : (
-        <FlatList
-          data={filteredBatteries}
-          keyExtractor={(item) => `${item.id}-${item.intake_id ?? item.return_id ?? 'none'}`}
-          contentContainerClassName="p-4 gap-3 pb-16"
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={onRefresh}
-              tintColor="#38bdf8"
-              colors={['#38bdf8']}
-            />
-          }
-          ListEmptyComponent={
-            <View className="items-center justify-center py-20">
-              <View className="h-16 w-16 items-center justify-center rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-                <Icon name="battery" color="#94a3b8" size={22} />
-              </View>
-              <Text className="mt-3 font-bold text-slate-900 dark:text-white text-base">No batteries found</Text>
-              <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">
-                {search || dateFilter !== 'all'
-                  ? 'Try a different search term or date range'
-                  : 'No batteries under this category'}
-              </Text>
-            </View>
-          }
-          renderItem={({ item }) => {
-            const isClientLocked = item.serial_number_added_by_role === 'client';
-            return (
-              <TouchableOpacity
-                activeOpacity={0.7}
-                onPress={() =>
-                  navigation.navigate('BatteryDetail', { code: item.battery_code, fromScan: false })
-                }
-                className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm active:bg-slate-850"
-              >
-                <View className="flex-row items-center justify-between">
-                  <View className="flex-row items-center gap-2">
-                    <Text className="text-base font-extrabold text-blue-600 dark:text-blue-400">
-                      {item.battery_code}
-                    </Text>
-                    {item.is_blocked && (
-                      <View className="rounded-full bg-red-50 dark:bg-red-950 px-2 py-0.5 border border-red-200 dark:border-red-800/40">
-                        <Text className="text-[10px] font-bold text-red-600 dark:text-red-400">Blocked</Text>
-                      </View>
-                    )}
-                  </View>
-                  <StatusBadge status={clientBatteryStatus(item)} />
-                </View>
-
-                {/* Battery Number row */}
-                <View className="mt-3 flex-row items-center justify-between border-t border-slate-200/80 dark:border-slate-800/80 pt-2.5">
-                  <View className="flex-1 mr-2">
-                    {item.serial_number ? (
-                      <View className="flex-row items-center gap-1.5 flex-wrap">
-                        <Text className="text-xs font-semibold text-slate-700 dark:text-slate-200">
-                          SN: {item.serial_number}
-                        </Text>
-                        <View
-                          className={`rounded-full px-2 py-0.5 border ${
-                            isClientLocked
-                              ? 'bg-amber-50 dark:bg-amber-950/60 border-amber-200 dark:border-amber-800/40'
-                              : 'bg-slate-100 dark:bg-slate-800 border-slate-300 dark:border-slate-700'
-                          }`}
-                        >
-                          <Text
-                            className={`text-[10px] font-bold ${
-                              isClientLocked ? 'text-amber-600 dark:text-amber-400' : 'text-slate-500 dark:text-slate-400'
-                            }`}
-                          >
-                            {isClientLocked ? 'Set by you' : 'Admin'}
-                          </Text>
-                        </View>
-                      </View>
-                    ) : (
-                      <Text className="text-xs text-slate-400 dark:text-slate-500 italic">No Serial Number</Text>
-                    )}
-                  </View>
-
-                  <TouchableOpacity
-                    onPress={() => openSerialModal(item)}
-                    className="rounded-xl bg-slate-100 dark:bg-slate-800 px-3 py-1.5 border border-slate-300 dark:border-slate-700 active:bg-slate-200 dark:active:bg-slate-700"
-                  >
-                    <Text className="text-xs font-bold text-blue-600 dark:text-blue-400">
-                      {item.serial_number ? 'Edit' : '+ Add Number'}
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </TouchableOpacity>
-            );
-          }}
-        />
       )}
 
-      {/* ── Serial Number Modal (Dark Executive) ──────────────────────────── */}
-      {serialModalTarget && (
-        <Modal
-          visible={!!serialModalTarget}
-          transparent
-          animationType="fade"
-          onRequestClose={() => setSerialModalTarget(null)}
-        >
-          <View className="flex-1 items-center justify-center bg-slate-50 dark:bg-slate-950/80 px-6 backdrop-blur-md">
-            <View className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-base font-extrabold text-slate-900 dark:text-white">
-                  Battery Number
-                </Text>
-                <View className="rounded-full bg-blue-50 dark:bg-blue-950 px-2.5 py-0.5 border border-blue-200 dark:border-blue-800/40">
-                  <Text className="text-xs font-mono font-bold text-blue-600 dark:text-blue-400">{serialModalTarget.battery_code}</Text>
-                </View>
-              </View>
-
-              <Text className="mt-2 text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-                Enter the physical serial number printed on the battery. Once set by you, it is locked from admin overwrites.
-              </Text>
-
-              <TextInput
-                value={serialInput}
-                onChangeText={setSerialInput}
-                placeholder="e.g. SN-88213"
-                placeholderTextColor="#64748b"
-                autoFocus
-                className="mt-4 rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 p-3.5 text-sm text-slate-900 dark:text-white focus:border-blue-500"
-              />
-
-              {serialError && (
-                <Text className="mt-2 text-xs text-red-600 dark:text-red-400 font-medium">{serialError}</Text>
-              )}
-
-              <View className="mt-6 flex-row justify-end gap-2.5">
-                <TouchableOpacity
-                  onPress={() => setSerialModalTarget(null)}
-                  className="rounded-xl px-4 py-2.5"
-                >
-                  <Text className="text-sm font-medium text-slate-500 dark:text-slate-400">Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  onPress={handleSerialSave}
-                  disabled={serialSaving}
-                  className="rounded-xl bg-blue-600 px-5 py-2.5 shadow-md shadow-blue-600/30 disabled:opacity-50"
-                >
-                  {serialSaving ? (
-                    <ActivityIndicator color="#fff" size="small" />
-                  ) : (
-                    <Text className="text-sm font-bold text-white">Save Number</Text>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-        </Modal>
-      )}
-
-      {/* ── Pack-for-Repair Intake Modal ────────────────────────────────── */}
-      <Modal visible={packModalOpen} transparent animationType="fade" onRequestClose={closePackModal}>
-        <View className="flex-1 items-center justify-center bg-slate-50 dark:bg-slate-950/80 px-6">
-          <View className="w-full max-w-sm rounded-3xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-6 shadow-2xl">
-            <Text className="text-base font-extrabold text-slate-900 dark:text-white">Pack Batteries for Repair</Text>
-            <Text className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-              Scan or type battery codes to send for workshop repair.
-            </Text>
-
-            {packSuccess && (
-              <View className="mt-3 rounded-xl border border-emerald-200 dark:border-emerald-800/50 bg-emerald-50 dark:bg-emerald-950/40 p-3">
-                <Text className="text-xs font-bold text-emerald-600 dark:text-emerald-300">{packSuccess}</Text>
-              </View>
-            )}
-            {packError && (
-              <View className="mt-3 rounded-xl border border-red-200 dark:border-red-800/50 bg-red-50 dark:bg-red-950/40 p-3">
-                <Text className="text-xs font-medium text-red-600 dark:text-red-300">{packError}</Text>
-              </View>
-            )}
-
-            <Text className="mb-1.5 mt-4 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Truck Number <Text className="text-red-500 font-bold">*</Text>
-            </Text>
-            <TextInput
-              value={truckNumber}
-              onChangeText={(v) => setTruckNumber(v.toUpperCase())}
-              placeholder="e.g. GB21 XYZ"
-              placeholderTextColor="#64748b"
-              className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white"
-            />
-
-            <Text className="mb-1.5 mt-3 text-xs font-semibold text-slate-700 dark:text-slate-300">
-              Driver Name <Text className="text-red-500 font-bold">*</Text>
-            </Text>
-            <TextInput
-              value={driverName}
-              onChangeText={setDriverName}
-              placeholder="e.g. George Davies"
-              placeholderTextColor="#64748b"
-              className="rounded-2xl border border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 px-4 py-3 text-sm text-slate-900 dark:text-white"
-            />
-
-            <Text className="mb-1.5 mt-3 text-xs font-semibold text-slate-500 dark:text-slate-400">Scan / Add Batteries</Text>
-            <ScanBatteryInput onSubmit={addScanned} placeholder="Battery code, QR or RFID tag…" />
-
-            {scannedBatteries.length > 0 && (
-              <View className="mt-3 max-h-32">
-                <FlatList
-                  data={scannedBatteries}
-                  keyExtractor={(item) => String(item.id)}
-                  renderItem={({ item }) => (
-                    <View className="mb-1.5 flex-row items-center justify-between rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 px-3 py-2">
-                      <Text className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400">{item.code}</Text>
-                      <TouchableOpacity onPress={() => removeScanned(item.id)}>
-                        <Text className="text-xs font-bold text-red-600 dark:text-red-400">Remove</Text>
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                />
-              </View>
-            )}
-
-            <View className="mt-5 flex-row justify-end gap-2.5">
-              <TouchableOpacity onPress={closePackModal} className="rounded-xl px-4 py-2.5">
-                <Text className="text-sm font-medium text-slate-500 dark:text-slate-400">Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                onPress={handlePackSubmit}
-                disabled={packing}
-                className="rounded-xl bg-blue-600 px-5 py-2.5 shadow-md shadow-blue-600/30 disabled:opacity-50"
-              >
-                {packing ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text className="text-sm font-bold text-white">Submit Intake</Text>
-                )}
-              </TouchableOpacity>
-            </View>
-          </View>
-        </View>
-      </Modal>
+      <SerialNumberModal battery={serialTarget} onClose={() => setSerialTarget(null)} onSaved={fetchBatteries} />
+      <AddIntakeModal visible={intakeOpen} fleet={fleet} onClose={() => setIntakeOpen(false)} onRecorded={fetchBatteries} />
     </View>
   );
 }

@@ -5,13 +5,18 @@ import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import { logout, setUser } from '../../store/auth-slice';
 import ZebraScannerCard from '../../components/scan/ZebraScannerCard';
+import { hasClientPermission } from '../../utils/permissions';
 
+// Client "Account & More" — the web client menu's other pages, shown only
+// when the client login has that module (same flags as the web sidebar).
 const CLIENT_LINKS = [
-  { to: 'BatterySorting', label: 'Battery Sorting', hint: 'Group batteries by requirement' },
-  { to: 'Invoices', label: 'Invoices & Bills', hint: 'Download billing PDFs' },
-  { to: 'Transactions', label: 'Transactions', hint: 'Repair billing history' },
-  { to: 'ClientNotifications', label: 'Notifications', hint: 'Fleet activity feed' },
-  { to: 'Support', label: 'Help & Support', hint: 'Message the service team' },
+  { to: 'ClientHistory', label: 'Service History', hint: 'Every repair visit and return' },
+  { to: 'BatterySorting', label: 'Battery Sorting', hint: 'Group batteries by requirement', permission: 'client_battery_sorting' },
+  { to: 'Invoices', label: 'Invoices & Bills', hint: 'Download billing PDFs', permission: 'client_invoices' },
+  { to: 'Transactions', label: 'Transactions', hint: 'Repair billing history', permission: 'client_transactions' },
+  { to: 'ClientCertificates', label: 'Certificates', hint: 'ESG milestone certificates' },
+  { to: 'ClientNotifications', label: 'Notifications', hint: 'Fleet activity feed', permission: 'client_notifications' },
+  { to: 'Support', label: 'Help & Support', hint: 'Message the service team', permission: 'client_support' },
 ];
 
 export default function ProfileScreen() {
@@ -41,6 +46,10 @@ export default function ProfileScreen() {
       setError('Enter your current password');
       return;
     }
+    if (newPassword.length < 8) {
+      setError('New password must be at least 8 characters');
+      return;
+    }
     if (newPassword !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -62,6 +71,7 @@ export default function ProfileScreen() {
   }
 
   const isClient = user?.role === 'client';
+  const clientLinks = CLIENT_LINKS.filter((l) => !l.permission || hasClientPermission(user, l.permission));
 
   return (
     <ScrollView className="flex-1 bg-slate-50 dark:bg-slate-950" contentContainerClassName="p-5 pb-16">
@@ -127,12 +137,12 @@ export default function ProfileScreen() {
           <Text className="px-5 pt-5 pb-3 text-xs font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
             Account & More
           </Text>
-          {CLIENT_LINKS.map((link, i) => (
+          {clientLinks.map((link, i) => (
             <TouchableOpacity
               key={link.to}
               onPress={() => navigation.navigate(link.to)}
               className={`flex-row items-center justify-between px-5 py-3.5 active:bg-slate-100 dark:active:bg-slate-800 ${
-                i < CLIENT_LINKS.length - 1 ? 'border-b border-slate-200/80 dark:border-slate-800/80' : ''
+                i < clientLinks.length - 1 ? 'border-b border-slate-200/80 dark:border-slate-800/80' : ''
               }`}
             >
               <View>

@@ -3,11 +3,12 @@ import { ActivityIndicator, FlatList, RefreshControl, ScrollView, Text, Touchabl
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import { StatusBadge } from '../../components/ui/Badge';
+import Icon from '../../components/ui/Icon';
 
 // The client's billing history — same as the web ClientTransactionsPage:
 // every repair charge and service/testing fee (GET /clients/me/transactions),
 // a month filter (months that have charges, newest first) and the four
-// figures for the chosen period.
+// figures for the chosen period, a Refresh button and a numbered list.
 
 function getMonthKey(dateStr) {
   if (!dateStr) return '';
@@ -20,6 +21,15 @@ function formatMonthLabel(key) {
   if (!key || key === 'ALL') return 'All Time';
   const [y, m] = key.split('-');
   return new Date(Number(y), Number(m) - 1, 1).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
+}
+
+// same three charge categories as the web "Charge Category" column
+function chargeCategory(row) {
+  if (row.charge_type === 'repair') return { label: 'Repair Service', color: 'text-blue-700' };
+  if (row.battery_status === 'unserviceable' || row.battery_status === 'tested_parts_removed') {
+    return { label: 'Testing & Diagnostic Fee', color: 'text-rose-700' };
+  }
+  return { label: 'Service & Testing Fee', color: 'text-indigo-700' };
 }
 
 const money = (v) => `£${Number(v || 0).toFixed(2)}`;
@@ -117,24 +127,33 @@ export default function ClientTransactionsScreen() {
           }
           ListHeaderComponent={
             <View className="mb-1 gap-3">
+              <View className="flex-row items-center justify-between gap-2">
+                <Text className="flex-1 text-[11px] text-slate-500" numberOfLines={2}>
+                  Verified repair charges, diagnostic inspection fees, and service billing across all your batteries.
+                </Text>
+                <TouchableOpacity onPress={onRefresh} disabled={refreshing} className="flex-row items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2">
+                  <Icon name="rotateCcw" color="#334155" size={13} />
+                  <Text className="text-xs font-bold text-slate-700">{refreshing ? 'Refreshing…' : 'Refresh'}</Text>
+                </TouchableOpacity>
+              </View>
               <View className="flex-row flex-wrap justify-between gap-y-3">
                 <StatCard
                   tone="amber"
                   label={selectedMonth === 'ALL' ? 'Total Billed' : `${formatMonthLabel(selectedMonth)} Total`}
                   value={money(total)}
-                  sub={`${rows.length} billing line${rows.length === 1 ? '' : 's'}`}
+                  sub={`${rows.length} total billing line${rows.length === 1 ? '' : 's'}`}
                 />
                 <StatCard
                   tone="blue"
                   label="Repair Services"
                   value={money(sum(repairRows))}
-                  sub={`${repairRows.length} repair line${repairRows.length === 1 ? '' : 's'}`}
+                  sub={`${repairRows.length} repair service line${repairRows.length === 1 ? '' : 's'} (refurbishment & service)`}
                 />
                 <StatCard
                   tone="violet"
                   label="Testing & Diagnostics"
                   value={money(sum(serviceRows))}
-                  sub={`${serviceRows.length} inspection & QA test${serviceRows.length === 1 ? '' : 's'}`}
+                  sub={`${serviceRows.length} intake inspection & QA test${serviceRows.length === 1 ? '' : 's'}`}
                 />
                 <StatCard
                   tone="emerald"
@@ -144,12 +163,22 @@ export default function ClientTransactionsScreen() {
                 />
               </View>
               {availableMonths.length > 0 && (
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-xs font-bold text-slate-700">Filter by Month:</Text>
+                  {selectedMonth !== 'ALL' ? (
+                    <TouchableOpacity onPress={() => setSelectedMonth('ALL')} className="rounded-lg bg-slate-100 px-2.5 py-1">
+                      <Text className="text-[11px] font-bold text-slate-600">Clear Filter</Text>
+                    </TouchableOpacity>
+                  ) : null}
+                </View>
+              )}
+              {availableMonths.length > 0 && (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
-                  {[{ key: 'ALL', label: 'All Time', count: data.length }, ...availableMonths].map((m) => {
+                  {[{ key: 'ALL', label: 'All Months', count: data.length }, ...availableMonths].map((m) => {
                     const on = selectedMonth === m.key;
                     return (
                       <TouchableOpacity key={m.key} onPress={() => setSelectedMonth(m.key)} className={`rounded-xl px-3 py-1.5 ${on ? 'bg-amber-600' : 'bg-white border border-slate-200'}`}>
-                        <Text className={`text-[11px] font-bold ${on ? 'text-white' : 'text-slate-600'}`}>{m.label} ({m.count})</Text>
+                        <Text className={`text-[11px] font-bold ${on ? 'text-white' : 'text-slate-600'}`}>{m.label} ({m.count} records)</Text>
                       </TouchableOpacity>
                     );
                   })}
@@ -159,11 +188,11 @@ export default function ClientTransactionsScreen() {
           }
           ListEmptyComponent={
             <View className="items-center justify-center py-16">
-              <Text className="text-sm font-bold text-slate-900 dark:text-white">{selectedMonth === 'ALL' ? 'No transactions yet' : `No charges in ${formatMonthLabel(selectedMonth)}`}</Text>
+              <Text className="text-sm font-bold text-slate-900 dark:text-white">{selectedMonth === 'ALL' ? 'No transactions yet.' : `No transactions found for ${formatMonthLabel(selectedMonth)}.`}</Text>
               <Text className="mt-1 text-xs text-slate-400 dark:text-slate-500">Your billing history will appear here.</Text>
             </View>
           }
-          renderItem={({ item }) => (
+          renderItem={({ item, index }) => (
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={() =>
@@ -172,19 +201,20 @@ export default function ClientTransactionsScreen() {
               className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 shadow-sm active:bg-slate-850"
             >
               <View className="flex-row items-center justify-between">
-                <Text className="text-sm font-extrabold text-blue-600 dark:text-blue-400">{item.battery_code}</Text>
+                <Text className="text-sm font-extrabold text-blue-600 dark:text-blue-400">
+                  <Text className="text-[11px] font-mono text-slate-400">#{index + 1}  </Text>
+                  {item.battery_code}
+                </Text>
                 <Text className="text-sm font-extrabold text-slate-900 dark:text-white">£{Number(item.amount).toFixed(2)}</Text>
               </View>
               <View className="mt-2 flex-row items-center justify-between gap-2">
-                <Text className={`text-[11px] font-semibold ${item.charge_type === 'repair' ? 'text-blue-700' : 'text-violet-700'}`}>
-                  {item.charge_type === 'repair' ? 'Repair Service' : 'Service & Testing Fee'}
-                </Text>
+                <Text className={`text-[11px] font-semibold ${chargeCategory(item).color}`}>{chargeCategory(item).label}</Text>
                 {item.battery_status ? <StatusBadge status={item.battery_status} /> : null}
               </View>
               <View className="mt-1.5 flex-row items-center justify-between">
                 <Text className="flex-1 text-[11px] text-slate-500 dark:text-slate-400" numberOfLines={1}>{item.part_name || '—'}{item.truck_number ? ` · Truck ${item.truck_number}` : ''}</Text>
                 <Text className="text-[11px] text-slate-400 dark:text-slate-500">
-                  {item.repaired_at ? new Date(item.repaired_at).toLocaleDateString() : '—'}
+                  {item.repaired_at ? new Date(item.repaired_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' }) : '—'}
                 </Text>
               </View>
               {item.staff_name && (

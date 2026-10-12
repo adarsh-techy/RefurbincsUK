@@ -641,7 +641,7 @@ function ClientDashboardPage() {
                 </span>
               </div>
               <p className="text-xs text-slate-600 dark:text-neutral-300 mt-1 leading-relaxed">
-                <span className="font-bold text-blue-700 dark:text-blue-400">{verifiedIntake} verified at workshop</span> (Truck #KL12) &bull; <span className="font-bold text-amber-700 dark:text-amber-400">{awaitingIntake} in transit / awaiting check-in</span> (Truck #KL10ASASD)
+                <span className="font-bold text-blue-700 dark:text-blue-400">{verifiedIntake} verified at workshop</span> &bull; <span className="font-bold text-amber-700 dark:text-amber-400">{awaitingIntake} in transit / awaiting check-in</span>
               </p>
             </div>
           </div>

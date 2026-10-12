@@ -15,6 +15,14 @@ import DataTable from '../../../components/ui/table/DataTable';
 import TableState from '../../../components/ui/table/TableState';
 import Modal from '../../../components/ui/overlays/Modal';
 
+// YYYY-MM-DD in the viewer's own timezone, to match the date input's value
+function localDateKey(value) {
+  if (!value) return '';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 function isImageFile(fileName = '', filePath = '') {
   return /\.(png|jpe?g|webp|gif|svg)$/i.test(fileName || filePath || '');
 }
@@ -134,7 +142,7 @@ function ClientInvoicesPage() {
       inv.file_name?.toLowerCase().includes(q) ||
       inv.notes?.toLowerCase().includes(q);
 
-    const matchesDate = !dateFilter || inv.issue_date?.slice(0, 10) === dateFilter;
+    const matchesDate = !dateFilter || localDateKey(inv.issue_date) === dateFilter;
 
     const matchesStatus =
       !statusFilter ||

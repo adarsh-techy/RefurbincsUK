@@ -3058,7 +3058,9 @@ function ClientBatteriesPage() {
               className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
             >
               <option value="">All Statuses</option>
-              <option value="returned">Active in Fleet</option>
+              <option value="in_fleet">Active in Fleet</option>
+              <option value="registered">Registered (Not Serviced)</option>
+              <option value="returned">Returned to Client</option>
               <option value="in_service">In Workshop Repair</option>
               <option value="in_repair">Packed for Repair</option>
               <option value="repaired">Repair Complete</option>

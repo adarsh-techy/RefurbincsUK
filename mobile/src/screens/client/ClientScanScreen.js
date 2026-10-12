@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
-import { StatusBadge } from '../../components/ui/Badge';
+import { isLikelyRfidTag, resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import { StatusBadge, clientBatteryStatus } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import RfidLookupButton from '../../components/scan/RfidLookupButton';
 
@@ -48,6 +49,29 @@ export default function ClientScanScreen() {
     }, DEBOUNCE_MS);
     return () => clearTimeout(debounceRef.current);
   }, [manualCode]);
+
+  // A typed/pasted RFID tag (no QR link, no battery code) is looked up in the
+  // client's own batteries first; the web dashboard's scan box only takes
+  // codes, but on mobile the same box also takes a tag.
+  async function openTyped(raw) {
+    const value = String(raw || '').trim();
+    if (!value) return;
+    if (isClient && isLikelyRfidTag(value)) {
+      try {
+        const { data } = await apiClient.get('/clients/me/batteries');
+        const resolved = resolveBatteryInput(value, data?.data || []);
+        if (resolved.unassignedTag) {
+          Alert.alert('RFID tag not assigned', `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})`);
+          return;
+        }
+        goToBattery(resolved.code);
+        return;
+      } catch {
+        // fall through and try it as a code
+      }
+    }
+    goToBattery(value);
+  }
 
   function goToBattery(raw) {
     const code = extractBatteryCode(raw);
@@ -106,7 +130,7 @@ export default function ClientScanScreen() {
           </View>
           <Text className="text-2xl font-black text-slate-900 dark:text-white">Scan Battery QR Code</Text>
           <Text className="mt-2 max-w-xs text-center text-xs leading-relaxed text-slate-500 dark:text-slate-400">
-            Scan the QR code or RFID tag on your battery to inspect its full intake-to-return lifecycle, repair parts, and testing record.
+            Point your camera at the battery QR code, scan its RFID tag, or type the Battery ID below to open its complete lifecycle, repairs, testing, and return logs.
           </Text>
 
           <View className="mt-8 w-full max-w-xs gap-3">
@@ -115,27 +139,36 @@ export default function ClientScanScreen() {
               activeOpacity={0.8}
               className="items-center rounded-2xl bg-blue-600 px-4 py-4 shadow-lg shadow-blue-600/30 active:bg-blue-700"
             >
-              <Text className="text-base font-bold text-white">Open Device Camera</Text>
+              <Text className="text-base font-bold text-white">Open Camera Scanner</Text>
             </TouchableOpacity>
 
             <RfidLookupButton onScan={goToBattery} />
 
             <View className="flex-row items-center gap-3 my-2">
               <View className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
-              <Text className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">or search code</Text>
+              <Text className="text-xs font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">or enter code manually</Text>
               <View className="h-px flex-1 bg-slate-100 dark:bg-slate-800" />
             </View>
 
+            <Text className="-mb-1 text-xs font-semibold text-slate-700 dark:text-slate-200">Battery Code / URL</Text>
             <TextInput
               value={manualCode}
               onChangeText={setManualCode}
-              onSubmitEditing={() => goToBattery(manualCode)}
-              placeholder="e.g. DEM-0001 or scan link"
+              onSubmitEditing={() => openTyped(manualCode)}
+              placeholder="e.g. DEM-0001 or scan URL"
               placeholderTextColor="#64748b"
               autoCapitalize="characters"
               autoCorrect={false}
               className="rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-4 py-3.5 text-center text-sm font-bold text-slate-900 dark:text-white"
             />
+
+            <TouchableOpacity
+              onPress={() => openTyped(manualCode)}
+              disabled={!manualCode.trim()}
+              className={`items-center rounded-2xl bg-emerald-600 py-3.5 ${!manualCode.trim() ? 'opacity-50' : ''}`}
+            >
+              <Text className="text-sm font-bold text-white">View Full History</Text>
+            </TouchableOpacity>
 
             {suggestions.length > 0 && (
               <View className="max-h-64 overflow-hidden rounded-2xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-2xl">
@@ -153,7 +186,7 @@ export default function ClientScanScreen() {
                           <Text className="text-xs text-slate-500 dark:text-slate-400">SN: {item.serial_number}</Text>
                         )}
                       </View>
-                      <StatusBadge status={item.status} />
+                      <StatusBadge status={clientBatteryStatus(item)} />
                     </TouchableOpacity>
                   )}
                 />

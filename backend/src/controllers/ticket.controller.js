@@ -1,5 +1,6 @@
 const ticketModel = require('../models/ticket.model');
 const clientModel = require('../models/client.model');
+const batteryModel = require('../models/battery.model');
 const realtime = require('../realtime');
 
 function isClientRole(role) {
@@ -95,6 +96,15 @@ async function create(req, res, next) {
       }
     }
 
+    // A linked battery must exist and, for a client, be one of theirs
+    const code = typeof batteryCode === 'string' ? batteryCode.trim().toUpperCase() : '';
+    if (code) {
+      const battery = await batteryModel.findByCode(code);
+      if (!battery || (isClientRole(req.user.role) && String(battery.client_name || '').trim().toLowerCase() !== String(finalClientName || '').trim().toLowerCase())) {
+        return res.status(400).json({ message: `Battery ${code} was not found in your fleet.` });
+      }
+    }
+
     const ticket = await ticketModel.createTicket({
       clientId: finalClientId,
       clientName: finalClientName,
@@ -102,7 +112,7 @@ async function create(req, res, next) {
       subject,
       category: category || 'general',
       priority: priority || 'normal',
-      batteryCode: batteryCode || null,
+      batteryCode: code || null,
       initialMessage,
       senderName: req.user.name || finalClientName,
       senderRole: req.user.role,

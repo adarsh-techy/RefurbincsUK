@@ -37,6 +37,7 @@ function problemTitle(message = '') {
   if (/not (on|in) (this|the)/i.test(message)) return 'Not on this list';
   if (/already assigned to|tag in use|belongs to another/i.test(message)) return 'Tag is on another battery';
   if (/does not match|client mismatch/i.test(message)) return 'Different client';
+  if (/already sorted in the .*group/i.test(message)) return 'Already in another sort group';
   if (/already/i.test(message)) return 'Already scanned';
   if (/not one of your|not found|no battery/i.test(message)) return 'Battery not found';
   return 'Scan problem';
