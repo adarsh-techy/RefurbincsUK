@@ -95,7 +95,7 @@ async function getAdminNotifications(req, res, next) {
 
     // Map Low Stock
     lowStockParts.forEach((p) => {
-      const isZero = !p.in_stock || Number(p.quantity) <= 0;
+      const isZero = Number(p.quantity) <= 0;
       feed.push({
         id: `stock_${p.id}`,
         type: 'stock',
@@ -297,13 +297,13 @@ async function getAdminNotificationById(req, res, next) {
     if (id.startsWith('stock_')) {
       const partId = Number(id.replace('stock_', ''));
       const { rows } = await db.query(
-        `SELECT id, name, sku, quantity, in_stock, repair_cost, created_at, updated_at
+        `SELECT id, name, sku, quantity, in_stock, repair_cost, created_at
          FROM parts WHERE id = $1`,
         [partId]
       );
       if (rows.length > 0) {
         const p = rows[0];
-        const isZero = !p.in_stock || Number(p.quantity) <= 0;
+        const isZero = Number(p.quantity) <= 0;
         return res.json({
           notification: {
             id,
@@ -314,7 +314,7 @@ async function getAdminNotificationById(req, res, next) {
             message: isZero
               ? `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) has reached 0 units in stock. Reorder immediately to avoid workshop repair delays.`
               : `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) is running low with only ${p.quantity} unit(s) remaining in stock.`,
-            timestamp: p.updated_at || p.created_at || new Date().toISOString(),
+            timestamp: p.created_at || new Date().toISOString(),
             actionLabel: 'Restock & Manage Part',
             actionUrl: `/parts/${p.id}`,
             meta: {
