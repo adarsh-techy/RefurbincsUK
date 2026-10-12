@@ -360,7 +360,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
                           : 'Select a client above to enable scanning…'
                       }
                       autoComplete="off"
-                      disabled={scanLoading || !form.clientId}
+                      disabled={!form.clientId}
                       className={`${inputClasses} font-mono disabled:cursor-not-allowed disabled:opacity-50`}
                     />
                     <RfidScanButton target="intake" />

@@ -26,6 +26,7 @@ export default function ManifestPicker({
   candidates,
   added,
   onScan, // async (raw) => { tone, message }
+  scanRef, // optional ref to the scan box (for tags typed into other fields)
   onRemove, // (battery) => void
   suggestionTitle, // (filtering, count) => string
   sugMeta, // (battery) => string | null — small chip next to the code
@@ -75,7 +76,7 @@ export default function ManifestPicker({
           <Text className="flex-1 text-xs font-bold uppercase tracking-wider text-slate-700">{label}</Text>
           {countText ? <Text className="text-[11px] font-bold text-slate-500">{countText}</Text> : null}
         </View>
-        <ScanBatteryInput onSubmit={onScan} placeholder={placeholder} submitLabel="Add" disabled={disabled} />
+        <ScanBatteryInput ref={scanRef} onSubmit={onScan} placeholder={placeholder} submitLabel="Add" disabled={disabled} />
         {tapFeedback ? <View className="mt-2"><Feedback feedback={tapFeedback} /></View> : null}
       </View>
 

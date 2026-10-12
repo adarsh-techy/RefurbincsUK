@@ -317,7 +317,6 @@ function RecycleForm({ onCreated, onCancel }) {
                   }}
                   placeholder="Scan QR or enter unserviceable battery code…"
                   autoComplete="off"
-                  disabled={scanLoading}
                   className={`${inputClasses} font-mono disabled:cursor-not-allowed disabled:opacity-50`}
                 />
                 <RfidScanButton target="recycle" />

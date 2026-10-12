@@ -167,7 +167,14 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
     setValue(t);
   };
 
-  useImperativeHandle(ref, () => ({ focus: () => inputRef.current?.focus(), clear: () => setText('') }));
+  useImperativeHandle(ref, () => ({
+    focus: () => inputRef.current?.focus(),
+    clear: () => setText(''),
+    // a tag the reader typed into another field on the screen
+    scan: (raw) => {
+      if (!disabled) deliverAll(splitScanInput(raw), true);
+    },
+  }));
 
   useEffect(() => () => clearTimeout(idleRef.current), []);
 

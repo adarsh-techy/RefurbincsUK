@@ -91,9 +91,58 @@ function takeCompleteTags(input) {
   return true;
 }
 
+// ── Reads that land in the wrong field ──────────────────────────────────
+// The reader types into whichever field has the cursor. On a page with a scan
+// box, a burst of hex typed at reader speed into another field (truck number,
+// driver name…) is a tag, not text: the field is put back the way it was and
+// the tag goes to the scan box.
+const STRAY_GAP_MS = 45; // people type slower than this between keys
+const STRAY_MIN_LENGTH = 12;
+const stray = new WeakMap(); // field → { before, text, last, captured, timer }
+
+function scanBoxFor(field) {
+  const scope = field.closest('form, [role="dialog"], .fixed') || document;
+  const box = scope.querySelector('[data-rfid-scan]') || document.querySelector('[data-rfid-scan]');
+  return box && box !== field ? box : null;
+}
+
+function onStrayInput(field, e) {
+  const box = scanBoxFor(field);
+  if (!box) return;
+  const now = Date.now();
+  const typed = e.inputType === 'insertText' || e.inputType === 'insertFromPaste' ? e.data || '' : '';
+  let run = stray.get(field);
+  if (!typed) {
+    stray.delete(field);
+    return;
+  }
+  if (!run || now - run.last > STRAY_GAP_MS) {
+    run = { before: field.value.slice(0, Math.max(0, field.value.length - typed.length)), text: '', last: now, captured: false };
+  }
+  run.text += typed;
+  run.last = now;
+  stray.set(field, run);
+  const clean = normalizeRfidTag(run.text);
+  if (!run.captured && !(clean.length >= STRAY_MIN_LENGTH && /^[0-9A-F]+$/.test(clean) && run.text.length > 1)) return;
+  run.captured = true;
+  setValue(field, run.before); // give the field its text back
+  clearTimeout(run.timer);
+  run.timer = setTimeout(() => {
+    stray.delete(field);
+    if (box.disabled || !box.isConnected) return;
+    box.focus();
+    feed(box, splitScanInput(run.text));
+  }, QUIET_MS / 3);
+}
+
 function onInput(e) {
   const input = e.target;
-  if (!(input instanceof HTMLInputElement) || !input.matches('[data-rfid-scan]') || !e.isTrusted) return;
+  if (!e.isTrusted) return;
+  if (input instanceof HTMLInputElement && !input.matches('[data-rfid-scan]') && /^(text|search|tel|)$/.test(input.type)) {
+    onStrayInput(input, e);
+    return;
+  }
+  if (!(input instanceof HTMLInputElement) || !input.matches('[data-rfid-scan]')) return;
   if (takeCompleteTags(input)) return;
   const now = Date.now();
   const s = state.get(input) || { first: now, count: 0 };

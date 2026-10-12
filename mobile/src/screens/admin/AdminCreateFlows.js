@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
@@ -7,6 +7,7 @@ import useFleetClients from '../../components/admin/sa2/useFleetClients';
 import DateTimeField, { DocumentBox, pickDocument } from '../../components/admin/sa2/DateTimeField';
 import { apiError, ClientSelect, ErrorBox, GhostButton, Input, Label, PrimaryButton } from '../../components/admin/sa2/ui';
 import { statusLabel } from '../../components/ui/Badge';
+import { useReaderGuard } from '../../utils/reader-guard';
 
 // Admin create flows: "Record a Return" and "Record a Recycle Shipment" —
 // the web ReturnForm and RecycleForm with the same checks, endpoints and
@@ -44,6 +45,11 @@ export function AdminReturnCreateScreen() {
   const [clientId, setClientId] = useState('');
   const [truckNumber, setTruckNumber] = useState('');
   const [driverName, setDriverName] = useState('');
+  // a tag the reader types into these fields goes to the scan box instead
+  const scanRef = useRef(null);
+  const toScanBox = (tag) => scanRef.current?.scan(tag);
+  const onTruckChange = useReaderGuard(truckNumber, (t) => setTruckNumber(t.toUpperCase()), toScanBox);
+  const onDriverChange = useReaderGuard(driverName, setDriverName, toScanBox);
   const [returnedAt, setReturnedAt] = useState(new Date());
   const [docFile, setDocFile] = useState(null);
   const [candidates, setCandidates] = useState([]);
@@ -127,11 +133,11 @@ export function AdminReturnCreateScreen() {
           </View>
           <View>
             <Label>🚚 Dispatch Truck Number</Label>
-            <Input value={truckNumber} onChangeText={(t) => setTruckNumber(t.toUpperCase())} autoCapitalize="characters" placeholder="e.g. GB21 XYZ" />
+            <Input value={truckNumber} onChangeText={onTruckChange} autoCapitalize="characters" placeholder="e.g. GB21 XYZ" />
           </View>
           <View>
             <Label>👤 Driver Name</Label>
-            <Input value={driverName} onChangeText={setDriverName} placeholder="e.g. George Davies" />
+            <Input value={driverName} onChangeText={onDriverChange} placeholder="e.g. George Davies" />
           </View>
           <View>
             <Label>📅 Return Date & Time</Label>
@@ -144,6 +150,7 @@ export function AdminReturnCreateScreen() {
         </Card>
 
         <ManifestPicker
+          scanRef={scanRef}
           label="Scan / Pick Repaired Batteries for Return"
           countText={clientId ? `${candidates.filter((b) => !added.some((a) => a.id === b.id)).length} repaired units ready` : null}
           disabled={!clientId}
@@ -182,6 +189,11 @@ export function AdminRecycleCreateScreen() {
   const partners = useFleetClients(true, 'recycle');
   const [vehicleNumber, setVehicleNumber] = useState('');
   const [driverName, setDriverName] = useState('');
+  // a tag the reader types into these fields goes to the scan box instead
+  const scanRef = useRef(null);
+  const toScanBox = (tag) => scanRef.current?.scan(tag);
+  const onVehicleChange = useReaderGuard(vehicleNumber, (t) => setVehicleNumber(t.toUpperCase()), toScanBox);
+  const onDriverChange = useReaderGuard(driverName, setDriverName, toScanBox);
   const [partnerId, setPartnerId] = useState('');
   const [pricePerKg, setPricePerKg] = useState('3.40');
   const [totalWeightKg, setTotalWeightKg] = useState('');
@@ -255,11 +267,11 @@ export function AdminRecycleCreateScreen() {
         <Card>
           <View>
             <Label>🚚 Vehicle / Truck Number</Label>
-            <Input value={vehicleNumber} onChangeText={(t) => setVehicleNumber(t.toUpperCase())} autoCapitalize="characters" placeholder="e.g. GB21 XYZ" />
+            <Input value={vehicleNumber} onChangeText={onVehicleChange} autoCapitalize="characters" placeholder="e.g. GB21 XYZ" />
           </View>
           <View>
             <Label>👤 Driver Name</Label>
-            <Input value={driverName} onChangeText={setDriverName} placeholder="e.g. George Davies" />
+            <Input value={driverName} onChangeText={onDriverChange} placeholder="e.g. George Davies" />
           </View>
           <View>
             <Label>🏢 Recycle Partner (Optional)</Label>
@@ -292,6 +304,7 @@ export function AdminRecycleCreateScreen() {
         </Card>
 
         <ManifestPicker
+          scanRef={scanRef}
           label="Scan / Pick Unserviceable Batteries"
           countText={`${candidates.filter((b) => !added.some((a) => a.id === b.id)).length} unserviceable units available`}
           placeholder="Scan QR or enter unserviceable battery code…"
