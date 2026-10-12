@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SuccessPopup from '../../components/technician/SuccessPopup';
 import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
@@ -208,6 +209,12 @@ export default function ProfileScreen() {
 
               {error && <Text className="text-xs font-medium text-red-600 dark:text-red-400">{error}</Text>}
               {success && <Text className="text-xs font-medium text-emerald-600 dark:text-emerald-400">Password updated successfully.</Text>}
+              <SuccessPopup
+                open={success}
+                title="Password Updated"
+                message="Your new password is saved. Use it the next time you sign in."
+                onClose={() => setSuccess(false)}
+              />
 
               <TouchableOpacity
                 onPress={handleSubmit}

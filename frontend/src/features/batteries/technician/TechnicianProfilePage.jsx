@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import SuccessPopup from './SuccessPopup';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
@@ -68,6 +69,12 @@ function TechnicianProfilePage() {
 
   return (
     <div className="mx-auto max-w-xl pb-16">
+      <SuccessPopup
+        open={success}
+        title="Password Updated"
+        message="Your new password is saved. Use it the next time you sign in."
+        onClose={() => setSuccess(false)}
+      />
       <h1 className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">Account Profile</h1>
       <p className="mb-4 sm:mb-6 text-xs text-slate-500 dark:text-neutral-400">
         Manage your portal credentials and security settings.

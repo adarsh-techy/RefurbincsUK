@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import SuccessPopup from '../../components/technician/SuccessPopup';
 import {
   ActivityIndicator,
   Image,
@@ -369,6 +370,7 @@ export default function BatteryDetailScreen() {
   const [showUnverifiedIntakeModal, setShowUnverifiedIntakeModal] = useState(false);
   const [unverifiedIntakeData, setUnverifiedIntakeData] = useState(null);
   const [showUnserviceableAlertModal, setShowUnserviceableAlertModal] = useState(false);
+  const [successPopup, setSuccessPopup] = useState(null); // { title, message, autoCloseMs }
   const [unserviceableAlertData, setUnserviceableAlertData] = useState(null);
   const [showHistoryInScan, setShowHistoryInScan] = useState(false);
   const scanAlertHandledRef = useRef(false);
@@ -818,6 +820,7 @@ export default function BatteryDetailScreen() {
     try {
       await apiClient.patch(`/batteries/${result.battery.id}/start-work`);
       await load();
+      setSuccessPopup({ title: 'Work Started', message: `You are now working on ${result.battery.battery_code}. The repair timer is running.`, autoCloseMs: 1600 });
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
     } finally {
@@ -837,6 +840,7 @@ export default function BatteryDetailScreen() {
     try {
       const { data: updatedBattery } = await apiClient.patch(`/batteries/${result.battery.id}/start-testing`);
       setResult((prev) => (prev ? { ...prev, battery: updatedBattery } : prev));
+      setSuccessPopup({ title: 'Testing Started', message: `The testing timer for ${result.battery.battery_code} is running.`, autoCloseMs: 1600 });
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
     } finally {
@@ -991,6 +995,7 @@ export default function BatteryDetailScreen() {
       setIssueNote('');
       setIssuePhotos([]);
       await load();
+      setSuccessPopup({ title: 'Marked Unserviceable', message: 'Now remove and restock the fitted parts below.', autoCloseMs: 2000 });
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
     } finally {
@@ -1927,6 +1932,13 @@ export default function BatteryDetailScreen() {
   ).size;
   return (
     <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-5 pb-16" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
+      <SuccessPopup
+        open={Boolean(successPopup)}
+        title={successPopup?.title}
+        message={successPopup?.message}
+        autoCloseMs={successPopup?.autoCloseMs}
+        onClose={() => setSuccessPopup(null)}
+      />
       {/* ── Executive Header ─────────────────────────────────────────────── */}
       <View className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
         <View className="flex-row items-center justify-between">

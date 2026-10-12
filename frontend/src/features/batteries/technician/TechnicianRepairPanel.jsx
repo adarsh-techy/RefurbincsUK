@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import SuccessPopup from './SuccessPopup';
 import { useSelector } from 'react-redux';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
@@ -102,7 +103,8 @@ function TechnicianRepairPanel({
   const [testingElapsedSeconds, setTestingElapsedSeconds] = useState(0);
 
   // Modals state — identical to mobile app
-  const [modalType, setModalType] = useState(null); // 'submitted' | 'completed' | 'unserviceable' | 'passed_back' | 'parts_removed'
+  const [modalType, setModalType] = useState(null);
+  const [successPopup, setSuccessPopup] = useState(null); // { title, message, autoCloseMs } // 'submitted' | 'completed' | 'unserviceable' | 'passed_back' | 'parts_removed'
   const redirectTimerRef = useRef(null);
 
   const passBackService = services.find((s) => s.service_name === 'Passed back to Technician');
@@ -398,6 +400,7 @@ function TechnicianRepairPanel({
     try {
       await apiClient.patch(`/batteries/${battery.id}/start-testing`);
       if (onUpdated) onUpdated();
+      setSuccessPopup({ title: 'Testing Started', message: `The testing timer for ${battery.battery_code} is running.`, autoCloseMs: 1600 });
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -443,6 +446,7 @@ function TechnicianRepairPanel({
     try {
       await apiClient.patch(`/batteries/${battery.id}/start-work`);
       if (onUpdated) onUpdated();
+      setSuccessPopup({ title: 'Work Started', message: `You are now working on ${battery.battery_code}. The repair timer is running.`, autoCloseMs: 1600 });
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
       setError(msg);
@@ -597,6 +601,7 @@ function TechnicianRepairPanel({
       setIssueNote('');
       setIssuePhotos([]);
       if (onUpdated) onUpdated();
+      setSuccessPopup({ title: 'Marked Unserviceable', message: 'Now remove and restock the fitted parts below.', autoCloseMs: 2000 });
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -686,6 +691,13 @@ function TechnicianRepairPanel({
 
   return (
     <div className="mb-4 sm:mb-6">
+      <SuccessPopup
+        open={Boolean(successPopup)}
+        title={successPopup?.title}
+        message={successPopup?.message}
+        autoCloseMs={successPopup?.autoCloseMs}
+        onClose={() => setSuccessPopup(null)}
+      />
       {/* ── Passed Back to Technician Banner ── */}
       {battery.status === 'in_repair' && passBackService && (
         <div className="mb-3.5 sm:mb-5 rounded-xl sm:rounded-2xl border border-amber-300 bg-amber-50 p-3 sm:p-4 shadow-sm dark:border-amber-900/50 dark:bg-amber-950/20">
