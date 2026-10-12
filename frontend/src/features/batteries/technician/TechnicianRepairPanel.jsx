@@ -198,6 +198,10 @@ function TechnicianRepairPanel({
       removedParts: removedHistory,
       removedBy: firstRemoved?.removed_by_staff_name || 'Workshop Staff',
       removedAt: firstRemoved?.removed_at || null,
+      // a technician declared it unserviceable during repair: nobody tested
+      // it, so there are no tester details and no parts to remove
+      markedByTechnician:
+        !battery?.failed_testing && !latestIssue?.failed_testing && !passBackService && removedHistory.length === 0,
     };
   })();
 
@@ -2023,22 +2027,22 @@ function TechnicianRepairPanel({
               </div>
 
               <div className="mb-3 space-y-2 rounded-2xl border border-red-200 bg-red-50/60 p-3 dark:border-red-900/60 dark:bg-red-950/20">
-                <p className="border-b border-red-200/60 pb-1 text-[11px] font-bold uppercase tracking-wider text-red-900 dark:border-red-900/40 dark:text-red-300">⚠ 2. Tested &amp; Marked Unserviceable</p>
+                <p className="border-b border-red-200/60 pb-1 text-[11px] font-bold uppercase tracking-wider text-red-900 dark:border-red-900/40 dark:text-red-300">{unserviceableAlertData.markedByTechnician ? '⚠ 2. Marked Unserviceable' : '⚠ 2. Tested & Marked Unserviceable'}</p>
                 <div>
-                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Testing Diagnosis</p>
+                  <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">{unserviceableAlertData.markedByTechnician ? 'Reason' : 'Testing Diagnosis'}</p>
                   <span className="inline-block rounded-lg border border-red-200 bg-red-100 px-2.5 py-1 font-bold text-red-800 dark:border-red-900/60 dark:bg-red-950/60 dark:text-red-300">{unserviceableAlertData.reason}</span>
                 </div>
                 <div className="flex justify-between border-t border-red-200/50 pt-1 dark:border-red-900/30">
-                  <span className="font-semibold text-slate-500 dark:text-neutral-400">Tested By</span>
+                  <span className="font-semibold text-slate-500 dark:text-neutral-400">{unserviceableAlertData.markedByTechnician ? 'Reported By' : 'Tested By'}</span>
                   <span className="flex items-center gap-1 font-bold text-slate-900 dark:text-white">
                     {unserviceableAlertData.staffName}
                     {unserviceableAlertData.isTestedByMe && <span className="rounded border border-red-200 bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700 dark:border-red-800 dark:bg-red-950/60 dark:text-red-300">You</span>}
                   </span>
                 </div>
-                <div className="flex justify-between"><span className="font-semibold text-slate-500 dark:text-neutral-400">Tested Date</span><span className="font-bold text-slate-700 dark:text-neutral-300">{fmtDateTime(unserviceableAlertData.reportedAt)}</span></div>
+                <div className="flex justify-between"><span className="font-semibold text-slate-500 dark:text-neutral-400">{unserviceableAlertData.markedByTechnician ? 'Reported Date' : 'Tested Date'}</span><span className="font-bold text-slate-700 dark:text-neutral-300">{fmtDateTime(unserviceableAlertData.reportedAt)}</span></div>
                 {unserviceableAlertData.note && (
                   <div className="border-t border-red-200/50 pt-1 dark:border-red-900/30">
-                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">Tester Notes</p>
+                    <p className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">{unserviceableAlertData.markedByTechnician ? 'Notes' : 'Tester Notes'}</p>
                     <p className="italic text-red-950 dark:text-red-200">"{unserviceableAlertData.note}"</p>
                   </div>
                 )}
@@ -2056,6 +2060,7 @@ function TechnicianRepairPanel({
                 )}
               </div>
 
+              {!unserviceableAlertData.markedByTechnician && (
               <div className="mb-2 space-y-1.5 rounded-2xl border border-emerald-200 bg-emerald-50/50 p-3 dark:border-emerald-900/60 dark:bg-emerald-950/20">
                 <p className="border-b border-emerald-200/60 pb-1 text-[11px] font-bold uppercase tracking-wider text-emerald-900 dark:border-emerald-900/40 dark:text-emerald-300">✓ 3. Parts Removed &amp; Restocked</p>
                 {unserviceableAlertData.hasRemovedParts ? (
@@ -2080,6 +2085,7 @@ function TechnicianRepairPanel({
                   <p className="py-1 italic text-slate-600 dark:text-neutral-400">No fitted parts required removal for this unit.</p>
                 )}
               </div>
+              )}
             </div>
             <div className="flex flex-col gap-2 border-t border-slate-100 p-4 pt-2 dark:border-white/10">
               <button type="button" onClick={handleScanNext} className="w-full rounded-2xl bg-red-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-red-700">📷 Scan Next Battery</button>

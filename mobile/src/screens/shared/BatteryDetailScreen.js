@@ -648,6 +648,10 @@ export default function BatteryDetailScreen() {
             servicedAt,
             fittedParts,
             isTestedByMe,
+            // a technician declared it unserviceable during repair: nobody
+            // tested it, so there are no tester details and no parts to remove
+            markedByTechnician:
+              !data.battery?.failed_testing && !latestIssue?.failed_testing && !latestPassBack && removedParts.length === 0,
           });
           setShowUnserviceableAlertModal(true);
         } else if (fromScan && isTestingStatus) {
@@ -3705,14 +3709,14 @@ export default function BatteryDetailScreen() {
                 <View className="flex-row items-center gap-1.5 pb-1 border-b border-red-200/60 dark:border-red-900/40">
                   <Icon name="alertCircle" color="#dc2626" size={13} />
                   <Text className="text-[11px] font-bold text-red-900 dark:text-red-300 uppercase tracking-wider">
-                    2. Tested &amp; Marked Unserviceable
+                    {unserviceableAlertData?.markedByTechnician ? '2. Marked Unserviceable' : '2. Tested & Marked Unserviceable'}
                   </Text>
                 </View>
 
                 {/* Reason */}
                 <View className="pb-1">
                   <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                    Testing Diagnosis
+                    {unserviceableAlertData?.markedByTechnician ? 'Reason' : 'Testing Diagnosis'}
                   </Text>
                   <View className="self-start rounded-lg bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 px-2.5 py-1">
                     <Text className="text-xs font-bold text-red-800 dark:text-red-300">
@@ -3723,7 +3727,7 @@ export default function BatteryDetailScreen() {
 
                 {/* Tested By */}
                 <View className="flex-row items-center justify-between py-0.5 border-t border-red-200/50 dark:border-red-900/30">
-                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tested By</Text>
+                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">{unserviceableAlertData?.markedByTechnician ? 'Reported By' : 'Tested By'}</Text>
                   <View className="flex-row items-center gap-1">
                     <Text className="text-xs font-bold text-slate-900 dark:text-white">
                       {unserviceableAlertData?.staffName || 'Supervisor / Tester'}
@@ -3738,7 +3742,7 @@ export default function BatteryDetailScreen() {
 
                 {/* Tested Date */}
                 <View className="flex-row items-center justify-between py-0.5">
-                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">Tested Date</Text>
+                  <Text className="text-xs font-semibold text-slate-500 dark:text-slate-400">{unserviceableAlertData?.markedByTechnician ? 'Reported Date' : 'Tested Date'}</Text>
                   <Text className="text-xs font-bold text-slate-700 dark:text-slate-300">
                     {unserviceableAlertData?.reportedAt
                       ? `${new Date(unserviceableAlertData.reportedAt).toLocaleDateString('en-GB', {
@@ -3757,7 +3761,7 @@ export default function BatteryDetailScreen() {
                 {unserviceableAlertData?.note ? (
                   <View className="pt-1 border-t border-red-200/50 dark:border-red-900/30">
                     <Text className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-1">
-                      Tester Notes
+                      {unserviceableAlertData?.markedByTechnician ? 'Notes' : 'Tester Notes'}
                     </Text>
                     <Text className="text-xs text-red-950 dark:text-red-200 italic">
                       "{unserviceableAlertData.note}"
@@ -3800,7 +3804,8 @@ export default function BatteryDetailScreen() {
                 )}
               </View>
 
-              {/* ── 3. Parts Removed (Who Removed) ── */}
+              {/* ── 3. Parts Removed (Who Removed) — not for a unit a technician marked unserviceable ── */}
+              {!unserviceableAlertData?.markedByTechnician && (
               <View className="mb-2 rounded-2xl border border-emerald-200 dark:border-emerald-900/60 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 space-y-1.5">
                 <View className="flex-row items-center gap-1.5 pb-1 border-b border-emerald-200/60 dark:border-emerald-900/40">
                   <Icon name="checkCircle" color="#059669" size={13} />
@@ -3864,6 +3869,7 @@ export default function BatteryDetailScreen() {
                   </Text>
                 )}
               </View>
+              )}
             </ScrollView>
 
             {/* Action Buttons */}
