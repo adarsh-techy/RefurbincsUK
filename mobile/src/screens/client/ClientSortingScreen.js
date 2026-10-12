@@ -12,13 +12,7 @@ import SortDialog, { NameModal } from '../../components/client/sorting/SortDialo
 import SortGroupCard from '../../components/client/sorting/SortGroupCard';
 import SortedBattery from '../../components/client/sorting/SortedBattery';
 import AvailableBatteries from '../../components/client/sorting/AvailableBatteries';
-import {
-  NOT_WITH_CLIENT_STATUSES,
-  capitalizeFirstLetter,
-  formatDate,
-  isBatteryPackedForRepair,
-  plural,
-} from '../../components/client/sorting/sort-utils';
+import { NOT_WITH_CLIENT_STATUSES, capitalizeFirstLetter, formatDate, isBatteryPackedForRepair, plural, sortedBatteryCodes } from '../../components/client/sorting/sort-utils';
 
 // Battery Sorting — the mobile twin of the web ClientBatterySortPage.
 // Creating, renaming and deleting a group is saved straight away; batteries
@@ -560,7 +554,7 @@ export default function ClientSortingScreen() {
       <View className="flex-1 bg-slate-50 dark:bg-slate-950">
         <FlatList
           automaticallyAdjustKeyboardInsets
-          data={activeGroup.batteries}
+          data={sortedBatteryCodes(activeGroup.batteries)}
           keyExtractor={(code) => code}
           keyboardShouldPersistTaps="handled"
           ListHeaderComponent={header}

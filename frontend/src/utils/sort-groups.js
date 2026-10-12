@@ -52,3 +52,18 @@ export async function saveSortGroups(groups) {
     throw err;
   }
 }
+
+// Battery codes in ascending battery-number order: prefix A–Z, then the
+// number (HUM-0000002 before HUM-0000010). Used for display and export only —
+// the saved group keeps the order the batteries were scanned in.
+export function compareBatteryCodes(a, b) {
+  const pa = String(a || '').toUpperCase().match(/^([A-Z]*)-?(\d*)/);
+  const pb = String(b || '').toUpperCase().match(/^([A-Z]*)-?(\d*)/);
+  if (pa[1] !== pb[1]) return pa[1] < pb[1] ? -1 : 1;
+  const na = pa[2] === '' ? Infinity : Number(pa[2]);
+  const nb = pb[2] === '' ? Infinity : Number(pb[2]);
+  if (na !== nb) return na - nb;
+  return String(a).localeCompare(String(b));
+}
+
+export const sortedBatteryCodes = (codes) => [...(codes || [])].sort(compareBatteryCodes);

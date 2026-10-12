@@ -14,11 +14,7 @@ import extractBatteryCode from '../../../utils/extract-battery-code';
 import { resolveBatteryInput, recheckUnassignedTag } from '../../../utils/scan-input';
 
 import { useTheme } from '../../../context/ThemeContext';
-import {
-  clearLegacySortGroups,
-  fetchSortGroups,
-  saveSortGroups,
-} from '../../../utils/sort-groups';
+import { clearLegacySortGroups, fetchSortGroups, saveSortGroups, sortedBatteryCodes } from '../../../utils/sort-groups';
 import {
   FiLayers,
   FiCalendar,
@@ -272,7 +268,7 @@ function ClientBatterySortPage() {
   function handleExportExcel() {
     if (!activeGroup || !activeGroup.batteries || activeGroup.batteries.length === 0) return;
 
-    const exportData = activeGroup.batteries.map((code) => ({
+    const exportData = sortedBatteryCodes(activeGroup.batteries).map((code) => ({
       'Battery ID': code,
     }));
 
@@ -901,7 +897,7 @@ function ClientBatterySortPage() {
         ) : detailViewMode === 'table' ? (
           <DataTable
             columns={sortedTableColumns}
-            rows={activeGroup.batteries.map((code) => ({
+            rows={sortedBatteryCodes(activeGroup.batteries).map((code) => ({
               id: code,
               code,
               match: codeToBattery.get(code.toUpperCase()),
@@ -912,7 +908,7 @@ function ClientBatterySortPage() {
           />
         ) : (
           <div className="grid max-h-[calc(100vh-340px)] grid-cols-1 gap-5 overflow-y-auto p-1 pr-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {activeGroup.batteries.map((code) => {
+            {sortedBatteryCodes(activeGroup.batteries).map((code) => {
               const match = codeToBattery.get(code.toUpperCase());
               const isPackedForRepair = isBatteryPackedForRepair(match);
               const packedDate = getBatteryPackedDate(match);

@@ -1,5 +1,6 @@
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
+import { sortedBatteryCodes } from '../components/client/sorting/sort-utils';
 
 // Sort group → .xlsx, the mobile twin of handleExportExcel on the web
 // ClientBatterySortPage: one sheet named after the group (Excel-safe, max 31
@@ -8,10 +9,11 @@ import { File, Paths } from 'expo-file-system';
 
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
+
 export async function exportSortGroup(group) {
   // loaded on first use, not at app start
   const XLSX = require('xlsx');
-  const codes = group?.batteries || [];
+  const codes = sortedBatteryCodes(group?.batteries); // ascending battery number
   if (codes.length === 0) throw new Error('This group has no batteries to export yet.');
 
   const worksheet = XLSX.utils.json_to_sheet(codes.map((code) => ({ 'Battery ID': code })));
