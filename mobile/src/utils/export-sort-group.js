@@ -1,4 +1,3 @@
-import * as XLSX from 'xlsx';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
 
@@ -10,6 +9,8 @@ import { File, Paths } from 'expo-file-system';
 const XLSX_MIME = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
 
 export async function exportSortGroup(group) {
+  // loaded on first use, not at app start
+  const XLSX = require('xlsx');
   const codes = group?.batteries || [];
   if (codes.length === 0) throw new Error('This group has no batteries to export yet.');
 

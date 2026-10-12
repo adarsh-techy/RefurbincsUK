@@ -159,7 +159,9 @@ class ZebraDataWedgeModule : Module() {
     results.clear()
 
     send("com.symbol.datawedge.api.GET_VERSION_INFO", "")
-    send("com.symbol.datawedge.api.CREATE_PROFILE", profileName, "create_profile")
+    // No CREATE_PROFILE: it answers "PROFILE_ALREADY_EXIST - FAILURE" on every
+    // start after the first. SET_CONFIG with CREATE_IF_NOT_EXIST creates the
+    // profile when missing and updates it when it exists.
 
     // 1) profile ↔ this app, QR/barcode in, intent out, keystroke off
     val app = Bundle().apply {
@@ -183,7 +185,7 @@ class ZebraDataWedgeModule : Module() {
     send("com.symbol.datawedge.api.SET_CONFIG", Bundle().apply {
       putString("PROFILE_NAME", profileName)
       putString("PROFILE_ENABLED", "true")
-      putString("CONFIG_MODE", "UPDATE")
+      putString("CONFIG_MODE", "CREATE_IF_NOT_EXIST")
       putParcelableArray("APP_LIST", arrayOf(app))
       putParcelableArrayList("PLUGIN_CONFIG", arrayListOf(barcode, intentOut, keystroke))
     }, "profile_setup")

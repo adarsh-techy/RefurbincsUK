@@ -13,14 +13,15 @@ let subscription = null;
 
 function ensureSubscribed() {
   if (subscription || !DataWedge.hasNativeModule) return;
-  subscription = DataWedge.addScanListener(({ data }) => {
+  subscription = DataWedge.addScanListener(({ data, source, labelType }) => {
     const top = handlers[handlers.length - 1];
     if (!top) return;
     String(data || '')
       .split(/[\r\n]+/)
       .map((v) => v.trim())
       .filter(Boolean)
-      .forEach((v) => top.handle(v));
+      // meta tells an RFID read (source "rfid") from a barcode / QR read
+      .forEach((v) => top.handle(v, { source, labelType }));
   });
 }
 
@@ -34,6 +35,10 @@ export function setupHardwareScanner() {
 export const hardwareScannerAvailable = () => DataWedge.isAvailable();
 export const hardwareScannerStatus = () => DataWedge.getStatus();
 
+// DataWedge's answer to each setup command ({ command, result, info }), as it
+// arrives — used by the Profile "Zebra RFID reader" card.
+export const addSetupResultListener = (cb) => DataWedge.addResultListener(cb);
+
 export function useHardwareScan(handler, enabled = true) {
   const ref = useRef(handler);
   ref.current = handler;
@@ -41,7 +46,7 @@ export function useHardwareScan(handler, enabled = true) {
   useEffect(() => {
     if (!enabled || !focused || !DataWedge.hasNativeModule) return undefined;
     ensureSubscribed();
-    const entry = { handle: (v) => ref.current?.(v) };
+    const entry = { handle: (v, meta) => ref.current?.(v, meta) };
     handlers.push(entry);
     return () => {
       const i = handlers.indexOf(entry);

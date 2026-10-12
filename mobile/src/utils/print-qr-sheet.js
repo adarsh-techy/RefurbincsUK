@@ -1,7 +1,8 @@
-import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
-import QRCodeCore from 'qrcode/lib/core/qrcode';
-import SvgRenderer from 'qrcode/lib/renderer/svg-tag';
+
+// Loaded on first use, not at app start: keeps startup light and keeps a
+// problem in a print / export library from affecting launch (e.g. in Expo Go).
+const loadPrint = () => require('expo-print');
 
 // QR sheet for printing — the mobile twin of the web utils/generate-qr-sheet.js:
 // an A4 grid, `columns` across x 9 down (45 per page at the default 5), one QR
@@ -30,6 +31,8 @@ const escapeHtml = (s) =>
   String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 export function qrSvg(text) {
+  const QRCodeCore = require('qrcode/lib/core/qrcode');
+  const SvgRenderer = require('qrcode/lib/renderer/svg-tag');
   return SvgRenderer.render(QRCodeCore.create(String(text), { errorCorrectionLevel: 'M' }), { margin: 1 });
 }
 
@@ -92,13 +95,13 @@ function checkSize(codes) {
 // Opens the system print dialog (printer, or "Save as PDF").
 export async function printQrSheet(codes, columns = DEFAULT_COLUMNS) {
   checkSize(codes);
-  await Print.printAsync({ html: buildQrSheetHtml(codes, columns) });
+  await loadPrint().printAsync({ html: buildQrSheetHtml(codes, columns) });
 }
 
 // Builds the PDF and opens the share sheet (WhatsApp, email, Drive, …).
 export async function shareQrSheet(codes, columns = DEFAULT_COLUMNS) {
   checkSize(codes);
-  const { uri } = await Print.printToFileAsync({ html: buildQrSheetHtml(codes, columns), width: PAGE_W, height: PAGE_H });
+  const { uri } = await loadPrint().printToFileAsync({ html: buildQrSheetHtml(codes, columns), width: PAGE_W, height: PAGE_H });
   if (!(await Sharing.isAvailableAsync())) throw new Error(`Sharing isn't available on this device. PDF saved at ${uri}`);
   await Sharing.shareAsync(uri, {
     mimeType: 'application/pdf',

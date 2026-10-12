@@ -1,6 +1,9 @@
-import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { File, Paths } from 'expo-file-system';
+
+// Loaded on first use, not at app start: keeps startup light and keeps a
+// problem in a print / export library from affecting launch (e.g. in Expo Go).
+const loadPrint = () => require('expo-print');
 
 // Milestone certificate PDF — the mobile twin of the web
 // utils/generate-milestone-certificate.js (jsPDF). Same two A4-landscape
@@ -217,13 +220,13 @@ export function certificateFileName(certificate, clientName) {
 
 // Opens the system print dialog (printer, or "Save as PDF").
 export async function printCertificate(certificate, clientName) {
-  await Print.printAsync({ html: buildCertificateHtml(certificate, clientName), orientation: Print.Orientation.landscape });
+  await loadPrint().printAsync({ html: buildCertificateHtml(certificate, clientName), orientation: loadPrint().Orientation.landscape });
 }
 
 // Builds the PDF under the same file name the web download uses and opens
 // the share sheet (save to Files, WhatsApp, email…).
 export async function shareCertificate(certificate, clientName) {
-  const { uri } = await Print.printToFileAsync({ html: buildCertificateHtml(certificate, clientName), width: W, height: H });
+  const { uri } = await loadPrint().printToFileAsync({ html: buildCertificateHtml(certificate, clientName), width: W, height: H });
   let shareUri = uri;
   try {
     const named = new File(Paths.cache, certificateFileName(certificate, clientName));

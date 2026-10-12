@@ -1,6 +1,9 @@
-import * as Print from 'expo-print';
 import * as Sharing from 'expo-sharing';
 import { qrContentFor, qrSvg } from './print-qr-sheet';
+
+// Loaded on first use, not at app start: keeps startup light and keeps a
+// problem in a print / export library from affecting launch (e.g. in Expo Go).
+const loadPrint = () => require('expo-print');
 
 // Printable battery report — the mobile twin of the web BatteryDetailPage
 // "Print Report" (window.print). Built from the same GET /batteries/:code
@@ -137,11 +140,11 @@ export function buildBatteryReportHtml(data, { showPrices = false } = {}) {
 }
 
 export async function printBatteryReport(data, opts) {
-  await Print.printAsync({ html: buildBatteryReportHtml(data, opts) });
+  await loadPrint().printAsync({ html: buildBatteryReportHtml(data, opts) });
 }
 
 export async function shareBatteryReport(data, opts) {
-  const { uri } = await Print.printToFileAsync({ html: buildBatteryReportHtml(data, opts) });
+  const { uri } = await loadPrint().printToFileAsync({ html: buildBatteryReportHtml(data, opts) });
   if (!(await Sharing.isAvailableAsync())) throw new Error(`Sharing isn't available on this device. PDF saved at ${uri}`);
   await Sharing.shareAsync(uri, {
     mimeType: 'application/pdf',
