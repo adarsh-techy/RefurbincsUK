@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, FlatList, Modal, Text, TouchableOpacity, View } from 'react-native';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import { resolveBatteryInput } from '../../utils/scan-input';
 import ScanBatteryInput from './ScanBatteryInput';
 
 // Battery-by-battery check before confirming a shipment — the mobile twin of
@@ -70,9 +70,7 @@ export default function ScanVerifyModal({
 
   function handleScan(raw) {
     const resolved = resolveBatteryInput(raw, batteries);
-    if (resolved.unassignedTag) {
-      return report('bad', `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})`);
-    }
+    if (resolved.unassignedTag) return { ignore: true }; // unregistered tag: ignored
     const query = (resolved.code || '').trim().toUpperCase();
     if (!query) return;
     const match = batteries.find(

@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { Alert, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import extractBatteryCode from '../../utils/extract-battery-code';
-import { isLikelyRfidTag, resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../utils/scan-input';
+import { isLikelyRfidTag, resolveBatteryInput } from '../../utils/scan-input';
 import { StatusBadge, clientBatteryStatus } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import RfidLookupButton from '../../components/scan/RfidLookupButton';
@@ -60,10 +60,7 @@ export default function ClientScanScreen() {
       try {
         const { data } = await apiClient.get('/clients/me/batteries');
         const resolved = resolveBatteryInput(value, data?.data || []);
-        if (resolved.unassignedTag) {
-          Alert.alert('RFID tag not assigned', `${UNASSIGNED_TAG_MESSAGE} (tag ${resolved.code})`);
-          return;
-        }
+        if (resolved.unassignedTag) return; // unregistered tag: ignored
         goToBattery(resolved.code);
         return;
       } catch {

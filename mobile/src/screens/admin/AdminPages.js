@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Alert, Linking, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Alert, Linking, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import AdminListScreen from '../../components/admin/AdminListScreen';
 import apiClient from '../../services/api-client';
 import { Badge } from '../../components/ui/Badge';
+import DateField from '../../components/ui/DateField';
 
 // The admin list pages, each a config over AdminListScreen. Bespoke screens
 // (Parts restock, Finance, Generate QR, Dashboard, Batteries, Intakes,
@@ -40,7 +41,6 @@ function StatCards({ items }) {
 // ── Filter controls (shared by Ratings / Audit log) ──────────────────────
 const pad2 = (n) => String(n).padStart(2, '0');
 const ymd = (d) => `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
-const isYmd = (v) => /^\d{4}-\d{2}-\d{2}$/.test(v) && !Number.isNaN(new Date(`${v}T00:00:00`).getTime());
 
 // same presets as the web Ratings page
 function presetRange(id) {
@@ -71,28 +71,12 @@ function Chips({ options, value, onChange }) {
   );
 }
 
-// YYYY-MM-DD box (no date-picker package): reports a value only once it is
-// a real date, or '' when cleared
+// Date picker / YYYY-MM-DD box: reports a value only once it is a real
+// date, or '' when cleared
 function DateInput({ label, value, onChange }) {
-  const [text, setText] = useState(value || '');
-  useEffect(() => setText(value || ''), [value]);
-  const bad = text !== '' && !isYmd(text);
   return (
     <View className="flex-1">
-      <Text className="mb-1 text-[10px] font-bold uppercase text-slate-400">{label}</Text>
-      <TextInput
-        value={text}
-        onChangeText={(t) => {
-          const v = t.replace(/[^0-9-]/g, '').slice(0, 10);
-          setText(v);
-          if (v === '') onChange('');
-          else if (isYmd(v)) onChange(v);
-        }}
-        placeholder="YYYY-MM-DD"
-        placeholderTextColor="#94a3b8"
-        keyboardType="numbers-and-punctuation"
-        className={`rounded-xl border bg-slate-50 px-3 py-2 text-xs text-slate-900 ${bad ? 'border-red-400' : 'border-slate-200'}`}
-      />
+      <DateField label={label} value={value || ''} onChange={onChange} quick={false} />
     </View>
   );
 }

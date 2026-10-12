@@ -3,9 +3,11 @@ const serviceModel = require('./service.model');
 
 // Joins in the linked login account's email and permissions so the Clients page
 // and permission management can view and manage client dashboard access.
+// user_role marks a recycling partner: its login's role, or — for a partner
+// record with no login — having received recycle shipments.
 async function findAll() {
   const { rows } = await db.query(
-    `SELECT c.*, u.email AS login_email, u.role AS user_role, u.permissions AS user_permissions, u.active AS user_active
+    `SELECT c.*, u.email AS login_email, COALESCE(u.role, CASE WHEN EXISTS (SELECT 1 FROM recycle_batches rbp WHERE rbp.recycle_client_id = c.id) THEN 'recycle_client' END) AS user_role, u.permissions AS user_permissions, u.active AS user_active
      FROM clients c
      LEFT JOIN users u ON u.id = c.user_id
      ORDER BY c.name`
@@ -21,7 +23,7 @@ async function findByUserId(userId) {
 // Same login-email and permissions join as findAll, for the admin-facing client detail page.
 async function findById(id) {
   const { rows } = await db.query(
-    `SELECT c.*, u.email AS login_email, u.role AS user_role, u.permissions AS user_permissions, u.active AS user_active
+    `SELECT c.*, u.email AS login_email, COALESCE(u.role, CASE WHEN EXISTS (SELECT 1 FROM recycle_batches rbp WHERE rbp.recycle_client_id = c.id) THEN 'recycle_client' END) AS user_role, u.permissions AS user_permissions, u.active AS user_active
      FROM clients c
      LEFT JOIN users u ON u.id = c.user_id
      WHERE c.id = $1`,
@@ -206,7 +208,7 @@ async function create({ name, invoiceEmail, email, passwordHash, role = 'client'
   }
 }
 
-async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, permissions, active, batteryPrefix }) {
+async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, permissions, active, batteryPrefix, role }) {
   const client = await db.pool.connect();
   try {
     await client.query('BEGIN');
@@ -305,12 +307,19 @@ async function update(id, { name, invoiceEmail, logoPath, email, passwordHash, p
         );
       }
     } else if (email && passwordHash) {
-      // Provision user account for client if they had no login before
+      // Provision a login for a record that had none — a recycling partner
+      // (asked for, or it has received recycle shipments) gets a partner
+      // login, anything else a fleet-client login.
+      const { rows: shipments } = await client.query(
+        'SELECT 1 FROM recycle_batches WHERE recycle_client_id = $1 LIMIT 1',
+        [clientRow.id]
+      );
+      const userRole = role === 'recycle_client' || shipments.length ? 'recycle_client' : 'client';
       const { rows: userRows } = await client.query(
         `INSERT INTO users (name, email, password_hash, role, permissions, must_change_password)
-         VALUES ($1, $2, $3, 'client', $4, true)
+         VALUES ($1, $2, $3, $4, $5, true)
          RETURNING id`,
-        [name, email, passwordHash, JSON.stringify(permissions || [])]
+        [clientRow.name, email.trim(), passwordHash, userRole, JSON.stringify(userRole === 'client' ? permissions || [] : [])]
       );
       const { rows: linkedRows } = await client.query(
         'UPDATE clients SET user_id = $2 WHERE id = $1 RETURNING *',

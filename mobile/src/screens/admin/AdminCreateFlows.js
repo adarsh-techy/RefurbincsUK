@@ -6,6 +6,7 @@ import ManifestPicker, { resolveScan } from '../../components/admin/sa2/Manifest
 import useFleetClients from '../../components/admin/sa2/useFleetClients';
 import DateTimeField, { DocumentBox, pickDocument } from '../../components/admin/sa2/DateTimeField';
 import { apiError, ClientSelect, ErrorBox, GhostButton, Input, Label, PrimaryButton } from '../../components/admin/sa2/ui';
+import { statusLabel } from '../../components/ui/Badge';
 
 // Admin create flows: "Record a Return" and "Record a Recycle Shipment" —
 // the web ReturnForm and RecycleForm with the same checks, endpoints and
@@ -14,7 +15,7 @@ import { apiError, ClientSelect, ErrorBox, GhostButton, Input, Label, PrimaryBut
 // GET /batteries/:code like the web. (Truck intakes are recorded by
 // clients, not created from the admin app.)
 
-const statusText = (s) => String(s || '').replace('_', ' ');
+const statusText = (s) => statusLabel(s);
 
 function Card({ children }) {
   return <View className="gap-3.5 rounded-2xl border border-slate-200 bg-white p-4">{children}</View>;

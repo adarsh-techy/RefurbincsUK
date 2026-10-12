@@ -29,6 +29,14 @@ const STATUS_MAP = {
   recycled: { tone: 'black', label: 'Recycled', dot: 'bg-emerald-400 shadow-xs' },
 };
 
+// Plain-text label for a battery status (for sentences and small chips).
+export function statusLabel(status) {
+  if (!status) return 'Registered';
+  const meta = STATUS_MAP[status];
+  if (meta) return meta.subLabel ? `${meta.label} · ${meta.subLabel}` : meta.label;
+  return String(status).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 function Badge({ tone = 'neutral', status, children }) {
   if (status) {
     return <StatusBadge status={status} />;

@@ -22,6 +22,15 @@ async function anyExist() {
   return rows.length > 0;
 }
 
+// Same as findById plus token_version, for checking a JWT is still current.
+async function findForAuth(id) {
+  const { rows } = await db.query(`SELECT ${PUBLIC_COLUMNS}, token_version FROM users WHERE id = $1`, [id]);
+  const row = rows[0];
+  if (!row) return null;
+  const { token_version: tokenVersion, ...user } = row;
+  return { user, tokenVersion };
+}
+
 async function findById(id) {
   const { rows } = await db.query(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = $1`, [id]);
   return rows[0];
@@ -71,4 +80,4 @@ async function remove(id) {
   await db.query('DELETE FROM users WHERE id = $1', [id]);
 }
 
-module.exports = { findAll, anyExist, findById, findByEmail, create, update, updatePassword, remove };
+module.exports = { findForAuth, findAll, anyExist, findById, findByEmail, create, update, updatePassword, remove };

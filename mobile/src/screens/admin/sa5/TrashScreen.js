@@ -252,7 +252,7 @@ export default function TrashScreen() {
                       <View className="flex-row flex-wrap items-center gap-1.5">
                         <Text className="text-xs font-medium text-slate-900">{item.deleted_by_name || 'System / Admin'}</Text>
                         {item.deleted_by_role ? (
-                          <Text className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold uppercase text-slate-600">{item.deleted_by_role.replace('_', ' ')}</Text>
+                          <Text className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold uppercase text-slate-600">{item.deleted_by_role.replace(/_/g, ' ')}</Text>
                         ) : null}
                       </View>
                       {item.deleted_by_email ? <Text className="text-[11px] text-slate-500">{item.deleted_by_email}</Text> : null}

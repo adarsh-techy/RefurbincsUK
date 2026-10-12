@@ -1,8 +1,6 @@
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
-const env = require('../config/env');
 const { corsOrigin } = require('../config/cors-origin');
-const userModel = require('../models/user.model');
+const { verifyToken } = require('../middlewares/auth');
 const partModel = require('../models/part.model');
 const batteryModel = require('../models/battery.model');
 const clientModel = require('../models/client.model');
@@ -54,9 +52,8 @@ async function authenticate(socket, next) {
     const token = socket.handshake.auth?.token;
     if (!token) return next(new Error('Authentication required'));
 
-    const decoded = jwt.verify(token, env.jwt.secret);
-    const user = await userModel.findById(decoded.id);
-    if (!user || !user.active) return next(new Error('Invalid or expired token'));
+    const user = await verifyToken(token);
+    if (!user) return next(new Error('Invalid or expired token'));
 
     socket.user = user;
     next();

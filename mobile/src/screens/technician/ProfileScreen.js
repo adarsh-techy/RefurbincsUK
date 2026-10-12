@@ -3,7 +3,7 @@ import { ActivityIndicator, ScrollView, Text, TextInput, TouchableOpacity, View 
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
-import { logout, setUser } from '../../store/auth-slice';
+import { logout, setUser, setToken } from '../../store/auth-slice';
 import ZebraScannerCard from '../../components/scan/ZebraScannerCard';
 import { hasClientPermission } from '../../utils/permissions';
 
@@ -58,6 +58,7 @@ export default function ProfileScreen() {
     setError(null);
     try {
       const { data } = await apiClient.patch('/auth/change-password', { currentPassword, newPassword });
+      if (data.token) await dispatch(setToken(data.token));
       dispatch(setUser(data.user));
       setCurrentPassword('');
       setNewPassword('');

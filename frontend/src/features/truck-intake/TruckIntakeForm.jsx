@@ -15,6 +15,7 @@ import useFetchList from '../../utils/use-fetch-list';
 import AlertModal from '../../components/ui/overlays/AlertModal';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
+import { statusLabel } from '../../components/ui/primitives/Badge';
 
 const inputClasses =
   'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs transition-colors';
@@ -107,7 +108,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
       if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(battery.status)) {
         flashFeedback(
           'bad',
-          `${battery.battery_code} hasn't been returned to the client yet (status: ${battery.status.replace('_', ' ')}).`
+          `${battery.battery_code} hasn't been returned to the client yet (status: ${statusLabel(battery.status)}).`
         );
         return;
       }
@@ -380,7 +381,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
                                     {b.battery_code}
                                   </span>
                                   <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
-                                    {b.status?.replace('_', ' ') || 'Returned'}
+                                    {b.status ? statusLabel(b.status) : 'Returned'}
                                   </span>
                                 </div>
                               </div>
@@ -510,7 +511,7 @@ function TruckIntakeForm({ intake, onSaved, onCancel }) {
 
                       <div className="flex items-center gap-2 shrink-0">
                         <span className="inline-flex items-center gap-1 rounded-lg bg-blue-100 px-2 py-0.5 text-[10px] font-bold text-blue-800 dark:bg-blue-900/60 dark:text-blue-200">
-                          {b.status?.replace('_', ' ') || 'Intake'}
+                          {b.status ? statusLabel(b.status) : 'Intake'}
                         </span>
                         <button
                           type="button"

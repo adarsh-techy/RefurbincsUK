@@ -34,9 +34,10 @@ export default function RfidLookupButton({ onScan, label = 'Scan RFID tag', clas
     if (Date.now() - lockRef.current < 1500) return;
     lockRef.current = Date.now();
     const problem = await checkBattery(raw);
+    if (problem && /not assigned/i.test(problem)) return; // unregistered tag: ignored
     if (problem) {
       Vibration.vibrate([0, 160, 90, 160]);
-      Alert.alert(/not assigned/i.test(problem) ? 'RFID tag not assigned' : 'Battery not found', `${problem}\n\nScanned: ${raw}`);
+      Alert.alert('Battery not found', `${problem}\n\nScanned: ${raw}`);
       return;
     }
     onScan?.(raw);

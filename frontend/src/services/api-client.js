@@ -24,6 +24,19 @@ apiClient.interceptors.response.use(
         window.location.href = '/login';
       }
     }
+    // The account is on a temporary password: the API only allows the
+    // password change until it's done (see ProtectedRoute).
+    if (error.response?.status === 403 && error.response.data?.code === 'MUST_CHANGE_PASSWORD') {
+      try {
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (user) localStorage.setItem('user', JSON.stringify({ ...user, must_change_password: true }));
+      } catch {
+        // unreadable stored user — the login screen will sort it out
+      }
+      if (window.location.pathname !== '/set-password') {
+        window.location.href = '/set-password';
+      }
+    }
     return Promise.reject(error);
   }
 );

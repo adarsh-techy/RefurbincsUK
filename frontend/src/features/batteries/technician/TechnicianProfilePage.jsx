@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../../services/api-client';
-import { logout, setUser } from '../../auth/auth-slice';
+import { logout, setUser, setToken } from '../../auth/auth-slice';
 import { canTestBatteries } from '../../../utils/permissions';
 
 function TechnicianProfilePage() {
@@ -38,6 +38,7 @@ function TechnicianProfilePage() {
     setError(null);
     try {
       const { data } = await apiClient.patch('/auth/change-password', { currentPassword, newPassword });
+      if (data.token) dispatch(setToken(data.token));
       dispatch(setUser(data.user));
       setCurrentPassword('');
       setNewPassword('');
@@ -62,7 +63,7 @@ function TechnicianProfilePage() {
     : user?.role === 'technician'
       ? 'Technician'
       : user?.role
-        ? user.role.replace('_', ' ')
+        ? user.role.replace(/_/g, ' ')
         : 'Staff';
 
   return (

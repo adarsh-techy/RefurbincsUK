@@ -20,8 +20,10 @@ async function create({ clientId, clientUserId, batteryId, batteryCode, returnId
   return rows[0];
 }
 
-async function findAll({ clientId, rating, search, startDate, endDate, limit = 50, offset = 0 }) {
-  let whereConditions = ['1=1'];
+// The list and its summary cards use the same filters, so the cards always
+// describe exactly the reviews being shown (expects clients joined as c).
+function buildFilters({ clientId, rating, search, startDate, endDate }) {
+  const whereConditions = ['1=1'];
   const params = [];
 
   if (clientId) {
@@ -44,14 +46,18 @@ async function findAll({ clientId, rating, search, startDate, endDate, limit = 5
     whereConditions.push(`br.created_at <= $${params.length}::timestamptz`);
   }
 
-  if (search) {
+  if (search && search.trim()) {
     params.push(`%${search.trim()}%`);
     whereConditions.push(
       `(br.battery_code ILIKE $${params.length} OR br.custom_feedback ILIKE $${params.length} OR c.name ILIKE $${params.length})`
     );
   }
 
-  const whereClause = whereConditions.join(' AND ');
+  return { whereClause: whereConditions.join(' AND '), params };
+}
+
+async function findAll({ clientId, rating, search, startDate, endDate, limit = 50, offset = 0 }) {
+  const { whereClause, params } = buildFilters({ clientId, rating, search, startDate, endDate });
 
   const query = `
     SELECT 
@@ -156,24 +162,8 @@ async function findById(id) {
   return ratingRecord;
 }
 
-async function getStats({ clientId = null, startDate = null, endDate = null } = {}) {
-  const whereClauses = [];
-  const params = [];
-
-  if (clientId) {
-    params.push(clientId);
-    whereClauses.push(`br.client_id = $${params.length}`);
-  }
-  if (startDate) {
-    params.push(startDate);
-    whereClauses.push(`br.created_at >= $${params.length}::timestamptz`);
-  }
-  if (endDate) {
-    params.push(endDate);
-    whereClauses.push(`br.created_at <= $${params.length}::timestamptz`);
-  }
-
-  const whereSql = whereClauses.length > 0 ? `WHERE ${whereClauses.join(' AND ')}` : '';
+async function getStats({ clientId = null, rating = null, search = null, startDate = null, endDate = null } = {}) {
+  const { whereClause, params } = buildFilters({ clientId, rating, search, startDate, endDate });
 
   const { rows } = await db.query(
     `SELECT 
@@ -190,7 +180,8 @@ async function getStats({ clientId = null, startDate = null, endDate = null } = 
          COALESCE(br.return_id, br.id) AS review_key,
          AVG(br.rating) AS rating
        FROM battery_ratings br
-       ${whereSql}
+       LEFT JOIN clients c ON c.id = br.client_id
+       WHERE ${whereClause}
        GROUP BY COALESCE(br.return_id, br.id)
      ) sub`,
     params

@@ -8,9 +8,10 @@ const env = require('../config/env');
 const { PERMISSIONS } = require('../config/permissions');
 
 function signToken(user) {
-  // Only the id is embedded — requireAuth re-fetches role/permissions fresh
-  // from the DB on every request, so nothing else here is ever trusted.
-  return jwt.sign({ id: user.id }, env.jwt.secret, { expiresIn: env.jwt.expiresIn });
+  // Only the id and token version are embedded — requireAuth re-fetches
+  // role/permissions fresh from the DB on every request, and rejects the
+  // token once token_version moves on (password/role/permission/active change).
+  return jwt.sign({ id: user.id, tv: user.token_version || 0 }, env.jwt.secret, { expiresIn: env.jwt.expiresIn });
 }
 
 // A client's uploaded logo lives on their `clients` row, not the `users`
@@ -196,7 +197,10 @@ async function changePassword(req, res, next) {
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
     const user = await userModel.updatePassword(req.user.id, passwordHash);
-    res.json({ user });
+    // The new password signed every other session out (token_version moved
+    // on) — hand this one a fresh token so the caller stays logged in.
+    const { tokenVersion } = await userModel.findForAuth(req.user.id);
+    res.json({ user, token: signToken({ id: req.user.id, token_version: tokenVersion }) });
   } catch (err) {
     next(err);
   }

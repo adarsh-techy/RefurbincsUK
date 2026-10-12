@@ -11,8 +11,8 @@ import { capitalizeWords, ErrorBox, errMessage, Input, Label, PrimaryButton } fr
 //   2. Right to Work & Compliance Credentials (passport, NI, share code, document)
 //   3. Portal Access & Login Credentials (create only: login email, temp password,
 //      Generate, show/hide)
-// The phone also keeps the wage field it already had (the web shows the wage on
-// the staff page but has no field to set it).
+// Section 1 also has the Monthly / Contract Wage field (same as the web form;
+// blank = Standard Hourly).
 // route.params: { staff?, onSaved? }
 
 function generatePassword() {
@@ -97,6 +97,7 @@ export default function StaffFormScreen() {
     if (form.niNumber) fields.niNumber = form.niNumber.trim().toUpperCase();
     if (form.shareCode) fields.shareCode = form.shareCode.trim().toUpperCase();
     if (form.salary !== '') fields.salary = String(Number(form.salary));
+    else if (isEdit && Number(staff?.salary) > 0) fields.salary = '0';
     if (isEdit) {
       fields.active = String(form.active);
     } else if (grantLogin) {

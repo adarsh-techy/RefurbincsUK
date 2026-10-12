@@ -2,6 +2,29 @@ const jwt = require('jsonwebtoken');
 const env = require('../config/env');
 const userModel = require('../models/user.model');
 
+// Requests a user on a temporary password may still make.
+const MUST_CHANGE_ALLOWED = new Set([
+  'GET /api/auth/me',
+  'PATCH /api/auth/change-password',
+]);
+
+// Returns the token's user if the token is valid, the account is active and
+// the token's version is still current (it's bumped on password / role /
+// permission / active changes — see migration 057). Null otherwise. DB errors
+// propagate so an outage isn't reported to the apps as "logged out".
+async function verifyToken(token) {
+  let decoded;
+  try {
+    decoded = jwt.verify(token, env.jwt.secret);
+  } catch {
+    return null;
+  }
+  const found = await userModel.findForAuth(decoded.id);
+  if (!found || !found.user.active) return null;
+  if ((decoded.tv || 0) !== found.tokenVersion) return null;
+  return found.user;
+}
+
 // Verifies the JWT, then re-fetches the user's current role/permissions from
 // the DB rather than trusting the token's claims. This means a permission
 // change (or role change) by a super_admin takes effect on the admin's very
@@ -17,17 +40,26 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ message: 'Authentication required' });
   }
 
+  let user;
   try {
-    const decoded = jwt.verify(token, env.jwt.secret);
-    const user = await userModel.findById(decoded.id);
-    if (!user || !user.active) {
-      return res.status(401).json({ message: 'Invalid or expired token' });
-    }
-    req.user = user;
-    next();
+    user = await verifyToken(token);
   } catch (err) {
-    res.status(401).json({ message: 'Invalid or expired token' });
+    return next(err);
   }
+  if (!user) {
+    return res.status(401).json({ message: 'Invalid or expired token' });
+  }
+  req.user = user;
+
+  // An account on a temporary password may only finish the forced change
+  // (and read itself) until it does — the apps send it to that screen first.
+  if (user.must_change_password && !MUST_CHANGE_ALLOWED.has(`${req.method} ${req.baseUrl}${req.path}`)) {
+    return res.status(403).json({
+      code: 'MUST_CHANGE_PASSWORD',
+      message: 'Please set a new password before continuing.',
+    });
+  }
+  next();
 }
 
 async function optionalAuth(req, res, next) {
@@ -42,14 +74,13 @@ async function optionalAuth(req, res, next) {
   }
 
   try {
-    const decoded = jwt.verify(token, env.jwt.secret);
-    const user = await userModel.findById(decoded.id);
-    if (user && user.active) {
+    const user = await verifyToken(token);
+    if (user && !user.must_change_password) {
       req.user = user;
     }
     next();
-  } catch {
-    next();
+  } catch (err) {
+    next(err);
   }
 }
 
@@ -80,5 +111,5 @@ function requirePermission(permission) {
   };
 }
 
-module.exports = { requireAuth, optionalAuth, requireRole, requirePermission };
+module.exports = { requireAuth, optionalAuth, requireRole, requirePermission, verifyToken };
 

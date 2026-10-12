@@ -1,5 +1,6 @@
-import { Modal, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
 import { Badge, clientBatteryStatus } from '../../ui/Badge';
+import SharedDateField from '../../ui/DateField';
 
 // Helpers and small building blocks shared by the client battery screens
 // (All / Packed / Received / In Service) — same rules as the web
@@ -184,21 +185,16 @@ export function Btn({ label, onPress, disabled, tone = 'primary', className = ''
   );
 }
 
-// Exact-day filter (web <input type="date">): type YYYY-MM-DD or tap Today
+// Exact-day filter (web <input type="date">): native date picker or
+// type YYYY-MM-DD, plus Today / Clear
 export function DateField({ label, value, onChange }) {
-  const valid = !value || /^\d{4}-\d{2}-\d{2}$/.test(value);
   return (
     <View className="flex-1">
       <Text className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500">{label}</Text>
       <View className="flex-row items-center gap-1.5">
-        <TextInput
-          value={value}
-          onChangeText={(t) => onChange(t.replace(/[^0-9-]/g, '').slice(0, 10))}
-          placeholder="YYYY-MM-DD"
-          placeholderTextColor="#94a3b8"
-          keyboardType="numbers-and-punctuation"
-          className={`flex-1 rounded-xl border bg-slate-50 px-3 py-2 text-xs text-slate-900 dark:bg-slate-950 dark:text-white ${valid ? 'border-slate-300 dark:border-slate-700' : 'border-red-400'}`}
-        />
+        <View className="flex-1">
+          <SharedDateField value={value || ''} onChange={onChange} quick={false} clearable={false} />
+        </View>
         {value ? (
           <TouchableOpacity onPress={() => onChange('')} className="rounded-xl bg-slate-100 px-2.5 py-2 dark:bg-slate-800">
             <Text className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Clear</Text>

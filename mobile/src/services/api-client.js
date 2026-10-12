@@ -3,6 +3,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 
 const IPV4_REGEX = /^(\d{1,3}\.){3}\d{1,3}$/;
+const PRODUCTION_API_URL = 'https://refurbincsuk.onrender.com/api';
 
 export function getBaseUrl() {
   const hostUri =
@@ -23,7 +24,9 @@ export function getBaseUrl() {
   const envUrl = process.env.EXPO_PUBLIC_API_URL;
   if (envUrl && !envUrl.includes('exp.direct')) return envUrl;
 
-  return 'http://192.168.31.154:5001/api';
+  // A release build without EXPO_PUBLIC_API_URL must still reach the live
+  // API; the LAN address is only useful while developing.
+  return __DEV__ ? 'http://192.168.31.154:5001/api' : PRODUCTION_API_URL;
 }
 
 const apiClient = axios.create({
@@ -59,6 +62,15 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401 && storeRef) {
       const { logout } = require('../store/auth-slice');
       storeRef.dispatch(logout());
+    }
+    // Temporary password: the API only allows the change until it's done,
+    // and RootNavigator shows SetPassword while this flag is set.
+    if (error.response?.status === 403 && error.response.data?.code === 'MUST_CHANGE_PASSWORD' && storeRef) {
+      const user = storeRef.getState().auth?.user;
+      if (user && !user.must_change_password) {
+        const { setUser } = require('../store/auth-slice');
+        storeRef.dispatch(setUser({ ...user, must_change_password: true }));
+      }
     }
     return Promise.reject(error);
   }

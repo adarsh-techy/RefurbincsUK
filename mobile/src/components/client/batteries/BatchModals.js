@@ -3,7 +3,7 @@ import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'reac
 import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
 import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
-import { Badge } from '../../ui/Badge';
+import { Badge, statusLabel } from '../../ui/Badge';
 import Icon from '../../ui/Icon';
 import {
   Btn,
@@ -278,7 +278,7 @@ export function AddMoreModal({ batch, fleet = [], onClose, onChanged }) {
     const existing = fleet.find((b) => b.battery_code.toUpperCase() === code);
     if (existing) {
       if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(existing.status)) {
-        return { tone: 'bad', message: `Battery ${code} is already in the repair pipeline (${existing.status.replace('_', ' ')}).` };
+        return { tone: 'bad', message: `Battery ${code} is already in the repair pipeline (${statusLabel(existing.status)}).` };
       }
       if (existing.status === 'unserviceable') return { tone: 'bad', message: `Battery ${code} is marked as unserviceable.` };
     }

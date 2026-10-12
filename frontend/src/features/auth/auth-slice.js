@@ -73,6 +73,12 @@ const authSlice = createSlice({
       state.user = action.payload;
       localStorage.setItem('user', JSON.stringify(action.payload));
     },
+    // Changing your own password signs out every other session and returns
+    // a fresh token for this one.
+    setToken(state, action) {
+      state.token = action.payload;
+      localStorage.setItem('token', action.payload);
+    },
   },
   extraReducers: (builder) => {
     builder
@@ -131,5 +137,5 @@ const authSlice = createSlice({
   },
 });
 
-export const { logout, setUser } = authSlice.actions;
+export const { logout, setUser, setToken } = authSlice.actions;
 export default authSlice.reducer;

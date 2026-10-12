@@ -147,6 +147,18 @@ async function update(req, res, next) {
         if (prefixError) return res.status(prefixError.includes('already used') ? 409 : 400).json({ message: prefixError });
       }
     }
+    // Creating a login for a record that has none needs both an email and a
+    // temporary password (8+ characters).
+    if ((email && String(email).trim()) || tempPassword) {
+      const existing = await clientModel.findById(req.params.id);
+      if (!existing) return res.status(404).json({ message: 'Client not found' });
+      if (!existing.user_id && !(email && String(email).trim() && tempPassword)) {
+        return res.status(400).json({ message: 'To create a login, enter both an email and a temporary password.' });
+      }
+    }
+    if (tempPassword && String(tempPassword).length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters.' });
+    }
     const passwordHash = tempPassword ? await bcrypt.hash(tempPassword, 10) : undefined;
     let logoPath;
     let previousLogoPath;
@@ -164,6 +176,7 @@ async function update(req, res, next) {
       permissions: parsedPermissions,
       active,
       batteryPrefix,
+      role: req.body.role,
     });
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });

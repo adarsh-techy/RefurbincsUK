@@ -22,6 +22,10 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (isEdit && !hasExistingLogin && (email.trim() || tempPassword) && !(email.trim() && tempPassword)) {
+      setError('To create a login, enter both an email and a temporary password.');
+      return;
+    }
     if (tempPassword && tempPassword.length < 8) {
       setError('Password must be at least 8 characters.');
       return;
@@ -38,6 +42,9 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
           if (email.trim() && email.trim() !== client.login_email) body.email = email.trim();
           if (tempPassword) body.tempPassword = tempPassword;
           body.active = active ? 'true' : 'false';
+        } else if (email.trim() && tempPassword) {
+          // a partner record without a login: create one
+          Object.assign(body, { email: email.trim(), tempPassword, role: 'recycle_client' });
         }
         await apiClient.patch(`/clients/${client.id}`, body);
       } else {
@@ -105,6 +112,39 @@ function RecycleClientForm({ client, onSaved, onCancel }) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {isEdit && !hasExistingLogin && (
+        <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3.5 dark:border-amber-800/50 dark:bg-amber-950/20">
+          <p className="text-sm font-medium text-slate-700 dark:text-neutral-200">Create partner login</p>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            This partner has no login yet. Enter an email and a one-time password so they can sign in and see their
+            shipments — they'll set their own password on first login. Leave both blank to skip.
+          </p>
+          <div className="mt-3 flex flex-col gap-3">
+            <div>
+              <label className={labelClasses}>Login Email</label>
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="e.g. partner@ecorecycle.com"
+                className={inputClasses}
+              />
+            </div>
+            <div>
+              <label className={labelClasses}>Temporary Password</label>
+              <input
+                type="text"
+                value={tempPassword}
+                onChange={(e) => setTempPassword(e.target.value)}
+                placeholder="At least 8 characters"
+                className={inputClasses}
+                minLength={8}
+              />
+            </div>
+          </div>
         </div>
       )}
 

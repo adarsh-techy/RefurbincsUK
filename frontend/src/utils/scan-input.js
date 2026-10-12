@@ -20,6 +20,14 @@ export function normalizeRfidTag(value) {
 export const UNASSIGNED_TAG_MESSAGE =
   'This RFID tag is not assigned to any battery yet. Assign it on the RFID Assignment page first.';
 
+// Unregistered tags are ignored without any popup or message: an RFID
+// reader picks up every tag in range, and only tags assigned to a battery
+// matter. Scan handlers return a result with this message; the scan box
+// drops it silently.
+export function isUnassignedTagMessage(message) {
+  return /not assigned to any battery/i.test(String(message || ''));
+}
+
 // Resolves a scanned/typed value against a list of battery rows (which carry
 // rfid_tag). Returns { code, battery, unassignedTag }:
 //   - a QR link or code → that code (battery if it's in the list)

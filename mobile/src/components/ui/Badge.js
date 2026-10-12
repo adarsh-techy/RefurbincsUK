@@ -36,6 +36,14 @@ export function clientBatteryStatus(row) {
   return row.status === 'returned' && !serviced ? 'registered' : row.status;
 }
 
+// Plain-text label for a battery status (for sentences and small chips).
+export function statusLabel(status) {
+  if (!status) return 'Registered';
+  const meta = STATUS_MAP[status];
+  if (meta) return meta.subLabel ? `${meta.label} · ${meta.subLabel}` : meta.label;
+  return String(status).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export function Badge({ tone = 'neutral', children }) {
   const { bg, text } = TONES[tone] || TONES.neutral;
   return (

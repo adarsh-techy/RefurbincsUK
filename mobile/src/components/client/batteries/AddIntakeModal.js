@@ -3,7 +3,7 @@ import { Text, TextInput, TouchableOpacity, View } from 'react-native';
 import apiClient from '../../../services/api-client';
 import ScanBatteryInput from '../../scan/ScanBatteryInput';
 import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
-import { Badge } from '../../ui/Badge';
+import { Badge, statusLabel } from '../../ui/Badge';
 import Icon from '../../ui/Icon';
 import {
   Btn,
@@ -88,7 +88,7 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
         normalizeTruck(existing.truck_number) === normalizeTruck(truckNumber);
       if (!sameOpenTruck) {
         if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(existing.status)) {
-          return { tone: 'bad', message: `Battery ${code} is already in the repair pipeline (${existing.status.replace('_', ' ')}).` };
+          return { tone: 'bad', message: `Battery ${code} is already in the repair pipeline (${statusLabel(existing.status)}).` };
         }
         if (existing.status === 'unserviceable') {
           return { tone: 'bad', message: `Battery ${code} has been marked as unserviceable.` };
@@ -274,7 +274,7 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
                         <Icon name="battery" color="#64748b" size={14} />
                         <Text className="text-xs font-bold text-slate-800 dark:text-slate-100">{b.battery_code}</Text>
                       </View>
-                      <Text className="mr-2 text-[10px] capitalize text-slate-400">{b.status?.replace('_', ' ') || 'Ready'}</Text>
+                      <Text className="mr-2 text-[10px] capitalize text-slate-400">{b.status ? statusLabel(b.status) : 'Ready'}</Text>
                       <Text className="text-[11px] font-bold text-emerald-700">+ Add to Intake</Text>
                     </TouchableOpacity>
                   ))

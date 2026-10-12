@@ -416,7 +416,7 @@ export default function ClientTruckBatches({
                   <Text className="text-xs text-slate-600">
                     Filtered by:{' '}
                     <Text className="font-bold capitalize text-slate-900">
-                      {batchFilter === 'reached_workshop' ? 'Waiting for Service' : batchFilter.replace('_', ' ')}
+                      {batchFilter === 'reached_workshop' ? 'Waiting for Service' : batchFilter.replace(/_/g, ' ')}
                     </Text>
                   </Text>
                   <TouchableOpacity onPress={() => setBatchFilter('all')}>

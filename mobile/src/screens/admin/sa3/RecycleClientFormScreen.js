@@ -34,6 +34,9 @@ export default function RecycleClientFormScreen() {
     if (!name.trim()) return setError('Recycle Client Name is required.');
     if (!isEdit && !email.trim()) return setError('Email is required.');
     if (!isEdit && !tempPassword) return setError('Temporary Password is required.');
+    if (isEdit && !client.login_email && (email.trim() || tempPassword) && !(email.trim() && tempPassword)) {
+      return setError('To create a login, enter both an email and a temporary password.');
+    }
     if (tempPassword && tempPassword.length < 8) return setError('Password must be at least 8 characters.');
     setSubmitting(true);
     try {
@@ -44,6 +47,9 @@ export default function RecycleClientFormScreen() {
           if (email.trim() && email.trim() !== client.login_email) body.email = email.trim();
           if (tempPassword) body.tempPassword = tempPassword;
           body.active = active ? 'true' : 'false';
+        } else if (email.trim() && tempPassword) {
+          // a partner record without a login: create one
+          Object.assign(body, { email: email.trim(), tempPassword, role: 'recycle_client' });
         }
         await apiClient.patch(`/clients/${client.id}`, body);
       } else {
@@ -109,7 +115,30 @@ export default function RecycleClientFormScreen() {
             />
             <Checkbox checked={active} onPress={() => setActive((v) => !v)} label="Account Active (unchecking prevents this partner from logging in)" />
           </View>
-        ) : null}
+        ) : (
+          <View className="rounded-lg border border-amber-200 bg-amber-50 p-3.5 gap-3">
+            <Text className="text-sm font-medium text-slate-700">Create partner login</Text>
+            <Text className="text-xs text-slate-500">
+              This partner has no login yet. Enter an email and a one-time password so they can sign in and see their
+              shipments — they'll set their own password on first login. Leave both blank to skip.
+            </Text>
+            <Input
+              label="Login Email"
+              value={email}
+              onChangeText={setEmail}
+              placeholder="e.g. partner@ecorecycle.com"
+              keyboardType="email-address"
+              autoCapitalize="none"
+            />
+            <Input
+              label="Temporary Password"
+              value={tempPassword}
+              onChangeText={setTempPassword}
+              placeholder="At least 8 characters"
+              autoCapitalize="none"
+            />
+          </View>
+        )}
 
         <ErrorBox message={error} />
 

@@ -92,6 +92,8 @@ async function list(req, res, next) {
       }),
       ratingModel.getStats({
         clientId: targetClientId,
+        rating: rating ? Number(rating) : null,
+        search,
         startDate: startDate || null,
         endDate: endDate || null,
       }),

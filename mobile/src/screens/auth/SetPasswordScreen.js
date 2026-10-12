@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { ActivityIndicator, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useDispatch, useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
-import { logout, setUser } from '../../store/auth-slice';
+import { logout, setUser, setToken } from '../../store/auth-slice';
 
 // Forced first-login screen for accounts created with an admin-issued temp
 // password. Blocks everything else until a real password is set.
@@ -23,6 +23,7 @@ export default function SetPasswordScreen() {
     setError(null);
     try {
       const { data } = await apiClient.patch('/auth/change-password', { newPassword });
+      if (data.token) await dispatch(setToken(data.token));
       dispatch(setUser(data.user));
     } catch (err) {
       setError(err.response?.data?.message || err.message);

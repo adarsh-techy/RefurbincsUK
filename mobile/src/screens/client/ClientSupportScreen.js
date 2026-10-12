@@ -373,7 +373,7 @@ export default function ClientSupportScreen() {
                     <Text className="rounded-lg bg-slate-200 px-2.5 py-0.5 font-mono text-xs font-bold text-slate-900">{activeTicket.ticket_number}</Text>
                     <View className={`rounded-full px-2.5 py-0.5 ${(STATUS_TONE[activeTicket.status] || STATUS_TONE.open).bg}`}>
                       <Text className={`text-[10px] font-bold ${(STATUS_TONE[activeTicket.status] || STATUS_TONE.open).text}`}>
-                        {(activeTicket.status || 'open').replace('_', ' ').toUpperCase()}
+                        {(activeTicket.status || 'open').replace(/_/g, ' ').toUpperCase()}
                       </Text>
                     </View>
                   </View>
@@ -382,7 +382,7 @@ export default function ClientSupportScreen() {
                 <Text className="mt-2 text-base font-bold text-slate-900">{activeTicket.subject}</Text>
                 <View className="mt-3 flex-row flex-wrap gap-1.5">
                   <Text className="rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-900">
-                    Category: <Text className="capitalize text-slate-900">{(activeTicket.category || 'general').replace('_', ' ')}</Text>
+                    Category: <Text className="capitalize text-slate-900">{(activeTicket.category || 'general').replace(/_/g, ' ')}</Text>
                   </Text>
                   <Text className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900">
                     Priority: <Text className="capitalize text-slate-900">{activeTicket.priority || 'normal'}</Text>
@@ -396,7 +396,7 @@ export default function ClientSupportScreen() {
             {isOffice && (
               <View className="flex-row flex-wrap items-center gap-1.5">
                 <Text className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600">
-                  Category: <Text className="font-bold capitalize text-slate-900">{(activeTicket.category || 'general').replace('_', ' ')}</Text>
+                  Category: <Text className="font-bold capitalize text-slate-900">{(activeTicket.category || 'general').replace(/_/g, ' ')}</Text>
                 </Text>
                 <Text className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] text-slate-600">
                   Priority: <Text className="font-bold capitalize text-slate-900">{activeTicket.priority || 'normal'}</Text>
@@ -612,7 +612,7 @@ export default function ClientSupportScreen() {
                       ) : null}
                     </View>
                     <View className={`rounded-full ${tone.bg} px-2.5 py-0.5`}>
-                      <Text className={`text-[10px] font-bold uppercase ${tone.text}`}>{(item.status || 'open').replace('_', ' ')}</Text>
+                      <Text className={`text-[10px] font-bold uppercase ${tone.text}`}>{(item.status || 'open').replace(/_/g, ' ')}</Text>
                     </View>
                   </View>
                   <Text className="mt-2 text-xs font-bold text-slate-900" numberOfLines={1}>{item.subject}</Text>
@@ -622,7 +622,7 @@ export default function ClientSupportScreen() {
                   </Text>
                   <View className="mt-2.5 flex-row items-center justify-between border-t border-slate-100 pt-2">
                     <View className="flex-1 flex-row items-center gap-1.5">
-                      <Text className="text-[10px] capitalize text-slate-400">{(item.category || 'general').replace('_', ' ')}</Text>
+                      <Text className="text-[10px] capitalize text-slate-400">{(item.category || 'general').replace(/_/g, ' ')}</Text>
                       {item.battery_code ? (
                         <Text className="rounded-full bg-emerald-500 px-2 py-0.5 font-mono text-[10px] font-bold text-white">🔋 {item.battery_code}</Text>
                       ) : null}
@@ -649,7 +649,7 @@ export default function ClientSupportScreen() {
                   </View>
                   {clientLast && item.status !== 'closed' ? <View className="h-2.5 w-2.5 rounded-full bg-rose-500" /> : null}
                   <View className={`rounded-md ${tone.bg} px-2 py-0.5`}>
-                    <Text className={`text-[10px] font-bold capitalize ${tone.text}`}>{(item.status || 'open').replace('_', ' ')}</Text>
+                    <Text className={`text-[10px] font-bold capitalize ${tone.text}`}>{(item.status || 'open').replace(/_/g, ' ')}</Text>
                   </View>
                 </View>
                 <Text className="mt-2 text-sm font-bold text-slate-900 dark:text-white" numberOfLines={1}>{item.subject}</Text>
@@ -658,7 +658,7 @@ export default function ClientSupportScreen() {
                 </Text>
                 <View className="mt-2 flex-row items-center justify-between">
                   <View className="flex-1 flex-row items-center gap-1.5">
-                    <Text className="text-[10px] capitalize text-slate-400">{(item.category || 'general').replace('_', ' ')}</Text>
+                    <Text className="text-[10px] capitalize text-slate-400">{(item.category || 'general').replace(/_/g, ' ')}</Text>
                     {item.battery_code ? <Text className="rounded-full bg-emerald-50 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-700">🔋 {item.battery_code}</Text> : null}
                   </View>
                   <Text className="text-[10px] text-slate-400 dark:text-slate-500">{timeAgo(item.updated_at)}</Text>

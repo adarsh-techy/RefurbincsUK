@@ -7,6 +7,7 @@ import { StatusBadge } from '../../../components/ui/Badge';
 import Icon from '../../../components/ui/Icon';
 import { AlertDialog, Btn, Chips, ConfirmDialog, Empty, ErrorBox, SearchBox, Stat, dateOnly, dateTime, hasPermission, money } from '../../../components/admin/sa4/ui';
 import { PartFormSheet, RestockSheet } from '../../../components/admin/sa4/PartForms';
+import CopyButton from '../../../components/ui/CopyButton';
 
 // Part detail — the phone version of the web PartDetailPage
 // (GET /parts/:id → { part, usageHistory, stockHistory }): stock health and
@@ -419,7 +420,7 @@ export default function PartDetailScreen() {
           <View className="rounded-2xl border border-slate-200 bg-white p-4">
             <Text className="mb-1 text-sm font-bold text-slate-900">Identity &amp; Inventory Profile</Text>
             <Row label="Part Name">{part.name}</Row>
-            <Row label="SKU / Catalog Code">{part.sku ? <Text selectable className="font-mono text-xs font-bold text-slate-900">{part.sku}</Text> : 'Not specified'}</Row>
+            <Row label="SKU / Catalog Code">{part.sku ? <View className="flex-row items-center gap-1.5"><Text selectable className="font-mono text-xs font-bold text-slate-900">{part.sku}</Text><CopyButton value={part.sku} /></View> : 'Not specified'}</Row>
             <Row label="System Database ID">{`#${part.id}`}</Row>
             <Row label="Current Stock Quantity">{plural(quantity, 'unit')}</Row>
             <Row label="Active Units in Fleet">{plural(activeQuantity, 'unit')}</Row>

@@ -6,12 +6,12 @@ import apiClient from '../../../services/api-client';
 import DataTable from '../../../components/ui/table/DataTable';
 import TableState from '../../../components/ui/table/TableState';
 import InfiniteScrollTrigger from '../../../components/ui/table/InfiniteScrollTrigger';
-import { ClientStatusBadge } from '../../../components/ui/primitives/Badge';
+import { ClientStatusBadge, statusLabel } from '../../../components/ui/primitives/Badge';
 import { fetchSortGroups } from '../../../utils/sort-groups';
 import Modal from '../../../components/ui/overlays/Modal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../../utils/extract-battery-code';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryInput } from '../../../utils/scan-input';
 
 import { useTheme } from '../../../context/ThemeContext';
 import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter, FiRefreshCw } from 'react-icons/fi';
@@ -537,7 +537,7 @@ function ClientBatteriesPage() {
     // accepts a QR link, a battery code, or an RFID tag read by a reader
     const resolved = resolveBatteryInput(raw, allRegisteredBatteries);
     if (resolved.unassignedTag) {
-      setEditBatchError(UNASSIGNED_TAG_MESSAGE);
+      setEditBatchAddInput(''); // unregistered RFID tag: ignored quietly
       return;
     }
     const code = resolved.code;
@@ -738,7 +738,7 @@ function ClientBatteriesPage() {
   function handleAddMoreBattery(rawCode, initialSerial = '') {
     const resolved = resolveBatteryInput(rawCode, allRegisteredBatteries);
     if (resolved.unassignedTag) {
-      setAddMoreError(UNASSIGNED_TAG_MESSAGE);
+      setAddMoreScanInput(''); // unregistered RFID tag: ignored quietly
       return;
     }
     const code = resolved.code;
@@ -758,7 +758,7 @@ function ClientBatteriesPage() {
     );
     if (existing) {
       if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(existing.status)) {
-        setAddMoreError(`Battery ${code} is already in the repair pipeline (${existing.status.replace('_', ' ')}).`);
+        setAddMoreError(`Battery ${code} is already in the repair pipeline (${statusLabel(existing.status)}).`);
         return;
       }
       if (existing.status === 'unserviceable') {
@@ -790,7 +790,7 @@ function ClientBatteriesPage() {
     if (addMoreScanInput.trim()) {
       const resolved = resolveBatteryInput(addMoreScanInput, allRegisteredBatteries);
       if (resolved.unassignedTag) {
-        setAddMoreError(UNASSIGNED_TAG_MESSAGE);
+        setAddMoreScanInput(''); // unregistered RFID tag: ignored quietly
         return;
       }
       const code = resolved.code;
@@ -836,7 +836,7 @@ function ClientBatteriesPage() {
     }
     const resolved = resolveBatteryInput(rawCode, allRegisteredBatteries);
     if (resolved.unassignedTag) {
-      setPackError(UNASSIGNED_TAG_MESSAGE);
+      setScanInput(''); // unregistered RFID tag: ignored quietly
       return;
     }
     const code = resolved.code;
@@ -865,7 +865,7 @@ function ClientBatteriesPage() {
 
       if (!sameOpenTruckBatch) {
         if (['in_repair', 'in_progress', 'in_testing', 'repaired'].includes(existing.status)) {
-          setPackError(`Battery ${code} is already in the repair pipeline (${existing.status.replace('_', ' ')}).`);
+          setPackError(`Battery ${code} is already in the repair pipeline (${statusLabel(existing.status)}).`);
           return;
         }
         if (existing.status === 'unserviceable') {
@@ -2726,7 +2726,7 @@ function ClientBatteriesPage() {
               <span className="text-xs text-slate-500 dark:text-neutral-400">
                 Filtered by:{' '}
                 <span className="font-semibold text-slate-700 dark:text-neutral-200 capitalize">
-                  {batchStatusFilter === 'reached_workshop' ? 'Waiting for Service' : batchStatusFilter.replace('_', ' ')}
+                  {batchStatusFilter === 'reached_workshop' ? 'Waiting for Service' : batchStatusFilter.replace(/_/g, ' ')}
                 </span>
               </span>
               <button
@@ -3566,7 +3566,7 @@ function ClientBatteriesPage() {
 
                             <div className="flex items-center gap-2">
                               <span className="rounded-lg bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-800 group-hover:bg-white/20 group-hover:text-white dark:bg-emerald-950/80 dark:text-emerald-300">
-                                {b.status?.replace('_', ' ') || 'Ready'}
+                                {b.status ? statusLabel(b.status) : 'Ready'}
                               </span>
                               <span className="rounded-lg bg-blue-100 px-2.5 py-1 text-[11px] font-bold text-blue-700 group-hover:bg-white group-hover:text-blue-700 shadow-2xs dark:bg-blue-950 dark:text-blue-300">
                                 + Add to Intake

@@ -260,7 +260,7 @@ export default function TrashDetailPage() {
                   </h3>
                   {item.deleted_by_role && (
                     <span className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-slate-700 dark:bg-surface-700 dark:text-neutral-200">
-                      {item.deleted_by_role.replace('_', ' ')}
+                      {item.deleted_by_role.replace(/_/g, ' ')}
                     </span>
                   )}
                 </div>

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
-import { setUser } from '../../auth/auth-slice';
+import { setUser, setToken } from '../../auth/auth-slice';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
 
 const inputClasses =
@@ -45,6 +45,7 @@ function ClientProfilePage() {
     setError(null);
     try {
       const { data } = await apiClient.patch('/auth/change-password', { currentPassword, newPassword });
+      if (data.token) dispatch(setToken(data.token));
       dispatch(setUser(data.user));
       setCurrentPassword('');
       setNewPassword('');

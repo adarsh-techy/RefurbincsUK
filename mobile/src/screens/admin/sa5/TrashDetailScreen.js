@@ -6,10 +6,17 @@ import { ConfirmModal, SmallButton, initials, relativeTime } from '../../../comp
 import RestoreModal from '../../../components/admin/sa5/RestoreModal';
 import { typeConfig } from './trash-config';
 
+let Clipboard = null;
+try {
+  Clipboard = require('expo-clipboard');
+} catch {
+  Clipboard = null;
+}
+
 // One trash record — the web TrashDetailPage: GET /trash/:id. Hero card
 // (type, original ID, "Archived / Deleted", trash record #), who deleted it
 // and when, and the data snapshot as labelled fields with Show / Hide Raw
-// JSON and Copy JSON (the share sheet — there's no clipboard package).
+// JSON and Copy JSON (clipboard; share sheet if the clipboard isn't there).
 // Restore → POST /trash/:id/restore; Permanent Delete → DELETE /trash/:id;
 // both go back to the Trash Bin.
 
@@ -63,12 +70,21 @@ export default function TrashDetailScreen() {
     }
   }
 
+  const [jsonCopied, setJsonCopied] = useState(false);
+
   async function copyJson() {
     if (!item?.item_data) return;
+    const json = JSON.stringify(item.item_data, null, 2);
     try {
-      await Share.share({ message: JSON.stringify(item.item_data, null, 2) });
+      if (Clipboard) {
+        await Clipboard.setStringAsync(json);
+        setJsonCopied(true);
+        setTimeout(() => setJsonCopied(false), 1500);
+        return;
+      }
+      await Share.share({ message: json });
     } catch {
-      // share sheet dismissed
+      // clipboard unavailable / share sheet dismissed
     }
   }
 
@@ -154,7 +170,7 @@ export default function TrashDetailScreen() {
               <View className="flex-row flex-wrap items-center gap-2">
                 <Text className="text-base font-bold text-slate-900">{item.deleted_by_name || 'System / Administrator'}</Text>
                 {item.deleted_by_role ? (
-                  <Text className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-700">{item.deleted_by_role.replace('_', ' ')}</Text>
+                  <Text className="rounded bg-slate-100 px-2 py-0.5 text-xs font-semibold uppercase text-slate-700">{item.deleted_by_role.replace(/_/g, ' ')}</Text>
                 ) : null}
               </View>
               <Text className="mt-1 text-sm text-slate-500" selectable>{item.deleted_by_email || 'No email recorded'}</Text>
@@ -182,7 +198,7 @@ export default function TrashDetailScreen() {
           </View>
           <View className="flex-row gap-2">
             <SmallButton label={showRawJson ? '</> Hide Raw JSON' : '</> Show Raw JSON'} onPress={() => setShowRawJson((v) => !v)} />
-            <SmallButton label="Copy JSON" onPress={copyJson} />
+            <SmallButton label={jsonCopied ? 'Copied' : 'Copy JSON'} onPress={copyJson} />
           </View>
           {dataKeys.length === 0 ? (
             <Text className="text-sm text-slate-400">No snapshot attributes stored.</Text>

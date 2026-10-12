@@ -4,6 +4,7 @@ import { useSelector } from 'react-redux';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
+import { isLikelyRfidTag } from '../../utils/scan-input';
 import extractBatteryCode from '../../utils/extract-battery-code';
 import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
@@ -92,8 +93,14 @@ export default function ServiceScreen() {
         setUnverifiedBattery(data.battery);
         return; // staying here — accept new scans
       }
-    } catch {
-      // not found / offline: the detail screen shows its own error
+    } catch (err) {
+      // an unregistered RFID tag is ignored quietly; other not-found /
+      // offline cases go on to the detail screen, which shows its own error
+      if (err?.response?.status === 404 && isLikelyRfidTag(raw)) {
+        setCheckingScan(false);
+        checkingRef.current = false;
+        return;
+      }
     } finally {
       setCheckingScan(false);
       checkingRef.current = false;

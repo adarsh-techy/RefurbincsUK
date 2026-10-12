@@ -39,6 +39,7 @@ function StaffForm({ staff, onSaved, onCancel }) {
     passportNumber: staff?.passport_number || '',
     niNumber: staff?.ni_number || '',
     shareCode: staff?.share_code || '',
+    salary: staff?.salary != null && Number(staff.salary) > 0 ? String(staff.salary) : '',
   });
 
   const [docFile, setDocFile] = useState(null);
@@ -63,6 +64,10 @@ function StaffForm({ staff, onSaved, onCancel }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (form.salary !== '' && !(Number.isFinite(Number(form.salary)) && Number(form.salary) >= 0)) {
+      setError('Wage must be a number.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
 
@@ -76,6 +81,9 @@ function StaffForm({ staff, onSaved, onCancel }) {
       if (form.passportNumber) formData.append('passportNumber', form.passportNumber.trim());
       if (form.niNumber) formData.append('niNumber', form.niNumber.trim().toUpperCase());
       if (form.shareCode) formData.append('shareCode', form.shareCode.trim().toUpperCase());
+      // blank wage = Standard Hourly; clearing an existing wage sends 0
+      if (form.salary !== '') formData.append('salary', String(Number(form.salary)));
+      else if (isEdit && Number(staff?.salary) > 0) formData.append('salary', '0');
 
       if (docFile) {
         formData.append('docFile', docFile);
@@ -200,6 +208,23 @@ function StaffForm({ staff, onSaved, onCancel }) {
               value={form.phone}
               onChange={(e) => updateField('phone', e.target.value)}
               placeholder="e.g. +44 7700 900123"
+              className={inputClasses}
+            />
+          </div>
+
+          {/* Wage */}
+          <div>
+            <label className={labelClasses}>
+              <span>Monthly / Contract Wage (£)</span>
+            </label>
+            <input
+              type="number"
+              min="0"
+              step="0.01"
+              inputMode="decimal"
+              value={form.salary}
+              onChange={(e) => updateField('salary', e.target.value)}
+              placeholder="Leave blank for Standard Hourly"
               className={inputClasses}
             />
           </div>

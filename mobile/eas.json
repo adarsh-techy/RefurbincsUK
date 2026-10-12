@@ -20,6 +20,17 @@
         "EXPO_PUBLIC_APP_MODE": "production",
         "EXPO_PUBLIC_WEB_URL": "https://refurbincs-uk-git-main-adarsh-techys-projects.vercel.app"
       }
+    },
+    "production": {
+      "autoIncrement": true,
+      "android": {
+        "buildType": "app-bundle"
+      },
+      "env": {
+        "EXPO_PUBLIC_API_URL": "https://refurbincsuk.onrender.com/api",
+        "EXPO_PUBLIC_APP_MODE": "production",
+        "EXPO_PUBLIC_WEB_URL": "https://refurbincs-uk-git-main-adarsh-techys-projects.vercel.app"
+      }
     }
   }
 }

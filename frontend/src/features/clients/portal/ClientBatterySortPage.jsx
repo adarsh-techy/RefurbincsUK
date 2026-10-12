@@ -11,7 +11,7 @@ import AlertModal from '../../../components/ui/overlays/AlertModal';
 import QrScanner from '../../../components/ui/primitives/QrScanner';
 import { ClientStatusBadge } from '../../../components/ui/primitives/Badge';
 import extractBatteryCode from '../../../utils/extract-battery-code';
-import { resolveBatteryInput, UNASSIGNED_TAG_MESSAGE } from '../../../utils/scan-input';
+import { resolveBatteryInput } from '../../../utils/scan-input';
 
 import { useTheme } from '../../../context/ThemeContext';
 import {
@@ -503,7 +503,7 @@ function ClientBatterySortPage() {
     // QR link, battery code, or an RFID tag read by a reader
     const resolved = resolveBatteryInput(rawInput, registeredBatteries);
     if (resolved.unassignedTag) {
-      setAddError(UNASSIGNED_TAG_MESSAGE);
+      setScanInput(''); // unregistered RFID tag: ignored quietly
       return;
     }
     const extracted = resolved.code;

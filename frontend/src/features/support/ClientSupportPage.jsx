@@ -404,7 +404,7 @@ export default function ClientSupportPage() {
                                 : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-400'
                         }`}
                       >
-                        {t.status.replace('_', ' ')}
+                        {t.status.replace(/_/g, ' ')}
                       </span>
                     </div>
 
@@ -419,7 +419,7 @@ export default function ClientSupportPage() {
 
                     <div className="mt-2.5 flex items-center justify-between border-t border-slate-200/60 pt-2 text-[10px] text-slate-400 dark:border-white/5 dark:text-neutral-400">
                       <div className="flex items-center gap-1.5">
-                        <span className="capitalize">{t.category?.replace('_', ' ')}</span>
+                        <span className="capitalize">{t.category?.replace(/_/g, ' ')}</span>
                         {t.battery_code && (
                           <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 font-mono font-bold text-white shadow-2xs dark:bg-emerald-500">
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0 text-yellow-300">
@@ -466,7 +466,7 @@ export default function ClientSupportPage() {
                               : 'bg-slate-100 text-slate-800 border border-slate-300 dark:bg-white/10 dark:text-neutral-300 dark:border-white/10'
                       }`}
                     >
-                      {activeTicket.status.replace('_', ' ').toUpperCase()}
+                      {activeTicket.status.replace(/_/g, ' ').toUpperCase()}
                     </span>
                   </div>
 
@@ -482,7 +482,7 @@ export default function ClientSupportPage() {
                 {/* ── Enhanced Details Bar ── */}
                 <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/90 bg-white/90 p-2.5 text-xs font-semibold text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-900/90 dark:text-neutral-200">
                   <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-900 shadow-2xs border border-blue-200/70 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60">
-                    Category: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.category?.replace('_', ' ')}</strong>
+                    Category: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.category?.replace(/_/g, ' ')}</strong>
                   </span>
                   
                   <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 shadow-2xs border border-amber-200/70 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60">

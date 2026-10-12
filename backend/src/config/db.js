@@ -1,3 +1,4 @@
+const fs = require('fs');
 const { Pool } = require('pg');
 const env = require('./env');
 
@@ -7,9 +8,17 @@ const env = require('./env');
 // connections need ssl on; rejectUnauthorized is off because most of these
 // providers (Render, Railway, Supabase, Neon) use certs a plain Node
 // install can't otherwise verify — the connection itself is still
-// encrypted, this only skips validating the cert chain.
+// encrypted, this only skips validating the cert chain. Set
+// DB_SSL_VERIFY=true (optionally DB_SSL_CA) to validate it as well.
+function sslOptions() {
+  if (!env.db.sslVerify) return { rejectUnauthorized: false };
+  const ca = env.db.sslCa;
+  if (!ca) return { rejectUnauthorized: true };
+  return { rejectUnauthorized: true, ca: ca.includes('BEGIN CERTIFICATE') ? ca : fs.readFileSync(ca, 'utf8') };
+}
+
 const pool = env.db.url
-  ? new Pool({ connectionString: env.db.url, ssl: { rejectUnauthorized: false } })
+  ? new Pool({ connectionString: env.db.url, ssl: sslOptions() })
   : new Pool({
       host: env.db.host,
       port: env.db.port,

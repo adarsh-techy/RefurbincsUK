@@ -39,6 +39,10 @@ module.exports = {
     name: process.env.DB_NAME,
     user: process.env.DB_USER,
     password: process.env.DB_PASSWORD,
+    // 'true' = verify the managed database's TLS certificate (system CAs, or
+    // DB_SSL_CA: a PEM file path or the PEM text itself). Off by default.
+    sslVerify: process.env.DB_SSL_VERIFY === 'true',
+    sslCa: process.env.DB_SSL_CA,
   },
   jwt: {
     secret: process.env.JWT_SECRET,

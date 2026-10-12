@@ -9,6 +9,7 @@ import ImageViewerModal from '../../../components/ui/ImageViewerModal';
 import DateField from '../../../components/admin/DateField';
 import { hasPermission } from '../../../components/admin/sa3/permissions';
 import { BackLink, dateOnly, dateTime, ErrorBox, errMessage, openUpload, Pill, SearchBox, Stat } from '../../../components/admin/sa3/ui';
+import CopyButton from '../../../components/ui/CopyButton';
 
 // A staff member's page — the web StaffDetailPage: header (Edit Staff Profile,
 // Compliance Doc), hero card, credentials & right-to-work block, six KPI
@@ -86,7 +87,7 @@ function CopyField({ label, value }) {
         <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
         <Text className="mt-0.5 font-mono text-sm font-bold text-slate-900" selectable>{value || '—'}</Text>
       </View>
-      {value ? <Text className="text-[10px] text-slate-400">Hold to copy</Text> : null}
+      <CopyButton value={value} />
     </View>
   );
 }

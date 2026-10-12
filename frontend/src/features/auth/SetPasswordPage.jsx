@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import apiClient from '../../services/api-client';
-import { setUser, logout } from './auth-slice';
+import { setUser, setToken, logout } from './auth-slice';
 
 const inputClasses =
   'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-emerald-500 dark:focus:ring-emerald-500/30';
@@ -30,6 +30,7 @@ function SetPasswordPage() {
     setError(null);
     try {
       const { data } = await apiClient.patch('/auth/change-password', { newPassword });
+      if (data.token) dispatch(setToken(data.token));
       dispatch(setUser(data.user));
       navigate('/');
     } catch (err) {

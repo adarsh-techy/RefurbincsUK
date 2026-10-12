@@ -66,6 +66,13 @@ export const setUser = createAsyncThunk('auth/setUser', async (user) => {
   return user;
 });
 
+// Changing your own password signs out every other session and returns a
+// fresh token for this one.
+export const setToken = createAsyncThunk('auth/setToken', async (token) => {
+  await AsyncStorage.setItem('token', token);
+  return token;
+});
+
 export const logout = createAsyncThunk('auth/logout', async () => {
   await AsyncStorage.multiRemove(['token', 'user']);
 });
@@ -124,6 +131,9 @@ const authSlice = createSlice({
       })
       .addCase(setUser.fulfilled, (state, action) => {
         state.user = action.payload;
+      })
+      .addCase(setToken.fulfilled, (state, action) => {
+        state.token = action.payload;
       })
       .addCase(logout.fulfilled, (state) => {
         state.user = null;

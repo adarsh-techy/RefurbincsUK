@@ -18,6 +18,7 @@ import apiClient from '../../services/api-client';
 import useFetchList from '../../utils/use-fetch-list';
 import QrScanner from '../../components/ui/primitives/QrScanner';
 import extractBatteryCode from '../../utils/extract-battery-code';
+import { statusLabel } from '../../components/ui/primitives/Badge';
 
 const inputClasses =
   'w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-900 dark:text-neutral-100 shadow-2xs transition-colors';
@@ -110,7 +111,7 @@ function ReturnForm({ onCreated, onCancel }) {
         return;
       }
       if (battery.status !== 'repaired') {
-        flashFeedback('bad', `${battery.battery_code} is not ready to return (status: ${battery.status.replace('_', ' ')}).`);
+        flashFeedback('bad', `${battery.battery_code} is not ready to return (status: ${statusLabel(battery.status)}).`);
         return;
       }
       if (selectedClient && battery.client_name && battery.client_name.toLowerCase() !== selectedClient.name.toLowerCase()) {

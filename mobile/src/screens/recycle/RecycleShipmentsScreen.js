@@ -3,6 +3,7 @@ import { FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } fro
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import ShipmentRow, { formatDateTime } from '../../components/recycle/ShipmentRow';
+import DateField from '../../components/ui/DateField';
 
 // Recycling partner (role recycle_client) shipments — mirrors the web
 // RecycleClientShipmentsPage: GET /recycle-client/me/shipments → { data },
@@ -78,14 +79,9 @@ export default function RecycleShipmentsScreen() {
             className={input}
           />
           <View className="flex-row items-center gap-2">
-            <TextInput
-              value={date}
-              onChangeText={setDate}
-              placeholder="Date (YYYY-MM-DD)"
-              placeholderTextColor="#94a3b8"
-              autoCapitalize="none"
-              className={`flex-1 ${input}`}
-            />
+            <View className="flex-1">
+              <DateField value={date} onChange={setDate} quick={false} clearable={false} />
+            </View>
             <TouchableOpacity onPress={() => setDate(localDateKey(new Date()))} className="rounded-xl border border-slate-300 bg-white px-3 py-2.5">
               <Text className="text-xs font-semibold text-slate-700">Today</Text>
             </TouchableOpacity>

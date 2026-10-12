@@ -10,6 +10,7 @@ import Icon from '../../components/ui/Icon';
 import { StatusBadge } from '../../components/ui/Badge';
 import ScanBatteryInput from '../../components/scan/ScanBatteryInput';
 import { shareCsv } from '../../utils/share-csv';
+import CopyButton from '../../components/ui/CopyButton';
 
 // RFID Assignment — the mobile version of the web RfidAssignmentPage: the
 // .xlsx template, pick the client, choose the .xlsx/.csv (Battery Number,
@@ -536,7 +537,10 @@ export default function AdminRfidScreen() {
             </View>
             <View className="mt-2 flex-row items-center gap-2">
               {r.rfid_tag ? (
-                <Text className="flex-1 font-mono text-[11px] text-emerald-700" numberOfLines={1} selectable>● {r.rfid_tag}</Text>
+                <View className="flex-1 flex-row items-center gap-1.5">
+                  <Text className="shrink font-mono text-[11px] text-emerald-700" numberOfLines={1} selectable>● {r.rfid_tag}</Text>
+                  <CopyButton value={r.rfid_tag} />
+                </View>
               ) : (
                 <View className="flex-1"><Text className="self-start rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">● No tag yet</Text></View>
               )}

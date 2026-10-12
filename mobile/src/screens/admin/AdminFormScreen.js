@@ -5,6 +5,7 @@ import * as DocumentPicker from 'expo-document-picker';
 import apiClient from '../../services/api-client';
 import Icon from '../../components/ui/Icon';
 import { ADMIN_FORMS } from './adminForms';
+import DateField from '../../components/ui/DateField';
 
 // One create/edit screen for every admin entity (see adminForms.js).
 // route.params: { kind, row?, onSaved? } — `row` present = edit.
@@ -200,7 +201,10 @@ export default function AdminFormScreen() {
                   {f.label}{requiredHere ? <Text className="text-red-500"> *</Text> : null}
                 </Text>
               )}
-              {['text', 'email', 'number', 'password', 'date'].includes(f.type) && (
+              {f.type === 'date' && (
+                <DateField value={String(v ?? '')} onChange={(t) => set(f.key, t)} quick={false} />
+              )}
+              {['text', 'email', 'number', 'password'].includes(f.type) && (
                 <TextInput
                   value={String(v ?? '')}
                   onChangeText={(t) => set(f.key, f.uppercase ? t.toUpperCase() : f.capitalize ? capitalizeWords(t) : t)}

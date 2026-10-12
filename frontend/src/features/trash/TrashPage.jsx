@@ -417,7 +417,7 @@ export default function TrashPage() {
                               </span>
                               {item.deleted_by_role && (
                                 <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] uppercase font-semibold text-slate-600 dark:bg-surface-700 dark:text-neutral-300">
-                                  {item.deleted_by_role.replace('_', ' ')}
+                                  {item.deleted_by_role.replace(/_/g, ' ')}
                                 </span>
                               )}
                             </div>

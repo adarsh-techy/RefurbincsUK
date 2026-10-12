@@ -26,6 +26,7 @@ import { printBatteryReport, shareBatteryReport } from '../../utils/print-batter
 import formatDuration from '../../utils/format-duration';
 import { resolveImageUrl } from '../../utils/imageUrl';
 import { isIntakeUnverified as intakeIsUnverified } from '../../utils/intake';
+import CopyButton from '../../components/ui/CopyButton';
 
 function generateBatchId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
@@ -327,6 +328,9 @@ export default function BatteryDetailScreen() {
   // Where the web mounts its TechnicianRepairPanel: workshop logins always,
   // office admins only when they scanned the battery.
   const showRepairPanel = !isClient && !isRecycleClient && (isWorkshopRole || (isAdminRole && Boolean(fromScan)));
+  // "Scan Next" goes back to the login's own scanner tab: office logins
+  // (admin tab set) have 'Scan', workshop logins have 'Service'.
+  const scanScreen = ['super_admin', 'admin', 'staff'].includes(currentUser?.role) ? 'Scan' : 'Service';
   const [adminSerialOpen, setAdminSerialOpen] = useState(false);
   const [showQr, setShowQr] = useState(false);
   const [showStatusForm, setShowStatusForm] = useState(false);
@@ -1021,12 +1025,12 @@ export default function BatteryDetailScreen() {
       setShowPassToTechSuccessModal(false);
       allowExitRef.current = true;
       navigation.navigate('Main', {
-        screen: 'Service',
+        screen: scanScreen,
         params: { autoScan: Date.now() },
       });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [showPassToTechSuccessModal, navigation]);
+  }, [showPassToTechSuccessModal, navigation, scanScreen]);
 
   // Web: "submitted" always, and an unserviceable report by a plain
   // technician, jump back to the scanner after 2 seconds.
@@ -1041,12 +1045,12 @@ export default function BatteryDetailScreen() {
       setShowUnserviceableSuccessModal(false);
       allowExitRef.current = true;
       navigation.navigate('Main', {
-        screen: 'Service',
+        screen: scanScreen,
         params: { autoScan: Date.now() },
       });
     }, 2000);
     return () => clearTimeout(timer);
-  }, [autoRedirectToScan, navigation]);
+  }, [autoRedirectToScan, navigation, scanScreen]);
 
   async function handleConfirmTestingUnserviceable() {
     setShowTestingDecisionModal(false);
@@ -1519,7 +1523,7 @@ export default function BatteryDetailScreen() {
                   setBlockedStatus(null);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -1571,7 +1575,7 @@ export default function BatteryDetailScreen() {
                   setIsSubmittedSuccess(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -1631,7 +1635,7 @@ export default function BatteryDetailScreen() {
                   setShowCompletedModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -1697,7 +1701,7 @@ export default function BatteryDetailScreen() {
                   setShowUnserviceableSuccessModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -1765,7 +1769,7 @@ export default function BatteryDetailScreen() {
                   setShowPassToTechSuccessModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -1836,7 +1840,7 @@ export default function BatteryDetailScreen() {
                   setShowRemovePartsSuccessModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -1943,9 +1947,12 @@ export default function BatteryDetailScreen() {
               <Text className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">Being worked on by {battery.started_by_name}</Text>
             ) : null}
             {battery.rfid_tag ? (
-              <Text className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-800" selectable>
-                <Text className="font-bold">RFID </Text><Text className="font-mono">{battery.rfid_tag}</Text>
-              </Text>
+              <View className="flex-row items-center gap-1.5">
+                <Text className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-0.5 text-xs text-emerald-800" selectable>
+                  <Text className="font-bold">RFID </Text><Text className="font-mono">{battery.rfid_tag}</Text>
+                </Text>
+                <CopyButton value={battery.rfid_tag} />
+              </View>
             ) : null}
           </View>
         )}
@@ -2155,7 +2162,7 @@ export default function BatteryDetailScreen() {
                 onPress={() => {
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -2175,7 +2182,8 @@ export default function BatteryDetailScreen() {
       )}
 
       {/* ── Physical Battery Number Card ─────────────────────────────────── */}
-      {!(fromScan && isStaff) && (
+      {/* web hides the battery header (and its Battery No) from workshop logins */}
+      {!isWorkshopRole && !(fromScan && isStaff) && (
         <View className="mb-5 flex-row items-center justify-between rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <View className="flex-1 mr-2">
             <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
@@ -2252,7 +2260,7 @@ export default function BatteryDetailScreen() {
                   onPress={() => {
                     allowExitRef.current = true;
                     navigation.navigate('Main', {
-                      screen: 'Service',
+                      screen: scanScreen,
                       params: { autoScan: Date.now() },
                     });
                   }}
@@ -2388,7 +2396,7 @@ export default function BatteryDetailScreen() {
                   onPress={() => {
                     allowExitRef.current = true;
                     navigation.navigate('Main', {
-                      screen: 'Service',
+                      screen: scanScreen,
                       params: { autoScan: Date.now() },
                     });
                   }}
@@ -2477,7 +2485,7 @@ export default function BatteryDetailScreen() {
                   onPress={() => {
                     allowExitRef.current = true;
                     navigation.navigate('Main', {
-                      screen: 'Service',
+                      screen: scanScreen,
                       params: { autoScan: Date.now() },
                     });
                   }}
@@ -2610,7 +2618,7 @@ export default function BatteryDetailScreen() {
                     <TouchableOpacity
                       onPress={() =>
                         navigation.navigate('Main', {
-                          screen: 'Service',
+                          screen: scanScreen,
                           params: { autoScan: Date.now() },
                         })
                       }
@@ -3191,7 +3199,7 @@ export default function BatteryDetailScreen() {
                         onPress={() => {
                           setShowRepairedByModal(false);
                           navigation.navigate('Main', {
-                            screen: 'Service',
+                            screen: scanScreen,
                             params: { autoScan: Date.now() },
                           });
                         }}
@@ -3212,7 +3220,7 @@ export default function BatteryDetailScreen() {
                         onPress={() => {
                           setShowRepairedByModal(false);
                           navigation.navigate('Main', {
-                            screen: 'Service',
+                            screen: scanScreen,
                             params: { autoScan: Date.now() },
                           });
                         }}
@@ -3396,7 +3404,7 @@ export default function BatteryDetailScreen() {
                   setShowTestChoiceModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -3547,7 +3555,7 @@ export default function BatteryDetailScreen() {
                 onPress={() => {
                   setShowUnverifiedIntakeModal(false);
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -3865,7 +3873,7 @@ export default function BatteryDetailScreen() {
                   setShowUnserviceableAlertModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}
@@ -4148,7 +4156,7 @@ export default function BatteryDetailScreen() {
                   setShowCantServiceAlertModal(false);
                   allowExitRef.current = true;
                   navigation.navigate('Main', {
-                    screen: 'Service',
+                    screen: scanScreen,
                     params: { autoScan: Date.now() },
                   });
                 }}

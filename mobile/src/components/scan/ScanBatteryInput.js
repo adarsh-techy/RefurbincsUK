@@ -3,6 +3,7 @@ import { Modal, Text, TextInput, TouchableOpacity, Vibration, View } from 'react
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import Icon from '../ui/Icon';
 import { hardwareScannerAvailable, useHardwareScan } from '../../services/hardware-scanner';
+import { isUnassignedTagMessage } from '../../utils/scan-input';
 
 // One scan box for every place a battery is scanned (sorting, intake,
 // returns, recycle, verify, technician lookup) — the mobile twin of the web
@@ -80,6 +81,11 @@ const ScanBatteryInput = forwardRef(function ScanBatteryInput(
       res = { tone: 'bad', message: err?.response?.data?.message || err?.message || 'Scan failed' };
     }
     clearTimeout(resultTimer.current);
+    if (res?.ignore || isUnassignedTagMessage(res?.message)) {
+      // unregistered RFID tag: ignore it quietly
+      setLastRead(null);
+      return;
+    }
     if (!res?.tone) {
       setResult({ tone: 'info', message: `Scanned ${v}` });
     } else if (res.tone === 'bad' || res.tone === 'error') {
