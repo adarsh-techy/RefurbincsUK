@@ -17,6 +17,7 @@ import ClientNotificationsScreen from '../screens/client/ClientNotificationsScre
 import ClientSupportScreen from '../screens/client/ClientSupportScreen';
 import ClientHistoryScreen from '../screens/client/ClientHistoryScreen';
 import ClientCertificatesScreen from '../screens/client/ClientCertificatesScreen';
+import ClientPartsScreen from '../screens/client/ClientPartsScreen';
 import ClientTruckIntakeScreen from '../screens/client/ClientTruckIntakeScreen';
 import ClientHistoryDetailScreen from '../screens/client/ClientHistoryDetailScreen';
 import AdminDirectoryScreen from '../screens/admin/AdminDirectoryScreen';
@@ -200,6 +201,11 @@ export default function RootNavigator() {
               name="ClientHistory"
               component={ClientHistoryScreen}
               options={{ ...clientScreenOptions, title: 'Service History' }}
+            />
+            <Stack.Screen
+              name="ClientParts"
+              component={ClientPartsScreen}
+              options={{ ...clientScreenOptions, title: 'Parts Inventory' }}
             />
             <Stack.Screen
               name="ClientCertificates"

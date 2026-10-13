@@ -40,6 +40,7 @@ const NAV_GROUPS = [
       { key: 'invoices', label: 'Invoices', screen: 'Invoices', clientPermission: 'client_invoices' },
       { key: 'transactions', label: 'Transactions', screen: 'Transactions', clientPermission: 'client_transactions' },
       { key: 'certificates', label: 'Certificates', screen: 'ClientCertificates' },
+      { key: 'parts', label: 'Parts Inventory', screen: 'ClientParts' },
     ],
   },
   {

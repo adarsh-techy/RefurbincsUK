@@ -134,16 +134,19 @@ export default function ClientDashboardScreen() {
   const [previewCert, setPreviewCert] = useState(null);
   const milestoneShownRef = useRef(new Set());
   const dueAutoShownRef = useRef(false);
+  const [lowParts, setLowParts] = useState([]);
 
   const load = useCallback(async () => {
     try {
-      const [dash, batt, tick, inv, certs] = await Promise.all([
+      const [dash, batt, tick, inv, certs, parts] = await Promise.all([
         apiClient.get('/clients/me/dashboard'),
         apiClient.get('/clients/me/batteries'),
         apiClient.get('/tickets', { params: { limit: 4 } }).catch(() => ({ data: { data: [] } })),
         apiClient.get('/clients/me/invoices').catch(() => ({ data: { data: [] } })),
         apiClient.get('/certificates/my-milestones').catch(() => ({ data: null })),
+        apiClient.get('/clients/me/parts').catch(() => ({ data: { data: [] } })),
       ]);
+      setLowParts((parts.data?.data || []).filter((p) => p.is_low));
       setData(dash.data);
       setAllBatteries(batt.data?.data || []);
       setRecentTickets(tick.data?.data || []);
@@ -396,6 +399,27 @@ export default function ClientDashboardScreen() {
             {can('client_support') && <QuickAction icon="user" color="#9333ea" label="Help Desk" onPress={() => navigation.navigate('Support')} />}
           </View>
         </View>
+
+        {/* Low parts stock (web: "Low Parts Stock" banner) */}
+        {lowParts.length > 0 && (
+          <View className="rounded-3xl border border-red-200 bg-red-50 p-4">
+            <View className="flex-row items-start gap-3">
+              <View className="h-10 w-10 items-center justify-center rounded-2xl bg-red-100"><Icon name="alertTriangle" color="#b91c1c" size={18} /></View>
+              <View className="min-w-0 flex-1">
+                <Text className="text-sm font-black text-red-900">
+                  Low Parts Stock — {lowParts.length} part{lowParts.length === 1 ? '' : 's'} at or below the minimum
+                </Text>
+                <Text className="mt-0.5 text-xs text-red-800">
+                  {lowParts.slice(0, 3).map((p) => `${p.name} (${p.quantity} left, min ${p.min_stock})`).join(' · ')}
+                  {lowParts.length > 3 ? ` · +${lowParts.length - 3} more` : ''}
+                </Text>
+              </View>
+            </View>
+            <TouchableOpacity onPress={() => navigation.navigate('ClientParts')} className="mt-3 self-start rounded-2xl bg-red-600 px-4 py-2.5">
+              <Text className="text-xs font-bold text-white">View Parts Inventory →</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Shipment & workshop receiving tracker */}
         {totalPacked > 0 && (

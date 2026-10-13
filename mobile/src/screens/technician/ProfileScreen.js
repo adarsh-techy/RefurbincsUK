@@ -16,6 +16,7 @@ const CLIENT_LINKS = [
   { to: 'Invoices', label: 'Invoices & Bills', hint: 'Download billing PDFs', permission: 'client_invoices' },
   { to: 'Transactions', label: 'Transactions', hint: 'Repair billing history', permission: 'client_transactions' },
   { to: 'ClientCertificates', label: 'Certificates', hint: 'ESG milestone certificates' },
+  { to: 'ClientParts', label: 'Parts Inventory', hint: 'Your parts stock and minimum levels' },
   { to: 'ClientNotifications', label: 'Notifications', hint: 'Fleet activity feed', permission: 'client_notifications' },
   { to: 'Support', label: 'Help & Support', hint: 'Message the service team', permission: 'client_support' },
 ];
