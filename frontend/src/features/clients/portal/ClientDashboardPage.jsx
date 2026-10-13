@@ -97,6 +97,14 @@ function ClientDashboardPage() {
 
   // Invoices & Pending Due Modal State
   const [invoices, setInvoices] = useState([]);
+  // parts held for this client that are at or below their minimum stock
+  const [lowParts, setLowParts] = useState([]);
+  useEffect(() => {
+    apiClient
+      .get('/clients/me/parts')
+      .then(({ data: res }) => setLowParts((res?.data || []).filter((p) => p.is_low)))
+      .catch(() => setLowParts([]));
+  }, []);
   const [showDuePaymentModal, setShowDuePaymentModal] = useState(false);
   const [actionLoading, setActionLoading] = useState(null);
 
@@ -623,6 +631,32 @@ function ClientDashboardPage() {
           </div>
         </div>
       </div>
+
+      {/* ── Low-stock parts alert ─────────────────────── */}
+      {lowParts.length > 0 && (
+        <div className="flex flex-col gap-3 rounded-3xl border border-red-200 bg-red-50/80 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5 dark:border-red-900/50 dark:bg-red-950/30">
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-red-100 text-red-700 dark:bg-red-900/50 dark:text-red-300">
+              <FiAlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <p className="text-sm font-black text-red-900 dark:text-red-200">
+                Low Parts Stock — {lowParts.length} part{lowParts.length === 1 ? '' : 's'} at or below the minimum
+              </p>
+              <p className="mt-0.5 text-xs text-red-800/90 dark:text-red-300/90">
+                {lowParts.slice(0, 3).map((p) => `${p.name} (${p.quantity} left, min ${p.min_stock})`).join(' · ')}
+                {lowParts.length > 3 ? ` · +${lowParts.length - 3} more` : ''}
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/my/parts"
+            className="inline-flex shrink-0 items-center justify-center gap-1.5 self-start rounded-2xl bg-red-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-red-700 sm:self-auto"
+          >
+            View Parts Inventory <FiArrowRight className="h-3.5 w-3.5" />
+          </Link>
+        </div>
+      )}
 
       {/* ── Active Shipment & Intake Status Tracker Banner ─────────────────────── */}
       {totalPacked > 0 && (

@@ -220,7 +220,8 @@ function PartDetailPage() {
 
   // Stock status determination
   const isOutOfStock = quantity <= 0;
-  const isLowStock = quantity > 0 && quantity <= 5; // same line as the dashboard / Low Stock filter
+  const minStock = Number(part?.min_stock ?? 5);
+  const isLowStock = quantity > 0 && quantity <= minStock; // at or below this part's own minimum (set by the super admin)
 
   // Monthly breakdown
   const monthlyBreakdown = buildMonthlyBreakdown(usageHistory, stockHistory);
@@ -394,6 +395,8 @@ function PartDetailPage() {
             <span className="inline-flex items-center gap-1">
               <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
               <span>Registered on {formatDateOnly(part.created_at)}</span>
+              <span className="ml-2">· Client: <strong>{part.client_name || 'Unassigned'}</strong></span>
+              <span className="ml-2">· Min. stock: <strong>{minStock}</strong></span>
             </span>
             {lastRestockedAt && (
               <>

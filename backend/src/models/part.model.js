@@ -1,13 +1,49 @@
 const db = require('../config/db');
 
-async function findAll() {
-  const { rows } = await db.query('SELECT * FROM parts ORDER BY name');
+// Every part carries its owning client (client_id / client_name) and its own
+// minimum stock limit; "low" means quantity at or below that limit.
+const PART_COLUMNS = `p.*, c.name AS client_name, (p.quantity <= p.min_stock) AS is_low`;
+
+// clientId: only that client's parts. withUnassigned: also parts no client
+// owns yet (old stock from before parts were per client).
+async function findAll({ clientId, withUnassigned = false } = {}) {
+  const params = [];
+  let where = '';
+  if (clientId) {
+    params.push(clientId);
+    where = withUnassigned ? 'WHERE (p.client_id = $1 OR p.client_id IS NULL)' : 'WHERE p.client_id = $1';
+  }
+  const { rows } = await db.query(
+    `SELECT ${PART_COLUMNS} FROM parts p LEFT JOIN clients c ON c.id = p.client_id ${where} ORDER BY c.name NULLS FIRST, p.name`,
+    params
+  );
   return rows;
 }
 
 async function findById(id) {
-  const { rows } = await db.query('SELECT * FROM parts WHERE id = $1', [id]);
+  const { rows } = await db.query(`SELECT ${PART_COLUMNS} FROM parts p LEFT JOIN clients c ON c.id = p.client_id WHERE p.id = $1`, [id]);
   return rows[0];
+}
+
+// The fleet client a battery belongs to (batteries are linked by client name).
+async function findClientForBattery(batteryId) {
+  const { rows } = await db.query(
+    `SELECT c.id, c.name FROM batteries b
+       JOIN clients c ON lower(trim(c.name)) = lower(trim(b.client_name))
+      WHERE b.id = $1 LIMIT 1`,
+    [batteryId]
+  );
+  return rows[0] || null;
+}
+
+// A client's own parts for its portal: stock levels only, no pricing.
+async function findForClient(clientId) {
+  const { rows } = await db.query(
+    `SELECT id, name, sku, quantity, min_stock, (quantity <= min_stock) AS is_low, created_at
+       FROM parts WHERE client_id = $1 ORDER BY (quantity <= min_stock) DESC, name`,
+    [clientId]
+  );
+  return rows;
 }
 
 // Every repair that's ever used this part, newest first — for the part
@@ -34,20 +70,25 @@ async function findUsageHistory(partId) {
   return rows;
 }
 
-async function create({ name, sku, quantity, repairCost, serviceCharge }) {
+async function create({ name, sku, quantity, repairCost, serviceCharge, clientId, minStock }) {
   const { rows } = await db.query(
-    `INSERT INTO parts (name, sku, quantity, repair_cost, service_charge) VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-    [name, sku, quantity, repairCost, serviceCharge]
+    `INSERT INTO parts (name, sku, quantity, repair_cost, service_charge, client_id, min_stock)
+     VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING id`,
+    [name, sku, quantity, repairCost, serviceCharge, clientId, minStock]
   );
-  return rows[0];
+  return findById(rows[0].id);
 }
 
-async function update(id, { name, sku, quantity, repairCost, serviceCharge }) {
+// clientId / minStock are only changed when given (undefined = keep).
+async function update(id, { name, sku, quantity, repairCost, serviceCharge, clientId, minStock }) {
   const { rows } = await db.query(
-    `UPDATE parts SET name = $2, sku = $3, quantity = $4, repair_cost = $5, service_charge = $6 WHERE id = $1 RETURNING *`,
-    [id, name, sku, quantity, repairCost, serviceCharge]
+    `UPDATE parts SET name = $2, sku = $3, quantity = $4, repair_cost = $5, service_charge = $6,
+            client_id = CASE WHEN $7::boolean THEN $8::int ELSE client_id END,
+            min_stock = COALESCE($9::int, min_stock)
+      WHERE id = $1 RETURNING id`,
+    [id, name, sku, quantity, repairCost, serviceCharge, clientId !== undefined, clientId ?? null, minStock ?? null]
   );
-  return rows[0];
+  return rows[0] ? findById(rows[0].id) : undefined;
 }
 
 async function remove(id) {
@@ -113,6 +154,8 @@ async function findStockHistory(partId) {
 module.exports = {
   findAll,
   findById,
+  findClientForBattery,
+  findForClient,
   findUsageHistory,
   create,
   update,

@@ -17,12 +17,13 @@ async function getAdminNotifications(req, res, next) {
       { rows: recentMilestones },
       { rows: unserviceableBatteries },
     ] = await Promise.all([
-      // 1. Out of stock & low inventory parts (<= 5)
+      // 1. Out of stock & low inventory parts (at or below each part's own minimum)
       db.query(
-        `SELECT id, name, sku, quantity, in_stock, repair_cost
-         FROM parts
-         WHERE in_stock = false OR quantity <= 5
-         ORDER BY (CASE WHEN in_stock = false OR quantity <= 0 THEN 0 ELSE 1 END), quantity ASC, name ASC
+        `SELECT p.id, p.name, p.sku, p.quantity, p.in_stock, p.repair_cost, p.min_stock, c.name AS client_name
+         FROM parts p
+         LEFT JOIN clients c ON c.id = p.client_id
+         WHERE p.quantity <= p.min_stock
+         ORDER BY (CASE WHEN p.quantity <= 0 THEN 0 ELSE 1 END), p.quantity ASC, p.name ASC
          LIMIT 30`
       ),
 
@@ -104,7 +105,7 @@ async function getAdminNotifications(req, res, next) {
         title: isZero ? `Out of Stock: ${p.name}` : `Low Stock Alert: ${p.name}`,
         message: isZero
           ? `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) has reached 0 units in stock. Reorder immediately to avoid repair delays.`
-          : `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) is running low with only ${p.quantity} unit(s) remaining in stock.`,
+          : `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) is running low with only ${p.quantity} unit(s) remaining in stock (minimum ${p.min_stock}).`,
         timestamp: p.created_at || new Date().toISOString(),
         actionLabel: 'Restock Part →',
         actionUrl: `/parts/${p.id}`,
@@ -113,6 +114,8 @@ async function getAdminNotifications(req, res, next) {
           partName: p.name,
           sku: p.sku,
           quantity: p.quantity,
+          minStock: p.min_stock,
+          clientName: p.client_name,
           inStock: p.in_stock,
         },
       });
@@ -297,8 +300,8 @@ async function getAdminNotificationById(req, res, next) {
     if (id.startsWith('stock_')) {
       const partId = Number(id.replace('stock_', ''));
       const { rows } = await db.query(
-        `SELECT id, name, sku, quantity, in_stock, repair_cost, created_at
-         FROM parts WHERE id = $1`,
+        `SELECT p.id, p.name, p.sku, p.quantity, p.in_stock, p.repair_cost, p.min_stock, p.created_at, c.name AS client_name
+         FROM parts p LEFT JOIN clients c ON c.id = p.client_id WHERE p.id = $1`,
         [partId]
       );
       if (rows.length > 0) {
@@ -313,7 +316,7 @@ async function getAdminNotificationById(req, res, next) {
             title: isZero ? `Out of Stock: ${p.name}` : `Low Stock Alert: ${p.name}`,
             message: isZero
               ? `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) has reached 0 units in stock. Reorder immediately to avoid workshop repair delays.`
-              : `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) is running low with only ${p.quantity} unit(s) remaining in stock.`,
+              : `Part "${p.name}" (SKU: ${p.sku || 'N/A'}) is running low with only ${p.quantity} unit(s) remaining in stock (minimum ${p.min_stock}).`,
             timestamp: p.created_at || new Date().toISOString(),
             actionLabel: 'Restock & Manage Part',
             actionUrl: `/parts/${p.id}`,

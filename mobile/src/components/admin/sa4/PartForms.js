@@ -4,23 +4,27 @@ import apiClient from '../../../services/api-client';
 import { Field, FormButtons, Input, Sheet } from './ui';
 
 // The web PartForm (add / edit) and RestockForm, as bottom sheets.
-//   add      POST  /parts             { name, sku, quantity, repairCost, serviceCharge }
+//   add      POST  /parts             { clientId, minStock, name, sku, quantity, repairCost, serviceCharge }
 //   edit     PATCH /parts/:id         (same payload, super_admin only)
 //   restock  PATCH /parts/:id/restock { quantityAdded, note }
 
 // "bms board" → "Bms Board" (first letter of each word, rest untouched)
 const capitalizeWords = (val) => (val ? val.replace(/(^|\s)(\S)/g, (_, space, ch) => space + ch.toUpperCase()) : '');
 
-export function PartFormSheet({ visible, part, title, description, onSaved, onClose }) {
+export function PartFormSheet({ visible, part, title, description, onSaved, onClose, defaultClientId }) {
   const isEdit = Boolean(part);
   const [form, setForm] = useState({});
-  const [names, setNames] = useState([]);
+  const [allParts, setAllParts] = useState([]);
+  const [clients, setClients] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     if (!visible) return;
     setForm({
+      // every part's stock belongs to one fleet client and has its own minimum
+      clientId: part?.client_id ? String(part.client_id) : defaultClientId ? String(defaultClientId) : '',
+      minStock: part ? String(part.min_stock ?? 5) : '5',
       name: part?.name || '',
       sku: part?.sku || '',
       quantity: part ? String(part.quantity) : '0',
@@ -28,23 +32,36 @@ export function PartFormSheet({ visible, part, title, description, onSaved, onCl
       serviceCharge: part ? String(part.service_charge || 0) : '0',
     });
     setError(null);
-    apiClient.get('/parts').then(({ data }) => setNames([...new Set((data || []).map((p) => p.name))])).catch(() => {});
-  }, [visible, part]);
+    apiClient.get('/parts').then(({ data }) => setAllParts(data || [])).catch(() => {});
+    apiClient.get('/parts/clients').then(({ data }) => setClients(data || [])).catch(() => {});
+  }, [visible, part, defaultClientId]);
 
   const update = (k, v) => setForm((f) => ({ ...f, [k]: v }));
+  // name suggestions from the chosen client's own parts
+  const names = [...new Set(allParts.filter((p) => !form.clientId || String(p.client_id) === form.clientId).map((p) => p.name))];
   // the web's <datalist> of existing part names
   const q = (form.name || '').trim().toLowerCase();
   const suggestions = q ? names.filter((n) => n.toLowerCase().includes(q) && n.toLowerCase() !== q).slice(0, 5) : [];
 
   async function submit() {
+    if (!form.clientId) {
+      setError('Select the client these parts belong to.');
+      return;
+    }
     if (!form.name?.trim()) {
       setError('Part Name is required.');
+      return;
+    }
+    if (!/^\d+$/.test(String(form.minStock || '').trim())) {
+      setError('Minimum stock must be a whole number of 0 or more.');
       return;
     }
     setSubmitting(true);
     setError(null);
     try {
       const payload = {
+        clientId: Number(form.clientId),
+        minStock: Number(form.minStock),
         name: capitalizeWords(form.name.trim()),
         sku: form.sku?.trim() || undefined,
         quantity: Number(form.quantity) || 0,
@@ -68,6 +85,24 @@ export function PartFormSheet({ visible, part, title, description, onSaved, onCl
       description={description || (isEdit ? 'Update this part’s details.' : 'Add a new part to inventory.')}
       onClose={onClose}
     >
+      <Field label="Client *">
+        <View className="flex-row flex-wrap gap-2">
+          {clients.map((c) => {
+            const on = String(c.id) === form.clientId;
+            return (
+              <TouchableOpacity
+                key={c.id}
+                onPress={() => update('clientId', String(c.id))}
+                className={`rounded-full border px-3 py-1.5 ${on ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300 bg-white'}`}
+              >
+                <Text className={`text-xs font-semibold ${on ? 'text-white' : 'text-slate-700'}`}>{c.name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+          {clients.length === 0 ? <Text className="text-xs text-slate-400">No fleet clients yet.</Text> : null}
+        </View>
+        <Text className="mt-1 text-[11px] text-slate-500">Only this client's battery repairs can use these parts.</Text>
+      </Field>
       <Field label="Part Name">
         <Input value={form.name} onChangeText={(v) => update('name', capitalizeWords(v))} placeholder="e.g. 12V Cell Module" />
         {suggestions.length > 0 && (
@@ -85,6 +120,10 @@ export function PartFormSheet({ visible, part, title, description, onSaved, onCl
       </Field>
       <Field label={isEdit ? 'Quantity' : 'Starting Quantity'}>
         <Input value={form.quantity} onChangeText={(v) => update('quantity', v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" />
+      </Field>
+      <Field label="Minimum Stock Limit">
+        <Input value={form.minStock} onChangeText={(v) => update('minStock', v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" />
+        <Text className="mt-1 text-[11px] text-slate-500">A low-stock alert shows when the quantity reaches this number or below.</Text>
       </Field>
       <Field label="Service Charge (optional / £)">
         <Input value={form.serviceCharge} onChangeText={(v) => update('serviceCharge', v.replace(/[^0-9.]/g, ''))} keyboardType="decimal-pad" placeholder="0.00" />

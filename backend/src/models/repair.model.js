@@ -34,6 +34,23 @@ async function create({ batteryId, staffId, partId, quantityUsed, notes, laborCh
       throw err;
     }
 
+    // Parts are kept per client: a repair on a client's battery may only use
+    // that client's parts (or old stock no client owns yet).
+    const { rows: owner } = await client.query(
+      `SELECT p.client_id AS part_client_id, pc.name AS part_client_name, bc.id AS battery_client_id
+         FROM parts p
+         LEFT JOIN clients pc ON pc.id = p.client_id
+         LEFT JOIN batteries b ON b.id = $2
+         LEFT JOIN clients bc ON lower(trim(bc.name)) = lower(trim(b.client_name))
+        WHERE p.id = $1`,
+      [partId, batteryId]
+    );
+    if (owner[0] && owner[0].part_client_id && owner[0].part_client_id !== owner[0].battery_client_id) {
+      const err = new Error(`This part belongs to ${owner[0].part_client_name || 'another client'} and can't be used on this battery.`);
+      err.status = 400;
+      throw err;
+    }
+
     // Guard against overselling stock: only deduct if enough is on hand.
     const partResult = await client.query(
       'UPDATE parts SET quantity = quantity - $2 WHERE id = $1 AND quantity >= $2 RETURNING *',

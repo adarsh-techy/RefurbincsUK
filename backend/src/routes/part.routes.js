@@ -7,6 +7,7 @@ router.use(requireAuth);
 // Read is open to workshop logins (the Repairs form and technician panel
 // need part names and stock levels) but not clients — rows carry pricing.
 router.get('/', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), partController.list);
+router.get('/clients', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), partController.listPartClients);
 router.get('/:id', requireRole('super_admin', 'admin', 'staff', 'technician', 'supervisor'), partController.getById);
 router.post('/', requirePermission('parts'), auditTrail('part', 'create'), partController.create);
 // Full edit/delete (renaming, re-pricing, deleting) is super_admin only.

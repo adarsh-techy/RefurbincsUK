@@ -50,6 +50,7 @@ const FinanceDetailPage = lazy(() => import('../features/finance/FinanceDetailPa
 const UsersPage = lazy(() => import('../features/users/UsersPage'));
 const InvoicesPage = lazy(() => import('../features/invoices/InvoicesPage'));
 const ClientInvoicesPage = lazy(() => import('../features/clients/portal/ClientInvoicesPage'));
+const ClientPartsPage = lazy(() => import('../features/clients/portal/ClientPartsPage'));
 const RecycleClientShipmentsPage = lazy(() => import('../features/recycle-client/RecycleClientShipmentsPage'));
 const RecycleClientsAdminPage = lazy(() => import('../features/recycle-client/RecycleClientsAdminPage'));
 const RecycleClientDetailPage = lazy(() => import('../features/recycle-client/RecycleClientDetailPage'));
@@ -167,6 +168,7 @@ function AppRoutes() {
           </Route>
           <Route element={<ProtectedRoute roles={['client']} />}>
             <Route path="/my/certificates" element={<ClientCertificatesPage />} />
+            <Route path="/my/parts" element={<ClientPartsPage />} />
             <Route path="/my/batteries" element={<ClientBatteriesPage />} />
             {/* Stage 2 (In Service) page was removed from the client portal —
                 its batteries now stay visible in the Packed truck detail table. */}

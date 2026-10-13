@@ -12,7 +12,7 @@ async function getTotals() {
       (SELECT COUNT(*) FROM batteries WHERE status = 'registered') AS registered,
       (SELECT COUNT(*) FROM batteries WHERE status IN ('unserviceable', 'tested_parts_removed')) AS unserviceable,
       (SELECT COUNT(*) FROM batteries WHERE status = 'recycled') AS recycled,
-      (SELECT COUNT(*) FROM parts WHERE quantity <= 5) AS low_stock_parts
+      (SELECT COUNT(*) FROM parts WHERE quantity <= min_stock) AS low_stock_parts
   `);
   return rows[0];
 }

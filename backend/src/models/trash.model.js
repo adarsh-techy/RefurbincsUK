@@ -152,7 +152,7 @@ const RESTORE_TYPES = {
     label: 'part',
     notRestored: 'Stock adjustment history deleted with the part is not restored.',
     uniques: [
-      { columns: ['sku'], message: (r) => `Another part already uses SKU ${r.sku}.` },
+      { columns: ['client_id', 'sku'], message: (r) => `This client already has a part with SKU ${r.sku}.` },
     ],
   },
   service: {

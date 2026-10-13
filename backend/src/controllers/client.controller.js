@@ -2,6 +2,7 @@ const bcrypt = require('bcryptjs');
 const fileStorage = require('../services/file-storage');
 const clientModel = require('../models/client.model');
 const invoiceModel = require('../models/invoice.model');
+const partModel = require('../models/part.model');
 const recycleModel = require('../models/recycle.model');
 const trashModel = require('../models/trash.model');
 
@@ -416,6 +417,21 @@ async function myHistory(req, res, next) {
 }
 
 // The client's own invoices (with download link)
+// The client's own parts inventory: stock and minimum levels, never another
+// client's parts and no workshop pricing.
+async function myParts(req, res, next) {
+  try {
+    const client = await clientModel.findByUserId(req.user.id);
+    if (!client) {
+      return res.status(409).json({ message: 'Your account is not linked to a client record.' });
+    }
+    const data = await partModel.findForClient(client.id);
+    res.json({ data, lowStock: data.filter((p) => p.is_low).length });
+  } catch (err) {
+    next(err);
+  }
+}
+
 async function myInvoices(req, res, next) {
   try {
     const client = await clientModel.findByUserId(req.user.id);
@@ -558,6 +574,7 @@ async function updateMySortGroups(req, res, next) {
 }
 
 module.exports = {
+  myParts,
   list,
   getById,
   create,

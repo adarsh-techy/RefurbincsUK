@@ -743,11 +743,12 @@ export default function BatteryDetailScreen() {
 
   useEffect(() => {
     if (result?.battery?.status !== 'in_progress' || isClient) return;
+    // only this battery's client's parts (stock is kept per client)
     apiClient
-      .get('/parts')
+      .get('/parts', { params: { batteryId: result.battery.id } })
       .then(({ data }) => setParts(data))
       .catch(() => setParts([]));
-  }, [result?.battery?.status, isClient]);
+  }, [result?.battery?.status, result?.battery?.id, isClient]);
 
   // Issue reasons are needed both mid-repair (in_progress) and by a tester
   // during testing (in_testing) who finds the battery can't be serviced.

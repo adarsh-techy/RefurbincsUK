@@ -63,9 +63,14 @@ export default function AdminPartsScreen() {
     }, [load])
   );
 
-  // same rule as the web: "low stock" = not in stock (quantity 0)
-  const lowStock = parts.filter((p) => Number(p.quantity) <= 5);
-  const base = lowStockOnly ? lowStock : parts;
+  // parts are kept per client: filter by client; "low" = at or below each part's own minimum
+  const [clientFilter, setClientFilter] = useState('');
+  const clientOptions = [...new Map(parts.map((p) => [String(p.client_id ?? ''), p.client_name || 'Unassigned'])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const isLow = (p) => Number(p.quantity) <= Number(p.min_stock ?? 5);
+  const byClient = clientFilter ? parts.filter((p) => String(p.client_id ?? '') === clientFilter) : parts;
+  const lowStock = byClient.filter(isLow);
+  const base = lowStockOnly ? lowStock : byClient;
   const q = search.trim().toLowerCase();
   const visible = q ? base.filter((p) => [p.name, p.sku].some((v) => v && String(v).toLowerCase().includes(q))) : base;
 
@@ -95,10 +100,26 @@ export default function AdminPartsScreen() {
         </TouchableOpacity>
         {lowStockOnly && (
           <Text className="text-sm text-slate-500">
-            {lowStock.length} part{lowStock.length === 1 ? '' : 's'} at 5 units or fewer
+            {lowStock.length} part{lowStock.length === 1 ? '' : 's'} at or below their minimum stock
           </Text>
         )}
       </View>
+      {clientOptions.length > 1 && (
+        <View className="flex-row flex-wrap gap-2">
+          {[['', 'All clients'], ...clientOptions].map(([id, name]) => {
+            const on = clientFilter === id;
+            return (
+              <TouchableOpacity
+                key={id || 'all'}
+                onPress={() => setClientFilter(id)}
+                className={`rounded-full border px-3 py-1.5 ${on ? 'border-emerald-600 bg-emerald-600' : 'border-slate-300 bg-white'}`}
+              >
+                <Text className={`text-xs font-semibold ${on ? 'text-white' : 'text-slate-700'}`}>{name}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      )}
       <SearchBox value={search} onChangeText={setSearch} placeholder="Search part name or SKU…" />
       <ErrorBox text={error} />
     </View>
@@ -132,10 +153,14 @@ export default function AdminPartsScreen() {
                 <Text className="text-sm font-bold text-blue-700">{p.name}</Text>
                 <Text className="text-xs text-slate-500">SKU {p.sku || '—'}</Text>
               </View>
-              <Badge tone={p.in_stock ? 'good' : 'critical'}>{p.in_stock ? 'In Stock' : 'Out of Stock'}</Badge>
+              <Badge tone={p.in_stock ? 'good' : Number(p.quantity) > 0 ? 'warning' : 'critical'}>
+                {p.in_stock ? 'In Stock' : Number(p.quantity) > 0 ? `Low Stock (${p.quantity} left)` : 'Out of Stock'}
+              </Badge>
             </View>
             <View className="ml-6 mt-2 flex-row flex-wrap gap-x-4">
+              <Text className="text-xs text-slate-600">Client <Text className={`font-bold ${p.client_name ? 'text-slate-900' : 'text-amber-600'}`}>{p.client_name || 'Unassigned'}</Text></Text>
               <Text className="text-xs text-slate-600">Qty <Text className="font-bold text-slate-900">{p.quantity}</Text></Text>
+              <Text className="text-xs text-slate-600">Min. <Text className="font-bold text-slate-900">{p.min_stock ?? 5}</Text></Text>
               {isSuperAdmin && (
                 <Text className="text-xs text-slate-600">Service Charge <Text className="font-bold text-slate-900">{money(p.service_charge)}</Text></Text>
               )}
@@ -154,6 +179,7 @@ export default function AdminPartsScreen() {
       <PartFormSheet
         visible={Boolean(formTarget)}
         part={formTarget && formTarget !== 'new' ? formTarget : null}
+        defaultClientId={clientFilter || undefined}
         onSaved={() => { setFormTarget(null); load(); }}
         onClose={() => setFormTarget(null)}
       />

@@ -148,7 +148,8 @@ export default function PartDetailScreen() {
   const uniqueClientsCount = new Set(usageHistory.map((h) => h.client_name).filter(Boolean)).size;
   const lastRestockedAt = stockHistory.length > 0 ? stockHistory[0].adjusted_at : null;
   const isOutOfStock = quantity <= 0;
-  const isLowStock = quantity > 0 && quantity <= 10;
+  const minStock = Number(part?.min_stock ?? 5);
+  const isLowStock = quantity > 0 && quantity <= minStock; // at or below this part's own minimum
 
   const monthly = buildMonthlyBreakdown(usageHistory, stockHistory);
   const maxMonthly = Math.max(1, ...monthly.flatMap((m) => [m.restocked, m.used]));
@@ -219,6 +220,7 @@ export default function PartDetailScreen() {
           {part.sku ? <Text selectable className="font-semibold text-slate-700">SKU: {part.sku}</Text> : 'No SKU registered'}
           {'  •  '}Registered on {dateOnly(part.created_at)}
           {lastRestockedAt ? `  •  Last restocked ${dateOnly(lastRestockedAt)}` : ''}
+          {`  •  Client: ${part.client_name || 'Unassigned'}  •  Min. stock: ${minStock}`}
         </Text>
         {canManageParts && (
           <TouchableOpacity onPress={() => setRestocking(true)} className="flex-row items-center justify-center gap-2 rounded-xl border border-emerald-300 bg-white py-2.5">

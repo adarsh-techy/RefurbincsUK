@@ -7,11 +7,15 @@ const inputClasses =
 const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
 
 // part: pass an existing part record to edit it (PATCH); omit to create (POST).
-function PartForm({ part, onSaved, onCancel }) {
+// Every part's stock belongs to one fleet client (clientId, required) and has
+// its own minimum stock limit, which drives the low-stock alerts.
+function PartForm({ part, onSaved, onCancel, defaultClientId }) {
   const isEdit = Boolean(part);
   const { data: existingParts } = useFetchList('/parts');
-  const existingNames = [...new Set((existingParts || []).map((p) => p.name))];
+  const { data: partClients } = useFetchList('/parts/clients');
   const [form, setForm] = useState({
+    clientId: part?.client_id ? String(part.client_id) : defaultClientId ? String(defaultClientId) : '',
+    minStock: part ? String(part.min_stock ?? 5) : '5',
     name: part?.name || '',
     sku: part?.sku || '',
     quantity: part ? String(part.quantity) : '0',
@@ -20,6 +24,10 @@ function PartForm({ part, onSaved, onCancel }) {
   });
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState(null);
+  // name suggestions from the chosen client's own parts
+  const existingNames = [
+    ...new Set((existingParts || []).filter((p) => !form.clientId || String(p.client_id) === form.clientId).map((p) => p.name)),
+  ];
 
   // Capitalizes the first letter of every word as the name is typed
   // ("bms board" -> "Bms Board"); the rest of each word is left as entered.
@@ -34,10 +42,20 @@ function PartForm({ part, onSaved, onCancel }) {
 
   async function handleSubmit(e) {
     e.preventDefault();
+    if (!form.clientId) {
+      setError('Select the client these parts belong to.');
+      return;
+    }
+    if (!/^\d+$/.test(String(form.minStock).trim())) {
+      setError('Minimum stock must be a whole number of 0 or more.');
+      return;
+    }
     setSubmitting(true);
     setError(null);
     try {
       const payload = {
+        clientId: Number(form.clientId),
+        minStock: Number(form.minStock),
         name: capitalizeWords(form.name.trim()),
         sku: form.sku?.trim() || undefined,
         quantity: Number(form.quantity) || 0,
@@ -60,6 +78,24 @@ function PartForm({ part, onSaved, onCancel }) {
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-5">
       <div className="flex flex-col gap-4">
+        <div>
+          <label className={labelClasses}>Client <span className="text-critical-600">*</span></label>
+          <select
+            value={form.clientId}
+            onChange={(e) => updateField('clientId', e.target.value)}
+            className={inputClasses}
+            required
+          >
+            <option value="">Select the client this stock belongs to…</option>
+            {(partClients || []).map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            Only this client's battery repairs can use these parts.
+          </p>
+        </div>
+
         <div>
           <label className={labelClasses}>Part Name</label>
           <input
@@ -98,6 +134,21 @@ function PartForm({ part, onSaved, onCancel }) {
             onChange={(e) => updateField('quantity', e.target.value)}
             className={inputClasses}
           />
+        </div>
+
+        <div>
+          <label className={labelClasses}>Minimum Stock Limit</label>
+          <input
+            type="number"
+            min="0"
+            step="1"
+            value={form.minStock}
+            onChange={(e) => updateField('minStock', e.target.value)}
+            className={inputClasses}
+          />
+          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+            A low-stock alert shows when the quantity reaches this number or below.
+          </p>
         </div>
 
         <div>

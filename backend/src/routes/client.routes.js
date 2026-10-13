@@ -36,6 +36,7 @@ router.get('/me/sort-groups', requireRole('client'), clientController.mySortGrou
 router.put('/me/sort-groups', requireRole('client'), clientController.updateMySortGroups);
 router.get('/me/transactions', requireRole('client'), clientController.myTransactions);
 router.get('/me/history', requireRole('client'), clientController.myHistory);
+router.get('/me/parts', requireRole('client'), clientController.myParts);
 router.get('/me/invoices', requireRole('client'), clientController.myInvoices);
 router.get('/me/notifications', requireRole('client'), clientController.myNotifications);
 router.get('/:id', requireRole('super_admin', 'admin', 'staff'), clientController.getById);

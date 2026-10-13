@@ -252,6 +252,7 @@ export const CLIENT_NAV_GROUPS = [
       { to: '/my/batteries/packed', label: 'Packed for Pickup', icon: Icons.stage1, clientPermission: 'client_packed' },
       { to: '/my/batteries/received', label: 'Received Batteries', icon: Icons.stage3, clientPermission: 'client_received' },
       { to: '/my/battery-sorting', label: 'Sort Batteries', icon: Icons.sorting, clientPermission: 'client_battery_sorting' },
+      { to: '/my/parts', label: 'Parts Inventory', icon: Icons.inventory },
     ],
   },
   {

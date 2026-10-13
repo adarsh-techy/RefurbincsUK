@@ -34,7 +34,14 @@ function PartsPage() {
   const [deleteError, setDeleteError] = useState(null);
   const [restockTarget, setRestockTarget] = useState(null);
 
-  const filtered = lowStockOnly ? (data || []).filter((p) => Number(p.quantity) <= 5) : data;
+  // parts are kept per client: filter by client, and "low" = at or below each part's own minimum
+  const [clientFilter, setClientFilter] = useState('');
+  const clientOptions = [...new Map((data || []).map((p) => [String(p.client_id ?? ''), p.client_name || 'Unassigned'])).entries()]
+    .sort((a, b) => a[1].localeCompare(b[1]));
+  const isLow = (p) => Number(p.quantity) <= Number(p.min_stock ?? 5);
+  const filtered = (data || [])
+    .filter((p) => !clientFilter || String(p.client_id ?? '') === clientFilter)
+    .filter((p) => !lowStockOnly || isLow(p));
 
   function handleSaved() {
     refetch();
@@ -68,8 +75,14 @@ function PartsPage() {
         </Link>
       ),
     },
+    {
+      key: 'client_name',
+      label: 'Client',
+      render: (row) => row.client_name || <span className="font-semibold text-amber-600 dark:text-amber-400">Unassigned</span>,
+    },
     { key: 'sku', label: 'SKU', render: (row) => row.sku || '—' },
     { key: 'quantity', label: 'Qty' },
+    { key: 'min_stock', label: 'Min. Stock', render: (row) => row.min_stock ?? 5 },
     ...(isSuperAdmin
       ? [
           {
@@ -83,7 +96,7 @@ function PartsPage() {
       key: 'in_stock',
       label: 'Status',
       render: (row) => (
-        // in_stock is false at 5 units or fewer; only 0 is actually out
+        // in_stock is false at or below the part's minimum; only 0 is actually out
         <Badge tone={row.in_stock ? 'good' : Number(row.quantity) > 0 ? 'warning' : 'critical'}>
           {row.in_stock ? 'In Stock' : Number(row.quantity) > 0 ? `Low Stock (${row.quantity} left)` : 'Out of Stock'}
         </Badge>
@@ -123,7 +136,18 @@ function PartsPage() {
         <Button variant="darkViolet" onClick={() => setFormTarget('new')}>+ Add Part</Button>
       </PageHeader>
 
-      <div className="mb-6 flex items-center gap-3">
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <select
+          value={clientFilter}
+          onChange={(e) => setClientFilter(e.target.value)}
+          className="rounded-full border border-slate-300 bg-white px-3 py-1.5 text-sm text-slate-700 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200"
+          aria-label="Filter by client"
+        >
+          <option value="">All clients</option>
+          {clientOptions.map(([id, name]) => (
+            <option key={id || 'none'} value={id}>{name}</option>
+          ))}
+        </select>
         <button
           type="button"
           onClick={() => setLowStockOnly((prev) => !prev)}
@@ -137,7 +161,7 @@ function PartsPage() {
         </button>
         {lowStockOnly && (
           <span className="text-sm text-slate-500 dark:text-neutral-400">
-            {filtered.length} part{filtered.length === 1 ? '' : 's'} at 5 units or fewer
+            {filtered.length} part{filtered.length === 1 ? '' : 's'} at or below their minimum stock
           </span>
         )}
       </div>
@@ -152,6 +176,7 @@ function PartsPage() {
         >
           <PartForm
             part={formTarget === 'new' ? null : formTarget}
+            defaultClientId={clientFilter || undefined}
             onSaved={handleSaved}
             onCancel={() => setFormTarget(null)}
           />

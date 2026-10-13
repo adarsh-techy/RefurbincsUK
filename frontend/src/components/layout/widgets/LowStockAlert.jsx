@@ -92,7 +92,7 @@ function LowStockAlert() {
   return (
     <Modal
       title={title}
-      description={`${lowStockParts.length} part${lowStockParts.length === 1 ? '' : 's'} at 5 units or fewer — restock soon.`}
+      description={`${lowStockParts.length} part${lowStockParts.length === 1 ? '' : 's'} at or below their minimum stock — restock soon.`}
       onClose={() => setVisible(false)}
     >
       <ul className="mb-5 flex max-h-72 flex-col gap-2.5 overflow-y-auto">
@@ -103,7 +103,9 @@ function LowStockAlert() {
           >
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-medium text-slate-800 dark:text-neutral-100">{p.name}</p>
-              {p.sku && <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-neutral-400">{p.sku}</p>}
+              <p className="mt-0.5 truncate text-xs text-slate-500 dark:text-neutral-400">
+                {p.client_name || 'Unassigned'}{p.sku ? ` · ${p.sku}` : ''}{p.min_stock != null ? ` · min ${p.min_stock}` : ''}
+              </p>
             </div>
             <span className="shrink-0 rounded-full bg-critical-100 px-3 py-1 text-xs font-semibold text-critical-700 dark:bg-red-500/15 dark:text-red-300">
               {p.quantity} left

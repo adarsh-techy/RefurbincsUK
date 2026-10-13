@@ -81,7 +81,8 @@ function TechnicianRepairPanel({
   // The truck intake pages are admin-only routes, so workshop logins get no link
   const isOfficeAdmin = user?.role === 'super_admin' || user?.role === 'admin';
 
-  const { data: partsList } = useFetchList('/parts');
+  // only this battery's client's parts (stock is kept per client)
+  const { data: partsList } = useFetchList(`/parts?batteryId=${battery.id}`);
   const parts = partsList || [];
 
   const { data: issueReasonsList } = useFetchList('/issue-reasons?activeOnly=true');
