@@ -14,15 +14,22 @@ function notFound(req, res, next) {
 // whoever's debugging, and the client gets a generic message instead
 // (except in development, where seeing the real error locally is worth more
 // than hiding it).
+// Postgres rejecting a malformed value (e.g. /returns/undefined, /parts/abc)
+// is a bad request, not a server fault.
+const BAD_INPUT_PG_CODES = new Set(['22P02', '22003', '22007', '22008']);
+
 function errorHandler(err, req, res, next) {
-  const status = err.status || (err.name === 'MulterError' ? 400 : 500);
+  const badInput = BAD_INPUT_PG_CODES.has(err.code);
+  const status = err.status || (err.name === 'MulterError' || badInput ? 400 : 500);
 
   if (status >= 500) {
     console.error(err);
   }
 
   const message =
-    status < 500 || env.nodeEnv === 'development'
+    badInput && !err.status
+      ? 'Invalid value in the request.'
+      : status < 500 || env.nodeEnv === 'development'
       ? err.message || 'Internal server error'
       : 'Something went wrong on our end. Please try again, and contact support if it keeps happening.';
 
