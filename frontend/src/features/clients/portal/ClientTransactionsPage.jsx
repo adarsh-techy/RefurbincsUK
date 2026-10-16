@@ -13,7 +13,6 @@ import {
   FiX,
   FiGrid,
   FiList,
-  FiTruck,
   FiArrowRight,
   FiUser,
   FiInbox,
@@ -198,7 +197,7 @@ function ClientTransactionsPage() {
         <div className="flex flex-col py-0.5">
           <Link
             to={`/batteries/${encodeURIComponent(row.battery_code)}`}
-            className="font-mono font-bold text-xs sm:text-sm text-brand-700 hover:underline dark:text-emerald-400"
+            className="font-mono font-bold text-xs sm:text-sm text-emerald-700 hover:underline dark:text-emerald-400"
           >
             {row.battery_code}
           </Link>
@@ -222,7 +221,7 @@ function ClientTransactionsPage() {
         const cat = getChargeCategory(row);
         const IconComponent = cat.icon;
         return (
-          <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-[10px] font-bold border ${cat.badgeClass}`}>
+          <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-bold border ${cat.badgeClass}`}>
             <IconComponent className="w-3 h-3" />
             <span>{cat.label}</span>
           </span>
@@ -241,15 +240,15 @@ function ClientTransactionsPage() {
   ];
 
   return (
-    <div className="space-y-3 min-w-0 pb-10">
-      {/* 1. Page Header - Compact & refined */}
-      <div className="border-b border-slate-200/80 pb-2.5 dark:border-white/10">
-        <div className="flex items-center justify-between gap-2.5">
-          <div className="flex items-center gap-2 flex-wrap min-w-0">
-            <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+    <div className="space-y-4 min-w-0 pb-12">
+      {/* ── Page Header ─────────────────────────────────────────────── */}
+      <div className="border-b border-slate-200/80 pb-3 dark:border-white/10">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2.5 flex-wrap min-w-0">
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
               Transactions & Billing
             </h1>
-            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-surface-800 dark:text-neutral-300 border border-slate-200 dark:border-white/10">
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-neutral-300 border border-slate-200/80 dark:border-white/10">
               {filteredRows.length} Items
             </span>
           </div>
@@ -257,14 +256,14 @@ function ClientTransactionsPage() {
           <button
             type="button"
             onClick={fetchTransactions}
-            className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer shrink-0 transition-colors"
+            className="inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer shrink-0 transition-all active:scale-98"
             title="Refresh transactions"
           >
-            <FiRefreshCw className={`h-3 w-3 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+            <FiRefreshCw className={`h-3.5 w-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
             <span>Refresh</span>
           </button>
         </div>
-        <p className="text-[10.5px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5 leading-tight">
+        <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 leading-relaxed">
           Verified repair charges, diagnostic inspection fees, and service billing across your fleet.
         </p>
       </div>
@@ -275,30 +274,30 @@ function ClientTransactionsPage() {
         <TableState tone="error">{error}</TableState>
       ) : (
         <>
-          {/* 2. Top Metric Cards - Compact 2x2 Grid with Reduced Size */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-4">
+          {/* ── 4 Top Metric Cards (Responsive 2x2 on Mobile, 4 Cols on Desktop) ── */}
+          <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 lg:grid-cols-4">
             {/* Total Billed */}
             <div
               onClick={() => setChargeFilter('all')}
-              className={`rounded-xl border p-2.5 sm:p-3 flex flex-col justify-between transition-all cursor-pointer ${
+              className={`rounded-2xl border p-3.5 sm:p-4 flex flex-col justify-between transition-all cursor-pointer ${
                 chargeFilter === 'all'
-                  ? 'border-emerald-300 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/20 shadow-2xs'
+                  ? 'border-emerald-300 bg-emerald-50/50 dark:border-emerald-800/60 dark:bg-emerald-950/20 shadow-2xs'
                   : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 shadow-2xs'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 truncate">
+                <span className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 truncate">
                   {selectedMonth === 'ALL' ? 'Total Billed' : 'Month Total'}
                 </span>
-                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shrink-0">
-                  <FiDollarSign className="w-3 h-3" />
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shrink-0">
+                  <FiDollarSign className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="mt-1">
-                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+              <div className="mt-2">
+                <div className="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">
                   £{metrics.totalAmount.toFixed(2)}
                 </div>
-                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
                   {filteredRows.length} billing item{filteredRows.length === 1 ? '' : 's'}
                 </p>
               </div>
@@ -307,25 +306,25 @@ function ClientTransactionsPage() {
             {/* Repair Services */}
             <div
               onClick={() => setChargeFilter(chargeFilter === 'repair' ? 'all' : 'repair')}
-              className={`rounded-xl border p-2.5 sm:p-3 flex flex-col justify-between transition-all cursor-pointer ${
+              className={`rounded-2xl border p-3.5 sm:p-4 flex flex-col justify-between transition-all cursor-pointer ${
                 chargeFilter === 'repair'
-                  ? 'border-blue-500 bg-blue-50/70 dark:border-blue-500/70 dark:bg-blue-950/30 ring-1 ring-blue-400/30 shadow-2xs'
+                  ? 'border-blue-400 bg-blue-50/70 dark:border-blue-500/70 dark:bg-blue-950/30 ring-1 ring-blue-400/30 shadow-2xs'
                   : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 shadow-2xs'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-400 truncate">
+                <span className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-blue-800 dark:text-blue-400 truncate">
                   Repairs
                 </span>
-                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-blue-100/80 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 shrink-0">
-                  <FiTool className="w-3 h-3" />
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 shrink-0">
+                  <FiTool className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="mt-1">
-                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+              <div className="mt-2">
+                <div className="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">
                   £{metrics.repairAmount.toFixed(2)}
                 </div>
-                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
                   {metrics.repairCount} repair charge{metrics.repairCount === 1 ? '' : 's'}
                 </p>
               </div>
@@ -334,83 +333,83 @@ function ClientTransactionsPage() {
             {/* Testing & Fees */}
             <div
               onClick={() => setChargeFilter(chargeFilter === 'service' ? 'all' : 'service')}
-              className={`rounded-xl border p-2.5 sm:p-3 flex flex-col justify-between transition-all cursor-pointer ${
+              className={`rounded-2xl border p-3.5 sm:p-4 flex flex-col justify-between transition-all cursor-pointer ${
                 chargeFilter === 'service'
-                  ? 'border-indigo-500 bg-indigo-50/70 dark:border-indigo-500/70 dark:bg-indigo-950/30 ring-1 ring-indigo-400/30 shadow-2xs'
+                  ? 'border-indigo-400 bg-indigo-50/70 dark:border-indigo-500/70 dark:bg-indigo-950/30 ring-1 ring-indigo-400/30 shadow-2xs'
                   : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 shadow-2xs'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-400 truncate">
+                <span className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-indigo-800 dark:text-indigo-400 truncate">
                   Testing & Fees
                 </span>
-                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shrink-0">
-                  <FiCheckCircle className="w-3 h-3" />
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-indigo-100 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shrink-0">
+                  <FiCheckCircle className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="mt-1">
-                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+              <div className="mt-2">
+                <div className="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">
                   £{metrics.serviceAmount.toFixed(2)}
                 </div>
-                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
                   {metrics.serviceCount} test fee{metrics.serviceCount === 1 ? '' : 's'}
                 </p>
               </div>
             </div>
 
             {/* Fleet Serviced */}
-            <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 flex flex-col justify-between dark:border-white/10 dark:bg-surface-900 shadow-2xs">
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 flex flex-col justify-between dark:border-white/10 dark:bg-surface-900 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400 truncate">
+                <span className="text-[10px] sm:text-xs font-extrabold uppercase tracking-wider text-amber-800 dark:text-amber-400 truncate">
                   Fleet Serviced
                 </span>
-                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-amber-100/80 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">
-                  <FiTrendingUp className="w-3 h-3" />
+                <div className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">
+                  <FiTrendingUp className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 </div>
               </div>
-              <div className="mt-1">
-                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
-                  {metrics.uniqueBatteries} <span className="text-[10px] font-semibold text-slate-400">Units</span>
+              <div className="mt-2">
+                <div className="text-base sm:text-xl font-black text-slate-900 dark:text-white leading-tight">
+                  {metrics.uniqueBatteries} <span className="text-xs font-semibold text-slate-400">Units</span>
                 </div>
-                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                <p className="text-[10px] sm:text-xs text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
                   Avg. £{metrics.avgPerBattery.toFixed(2)}/unit
                 </p>
               </div>
             </div>
           </div>
 
-          {/* 3. Search and Filter Bar - Compact sizing */}
-          <div className="space-y-1.5">
-            {/* Search Input with standard padding */}
+          {/* ── Search and Filter Controls Toolbar ─────────────────────── */}
+          <div className="space-y-2">
+            {/* Search Input */}
             <div className="relative w-full">
-              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                <FiSearch className="h-3.5 w-3.5" />
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <FiSearch className="h-4 w-4" />
               </div>
               <input
                 type="search"
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 placeholder="Search battery ID, part or truck…"
-                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 shadow-2xs h-8"
+                className="w-full rounded-xl border border-slate-200/90 bg-white pl-10 pr-9 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 shadow-2xs h-10"
               />
               {search && (
                 <button
                   type="button"
                   onClick={() => setSearch('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-300 cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-300 cursor-pointer"
                   title="Clear search"
                 >
-                  <FiX className="h-3 w-3" />
+                  <FiX className="h-4 w-4" />
                 </button>
               )}
             </div>
 
             {/* Filter Pills & View Toggle Row */}
-            <div className="flex items-center justify-between gap-1.5 flex-wrap">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pt-1 border-t border-slate-100 dark:border-white/5">
               {/* Category Pills */}
-              <div className="flex items-center gap-1">
+              <div className="flex items-center gap-1.5 flex-wrap">
                 {[
-                  { id: 'all', label: 'All' },
+                  { id: 'all', label: 'All Items' },
                   { id: 'repair', label: 'Repairs' },
                   { id: 'service', label: 'Testing' },
                 ].map((tab) => {
@@ -420,7 +419,7 @@ function ClientTransactionsPage() {
                       key={tab.id}
                       type="button"
                       onClick={() => setChargeFilter(tab.id)}
-                      className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer h-7.5 ${
+                      className={`inline-flex items-center rounded-xl px-3 py-1.5 text-xs font-bold transition-all cursor-pointer h-8.5 sm:h-9 ${
                         active
                           ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
                           : 'border border-slate-200/90 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300'
@@ -432,12 +431,13 @@ function ClientTransactionsPage() {
                 })}
               </div>
 
-              <div className="flex items-center gap-1.5">
+              {/* Month Selector + Reset + View Toggle */}
+              <div className="flex items-center justify-between sm:justify-end gap-2 flex-wrap">
                 {/* Month Dropdown Selector */}
                 <select
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="rounded-lg border border-slate-200/90 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer shadow-2xs h-7.5"
+                  className="rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer shadow-2xs h-8.5 sm:h-9"
                 >
                   <option value="ALL">All Months ({data.length})</option>
                   {availableMonths.map((m) => (
@@ -455,55 +455,56 @@ function ClientTransactionsPage() {
                       setChargeFilter('all');
                       setSearch('');
                     }}
-                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 cursor-pointer shadow-2xs h-7.5"
-                    title="Reset all filters"
+                    className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer h-8.5 sm:h-9 shadow-2xs"
                   >
-                    Clear
+                    Reset
                   </button>
                 )}
 
                 {/* View Mode Toggle: Cards vs Table */}
-                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-white/10 dark:bg-surface-800 h-7.5">
+                <div className="inline-flex rounded-xl border border-slate-200/90 bg-white p-0.5 shadow-2xs dark:border-white/10 dark:bg-surface-800 h-8.5 sm:h-9 items-center">
                   <button
                     type="button"
                     onClick={() => setViewMode('cards')}
-                    className={`rounded-md px-1.5 py-1 transition-colors cursor-pointer ${
+                    className={`rounded-lg px-2 py-1 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       viewMode === 'cards'
-                        ? 'bg-white text-slate-900 shadow-2xs dark:bg-surface-700 dark:text-white'
+                        ? 'bg-slate-900 text-white shadow-2xs dark:bg-surface-700 dark:text-white'
                         : 'text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200'
                     }`}
                     title="Card view (Mobile optimized)"
                   >
-                    <FiGrid className="h-3 w-3" />
+                    <FiGrid className="h-3.5 w-3.5" />
+                    <span className="hidden min-[400px]:inline text-[11px]">Cards</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setViewMode('table')}
-                    className={`rounded-md px-1.5 py-1 transition-colors cursor-pointer ${
+                    className={`rounded-lg px-2 py-1 text-xs font-bold transition-all cursor-pointer flex items-center gap-1 ${
                       viewMode === 'table'
-                        ? 'bg-white text-slate-900 shadow-2xs dark:bg-surface-700 dark:text-white'
+                        ? 'bg-slate-900 text-white shadow-2xs dark:bg-surface-700 dark:text-white'
                         : 'text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200'
                     }`}
                     title="Table view"
                   >
-                    <FiList className="h-3 w-3" />
+                    <FiList className="h-3.5 w-3.5" />
+                    <span className="hidden min-[400px]:inline text-[11px]">Table</span>
                   </button>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* 4. Content Area */}
+          {/* ── Content Area ───────────────────────────────────────────── */}
           {filteredRows.length === 0 ? (
             /* Compact Solid Empty State */
-            <div className="rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-8 text-center shadow-2xs dark:border-white/10 dark:bg-surface-900 space-y-2.5">
-              <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/40 shadow-2xs">
-                <FiInbox className="h-5 w-5" />
+            <div className="rounded-2xl border border-slate-200/90 bg-white p-8 sm:p-12 text-center shadow-2xs dark:border-white/10 dark:bg-surface-900 space-y-3">
+              <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/40 shadow-2xs">
+                <FiInbox className="h-6 w-6" />
               </div>
-              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+              <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                 {anyFilter ? 'No matching transactions' : 'No Transactions Recorded Yet'}
               </h3>
-              <p className="text-[11px] text-slate-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+              <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
                 {anyFilter
                   ? 'No billing items match your current filter selection. Try clearing the search keyword or selecting a different month.'
                   : 'Verified billing line items for diagnostic inspections, parts, and battery repairs will automatically populate here as jobs complete.'}
@@ -516,15 +517,15 @@ function ClientTransactionsPage() {
                     setChargeFilter('all');
                     setSearch('');
                   }}
-                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer"
+                  className="inline-flex items-center gap-1 rounded-xl border border-slate-300 bg-white px-3.5 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer"
                 >
                   Reset Filters
                 </button>
               )}
             </div>
           ) : viewMode === 'cards' ? (
-            /* Compact Mobile-First Card View (Zero horizontal scroll) */
-            <div className="grid grid-cols-1 gap-2 sm:gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+            /* Responsive Card View (Zero horizontal scroll on phones & tablets) */
+            <div className="grid grid-cols-1 gap-3 sm:gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
               {filteredRows.map((row, idx) => {
                 const cat = getChargeCategory(row);
                 const IconComponent = cat.icon;
@@ -532,35 +533,35 @@ function ClientTransactionsPage() {
                 return (
                   <div
                     key={`${row.charge_type}-${row.id || idx}-${row.battery_code}`}
-                    className="group flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs dark:border-surface-700/80 dark:bg-surface-900"
+                    className="group flex flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs dark:border-surface-700/80 dark:bg-surface-900"
                   >
                     <div>
                       {/* Card Header: Battery ID + Amount */}
-                      <div className="flex items-center justify-between gap-1.5">
-                        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="min-w-0 flex-1 flex items-center gap-2">
                           <Link
                             to={`/batteries/${encodeURIComponent(row.battery_code)}`}
-                            className="font-mono text-xs font-bold text-brand-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 truncate"
+                            className="font-mono text-sm font-black text-emerald-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1.5 truncate"
                           >
                             <span>{row.battery_code}</span>
-                            <FiArrowRight className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                            <FiArrowRight className="w-3 h-3 opacity-60 shrink-0" />
                           </Link>
                           {row.truck_number ? (
-                            <span className="text-[9.5px] font-medium text-slate-400 dark:text-neutral-500 bg-slate-100 dark:bg-surface-800 px-1 py-0.5 rounded shrink-0">
-                              T{row.truck_number}
+                            <span className="text-[10px] font-medium text-slate-500 dark:text-neutral-400 bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 rounded-md shrink-0">
+                              Truck {row.truck_number}
                             </span>
                           ) : null}
                         </div>
 
-                        <span className="font-mono text-xs sm:text-sm font-black text-slate-900 dark:text-white shrink-0 bg-slate-50 dark:bg-surface-800 border border-slate-200/60 dark:border-white/5 px-1.5 py-0.5 rounded-md">
+                        <span className="font-mono text-sm sm:text-base font-black text-slate-900 dark:text-white shrink-0 bg-slate-50 dark:bg-surface-800 border border-slate-200/60 dark:border-white/5 px-2 py-0.5 rounded-lg">
                           £{Number(row.amount || 0).toFixed(2)}
                         </span>
                       </div>
 
                       {/* Badge row: Category + Status */}
-                      <div className="mt-2 flex items-center justify-between gap-1 flex-wrap">
-                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-bold border ${cat.badgeClass}`}>
-                          <IconComponent className="w-2.5 h-2.5" />
+                      <div className="mt-2.5 flex items-center justify-between gap-1.5 flex-wrap">
+                        <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-xs font-bold border ${cat.badgeClass}`}>
+                          <IconComponent className="w-3 h-3" />
                           <span>{cat.label}</span>
                         </span>
 
@@ -569,19 +570,19 @@ function ClientTransactionsPage() {
                         ) : null}
                       </div>
 
-                      {/* Details row: Part name + Date */}
-                      <div className="mt-2 grid grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-1.5 text-[9.5px] dark:bg-surface-800/80 border border-slate-100 dark:border-white/5">
+                      {/* Details row: Date + Staff */}
+                      <div className="mt-2.5 grid grid-cols-2 gap-2 rounded-xl bg-slate-50 p-2 text-xs dark:bg-surface-800/80 border border-slate-100 dark:border-white/5">
                         <div>
-                          <span className="text-slate-400 dark:text-neutral-400 block font-semibold flex items-center gap-1">
-                            <FiCalendar className="w-2 h-2" /> Date
+                          <span className="text-slate-400 dark:text-neutral-400 block font-medium flex items-center gap-1 text-[10px] uppercase tracking-wider">
+                            <FiCalendar className="w-3 h-3" /> Date
                           </span>
                           <span className="text-slate-700 dark:text-neutral-200 font-bold block truncate mt-0.5">
                             {formatDate(row.repaired_at)}
                           </span>
                         </div>
                         <div>
-                          <span className="text-slate-400 dark:text-neutral-400 block font-semibold flex items-center gap-1">
-                            <FiUser className="w-2 h-2" /> Staff
+                          <span className="text-slate-400 dark:text-neutral-400 block font-medium flex items-center gap-1 text-[10px] uppercase tracking-wider">
+                            <FiUser className="w-3 h-3" /> Staff
                           </span>
                           <span className="text-slate-700 dark:text-neutral-200 font-bold block truncate mt-0.5">
                             {row.staff_name || 'Workshop'}
@@ -591,9 +592,9 @@ function ClientTransactionsPage() {
 
                       {/* Part Name if present */}
                       {row.part_name ? (
-                        <p className="mt-1.5 text-[10px] text-slate-500 dark:text-neutral-400 truncate flex items-center gap-1">
-                          <FiTool className="w-2.5 h-2.5 text-slate-400 shrink-0" />
-                          <span className="font-semibold text-slate-600 dark:text-neutral-300 truncate">
+                        <p className="mt-2 text-xs text-slate-500 dark:text-neutral-400 truncate flex items-center gap-1.5">
+                          <FiTool className="w-3 h-3 text-slate-400 shrink-0" />
+                          <span className="font-semibold text-slate-700 dark:text-neutral-300 truncate">
                             {row.part_name}
                           </span>
                         </p>
@@ -604,8 +605,8 @@ function ClientTransactionsPage() {
               })}
             </div>
           ) : (
-            /* Table View */
-            <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:border-surface-700/80 dark:bg-surface-900">
+            /* Table View with responsive container */
+            <div className="overflow-x-auto rounded-2xl border border-slate-200/90 bg-white shadow-2xs dark:border-surface-700/80 dark:bg-surface-900">
               <DataTable
                 columns={columns}
                 rows={filteredRows}

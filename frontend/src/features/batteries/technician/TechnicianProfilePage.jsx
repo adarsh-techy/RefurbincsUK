@@ -74,6 +74,7 @@ function TechnicianProfilePage() {
 
   const canTest = canTestBatteries(user);
 
+  const isOffice = user?.role === 'super_admin' || user?.role === 'admin';
   const roleLabel = user?.staff_role
     ? user.staff_role.charAt(0).toUpperCase() + user.staff_role.slice(1)
     : user?.role === 'technician'
@@ -121,10 +122,12 @@ function TechnicianProfilePage() {
                 {roleLabel}
               </span>
 
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Active Shift
-              </span>
+              {!isOffice && (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Active Shift
+                </span>
+              )}
             </div>
 
             {user?.email && (
@@ -149,13 +152,13 @@ function TechnicianProfilePage() {
           </div>
           <div className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
             <FiShield className="h-3.5 w-3.5" />
-            <span>Verified Staff</span>
+            <span>{isOffice ? 'Administrator' : 'Verified Staff'}</span>
           </div>
         </div>
 
         <div className="space-y-3">
           <div className="flex items-center justify-between border-b border-slate-100/80 pb-2.5 dark:border-white/5">
-            <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Staff Member</span>
+            <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">{isOffice ? 'Account' : 'Staff Member'}</span>
             <span className="text-xs font-bold text-slate-900 dark:text-white">{user?.name || '—'}</span>
           </div>
 
@@ -169,6 +172,7 @@ function TechnicianProfilePage() {
             <span className="text-xs font-bold text-slate-800 dark:text-neutral-200">{roleLabel}</span>
           </div>
 
+{!isOffice && (
           <div className="flex items-center justify-between border-b border-slate-100/80 pb-2.5 dark:border-white/5">
             <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Testing QA Sign-off</span>
             <span className="inline-flex items-center gap-1.5">
@@ -178,6 +182,7 @@ function TechnicianProfilePage() {
               </span>
             </span>
           </div>
+          )}
 
           <div className="flex items-center justify-between pt-0.5">
             <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Session Security</span>

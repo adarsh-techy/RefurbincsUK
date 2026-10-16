@@ -50,16 +50,6 @@ const TECHNICIAN_TABS = [
   { to: '/my/profile', label: 'Profile', icon: ProfileIcon },
 ];
 
-function initials(name) {
-  return (name || 'Staff')
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
 function PortalHeader() {
   const dispatch = useDispatch();
   const navigate = useNavigate();
@@ -72,10 +62,6 @@ function PortalHeader() {
     user?.role === 'staff' ||
     user?.staff_role === 'technician' ||
     user?.staff_role === 'supervisor';
-
-  const staffRole = (user?.staff_role || user?.staffRole || user?.role || 'staff').toLowerCase();
-  const isSupervisor = staffRole === 'supervisor';
-  const roleLabel = isSupervisor ? 'Supervisor' : staffRole === 'technician' ? 'Technician' : 'Staff';
 
   const isDark = theme === 'dark';
   const isAccentHeader = !isDark && !!customTheme?.applyToHeader;
@@ -142,44 +128,10 @@ function PortalHeader() {
           )}
         </div>
 
-        {/* Right Tools, Clock, Staff Info & Logout */}
-        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3.5">
+        {/* Right Tools, Clock & Logout */}
+        <div className="flex min-w-0 shrink-0 items-center gap-2 sm:gap-3">
           <UkClock className="hidden xl:block" />
           <UkClock compact className="hidden sm:inline-flex xl:hidden" />
-
-          {/* User Info & Role Badge */}
-          <div className="hidden sm:flex items-center gap-2 pl-1 sm:pl-2.5 border-l border-slate-200 dark:border-white/10">
-            <div
-              className={`flex h-8 w-8 sm:h-[2.125rem] sm:w-[2.125rem] shrink-0 items-center justify-center rounded-full text-xs font-bold ring-1 transition-all ${
-                isSupervisor
-                  ? 'bg-amber-100 text-amber-900 ring-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-700/60'
-                  : 'bg-emerald-100 text-emerald-900 ring-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-700/60'
-              }`}
-              title={`${user?.name || 'Staff'} (${roleLabel})`}
-            >
-              {initials(user?.name)}
-            </div>
-
-            <div className="hidden sm:flex lg:hidden xl:flex flex-col text-left leading-tight min-w-0 max-w-[110px] md:max-w-[150px]">
-              <span className="truncate text-xs font-bold text-slate-800 dark:text-white">
-                {user?.name || 'Staff User'}
-              </span>
-              <span
-                className={`inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider ${
-                  isSupervisor
-                    ? 'text-amber-600 dark:text-amber-400'
-                    : 'text-emerald-600 dark:text-emerald-400'
-                }`}
-              >
-                <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    isSupervisor ? 'bg-amber-500' : 'bg-emerald-500'
-                  }`}
-                />
-                {roleLabel}
-              </span>
-            </div>
-          </div>
 
           {/* Logout Button */}
           <button
@@ -187,7 +139,7 @@ function PortalHeader() {
             onClick={handleLogout}
             title="Log out"
             aria-label="Log out"
-            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200 dark:hover:border-red-900/50 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-all cursor-pointer shadow-2xs shrink-0"
+            className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200 dark:hover:border-red-900/50 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-all cursor-pointer shadow-2xs shrink-0"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

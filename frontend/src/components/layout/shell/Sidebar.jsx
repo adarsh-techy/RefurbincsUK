@@ -353,6 +353,7 @@ export const NAV_GROUPS = [
       { to: '/users', label: 'User Accounts', icon: Icons.users, superAdminOnly: true },
       { to: '/audit-logs', label: 'Activity Audit Log', icon: Icons.audit, permission: 'audit_logs' },
       { to: '/trash', label: 'Trash Bin', icon: Icons.trash, superAdminOnly: true },
+      { to: '/my/profile', label: 'Account Profile', icon: Icons.profile },
     ],
   },
 ];

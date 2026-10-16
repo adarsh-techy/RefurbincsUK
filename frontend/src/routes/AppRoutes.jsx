@@ -81,7 +81,9 @@ function ProfileRouter() {
     user?.role === 'supervisor' ||
     user?.role === 'staff' ||
     user?.staff_role === 'supervisor' ||
-    user?.staff_role === 'technician';
+    user?.staff_role === 'technician' ||
+    user?.role === 'super_admin' ||
+    user?.role === 'admin';
   if (isStaff) return <TechnicianProfilePage />;
   return <ClientProfilePage />;
 }
@@ -179,7 +181,7 @@ function AppRoutes() {
           <Route element={<ProtectedRoute roles={['client']} clientPermission="client_battery_sorting" />}>
             <Route path="/my/battery-sorting" element={<ClientBatterySortPage />} />
           </Route>
-          <Route element={<ProtectedRoute roles={['client', 'technician', 'supervisor', 'staff', 'recycle_client']} />}>
+          <Route element={<ProtectedRoute roles={['client', 'technician', 'supervisor', 'staff', 'recycle_client', 'super_admin', 'admin']} />}>
             <Route path="/my/profile" element={<ProfileRouter />} />
           </Route>
           <Route element={<ProtectedRoute roles={['recycle_client']} />}>
