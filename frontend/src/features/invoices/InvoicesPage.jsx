@@ -16,6 +16,8 @@ import {
   FiSend,
   FiX,
   FiMail,
+  FiRefreshCw,
+  FiPlus,
 } from 'react-icons/fi';
 import apiClient from '../../services/api-client';
 import PageHeader from '../../components/ui/primitives/PageHeader';
@@ -499,41 +501,151 @@ function InvoicesPage() {
 
   const selectedClientObj = clients.find((c) => String(c.id) === String(clientId));
 
-  return (
-    <div className="space-y-6">
-      <PageHeader
-        title="Invoices"
-        description="Upload and send invoices (PDF / Images) directly to client dashboards, track due dates and mark payments."
-        titleClassName="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400"
-      >
-        <Button variant="darkViolet" onClick={openUploadModal}>
-          + Upload & Send Invoice
-        </Button>
-      </PageHeader>
+  const totalCount = invoices.length;
+  const paidCount = invoices.filter((i) => i.status === 'paid').length;
+  const overdueCount = invoices.filter((i) => isOverdue(i)).length;
+  const unpaidCount = totalCount - paidCount;
 
-      {/* Filter Toolbar */}
-      <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+  return (
+    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-5 pb-12">
+      {/* ── 1. Executive Header Card with Live Metrics Strip ────────────────── */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-lg sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+                Client Invoices & Billing Dispatch
+              </h1>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-[10.5px] font-bold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50">
+                Billing & Accounts
+              </span>
+            </div>
+            <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1 max-w-2xl leading-4">
+              Upload and dispatch official invoices (PDF / Images) directly to client dashboards, track due dates and mark settlements.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              type="button"
+              onClick={openUploadModal}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-slate-900 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-slate-800 dark:bg-surface-700 dark:hover:bg-surface-600 dark:border dark:border-white/10 transition-colors shadow-2xs cursor-pointer"
+            >
+              <FiPlus className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Upload & Send Invoice</span>
+            </button>
+            <button
+              type="button"
+              onClick={fetchData}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-850 dark:text-neutral-200 dark:hover:bg-surface-800 transition-colors shadow-2xs cursor-pointer"
+            >
+              <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Live Counters Strip */}
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2.5 mt-2.5 border-t border-slate-100 dark:border-white/5 text-[11px]">
+          <span className="text-slate-500 dark:text-neutral-400">
+            Total Invoices: <strong className="font-black text-slate-900 dark:text-white">{totalCount}</strong>
+          </span>
+          <span className="text-slate-300 dark:text-white/20">•</span>
+          <span className="text-slate-500 dark:text-neutral-400">
+            Settled (Paid): <strong className="font-extrabold text-emerald-600 dark:text-emerald-400">{paidCount}</strong>
+          </span>
+          <span className="text-slate-300 dark:text-white/20">•</span>
+          <span className="text-slate-500 dark:text-neutral-400">
+            Pending: <strong className="font-extrabold text-blue-600 dark:text-blue-400">{unpaidCount}</strong>
+          </span>
+          <span className="text-slate-300 dark:text-white/20">•</span>
+          <span className="text-slate-500 dark:text-neutral-400">
+            Overdue: <strong className="font-extrabold text-rose-600 dark:text-rose-400">{overdueCount}</strong>
+          </span>
+        </div>
+      </div>
+
+      {/* ── 2. 4 Compact KPI Stat Cards ────────────────────────────────────── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3">
+        <div className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs dark:border-white/10 dark:bg-surface-850">
+          <span className="text-[10px] sm:text-[11px] font-bold text-slate-500 uppercase tracking-wider block">
+            Total Invoices
+          </span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{totalCount}</span>
+            <span className="text-[10px] text-slate-400 font-bold">issued</span>
+          </div>
+          <p className="text-[10px] text-slate-400 mt-0.5 truncate">Total documents logged</p>
+        </div>
+
+        <div className="rounded-xl border border-emerald-200/90 bg-emerald-50/50 p-3 shadow-2xs dark:border-emerald-900/40 dark:bg-emerald-950/20">
+          <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider block">
+            Settled (Paid)
+          </span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{paidCount}</span>
+            <span className="text-[10px] text-emerald-700 dark:text-emerald-300 font-bold">paid</span>
+          </div>
+          <p className="text-[10px] text-emerald-600 dark:text-emerald-400 mt-0.5 truncate">Payments received & cleared</p>
+        </div>
+
+        <div className="rounded-xl border border-blue-200/90 bg-blue-50/50 p-3 shadow-2xs dark:border-blue-900/40 dark:bg-blue-950/20">
+          <span className="text-[10px] sm:text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider block">
+            Pending Payment
+          </span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">{unpaidCount}</span>
+            <span className="text-[10px] text-blue-700 dark:text-blue-300 font-bold">due</span>
+          </div>
+          <p className="text-[10px] text-blue-600 dark:text-blue-400 mt-0.5 truncate">Awaiting client remittance</p>
+        </div>
+
+        <div className="rounded-xl border border-rose-200/90 bg-rose-50/50 p-3 shadow-2xs dark:border-rose-900/40 dark:bg-rose-950/20">
+          <span className="text-[10px] sm:text-[11px] font-bold text-rose-800 dark:text-rose-300 uppercase tracking-wider block">
+            Overdue Invoices
+          </span>
+          <div className="mt-1 flex items-baseline gap-1">
+            <span className="text-xl sm:text-2xl font-black text-rose-700 dark:text-rose-400">{overdueCount}</span>
+            <span className="text-[10px] text-rose-700 dark:text-rose-300 font-bold">past due</span>
+          </div>
+          <p className="text-[10px] text-rose-600 dark:text-rose-400 mt-0.5 truncate">Requires collection follow-up</p>
+        </div>
+      </div>
+
+      {/* ── 3. Filter Toolbar — WRAPPING (Zero Horizontal Scrolling) ─────────── */}
+      <div className="flex flex-wrap items-end gap-2.5 rounded-2xl border border-slate-200/80 bg-white p-3 shadow-2xs dark:border-white/10 dark:bg-surface-900">
         <div className="w-full sm:w-auto min-w-0 sm:min-w-[13rem] flex-1 sm:flex-none">
-          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+          <label className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
             Search Invoice
           </label>
-          <input
-            type="text"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search title, client or notes…"
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white sm:w-56"
-          />
+          <div className="relative">
+            <input
+              type="text"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title, client or notes…"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 pr-7 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+            />
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              >
+                <FiX className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="w-full min-w-0 sm:w-auto">
-          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+          <label className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
             Client
           </label>
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="w-full sm:w-auto sm:max-w-[16rem] truncate rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+            className="w-full sm:w-auto sm:max-w-[15rem] truncate rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
           >
             <option value="">All Fleet Clients</option>
             {clients.map((c) => (
@@ -545,13 +657,13 @@ function InvoicesPage() {
         </div>
 
         <div>
-          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+          <label className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
             Payment Status
           </label>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+            className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-1.5 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
           >
             <option value="">All Statuses</option>
             <option value="paid">Paid</option>
@@ -560,23 +672,23 @@ function InvoicesPage() {
           </select>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+            <label className="mb-1 block text-[10.5px] font-bold uppercase tracking-wider text-slate-500">
               Upload Date
             </label>
             <input
               type="date"
               value={dateFilter}
               onChange={(e) => setDateFilter(e.target.value)}
-              className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+              className="rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-1 text-xs font-semibold text-slate-900 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
             />
           </div>
           {dateFilter && (
             <button
               type="button"
               onClick={() => setDateFilter('')}
-              className="self-end pb-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+              className="self-end pb-1.5 text-xs font-bold text-slate-500 hover:text-slate-700"
             >
               Clear
             </button>
@@ -592,9 +704,9 @@ function InvoicesPage() {
               setStatusFilter('');
               setDateFilter('');
             }}
-            className="self-end pb-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+            className="self-end pb-1.5 text-xs font-bold text-rose-600 hover:underline cursor-pointer"
           >
-            Clear all
+            ✕ Reset filters
           </button>
         )}
       </div>
@@ -603,15 +715,144 @@ function InvoicesPage() {
       {error && <TableState tone="error">{error}</TableState>}
 
       {!loading && !error && (
-        <DataTable
-          tableLayout={wideScreen ? 'fixed' : 'auto'}
-          headerColor="blue"
-          columns={columns}
-          rows={filtered}
-          showRowNumber
-          maxHeight="calc(100vh - 270px)"
-          emptyMessage="No invoices found."
-        />
+        <>
+          {/* ── Mobile Stacking Cards (< lg) (Zero Horizontal Scrolling) ── */}
+          <div className="lg:hidden space-y-2.5">
+            {filtered.length === 0 ? (
+              <div className="rounded-xl border border-dashed border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
+                No invoices found.
+              </div>
+            ) : (
+              filtered.map((inv, index) => {
+                const isImg = isImageFile(inv.file_name, inv.file_path);
+                const isPaidStatus = inv.status === 'paid';
+                const overdue = isOverdue(inv);
+                const isUpdating = updatingPaidId === inv.id;
+
+                return (
+                  <div
+                    key={inv.id}
+                    className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs dark:border-white/10 dark:bg-surface-900 space-y-2"
+                  >
+                    {/* Top Row: Index, Icon, Title, Status */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-start gap-2 min-w-0 flex-1">
+                        <span className="font-mono text-[10px] text-slate-400 pt-0.5">#{index + 1}</span>
+                        <div
+                          className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${
+                            isImg
+                              ? 'bg-blue-50 text-blue-600 border-blue-100'
+                              : 'bg-red-50 text-red-600 border-red-100'
+                          }`}
+                        >
+                          {isImg ? <FiImage className="h-3.5 w-3.5" /> : <FiFileText className="h-3.5 w-3.5" />}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p className="font-black text-xs text-slate-900 dark:text-white truncate" title={inv.invoice_number}>
+                            {inv.invoice_number}
+                          </p>
+                          {inv.file_name && (
+                            <p className="text-[10px] text-slate-400 truncate" title={inv.file_name}>
+                              {inv.file_name}
+                            </p>
+                          )}
+                          <p className="text-[11px] font-bold text-slate-700 dark:text-neutral-200 mt-0.5 truncate">
+                            {inv.client_name}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Status Toggle Button */}
+                      <button
+                        type="button"
+                        disabled={isUpdating}
+                        onClick={() => handleTogglePaid(inv)}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border text-[10.5px] font-extrabold cursor-pointer transition-all shrink-0 ${
+                          isPaidStatus
+                            ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                            : overdue
+                            ? 'bg-rose-50 border-rose-300 text-rose-700'
+                            : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+                        } ${isUpdating ? 'opacity-50 pointer-events-none' : ''}`}
+                      >
+                        {isPaidStatus ? (
+                          <FiCheck className="w-3 h-3 text-emerald-600 stroke-[3]" />
+                        ) : overdue ? (
+                          <FiClock className="w-3 h-3 text-rose-600" />
+                        ) : null}
+                        <span>{isPaidStatus ? 'Paid' : overdue ? 'Overdue' : 'Unpaid'}</span>
+                      </button>
+                    </div>
+
+                    {/* Dates Ribbon */}
+                    <div className="flex flex-wrap items-center gap-2 text-[10.5px] p-1.5 rounded-lg bg-slate-50/80 dark:bg-surface-800/60 border border-slate-100">
+                      <span className="text-slate-500">
+                        Issued: <strong className="text-slate-800">{inv.issue_date ? new Date(inv.issue_date).toLocaleDateString('en-GB') : '—'}</strong>
+                      </span>
+                      {inv.due_date && (
+                        <span className={overdue ? 'text-rose-600 font-bold' : 'text-slate-500'}>
+                          • Due: <strong className={overdue ? 'text-rose-700' : 'text-slate-800'}>{new Date(inv.due_date).toLocaleDateString('en-GB')}</strong>
+                          {overdue ? ' (Overdue)' : ''}
+                        </span>
+                      )}
+                    </div>
+
+                    {inv.notes && (
+                      <p className="text-[10.5px] text-slate-500 italic truncate">
+                        Note: “{inv.notes}”
+                      </p>
+                    )}
+
+                    {/* Actions */}
+                    <div className="flex items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
+                      {inv.file_path && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleView(inv)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer"
+                          >
+                            <FiEye className="w-3 h-3" />
+                            <span>View</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDownload(inv)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700 hover:bg-slate-50 shadow-2xs cursor-pointer"
+                          >
+                            <FiDownload className="w-3 h-3" />
+                            <span>Download</span>
+                          </button>
+                        </>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(inv)}
+                        className="inline-flex items-center gap-1 rounded-lg border border-rose-200 bg-rose-50 px-2 py-0.5 text-[11px] font-bold text-rose-700 hover:bg-rose-100 shadow-2xs cursor-pointer"
+                      >
+                        <FiTrash2 className="w-3 h-3" />
+                        <span>Delete</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* ── Desktop Data Table (lg:block) ── */}
+          <div className="hidden lg:block">
+            <DataTable
+              tableLayout={wideScreen ? 'fixed' : 'auto'}
+              headerColor="blue"
+              columns={columns}
+              rows={filtered}
+              showRowNumber
+              maxHeight="calc(100vh - 270px)"
+              emptyMessage="No invoices found."
+            />
+          </div>
+        </>
       )}
 
       {/* ── PROFESSIONAL LARGE UPLOAD & SEND INVOICE MODAL ─────────────────── */}

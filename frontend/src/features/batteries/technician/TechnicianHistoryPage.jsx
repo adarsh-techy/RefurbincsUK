@@ -231,6 +231,7 @@ function TechnicianHistoryPage() {
       const total = tests.length + issues.length;
       const passRate = tests.length ? Math.round((passed.length / tests.length) * 100) : 0;
       return {
+        totalBatteries: total,
         totalTests: tests.length,
         passedCount: passed.length,
         passedBackCount: passedBack.length,
@@ -242,14 +243,17 @@ function TechnicianHistoryPage() {
       const repairs = data.repairs || [];
       const issues = data.issues || [];
       const completed = repairs.filter((r) => !r.parts_removed && (r.repaired_at || r.id));
-      const timedRepairs = repairs.filter((r) => typeof r.duration_seconds === 'number' && r.duration_seconds > 0);
-      const avgDuration = timedRepairs.length
-        ? Math.round(timedRepairs.reduce((s, r) => s + r.duration_seconds, 0) / timedRepairs.length)
-        : null;
+      const failedTest = repairs.filter(
+        (r) =>
+          r.parts_removed ||
+          r.battery_status === 'tested_parts_removed' ||
+          r.battery_status === 'unserviceable_parts_removed'
+      );
       return {
+        totalBatteries: repairs.length + issues.length,
         totalRepairs: repairs.length,
         completedCount: completed.length,
-        avgDuration,
+        failedTestCount: failedTest.length,
         issueCount: issues.length,
         total: repairs.length + issues.length,
       };
@@ -383,139 +387,96 @@ function TechnicianHistoryPage() {
 
   return (
     <div className="mx-auto max-w-4xl pb-20">
-      {/* ── Hero Banner & Role Stats Header ────────────────────────────── */}
-      <div className="mb-3 overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 shadow-xs dark:border-white/10 dark:bg-surface-900">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5 pb-3 border-b border-slate-100 dark:border-white/5">
-          <div className="flex items-center gap-2.5">
-            <div
-              className={`flex h-9 w-9 items-center justify-center rounded-xl text-base shadow-2xs ${
-                isSupervisor
-                  ? 'bg-gradient-to-br from-violet-500 to-indigo-600 text-white'
-                  : 'bg-gradient-to-br from-blue-500 to-cyan-600 text-white'
-              }`}
-            >
-              {isSupervisor ? '🔬' : '🔧'}
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h1 className="text-base sm:text-lg font-bold tracking-tight text-slate-900 dark:text-white">
-                  {isSupervisor ? 'QA Testing & Sign-off History' : 'Repair & Service History'}
-                </h1>
-                <span
-                  className={`inline-flex items-center rounded-full px-2 py-0.5 text-[9px] font-black uppercase tracking-wider ${
-                    isSupervisor
-                      ? 'bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300'
-                      : 'bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300'
-                  }`}
-                >
-                  {isSupervisor ? 'Supervisor' : 'Technician'}
-                </span>
-              </div>
-              <p className="text-[11px] text-slate-400 dark:text-neutral-400">
-                {isSupervisor
-                  ? 'Battery testing sign-offs, QA services, and technician rework passes'
-                  : 'Battery repairs, fitted parts, and workshop service logs'}
-              </p>
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1.5 self-start sm:self-auto rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700 dark:bg-surface-800 dark:text-neutral-300">
-            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span className="text-[11px]">Staff: {data?.staff?.name || user?.name}</span>
-          </div>
-        </div>
-
-        {/* Quick Stats Grid */}
+      {/* ── Top Header & Stats Summary Banner (Mobile-App Style) ────────────────────────── */}
+      <div className="mb-3.5 rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        {/* Stats Grid */}
         {stats && (
-          <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
+          <div className="mb-3.5 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5">
             {isSupervisor ? (
               <>
-                <div className="rounded-xl border border-violet-100 bg-violet-50/50 p-2.5 dark:border-violet-900/30 dark:bg-violet-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">Total Tested</p>
+                <div className="rounded-xl border border-violet-100 bg-violet-50/80 p-2.5 sm:p-3 dark:border-violet-900/30 dark:bg-violet-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-violet-700 dark:text-violet-300">Total Batteries</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-violet-950 dark:text-white">
-                    {stats.totalTests}
+                    {stats.totalBatteries}
                   </p>
-                  <p className="text-[10px] text-violet-600/80 dark:text-violet-400">
-                    Sign-offs logged
+                  <p className="text-[10px] sm:text-[11px] text-violet-600 dark:text-violet-400">
+                    Total started work ({stats.totalTests} tests)
                   </p>
                 </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2.5 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Passed QA</p>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-2.5 sm:p-3 dark:border-emerald-900/30 dark:bg-emerald-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Passed QA</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-emerald-950 dark:text-white">
                     {stats.passedCount}
                   </p>
-                  <p className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">
+                  <p className="text-[10px] sm:text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
                     {stats.passRate}% pass rate
                   </p>
                 </div>
-                <div className="rounded-xl border border-amber-100 bg-amber-50/50 p-2.5 dark:border-amber-900/30 dark:bg-amber-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Passed Back</p>
+                <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-2.5 sm:p-3 dark:border-amber-900/30 dark:bg-amber-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Passed Back</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-amber-950 dark:text-white">
                     {stats.passedBackCount}
                   </p>
-                  <p className="text-[10px] text-amber-600/80 dark:text-amber-400">
+                  <p className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400">
                     Returned for rework
                   </p>
                 </div>
-                <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-2.5 dark:border-rose-900/30 dark:bg-rose-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Unserviceable</p>
+                <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-2.5 sm:p-3 dark:border-rose-900/30 dark:bg-rose-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Unserviceable</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-rose-950 dark:text-white">
                     {stats.issueCount}
                   </p>
-                  <p className="text-[10px] text-rose-600/80 dark:text-rose-400">
+                  <p className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400">
                     Failed testing
                   </p>
                 </div>
               </>
             ) : (
               <>
-                <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-2.5 dark:border-blue-900/30 dark:bg-blue-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Total Repairs</p>
+                <div className="rounded-xl border border-blue-100 bg-blue-50/80 p-2.5 sm:p-3 dark:border-blue-900/30 dark:bg-blue-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-blue-700 dark:text-blue-300">Total Batteries</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-blue-950 dark:text-white">
-                    {stats.totalRepairs}
+                    {stats.totalBatteries}
                   </p>
-                  <p className="text-[10px] text-blue-600/80 dark:text-blue-400">
-                    Batteries repaired
+                  <p className="text-[10px] sm:text-[11px] text-blue-600 dark:text-blue-400">
+                    Total started work ({stats.totalRepairs} repairs)
                   </p>
                 </div>
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50/50 p-2.5 dark:border-emerald-900/30 dark:bg-emerald-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Completed</p>
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50/80 p-2.5 sm:p-3 dark:border-emerald-900/30 dark:bg-emerald-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Completed</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-emerald-950 dark:text-white">
                     {stats.completedCount}
                   </p>
-                  <p className="text-[10px] text-emerald-600/80 dark:text-emerald-400">
-                    Submitted for test
+                  <p className="text-[10px] sm:text-[11px] text-emerald-600 dark:text-emerald-400">
+                    Passed QA testing
                   </p>
                 </div>
-                <div className="rounded-xl border border-indigo-100 bg-indigo-50/50 p-2.5 dark:border-indigo-900/30 dark:bg-indigo-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-700 dark:text-indigo-300">Avg Duration</p>
-                  <p className="mt-0.5 text-lg sm:text-xl font-black text-indigo-950 dark:text-white">
-                    {stats.avgDuration ? formatDuration(stats.avgDuration) : '—'}
+                <div className="rounded-xl border border-amber-100 bg-amber-50/80 p-2.5 sm:p-3 dark:border-amber-900/30 dark:bg-amber-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">Test Failed</p>
+                  <p className="mt-0.5 text-lg sm:text-xl font-black text-amber-950 dark:text-white">
+                    {stats.failedTestCount}
                   </p>
-                  <p className="text-[10px] text-indigo-600/80 dark:text-indigo-400">
-                    Per battery
+                  <p className="text-[10px] sm:text-[11px] text-amber-600 dark:text-amber-400">
+                    Unserviceable test failed
                   </p>
                 </div>
-                <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-2.5 dark:border-rose-900/30 dark:bg-rose-950/20">
-                  <p className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Issues</p>
+                <div className="rounded-xl border border-rose-100 bg-rose-50/80 p-2.5 sm:p-3 dark:border-rose-900/30 dark:bg-rose-950/20">
+                  <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">Unserviceable</p>
                   <p className="mt-0.5 text-lg sm:text-xl font-black text-rose-950 dark:text-white">
                     {stats.issueCount}
                   </p>
-                  <p className="text-[10px] text-rose-600/80 dark:text-rose-400">
-                    Unserviceable
+                  <p className="text-[10px] sm:text-[11px] text-rose-600 dark:text-rose-400">
+                    Reported issues
                   </p>
                 </div>
               </>
             )}
           </div>
         )}
-      </div>
 
-      {/* ── Search & Filter Controls ───────────────────────────────────── */}
-      <div className="mb-3 rounded-xl border border-slate-200/90 bg-white p-2 sm:p-2.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-        {/* Compact Search Bar */}
-        <div className="flex items-center gap-2 rounded-lg border border-slate-200/90 bg-slate-50/80 px-2.5 py-1 dark:border-white/10 dark:bg-surface-950">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 shrink-0 text-slate-400">
+        {/* Search Bar */}
+        <div className="flex h-10 sm:h-11 items-center gap-2.5 rounded-xl border border-slate-200/90 bg-slate-50/90 px-3.5 focus-within:border-blue-500 focus-within:bg-white focus-within:ring-2 focus-within:ring-blue-500/20 dark:border-white/10 dark:bg-surface-950 transition-all">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 shrink-0 text-slate-400">
             <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
           </svg>
           <input
@@ -527,28 +488,27 @@ function TechnicianHistoryPage() {
                 ? 'Search battery code, services, notes…'
                 : 'Search battery code, parts, notes…'
             }
-            className="flex-1 bg-transparent text-xs text-slate-900 focus:outline-none dark:text-white placeholder:text-slate-400"
+            className="min-w-0 flex-1 bg-transparent text-xs sm:text-sm text-slate-900 focus:outline-none dark:text-white placeholder:text-slate-400"
           />
           {search ? (
             <button
               type="button"
               onClick={() => setSearch('')}
-              className="flex h-4 w-4 items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-600 hover:bg-slate-300 dark:bg-surface-800 dark:text-neutral-300"
+              className="flex h-5 w-5 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-600 hover:bg-slate-300 dark:bg-surface-800 dark:text-neutral-300 cursor-pointer"
               title="Clear search"
             >
               ✕
             </button>
           ) : (
-            <span className="text-[10px] font-medium text-slate-400">
+            <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
               {filteredTimeline.length} {filteredTimeline.length === 1 ? 'unit' : 'units'}
             </span>
           )}
         </div>
 
-        {/* Compact Filters Toolbar */}
-        <div className="mt-1.5 flex flex-col md:flex-row md:items-center md:justify-between gap-1.5 border-t border-slate-100 pt-1.5 dark:border-white/5">
-          {/* Status/Type Filter - Classic Segmented Control */}
-          <div className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100 p-0.5 dark:bg-surface-950 border border-slate-200/50 dark:border-white/5">
+        {/* Type Filter Segmented Control & Reset */}
+        <div className="mt-3 sm:mt-3.5 flex flex-wrap items-center justify-between gap-2">
+          <div className="inline-flex items-center gap-1 rounded-xl bg-slate-100 p-1 dark:bg-surface-950 border border-slate-200/60 dark:border-white/5">
             {typeFilters.map((tf) => {
               const active = typeFilter === tf.id;
               return (
@@ -556,11 +516,11 @@ function TechnicianHistoryPage() {
                   key={tf.id}
                   type="button"
                   onClick={() => setTypeFilter(tf.id)}
-                  className={`rounded-md px-2 py-0.5 text-[11px] font-semibold transition-all duration-150 ${
+                  className={`rounded-lg px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
                     active
                       ? isSupervisor
-                        ? 'bg-white text-violet-700 shadow-2xs font-bold dark:bg-surface-800 dark:text-violet-300'
-                        : 'bg-white text-blue-700 shadow-2xs font-bold dark:bg-surface-800 dark:text-blue-300'
+                        ? 'bg-white text-violet-700 shadow-2xs dark:bg-surface-800 dark:text-violet-300'
+                        : 'bg-white text-blue-700 shadow-2xs dark:bg-surface-800 dark:text-blue-300'
                       : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
                   }`}
                 >
@@ -570,73 +530,98 @@ function TechnicianHistoryPage() {
             })}
           </div>
 
-          {/* Date Filter Pills - Compact, Classic & 100% Scrollbar-Free */}
-          <div
-            className="flex items-center gap-1 overflow-x-auto no-scrollbar"
-            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
-          >
-            {DATE_FILTERS.map((df) => {
-              const active = dateFilter === df.id;
-              return (
-                <button
-                  key={df.id}
-                  type="button"
-                  onClick={() => {
-                    setDateFilter(df.id);
-                    if (df.id !== 'custom') setCustomRange({ start: null, end: null });
-                  }}
-                  className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-medium transition-all ${
-                    active
-                      ? isSupervisor
-                        ? 'bg-violet-600 text-white font-bold shadow-2xs'
-                        : 'bg-blue-600 text-white font-bold shadow-2xs'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'
-                  }`}
-                >
-                  {df.label}
-                </button>
-              );
-            })}
-
-            {/* Custom Date Range Pill */}
+          {hasActiveFilters && (
             <button
               type="button"
-              onClick={openCustomDateModal}
-              className={`flex shrink-0 items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium transition-all ${
-                dateFilter === 'custom'
-                  ? isSupervisor
-                    ? 'bg-violet-600 text-white font-bold shadow-2xs'
-                    : 'bg-blue-600 text-white font-bold shadow-2xs'
-                  : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'
-              }`}
+              onClick={resetFilters}
+              className="rounded-lg px-2.5 py-1 text-xs font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors cursor-pointer"
             >
-              <span>📅</span>
-              <span>
-                {dateFilter === 'custom' && customRange.start
-                  ? customRange.end && customRange.end !== customRange.start
-                    ? `${formatShortDate(customRange.start)}–${formatShortDate(customRange.end)}`
-                    : formatShortDate(customRange.start)
-                  : 'Custom'}
-              </span>
+              Reset
             </button>
-
-            {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={resetFilters}
-                className="shrink-0 ml-1 rounded-md px-1.5 py-0.5 text-[10px] font-bold text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/30"
-              >
-                Reset
-              </button>
-            )}
-          </div>
+          )}
         </div>
+
+        {/* Date Filter Pills */}
+        <div className="mt-2.5 sm:mt-3 flex items-center gap-1.5 sm:gap-2 overflow-x-auto no-scrollbar py-0.5" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
+          {DATE_FILTERS.map((df) => {
+            const active = dateFilter === df.id;
+            return (
+              <button
+                key={df.id}
+                type="button"
+                onClick={() => {
+                  setDateFilter(df.id);
+                  if (df.id !== 'custom') setCustomRange({ start: null, end: null });
+                }}
+                className={`shrink-0 rounded-lg px-2.5 sm:px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+                  active
+                    ? isSupervisor
+                      ? 'bg-violet-600 text-white shadow-2xs'
+                      : 'bg-blue-600 text-white shadow-2xs'
+                    : 'bg-slate-100/90 text-slate-600 hover:bg-slate-200/80 dark:bg-surface-800 dark:text-neutral-300'
+                }`}
+              >
+                {df.label}
+              </button>
+            );
+          })}
+
+          {/* Custom Date Pill */}
+          <button
+            type="button"
+            onClick={openCustomDateModal}
+            className={`flex shrink-0 items-center gap-1 rounded-lg px-2.5 sm:px-3 py-1 text-xs font-bold transition-all cursor-pointer ${
+              dateFilter === 'custom'
+                ? isSupervisor
+                  ? 'bg-violet-600 text-white shadow-2xs'
+                  : 'bg-blue-600 text-white shadow-2xs'
+                : 'bg-slate-100/90 text-slate-600 hover:bg-slate-200/80 border border-slate-200/60 dark:bg-surface-800 dark:text-neutral-300'
+            }`}
+          >
+            <span>📅</span>
+            <span>
+              {dateFilter === 'custom' && customRange.start
+                ? customRange.end && customRange.end !== customRange.start
+                  ? `${formatShortDate(customRange.start)}–${formatShortDate(customRange.end)}`
+                  : formatShortDate(customRange.start)
+                : 'Custom'}
+            </span>
+          </button>
+        </div>
+      </div>
+
+      {/* ── Summary Count Bar ────────────────────────────────────────── */}
+      <div className="flex items-center justify-between px-3.5 py-1.5 rounded-xl bg-slate-100/90 border border-slate-200/70 text-[11px] font-bold text-slate-500 mb-3 dark:bg-surface-900 dark:border-white/5 dark:text-neutral-400">
+        <span>
+          {filteredTimeline.length} unit{filteredTimeline.length === 1 ? '' : 's'} across {dateGroups.length} date{dateGroups.length === 1 ? '' : 's'}
+        </span>
+        {dateFilter !== 'all' && (
+          <div className="flex items-center gap-1.5 rounded-full bg-slate-200 px-2.5 py-0.5 text-[10px] font-bold text-slate-700 uppercase dark:bg-surface-800 dark:text-neutral-200">
+            <span>
+              {dateFilter === 'custom'
+                ? customRange.end && customRange.end !== customRange.start
+                  ? `${formatShortDate(customRange.start)} – ${formatShortDate(customRange.end)}`
+                  : formatShortDate(customRange.start)
+                : DATE_FILTERS.find((d) => d.id === dateFilter)?.label}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                setDateFilter('all');
+                setCustomRange({ start: null, end: null });
+              }}
+              className="text-slate-500 hover:text-slate-800 dark:hover:text-white"
+            >
+              ✕
+            </button>
+          </div>
+        )}
       </div>
 
       {/* ── Date-Wise Grouped Feed ─────────────────────────────────────── */}
       {dateGroups.length === 0 ? (
-        <div className="rounded-2xl sm:rounded-3xl border border-slate-200 bg-white p-8 text-center shadow-xs dark:border-white/10 dark:bg-surface-900">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-xl dark:bg-surface-800">
+        <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-2xs dark:border-white/10 dark:bg-surface-900">
+          <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 text-lg dark:bg-surface-800">
             🔍
           </div>
           <p className="text-sm font-bold text-slate-800 dark:text-white">
@@ -662,23 +647,23 @@ function TechnicianHistoryPage() {
           )}
         </div>
       ) : (
-        <div className="flex flex-col gap-7 sm:gap-8">
+        <div className="flex flex-col gap-3.5">
           {dateGroups.map((group) => (
-            <div key={group.dateKey} className="flex flex-col gap-3.5">
+            <div key={group.dateKey} className="flex flex-col gap-2">
               {/* Date Header Tag */}
-              <div className="flex items-center justify-between px-1.5 py-0.5">
-                <div className="flex items-center gap-2.5">
+              <div className="flex items-center justify-between px-1">
+                <div className="flex items-center gap-1.5">
                   <span
                     className={`h-2.5 w-2.5 rounded-full ${
                       group.isToday
-                        ? 'bg-emerald-500 ring-4 ring-emerald-500/20'
+                        ? 'bg-emerald-500 ring-2 ring-emerald-500/20'
                         : isSupervisor
                           ? 'bg-violet-500'
                           : 'bg-blue-500'
                     }`}
                   />
                   <span
-                    className={`text-xs font-black tracking-tight ${
+                    className={`text-xs font-extrabold ${
                       group.isToday
                         ? 'text-emerald-700 dark:text-emerald-400'
                         : 'text-slate-800 dark:text-neutral-200'
@@ -687,182 +672,63 @@ function TechnicianHistoryPage() {
                     {group.label}
                   </span>
                 </div>
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-400 shadow-2xs">
+                <span className="rounded-full bg-slate-200/70 px-2 py-0.5 text-[10px] font-bold text-slate-600 dark:bg-surface-800 dark:text-neutral-400">
                   {group.data.length} unit{group.data.length === 1 ? '' : 's'}
                 </span>
               </div>
 
-              {/* Cards Grid / Stack */}
-              <div className="flex flex-col gap-3.5 sm:gap-4">
+              {/* Compact Cards Stack */}
+              <div className="flex flex-col gap-2">
                 {group.data.map((item) => {
-                  if (item.kind === 'test') {
-                    // SUPERVISOR TEST CARD
-                    const isPassedBack = item.passed_back;
-                    return (
-                      <Link
-                        key={`test-${item.id}`}
-                        to={`/batteries/${item.battery_code}?fromHistory=true`}
-                        className={`group relative overflow-hidden rounded-2xl border bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:bg-surface-900 ${
-                          isPassedBack
-                            ? 'border-amber-200/90 hover:border-amber-400 dark:border-amber-900/40'
-                            : 'border-emerald-200/90 hover:border-emerald-400 dark:border-emerald-900/40'
-                        }`}
-                      >
-                        {/* Left colored accent bar */}
-                        <div
-                          className={`absolute top-0 bottom-0 left-0 w-1.5 ${
-                            isPassedBack ? 'bg-amber-500' : 'bg-emerald-500'
-                          }`}
-                        />
+                  const isTest = item.kind === 'test';
+                  const isPassedBack = isTest && item.passed_back;
+                  const isIssue = item.kind === 'issue';
 
-                        {/* Top row: Battery Code + Status Badge + Time */}
-                        <div className="flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5">
-                            <span
-                              className={`flex h-6 w-6 items-center justify-center rounded-lg text-xs font-black ${
-                                isPassedBack
-                                  ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300'
-                                  : 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300'
-                              }`}
-                            >
-                              {isPassedBack ? '↩' : '✓'}
-                            </span>
-                            <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-violet-600 dark:text-white dark:group-hover:text-violet-400">
-                              {item.battery_code}
-                            </span>
-                            {isPassedBack ? (
-                              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-amber-800 dark:bg-amber-950 dark:text-amber-300">
-                                Sent Back to Tech
-                              </span>
-                            ) : (
-                              <StatusBadge status="repaired" />
-                            )}
-                          </div>
-                          <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                            {item.tested_at
-                              ? new Date(item.tested_at).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : ''}
-                          </span>
-                        </div>
-
-                        {/* Footer row: duration & action link */}
-                        <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
-                          {typeof item.testing_duration_seconds === 'number' && item.testing_duration_seconds > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-violet-100 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:border-violet-900/40 dark:bg-violet-950 dark:text-violet-300">
-                              ⏱️ Testing Time: {formatDuration(item.testing_duration_seconds)}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                              {isPassedBack ? 'Rework Pass-Back' : 'QA Testing Sign-off'}
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-violet-600 dark:text-neutral-500 dark:group-hover:text-violet-400">
-                            <span>View Battery Details</span>
-                            <span className="transition-transform group-hover:translate-x-0.5">›</span>
-                          </span>
-                        </div>
-                      </Link>
-                    );
-                  }
-
-                  if (item.kind === 'repair') {
-                    // TECHNICIAN REPAIR CARD
-                    return (
-                      <Link
-                        key={`repair-${item.id}`}
-                        to={`/batteries/${item.battery_code}?fromHistory=true`}
-                        className="group relative overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-400 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
-                      >
-                        {/* Left colored accent bar */}
-                        <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-blue-500" />
-
-                        {/* Top row */}
-                        <div className="flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-slate-100 dark:border-white/5">
-                          <div className="flex items-center gap-2.5">
-                            <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-400">
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                                <path fillRule="evenodd" d="M14.5 10a4.5 4.5 0 0 0 4.284-5.882c-.105-.324-.51-.391-.752-.15L15.34 6.66a.454.454 0 0 1-.493.11 3.01 3.01 0 0 1-1.618-1.616.455.455 0 0 1 .11-.494l2.694-2.692c.24-.241.174-.647-.15-.752a4.5 4.5 0 0 0-5.873 4.575c.055.873-.128 1.808-.8 2.368l-7.23 6.024a2.724 2.724 0 1 0 3.837 3.837l6.024-7.23c.56-.672 1.495-.855 2.368-.8.096.007.193.01.291.01ZM5 16a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clipRule="evenodd" />
-                              </svg>
-                            </span>
-                            <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
-                              {item.battery_code}
-                            </span>
-                            <StatusBadge status={repairBadgeStatus(item)} />
-                          </div>
-                          <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                            {item.repaired_at
-                              ? new Date(item.repaired_at).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : ''}
-                          </span>
-                        </div>
-
-                        {/* Footer row */}
-                        <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
-                          {typeof item.duration_seconds === 'number' && item.duration_seconds > 0 ? (
-                            <span className="inline-flex items-center gap-1 rounded-md border border-blue-100 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700 dark:border-blue-900/40 dark:bg-blue-950 dark:text-blue-300">
-                              ⏱️ Repair Time: {formatDuration(item.duration_seconds)}
-                            </span>
-                          ) : (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                              Completed Repair
-                            </span>
-                          )}
-                          <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-blue-600 dark:text-neutral-500 dark:group-hover:text-blue-400">
-                            <span>View Battery Details</span>
-                            <span className="transition-transform group-hover:translate-x-0.5">›</span>
-                          </span>
-                        </div>
-                      </Link>
-                    );
-                  }
-
-                  // ISSUE CARD (UNSERVICEABLE)
                   return (
                     <Link
-                      key={`issue-${item.id}`}
+                      key={`${item.kind}-${item.id}`}
                       to={`/batteries/${item.battery_code}?fromHistory=true`}
-                      className="group relative overflow-hidden rounded-2xl border border-rose-200/90 bg-white p-4 sm:p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-rose-400 hover:shadow-md dark:border-rose-900/40 dark:bg-surface-900"
+                      className={`flex items-center justify-between rounded-xl border bg-white px-3.5 py-3.5 shadow-2xs transition-all duration-150 hover:-translate-y-0.5 active:bg-slate-50 dark:bg-surface-900 ${
+                        isIssue
+                          ? 'border-rose-200/90 hover:border-rose-400 dark:border-rose-900/40'
+                          : isPassedBack
+                            ? 'border-amber-200/90 hover:border-amber-400 dark:border-amber-900/40'
+                            : 'border-slate-200/90 hover:border-blue-400 dark:border-white/10'
+                      }`}
                     >
-                      {/* Left colored accent bar */}
-                      <div className="absolute top-0 bottom-0 left-0 w-1.5 bg-rose-500" />
-
-                      {/* Top row */}
-                      <div className="flex items-center justify-between gap-3 pl-2 sm:pl-3 pb-3 border-b border-slate-100 dark:border-white/5">
-                        <div className="flex items-center gap-2.5">
-                          <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400 font-bold text-xs">
-                            ⚠
+                      <div className="flex items-center gap-2.5 min-w-0 pr-2">
+                        <span className="font-mono text-xs font-bold text-slate-900 dark:text-white truncate">
+                          {item.battery_code}
+                        </span>
+                        {isPassedBack ? (
+                          <span className="rounded-full bg-amber-100 px-1.5 py-0.5 text-[8.5px] font-bold uppercase tracking-wider text-amber-800 dark:bg-amber-950 dark:text-amber-300">
+                            Sent Back
                           </span>
-                          <span className="font-mono text-sm sm:text-base font-extrabold text-slate-900 group-hover:text-rose-600 dark:text-white dark:group-hover:text-rose-400">
-                            {item.battery_code}
-                          </span>
-                          <StatusBadge status={item.battery_status || 'unserviceable'} />
-                        </div>
-                        <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                          {item.reported_at
-                            ? new Date(item.reported_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : ''}
-                        </span>
+                        ) : (
+                          <StatusBadge
+                            size="sm"
+                            status={
+                              isTest
+                                ? 'repaired'
+                                : isIssue
+                                  ? (item.battery_status || 'unserviceable')
+                                  : repairBadgeStatus(item)
+                            }
+                          />
+                        )}
                       </div>
-
-                      {/* Footer row */}
-                      <div className="mt-3.5 flex items-center justify-between text-xs pl-2 sm:pl-3 pt-3 border-t border-slate-100 dark:border-white/5">
-                        <span className="inline-flex items-center gap-1 rounded-md border border-rose-100 bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700 dark:border-rose-900/40 dark:bg-rose-950 dark:text-rose-300">
-                          Marked Unserviceable
-                        </span>
-                        <span className="flex items-center gap-1 text-[11px] font-bold text-slate-400 group-hover:text-rose-600 dark:text-neutral-500 dark:group-hover:text-rose-400">
-                          <span>View Battery Details</span>
-                          <span className="transition-transform group-hover:translate-x-0.5">›</span>
-                        </span>
-                      </div>
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 20 20"
+                        fill="currentColor"
+                        className="h-3.5 w-3.5 text-slate-400 shrink-0"
+                      >
+                        <path
+                          fillRule="evenodd"
+                          d="M7.21 14.77a.75.75 0 0 1 .02-1.06L11.168 10 7.23 6.29a.75.75 0 1 1 1.04-1.08l4.5 4.25a.75.75 0 0 1 0 1.08l-4.5 4.25a.75.75 0 0 1-1.06-.02Z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
                     </Link>
                   );
                 })}

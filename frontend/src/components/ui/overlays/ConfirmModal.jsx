@@ -12,6 +12,7 @@ function ConfirmModal({
   confirmWord = 'yes',
   confirmLabel = 'Delete',
   requireTyping = true,
+  centered = true,
   onConfirm,
   onCancel,
 }) {
@@ -30,7 +31,7 @@ function ConfirmModal({
   }
 
   return (
-    <Modal title={title} onClose={onCancel}>
+    <Modal title={title} onClose={onCancel} centered={centered}>
       <div className="flex flex-col gap-5">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-critical-100 dark:bg-red-500/15">

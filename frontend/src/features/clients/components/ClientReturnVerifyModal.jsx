@@ -206,17 +206,17 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
           : 'Verifying return shipment batteries'
       }
       onClose={onClose}
-      size="4xl"
-      className="h-[88vh] max-h-[92vh]"
+      size="3xl"
+      className="max-h-[92vh]"
     >
       {loading ? (
         <TableState>Loading return shipment details…</TableState>
       ) : error ? (
         <TableState tone="error">{error}</TableState>
       ) : (
-        <div className="flex h-full flex-col justify-between space-y-4">
+        <div className="flex h-full flex-col justify-between space-y-3 sm:space-y-4">
           {/* Progress Header */}
-          <div className="rounded-2xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
+          <div className="rounded-xl sm:rounded-2xl border border-blue-200 bg-blue-50/50 p-2.5 sm:p-4 dark:border-blue-800/40 dark:bg-blue-950/20">
             <div className="flex flex-wrap items-center justify-between gap-2">
               <div className="flex items-center gap-2">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-600 text-sm font-bold text-white shadow-xs">
@@ -244,7 +244,7 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
             </div>
 
             {/* Progress Bar */}
-            <div className="mt-3 h-2.5 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-900/50">
+            <div className="mt-2 sm:mt-3 h-2 sm:h-2.5 w-full overflow-hidden rounded-full bg-blue-200 dark:bg-blue-900/50">
               <div
                 className={`h-full transition-all duration-300 ${
                   allScanned ? 'bg-emerald-500' : 'bg-blue-600'
@@ -256,10 +256,10 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
 
           {/* Scan Input & Camera Controls */}
           <div className="space-y-2">
-            <div className="flex gap-2">
+            <div className="flex gap-1.5 sm:gap-2">
               <div className="relative flex-1">
-                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 sm:pl-3 text-slate-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                     <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
                   </svg>
                 </div>
@@ -281,9 +281,9 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
                       handleScan(scanInput);
                     }
                   }}
-                  placeholder="Scan QR / barcode or type battery code, then press Enter"
+                  placeholder="Scan QR, RFID, or type code"
                   autoComplete="off"
-                  className="w-full rounded-xl border border-blue-300 bg-white py-2.5 pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/60 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
+                  className="w-full rounded-lg sm:rounded-xl border border-blue-300 bg-white py-1.5 sm:py-2.5 pl-8 sm:pl-9 pr-3 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/60 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
                 />
                 <RfidScanButton target="client-receive" />
 
@@ -319,7 +319,7 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
                 type="button"
                 onClick={() => handleScan(scanInput)}
                 disabled={!scanInput.trim()}
-                className="shrink-0 rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
+                className="shrink-0 rounded-lg sm:rounded-xl bg-blue-600 px-3 sm:px-4 py-1.5 sm:py-2.5 text-xs font-bold text-white shadow-xs hover:bg-blue-700 disabled:opacity-50"
               >
                 Verify
               </button>
@@ -327,9 +327,9 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
               <button
                 type="button"
                 onClick={() => setCameraOpen((prev) => !prev)}
-                className="shrink-0 rounded-xl border border-blue-300 bg-blue-50 px-3.5 py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
+                className="shrink-0 rounded-lg sm:rounded-xl border border-blue-300 bg-blue-50 px-2.5 sm:px-3.5 py-1.5 sm:py-2.5 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/40"
               >
-                {cameraOpen ? 'Close Camera' : '📷 Use Camera'}
+                {cameraOpen ? 'Close' : '📷 Camera'}
               </button>
             </div>
 
@@ -456,18 +456,18 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
           </div>
 
           {/* 3. Sticky Bottom Right Actions Footer */}
-          <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-200/90 bg-white/95 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
-            <div className="text-xs text-slate-500 dark:text-neutral-400 font-medium">
+          <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-2 sm:gap-3 border-t border-slate-200/90 bg-white/95 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-3.5 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
+            <div className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400 font-medium">
               {scannedCodes.length > 0
                 ? `${scannedCodes.length} of ${expectedCodes.length} verified`
                 : 'Scan batteries off the truck to verify'}
             </div>
 
-            <div className="flex items-center justify-end gap-2.5">
+            <div className="flex items-center justify-end gap-2 sm:gap-2.5">
               <button
                 type="button"
                 onClick={onClose}
-                className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
+                className="rounded-lg sm:rounded-xl border border-slate-300 bg-white px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -476,7 +476,7 @@ function ClientReturnVerifyModal({ returnId, batchData = null, onClose, onSucces
                 type="button"
                 disabled={scannedCodes.length === 0 || confirming}
                 onClick={handleConfirmReceipt}
-                className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 transition-all cursor-pointer"
+                className="inline-flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-emerald-600 px-4 sm:px-6 py-2 sm:py-2.5 text-xs font-bold text-white shadow-sm hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 transition-all cursor-pointer"
               >
                 {confirming ? (
                   <span>Saving Receipt…</span>

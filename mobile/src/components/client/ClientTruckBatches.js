@@ -275,14 +275,19 @@ export default function ClientTruckBatches({
         )}
         {isReceived && (
           batch.intakeStatus === 'pending_verification' ? (
-            <TouchableOpacity onPress={() => setVerifyBatch(batch)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5">
-              <Text className="text-[11px] font-bold text-white">📷 Scan to Verify</Text>
+            <TouchableOpacity onPress={() => setVerifyBatch(batch)} className="flex-row items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1.5 shadow-2xs">
+              <Icon name="camera" color="#ffffff" size={12} />
+              <Text className="text-[11px] font-bold text-white">Scan to Verify</Text>
             </TouchableOpacity>
           ) : isRated(batch.intakeId || batch.returnId) ? (
-            <View className="rounded-lg bg-amber-50 px-2.5 py-1.5"><Text className="text-[11px] font-bold text-amber-700">★ Rated</Text></View>
+            <View className="flex-row items-center gap-1 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-800">
+              <Icon name="star" color="#f59e0b" size={12} />
+              <Text className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Rated</Text>
+            </View>
           ) : (
-            <TouchableOpacity onPress={() => openRating(batch)} className="rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5">
-              <Text className="text-[11px] font-bold text-amber-800">★ Rate</Text>
+            <TouchableOpacity onPress={() => openRating(batch)} className="flex-row items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1.5 dark:border-amber-700 dark:bg-amber-950/40">
+              <Icon name="star" color="#d97706" size={12} />
+              <Text className="text-[11px] font-bold text-amber-800 dark:text-amber-300">Rate Delivery</Text>
             </TouchableOpacity>
           )
         )}
@@ -328,32 +333,38 @@ export default function ClientTruckBatches({
         <FlatList
           data={list}
           keyExtractor={(row, i) => `${row.id}-${row.intake_id ?? row.return_id ?? i}`}
-          contentContainerClassName="p-4 gap-2.5 pb-16"
+          contentContainerClassName="p-3 gap-2 pb-16"
           keyboardShouldPersistTaps="handled"
           refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
           ListHeaderComponent={
-            <View className="gap-3 pb-1">
+            <View className="gap-2.5 pb-1">
               <TouchableOpacity onPress={() => { setSelectedKey(null); setBatchSearch(''); setBatchFilter('all'); setNotice(null); }} className="flex-row items-center gap-1">
-                <Icon name="arrowLeft" color="#2563eb" size={16} />
-                <Text className="text-sm font-bold text-blue-700">Back to Intake List</Text>
+                <Icon name="arrowLeft" color="#2563eb" size={14} />
+                <Text className="text-xs font-bold text-blue-700">{isReceived ? 'Back to Received Batches' : 'Back to Intake List'}</Text>
               </TouchableOpacity>
 
-              <View className="rounded-3xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
-                <Text className="text-lg font-extrabold text-slate-900 dark:text-white">
-                  {selected.isAwaitingPickup ? 'Client Packed Batch' : `Truck ${selected.truckNumber}`}
+              <View className="rounded-2xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
+                <Text className="text-base font-extrabold text-slate-900 dark:text-white">
+                  {selected.isReturnDispatch
+                    ? (selected.truckNumber ? `Return Dispatch • ${selected.truckNumber}` : 'Return Dispatch')
+                    : selected.isAwaitingPickup
+                    ? 'Client Packed Batch'
+                    : `Truck ${selected.truckNumber}`}
                 </Text>
-                <Text className="text-xs text-slate-500">
-                  {selected.isAwaitingPickup
+                <Text className="text-[11px] text-slate-500">
+                  {selected.isReturnDispatch
+                    ? `Driver: ${selected.driverName || 'Workshop Driver'} • Delivered on ${formatDate(selected.intakeAt)}`
+                    : selected.isAwaitingPickup
                     ? 'Scheduled for workshop truck intake pickup'
                     : `Driver: ${selected.driverName || '—'} • Intaked on ${formatDate(selected.intakeAt)}`}
                 </Text>
-                <View className="mt-3 flex-row flex-wrap items-center gap-2">
+                <View className="mt-2.5 flex-row flex-wrap items-center gap-1.5">
                   {selected.isReturnDispatch ? (
                     selected.intakeStatus === 'pending_verification' ? (
                       <>
                         <Badge tone="warning">● Pending Verification</Badge>
-                        <TouchableOpacity onPress={() => setVerifyBatch(selected)} className="rounded-xl bg-emerald-600 px-3 py-2">
-                          <Text className="text-xs font-bold text-white">📷 Scan to Verify Receipt</Text>
+                        <TouchableOpacity onPress={() => setVerifyBatch(selected)} className="rounded-lg bg-emerald-600 px-2.5 py-1.5">
+                          <Text className="text-[11px] font-bold text-white">📷 Scan to Verify Receipt</Text>
                         </TouchableOpacity>
                       </>
                     ) : (
@@ -362,8 +373,8 @@ export default function ClientTruckBatches({
                         {isRated(selected.intakeId || selected.returnId) ? (
                           <Badge tone="warning">★ Rated — Thank You!</Badge>
                         ) : (
-                          <TouchableOpacity onPress={() => openRating(selected)} className="rounded-xl bg-amber-500 px-3 py-2">
-                            <Text className="text-xs font-bold text-white">★ Rate Delivery Batch</Text>
+                          <TouchableOpacity onPress={() => openRating(selected)} className="rounded-lg bg-amber-500 px-2.5 py-1.5">
+                            <Text className="text-[11px] font-bold text-white">★ Rate Delivery Batch</Text>
                           </TouchableOpacity>
                         )}
                       </>
@@ -373,17 +384,17 @@ export default function ClientTruckBatches({
                       <Badge tone="warning">● Waiting for Verify</Badge>
                       {canEdit && (
                         <>
-                          <TouchableOpacity onPress={() => setEditBatch({ ...selected, intakeId })} className="rounded-xl bg-slate-800 px-3 py-2">
-                            <Text className="text-xs font-bold text-white">Edit Batch</Text>
+                          <TouchableOpacity onPress={() => setEditBatch({ ...selected, intakeId })} className="rounded-lg bg-slate-800 px-2.5 py-1.5">
+                            <Text className="text-[11px] font-bold text-white">Edit Batch</Text>
                           </TouchableOpacity>
                           {selected.intakeId ? (
-                            <TouchableOpacity onPress={() => setAddMoreBatch(selected)} className="rounded-xl bg-blue-600 px-3 py-2">
-                              <Text className="text-xs font-bold text-white">+ Add Batteries</Text>
+                            <TouchableOpacity onPress={() => setAddMoreBatch(selected)} className="rounded-lg bg-blue-600 px-2.5 py-1.5">
+                              <Text className="text-[11px] font-bold text-white">+ Add Batteries</Text>
                             </TouchableOpacity>
                           ) : null}
                           {intakeId ? (
-                            <TouchableOpacity onPress={() => cancelBatchConfirm(selected)} className="rounded-xl bg-red-600 px-3 py-2">
-                              <Text className="text-xs font-bold text-white">Cancel Batch</Text>
+                            <TouchableOpacity onPress={() => cancelBatchConfirm(selected)} className="rounded-lg bg-red-600 px-2.5 py-1.5">
+                              <Text className="text-[11px] font-bold text-white">Cancel Batch</Text>
                             </TouchableOpacity>
                           ) : null}
                         </>
@@ -398,14 +409,14 @@ export default function ClientTruckBatches({
 
               {notice ? <Notice tone={notice.ok ? 'good' : 'bad'}>{notice.text}</Notice> : null}
 
-              <View className="flex-row flex-wrap gap-2">
+              <View className="flex-row flex-wrap gap-1.5">
                 {METRIC_CARDS.map((c) => {
                   const on = batchFilter === c.id;
                   return (
-                    <TouchableOpacity key={c.id} onPress={() => setBatchFilter(c.id)} className={`w-[31.5%] rounded-2xl border p-2.5 ${on ? c.on : c.cls}`}>
-                      <Text className={`text-[10px] font-bold uppercase ${c.text}`} numberOfLines={1}>{c.label}</Text>
-                      <Text className="mt-1 text-xl font-extrabold text-slate-900">{metrics[c.key]}</Text>
-                      <Text className="text-[10px] text-slate-500" numberOfLines={1}>{c.sub}</Text>
+                    <TouchableOpacity key={c.id} onPress={() => setBatchFilter(c.id)} className={`w-[31.8%] rounded-xl border p-2 ${on ? c.on : c.cls}`}>
+                      <Text className={`text-[9px] font-bold uppercase ${c.text}`} numberOfLines={1}>{c.label}</Text>
+                      <Text className="mt-0.5 text-base font-extrabold text-slate-900">{metrics[c.key]}</Text>
+                      <Text className="text-[9px] text-slate-500" numberOfLines={1}>{c.sub}</Text>
                     </TouchableOpacity>
                   );
                 })}
@@ -413,26 +424,26 @@ export default function ClientTruckBatches({
 
               {batchFilter !== 'all' ? (
                 <View className="flex-row items-center justify-between">
-                  <Text className="text-xs text-slate-600">
+                  <Text className="text-[11px] text-slate-600">
                     Filtered by:{' '}
                     <Text className="font-bold capitalize text-slate-900">
                       {batchFilter === 'reached_workshop' ? 'Waiting for Service' : batchFilter.replace(/_/g, ' ')}
                     </Text>
                   </Text>
                   <TouchableOpacity onPress={() => setBatchFilter('all')}>
-                    <Text className="text-xs font-bold text-blue-700">Clear filter</Text>
+                    <Text className="text-[11px] font-bold text-blue-700">Clear filter</Text>
                   </TouchableOpacity>
                 </View>
               ) : null}
 
-              <View className="flex-row items-center gap-2 rounded-2xl border border-slate-300 bg-white px-3.5 py-2 dark:border-slate-700 dark:bg-slate-900">
-                <Icon name="search" color="#64748b" size={15} />
+              <View className="flex-row items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-2.5 py-1.5 dark:border-slate-700 dark:bg-slate-900">
+                <Icon name="search" color="#64748b" size={13} />
                 <TextInput
                   value={batchSearch}
                   onChangeText={setBatchSearch}
                   placeholder="Search Battery ID, Serial, Status…"
                   placeholderTextColor="#94a3b8"
-                  className="min-w-0 flex-1 text-xs text-slate-900 dark:text-white"
+                  className="min-w-0 flex-1 text-xs text-slate-900 dark:text-white py-0"
                 />
               </View>
             </View>
@@ -441,11 +452,11 @@ export default function ClientTruckBatches({
             <Text className="py-8 text-center text-xs text-slate-400">No batteries match your selected status filter or search in this truck batch.</Text>
           }
           renderItem={({ item: row, index }) => (
-            <View className="rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
+            <View className="rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
               <View className="flex-row items-start justify-between gap-2">
                 <TouchableOpacity onPress={() => goHistory(row)} className="flex-1">
-                  <Text className="text-sm font-extrabold text-emerald-700">
-                    <Text className="text-xs font-semibold text-slate-400">{index + 1}. </Text>
+                  <Text className="text-xs font-black font-mono text-emerald-700 dark:text-emerald-400">
+                    <Text className="text-[10px] font-semibold text-slate-400">{index + 1}. </Text>
                     {row.battery_code}
                   </Text>
                 </TouchableOpacity>
@@ -458,33 +469,35 @@ export default function ClientTruckBatches({
                   />
                 )}
               </View>
-              <View className="mt-1.5 flex-row items-center justify-between gap-2">
-                <Text className="text-[10px] font-bold uppercase text-slate-400">Physical Serial Number</Text>
+              <View className="mt-1 flex-row items-center justify-between gap-1.5">
+                <Text className="text-[9px] font-bold uppercase text-slate-400">SN:</Text>
                 {row.serial_number ? (
-                  <Text className="text-xs font-semibold text-slate-800 dark:text-slate-100">{row.serial_number}</Text>
+                  <Text className="text-[10px] font-semibold text-slate-800 dark:text-slate-100">{row.serial_number}</Text>
                 ) : (
                   <TouchableOpacity onPress={() => setSerialTarget(row)} hitSlop={6}>
-                    <Text className="text-xs font-bold text-blue-600">+ Add Serial</Text>
+                    <Text className="text-[9.5px] font-bold text-blue-600 dark:text-blue-400">+ Add Serial</Text>
                   </TouchableOpacity>
                 )}
               </View>
-              <View className="mt-1 flex-row items-start justify-between gap-2">
-                <Text className="text-[10px] font-bold uppercase text-slate-400">Defect Notes</Text>
-                <Text className="flex-1 text-right text-[11px] text-slate-600 dark:text-slate-300" numberOfLines={3}>{row.notes || '—'}</Text>
-              </View>
-              <View className="mt-2 flex-row justify-end gap-2">
+              {row.notes ? (
+                <View className="mt-1 flex-row items-start justify-between gap-1.5">
+                  <Text className="text-[9px] font-bold uppercase text-slate-400">Notes:</Text>
+                  <Text className="flex-1 text-right text-[10px] text-slate-600 dark:text-slate-300" numberOfLines={2}>{row.notes}</Text>
+                </View>
+              ) : null}
+              <View className="mt-1.5 flex-row justify-end gap-1.5 border-t border-slate-100 pt-1.5 dark:border-slate-800">
                 {canEdit && (
                   <>
-                    <TouchableOpacity onPress={() => setEditBattery(row)} className="rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1">
-                      <Text className="text-[11px] font-bold text-slate-700">Edit</Text>
+                    <TouchableOpacity onPress={() => setEditBattery(row)} className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5">
+                      <Text className="text-[10px] font-bold text-slate-700">Edit</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => removeBatteryConfirm(row)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1">
-                      <Text className="text-[11px] font-bold text-red-700">Remove</Text>
+                    <TouchableOpacity onPress={() => removeBatteryConfirm(row)} className="rounded-md border border-red-200 bg-red-50 px-2 py-0.5">
+                      <Text className="text-[10px] font-bold text-red-700">Remove</Text>
                     </TouchableOpacity>
                   </>
                 )}
-                <TouchableOpacity onPress={() => goHistory(row)} className="rounded-lg bg-slate-100 px-2.5 py-1 dark:bg-slate-800">
-                  <Text className="text-[11px] font-bold text-slate-700 dark:text-slate-200">History →</Text>
+                <TouchableOpacity onPress={() => goHistory(row)} className="rounded-md bg-slate-100 px-2 py-0.5 dark:bg-slate-800">
+                  <Text className="text-[10px] font-bold text-slate-700 dark:text-slate-200">History →</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -502,61 +515,61 @@ export default function ClientTruckBatches({
       <FlatList
         data={shown}
         keyExtractor={(b) => b.key}
-        contentContainerClassName="p-4 gap-2.5 pb-16"
+        contentContainerClassName="p-3 gap-2 pb-16"
         refreshControl={onRefresh ? <RefreshControl refreshing={refreshing} onRefresh={onRefresh} /> : undefined}
         onEndReached={() => visible < batches.length && setVisible((v) => v + PAGE)}
         onEndReachedThreshold={0.4}
         ListEmptyComponent={
-          <View className="items-center rounded-2xl border border-slate-200 bg-white p-8 dark:border-slate-800 dark:bg-slate-900">
-            <Icon name="truck" color="#94a3b8" size={24} />
-            <Text className="mt-2 text-sm font-semibold text-slate-800 dark:text-slate-100">{EMPTY[bucket]}</Text>
-            {bucket === 'packed' ? <Text className="mt-0.5 text-center text-xs text-slate-400">Tap &apos;+ Add Intake&apos; to scan or enter batteries.</Text> : null}
+          <View className="items-center rounded-2xl border border-slate-200 bg-white p-6 dark:border-slate-800 dark:bg-slate-900">
+            <Icon name="truck" color="#94a3b8" size={22} />
+            <Text className="mt-2 text-xs font-semibold text-slate-800 dark:text-slate-100">{EMPTY[bucket]}</Text>
+            {bucket === 'packed' ? <Text className="mt-0.5 text-center text-[11px] text-slate-400">Tap &apos;+ Add Intake&apos; to scan or enter batteries.</Text> : null}
           </View>
         }
         ListFooterComponent={
           batches.length > PAGE ? (
-            <Text className="pt-2 text-center text-[11px] text-slate-400">
+            <Text className="pt-2 text-center text-[10px] text-slate-400">
               Showing {shown.length} of {batches.length} batches • Scroll down to load more
             </Text>
           ) : null
         }
         renderItem={({ item: b, index }) =>
           viewMode === 'cards' ? (
-            <TouchableOpacity onPress={() => { setNotice(null); setSelectedKey(b.key); }} className="rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+            <TouchableOpacity onPress={() => { setNotice(null); setSelectedKey(b.key); }} className="rounded-xl border border-slate-200 bg-white p-2.5 dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
               <View className="flex-row items-start justify-between gap-2">
                 <View className="flex-1">
-                  <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{b.isAwaitingPickup ? 'Client Shipment' : isReceived ? 'Return Dispatch' : 'Truck Intake'}</Text>
-                  <Text className="text-base font-extrabold text-slate-900 dark:text-white">{b.isAwaitingPickup ? 'Client Packed Batch' : b.truckNumber}</Text>
+                  <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{b.isAwaitingPickup ? 'Client Shipment' : isReceived ? 'Return Dispatch' : 'Truck Intake'}</Text>
+                  <Text className="text-sm font-extrabold text-slate-900 dark:text-white">{b.isAwaitingPickup ? 'Client Packed Batch' : b.truckNumber}</Text>
                 </View>
                 <Badge tone="info">{`${b.batteries.length} ${b.batteries.length === 1 ? 'Battery' : 'Batteries'}`}</Badge>
               </View>
-              <View className="mt-3 gap-1">
-                <Text className="text-xs text-slate-500">Driver: <Text className="font-bold text-slate-800 dark:text-slate-100">{b.driverName || '—'}</Text></Text>
-                <Text className="text-xs text-slate-500">Date: <Text className="text-slate-700 dark:text-slate-200">{formatDate(b.intakeAt)}</Text></Text>
-                <View className="flex-row items-center gap-1.5"><Text className="text-xs text-slate-500">Status:</Text><BatchStatus batch={b} /></View>
+              <View className="mt-2 gap-0.5">
+                <Text className="text-[11px] text-slate-500">Driver: <Text className="font-bold text-slate-800 dark:text-slate-100">{b.driverName || '—'}</Text></Text>
+                <Text className="text-[11px] text-slate-500">Date: <Text className="text-slate-700 dark:text-slate-200">{formatDate(b.intakeAt)}</Text></Text>
+                <View className="flex-row items-center gap-1"><Text className="text-[11px] text-slate-500">Status:</Text><BatchStatus batch={b} /></View>
               </View>
-              <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-3 dark:border-slate-800">
+              <View className="mt-2 flex-row items-center justify-between border-t border-slate-100 pt-2 dark:border-slate-800">
                 <BatchActions batch={b} />
-                <Text className="text-xs font-bold text-blue-700">View Details →</Text>
+                <Text className="text-[11px] font-bold text-blue-700">View Details →</Text>
               </View>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity onPress={() => { setNotice(null); setSelectedKey(b.key); }} className="rounded-2xl border border-slate-200 bg-white px-3.5 py-3 dark:border-slate-800 dark:bg-slate-900">
+            <TouchableOpacity onPress={() => { setNotice(null); setSelectedKey(b.key); }} className="rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900 shadow-2xs">
               <View className="flex-row items-center justify-between gap-2">
-                <Text className="flex-1 text-sm font-extrabold text-blue-700" numberOfLines={1}>
-                  <Text className="text-xs font-semibold text-slate-400">{index + 1}. </Text>
+                <Text className="flex-1 text-xs font-extrabold text-blue-700" numberOfLines={1}>
+                  <Text className="text-[11px] font-semibold text-slate-400">{index + 1}. </Text>
                   {b.isAwaitingPickup ? 'Client Packed Batch' : b.truckNumber}
                 </Text>
                 <BatchStatus batch={b} />
               </View>
-              <View className="mt-1 flex-row flex-wrap gap-x-3">
-                <Text className="text-[11px] text-slate-500">Driver: {b.driverName || '—'}</Text>
-                <Text className="text-[11px] text-slate-500">Batteries: <Text className="font-bold text-slate-800 dark:text-slate-100">{b.batteries.length}</Text></Text>
-                <Text className="text-[11px] text-slate-500">{formatDate(b.intakeAt)}</Text>
+              <View className="mt-1 flex-row flex-wrap gap-x-2.5">
+                <Text className="text-[10px] text-slate-500">Driver: {b.driverName || '—'}</Text>
+                <Text className="text-[10px] text-slate-500">Batteries: <Text className="font-bold text-slate-800 dark:text-slate-100">{b.batteries.length}</Text></Text>
+                <Text className="text-[10px] text-slate-500">{formatDate(b.intakeAt)}</Text>
               </View>
-              <View className="mt-2 flex-row items-center justify-between">
+              <View className="mt-1.5 flex-row items-center justify-between border-t border-slate-100 pt-1.5 dark:border-slate-800">
                 <BatchActions batch={b} />
-                <Text className="text-xs font-bold text-blue-700">View Details →</Text>
+                <Text className="text-[11px] font-bold text-blue-700">View Details →</Text>
               </View>
             </TouchableOpacity>
           )

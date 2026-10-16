@@ -2,9 +2,9 @@ import Modal from './Modal';
 
 // A single-button popup for surfacing an error message, styled consistently
 // with ConfirmModal instead of the browser's native window.alert.
-function AlertModal({ title = 'Error', message, onClose }) {
+function AlertModal({ title = 'Error', message, onClose, centered = true }) {
   return (
-    <Modal title={title} onClose={onClose}>
+    <Modal title={title} onClose={onClose} centered={centered}>
       <div className="flex flex-col gap-5">
         <div className="flex items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-critical-100 dark:bg-red-500/15">

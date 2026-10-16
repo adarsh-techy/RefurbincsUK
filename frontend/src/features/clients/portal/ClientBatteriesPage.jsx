@@ -14,7 +14,7 @@ import extractBatteryCode from '../../../utils/extract-battery-code';
 import { resolveBatteryInput, recheckUnassignedTag } from '../../../utils/scan-input';
 
 import { useTheme } from '../../../context/ThemeContext';
-import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter, FiRefreshCw } from 'react-icons/fi';
+import { FiStar, FiEdit2, FiTrash2, FiPlus, FiTruck, FiAlertCircle, FiCamera, FiActivity, FiCheckCircle, FiXCircle, FiLayers, FiFilter, FiRefreshCw, FiGrid, FiList, FiSearch } from 'react-icons/fi';
 import { hasClientPermission } from '../../../utils/permissions';
 import ClientReturnVerifyModal from '../components/ClientReturnVerifyModal';
 import RatingModal from '../../../components/feedback/RatingModal';
@@ -135,8 +135,14 @@ function ClientBatteriesPage() {
     return id !== null && id !== undefined && ratedReturnIds.has(String(id));
   }
 
-  // Default view is 'batch_table' (Admin-style Table View), with toggle to 'cards'
-  const [viewMode, setViewMode] = useState('batch_table');
+  // Default view is 'cards' on mobile (<768px) and 'batch_table' on desktop, with toggle available
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'cards';
+    }
+    return 'batch_table';
+  });
+  const [mobileBatteryView, setMobileBatteryView] = useState('cards'); // 'cards' | 'table'
 
   // Rating feedback modal state
   const [ratingModalData, setRatingModalData] = useState({
@@ -1767,13 +1773,13 @@ function ClientBatteriesPage() {
               )}
 
               {/* 1. Truck & Driver Metadata */}
-              <div className="rounded-2xl border border-slate-200/80 bg-slate-50/50 p-4 dark:border-white/10 dark:bg-surface-800/60">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200 mb-3 flex items-center gap-1.5">
+              <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-slate-50/50 p-3 sm:p-4 dark:border-white/10 dark:bg-surface-800/60">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200 mb-2.5 sm:mb-3 flex items-center gap-1.5">
                   <FiTruck className="w-3.5 h-3.5 text-blue-500" />
                   <span>Truck Logistics & Vehicle Info</span>
                 </h4>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
                   <div>
                     <label className={labelClasses}>
                       Truck Number <span className="text-rose-500 font-bold">*</span>
@@ -1810,7 +1816,7 @@ function ClientBatteriesPage() {
                       onClick={handleEditBatchSave}
                       disabled={editBatchSaving}
                       style={{ backgroundColor: accent }}
-                      className="inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg sm:rounded-xl px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
                     >
                       {editBatchSaving ? (
                         <>
@@ -1829,8 +1835,8 @@ function ClientBatteriesPage() {
               </div>
 
               {/* 2. Batteries in this Intake Batch */}
-              <div className="rounded-2xl border border-slate-200/80 bg-white p-4 dark:border-white/10 dark:bg-surface-800">
-                <div className="flex items-center justify-between mb-3">
+              <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-3 sm:p-4 dark:border-white/10 dark:bg-surface-800">
+                <div className="flex items-center justify-between mb-2.5 sm:mb-3">
                   <div className="flex items-center gap-2">
                     <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-200">
                       Batteries in this Intake ({editBatchBatteries.length} Loaded)
@@ -1842,7 +1848,7 @@ function ClientBatteriesPage() {
                 </div>
 
                 {editBatchBatteries.length === 0 ? (
-                  <div className="rounded-xl border border-dashed border-slate-200 p-6 text-center text-xs text-slate-400 dark:border-white/10 dark:text-neutral-500">
+                  <div className="rounded-xl border border-dashed border-slate-200 p-4 sm:p-6 text-center text-xs text-slate-400 dark:border-white/10 dark:text-neutral-500">
                     No batteries in this intake batch. Use the form below to add batteries.
                   </div>
                 ) : (
@@ -1852,23 +1858,23 @@ function ClientBatteriesPage() {
                         key={b.id || b.battery_code || idx}
                         className="pt-2 first:pt-0 flex items-center justify-between gap-3 text-xs"
                       >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <span className="font-mono text-slate-400 dark:text-neutral-500 w-5 text-center font-bold">
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className="font-mono text-slate-400 dark:text-neutral-500 w-4 sm:w-5 text-center font-bold text-[11px]">
                             {idx + 1}
                           </span>
                           <div className="min-w-0">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <span className="font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/40 px-2 py-0.5 rounded-lg">
+                            <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
+                              <span className="font-mono font-bold text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 border border-blue-200/60 dark:border-blue-800/40 px-1.5 sm:px-2 py-0.5 rounded-md sm:rounded-lg text-[11px] sm:text-xs">
                                 {b.battery_code || b.code}
                               </span>
                               {b.serial_number && (
-                                <span className="font-mono text-slate-600 dark:text-neutral-300 text-[11px]">
+                                <span className="font-mono text-slate-600 dark:text-neutral-300 text-[10.5px] sm:text-[11px]">
                                   SN: {b.serial_number}
                                 </span>
                               )}
                             </div>
                             {b.notes && (
-                              <p className="text-[11px] text-slate-500 dark:text-neutral-400 truncate mt-0.5">
+                              <p className="text-[10.5px] sm:text-[11px] text-slate-500 dark:text-neutral-400 truncate mt-0.5">
                                 {b.notes}
                               </p>
                             )}
@@ -1879,13 +1885,13 @@ function ClientBatteriesPage() {
                           type="button"
                           onClick={() => handleEditModalRemoveBattery(b)}
                           disabled={editBatchRemovingId === (b.id || b.battery_code || b.code)}
-                          className="inline-flex items-center gap-1 rounded-xl border border-red-200 bg-red-50/80 px-2.5 py-1 text-xs font-bold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
+                          className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-red-200 bg-red-50/80 px-2 sm:px-2.5 py-0.5 sm:py-1 text-[11px] sm:text-xs font-bold text-red-700 hover:bg-red-100 dark:border-red-900/50 dark:bg-red-950/40 dark:text-red-300 dark:hover:bg-red-900/50 transition-colors cursor-pointer shrink-0 disabled:opacity-50"
                           title="Remove from this intake"
                         >
                           {editBatchRemovingId === b.id ? (
                             <div className="h-3 w-3 animate-spin rounded-full border-2 border-red-600 border-t-transparent" />
                           ) : (
-                            <FiTrash2 className="w-3.5 h-3.5" />
+                            <FiTrash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                           )}
                           <span>Remove</span>
                         </button>
@@ -1896,8 +1902,8 @@ function ClientBatteriesPage() {
               </div>
 
               {/* 3. Add Another Battery to this Intake Batch */}
-              <div className="rounded-2xl border border-blue-200/90 bg-blue-50/40 p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
-                <div className="flex items-center justify-between mb-2.5">
+              <div className="rounded-xl sm:rounded-2xl border border-blue-200/90 bg-blue-50/40 p-3 sm:p-4 dark:border-blue-900/40 dark:bg-blue-950/20">
+                <div className="flex items-center justify-between mb-2 sm:mb-2.5">
                   <h4 className="text-xs font-bold uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-1.5">
                     <FiPlus className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
                     <span>Add Another Battery to this Intake</span>
@@ -1926,7 +1932,7 @@ function ClientBatteriesPage() {
                   </div>
                 )}
 
-                <div className="space-y-3">
+                <div className="space-y-2.5 sm:space-y-3">
                   <div className="relative">
                     <input data-rfid-scan="client-edit-batch"
                       type="text"
@@ -1945,7 +1951,7 @@ function ClientBatteriesPage() {
                         }
                       }}
                       placeholder="Type battery ID (e.g. UBE-0012) or scan QR code…"
-                      className="w-full rounded-xl border border-blue-300 bg-white px-3.5 py-2 text-xs font-mono font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-blue-800/60 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
+                      className="w-full rounded-xl border border-blue-300 bg-white px-3 sm:px-3.5 py-1.5 sm:py-2 text-xs font-mono font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-blue-800/60 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
                     />
                     <RfidScanButton target="client-edit-batch" />
 
@@ -1979,7 +1985,7 @@ function ClientBatteriesPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-2.5">
                     <input
                       type="text"
                       value={editBatchAddSerial}
@@ -2001,7 +2007,7 @@ function ClientBatteriesPage() {
                       type="button"
                       onClick={() => handleEditModalAddBattery()}
                       disabled={editBatchAddLoading || !editBatchAddInput.trim()}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1.5 rounded-lg sm:rounded-xl bg-blue-600 px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition-colors cursor-pointer"
                     >
                       {editBatchAddLoading ? (
                         <>
@@ -2020,7 +2026,7 @@ function ClientBatteriesPage() {
               </div>
 
               {/* Footer Buttons */}
-              <div className="flex items-center justify-between gap-3 pt-3 border-t border-slate-100 dark:border-white/5">
+              <div className="flex items-center justify-between gap-2.5 pt-2.5 sm:pt-3 border-t border-slate-100 dark:border-white/5">
                 <button
                   type="button"
                   onClick={() => {
@@ -2028,7 +2034,7 @@ function ClientBatteriesPage() {
                     setEditBatchError(null);
                     setEditBatchSuccess(null);
                   }}
-                  className="rounded-xl px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10 cursor-pointer"
+                  className="rounded-lg sm:rounded-xl px-3.5 sm:px-4 py-1.5 sm:py-2 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-white/10 cursor-pointer"
                 >
                   Close
                 </button>
@@ -2037,9 +2043,19 @@ function ClientBatteriesPage() {
                   onClick={handleEditBatchSave}
                   disabled={editBatchSaving}
                   style={{ backgroundColor: accent }}
-                  className="rounded-xl px-5 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-lg sm:rounded-xl px-4 sm:px-5 py-1.5 sm:py-2 text-xs font-bold text-white shadow-2xs hover:opacity-90 disabled:opacity-50 transition-all cursor-pointer"
                 >
-                  {editBatchSaving ? 'Saving Changes…' : 'Save & Done'}
+                  {editBatchSaving ? (
+                    <>
+                      <div className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                      <span>Saving…</span>
+                    </>
+                  ) : (
+                    <>
+                      <FiCheckCircle className="w-3.5 h-3.5" />
+                      <span>Done</span>
+                    </>
+                  )}
                 </button>
               </div>
             </div>
@@ -2401,10 +2417,10 @@ function ClientBatteriesPage() {
 
   if (selectedBatch) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-3.5 sm:space-y-6">
         {/* Back Navigation Bar */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5 dark:border-white/10">
-          <div className="flex items-center gap-3">
+        <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-3 sm:pb-5 dark:border-white/10">
+          <div className="flex items-center gap-2 sm:gap-3">
             <button
               type="button"
               onClick={() => {
@@ -2412,53 +2428,61 @@ function ClientBatteriesPage() {
                 setBatchSearch('');
                 setBatchStatusFilter('all');
               }}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-100 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer"
+              className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-slate-200 bg-white px-2.5 sm:px-3.5 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-100 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer"
             >
               <span>←</span>
-              <span>Back to Intake List</span>
+              <span>{selectedBatch.isReturnDispatch ? 'Back to Received Batches' : 'Back to Intake List'}</span>
             </button>
 
             <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
-                <span>{selectedBatch.isAwaitingPickup ? 'Client Packed Batch' : `Truck ${selectedBatch.truckNumber}`}</span>
+              <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white flex items-center gap-2">
+                <span>
+                  {selectedBatch.isReturnDispatch
+                    ? (selectedBatch.truckNumber ? `Return Dispatch • ${selectedBatch.truckNumber}` : 'Return Dispatch')
+                    : selectedBatch.isAwaitingPickup
+                    ? 'Client Packed Batch'
+                    : `Truck ${selectedBatch.truckNumber}`}
+                </span>
               </h1>
-              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
-                {selectedBatch.isAwaitingPickup
+              <p className="text-[10px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+                {selectedBatch.isReturnDispatch
+                  ? `Driver: ${selectedBatch.driverName || 'Workshop Driver'} • Delivered on ${formatDate(selectedBatch.intakeAt)}`
+                  : selectedBatch.isAwaitingPickup
                   ? 'Scheduled for workshop truck intake pickup'
                   : `Driver: ${selectedBatch.driverName || '—'} • Intaked on ${formatDate(selectedBatch.intakeAt)}`}
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-wrap">
             {selectedBatch.isReturnDispatch ? (
               selectedBatch.intakeStatus === 'pending_verification' ? (
                 <>
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
-                    <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                  <span className="inline-flex items-center gap-1.5 rounded-lg sm:rounded-xl border border-amber-300 bg-amber-50 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+                    <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                     Pending Verification
                   </span>
                   <button
                     type="button"
                     onClick={() => setVerifyTargetReturn(selectedBatch)}
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1.5 rounded-lg sm:rounded-xl bg-blue-600 px-3 sm:px-4 py-1.5 sm:py-2 text-[11px] sm:text-xs font-bold text-white shadow-md hover:bg-blue-700 transition-colors cursor-pointer"
                   >
                     <span>📷</span>
                     <span>Scan to Verify Receipt</span>
                   </button>
                 </>
               ) : (
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <div className="flex items-center gap-1.5 sm:gap-2">
+                  <span className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-emerald-300 bg-emerald-50 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-emerald-800 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                       <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
                     </svg>
                     Received & Verified
                   </span>
                   {isReturnRated(selectedBatch.intakeId || selectedBatch.returnId) ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-xl bg-slate-100 px-3.5 py-1.5 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
-                      <FiStar className="w-3.5 h-3.5 fill-amber-400 text-amber-400" />
-                      <span>Rated — Thank You!</span>
+                    <span className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl bg-slate-100 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
+                      <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+                      <span>Rated</span>
                     </span>
                   ) : (
                     <button
@@ -2474,18 +2498,18 @@ function ClientBatteriesPage() {
                           returnId: selectedBatch.intakeId || selectedBatch.returnId || null,
                         });
                       }}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 px-3.5 py-1.5 text-xs font-bold text-white shadow-xs hover:bg-amber-600 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl bg-amber-500 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-xs hover:bg-amber-600 transition-colors cursor-pointer"
                     >
-                      <FiStar className="w-3.5 h-3.5 fill-white text-white" />
-                      <span>Rate Delivery Batch</span>
+                      <FiStar className="w-3 h-3 fill-white text-white" />
+                      <span>Rate Delivery</span>
                     </button>
                   )}
                 </div>
               )
             ) : selectedBatch.intakeStatus === 'pending_arrival' ? (
               <>
-                <span className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-3.5 py-1.5 text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
-                  <span className="h-2 w-2 rounded-full bg-amber-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-amber-300 bg-amber-50 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                   Waiting for Verify
                 </span>
 
@@ -2494,9 +2518,9 @@ function ClientBatteriesPage() {
                     <button
                       type="button"
                       onClick={() => openEditBatch(selectedBatch)}
-                      className="inline-flex items-center gap-1.5 rounded-xl border border-blue-200 bg-white px-3.5 py-1.5 text-xs font-bold text-blue-700 shadow-2xs hover:bg-blue-50 dark:border-blue-800/40 dark:bg-surface-800 dark:text-blue-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-blue-200 bg-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-blue-700 shadow-2xs hover:bg-blue-50 dark:border-blue-800/40 dark:bg-surface-800 dark:text-blue-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
                     >
-                      <FiEdit2 className="w-3.5 h-3.5" />
+                      <FiEdit2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                       <span>Edit Batch</span>
                     </button>
 
@@ -2509,22 +2533,20 @@ function ClientBatteriesPage() {
                           setAddMoreError(null);
                           setAddMoreSuccess(null);
                         }}
-                        className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl bg-emerald-600 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-white shadow-2xs hover:bg-emerald-700 transition-colors cursor-pointer"
                       >
-                        <FiPlus className="w-3.5 h-3.5" />
+                        <FiPlus className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         <span>+ Add Batteries</span>
                       </button>
                     )}
 
-                    {/* Only a real truck intake can be cancelled — an
-                        awaiting-pickup group has no intake row to delete. */}
                     {resolveBatchIntakeId(selectedBatch) && (
                       <button
                         type="button"
                         onClick={() => setDeleteBatchTarget({ ...selectedBatch, intakeId: resolveBatchIntakeId(selectedBatch) })}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-red-200 bg-white px-3.5 py-1.5 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-50 dark:border-red-800/40 dark:bg-surface-800 dark:text-red-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-red-200 bg-white px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-red-700 shadow-2xs hover:bg-red-50 dark:border-red-800/40 dark:bg-surface-800 dark:text-red-300 dark:hover:bg-surface-700 transition-colors cursor-pointer"
                       >
-                        <FiTrash2 className="w-3.5 h-3.5" />
+                        <FiTrash2 className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                         <span>Cancel Batch</span>
                       </button>
                     )}
@@ -2532,41 +2554,41 @@ function ClientBatteriesPage() {
                 )}
               </>
             ) : (
-              <span className="inline-flex items-center gap-1.5 rounded-xl border border-yellow-300 bg-yellow-50 px-3.5 py-1.5 text-xs font-bold text-yellow-800 shadow-2xs dark:border-yellow-700/60 dark:bg-yellow-950/40 dark:text-yellow-300">
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4 text-yellow-600 dark:text-yellow-400">
+              <span className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-yellow-300 bg-yellow-50 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold text-yellow-800 shadow-2xs dark:border-yellow-700/60 dark:bg-yellow-950/40 dark:text-yellow-300">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 text-yellow-600 dark:text-yellow-400">
                   <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
                 </svg>
                 Waiting for Service
               </span>
             )}
-            <span className="rounded-xl bg-emerald-100 px-3.5 py-1.5 text-xs font-black text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-200">
+            <span className="rounded-lg sm:rounded-xl bg-emerald-100 px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-black text-emerald-900 dark:bg-emerald-950/80 dark:text-emerald-200">
               {selectedBatch.batteries.length} Batteries
             </span>
           </div>
         </div>
 
         {/* ── Top Status & Volume Breakdown Cards for this Truck Intake ────────────── */}
-        <div className="grid grid-cols-2 gap-3.5 sm:grid-cols-4 lg:grid-cols-7 sm:gap-4">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-2.5 sm:grid-cols-4 lg:grid-cols-7">
           {/* Card 1: Total in Batch */}
           <button
             type="button"
             onClick={() => setBatchStatusFilter('all')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'all'
                 ? 'border-blue-500 bg-blue-100/90 shadow-xs dark:border-blue-400 dark:bg-blue-950/60 ring-2 ring-blue-500/30'
                 : 'border-blue-200/80 bg-blue-50/70 hover:border-blue-300 hover:bg-blue-100/60 dark:border-blue-900/40 dark:bg-blue-950/20 dark:hover:border-blue-800'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-blue-900/80 uppercase dark:text-blue-300">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-blue-900/80 uppercase dark:text-blue-300">
                 Total Units
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-slate-900 dark:text-white">
                 {batchMetrics.total}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-slate-500 dark:text-neutral-400">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-slate-500 dark:text-neutral-400">
                 All in truck
               </p>
             </div>
@@ -2576,22 +2598,22 @@ function ClientBatteriesPage() {
           <button
             type="button"
             onClick={() => setBatchStatusFilter('reached_workshop')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'reached_workshop'
                 ? 'border-amber-500 bg-amber-100/90 shadow-xs dark:border-amber-400 dark:bg-amber-950/60 ring-2 ring-amber-500/30'
                 : 'border-amber-200/80 bg-amber-50/70 hover:border-amber-300 hover:bg-amber-100/60 dark:border-amber-900/40 dark:bg-amber-950/20 dark:hover:border-amber-800'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-amber-800 uppercase dark:text-amber-400">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-amber-800 uppercase dark:text-amber-400">
                 Waiting for Service
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-amber-600 dark:text-amber-400">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-amber-600 dark:text-amber-400">
                 {batchMetrics.reachedWorkshop}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-amber-700/70 dark:text-amber-400/70">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-amber-700/70 dark:text-amber-400/70">
                 At workshop
               </p>
             </div>
@@ -2601,22 +2623,22 @@ function ClientBatteriesPage() {
           <button
             type="button"
             onClick={() => setBatchStatusFilter('in_service')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'in_service'
                 ? 'border-indigo-500 bg-indigo-100/90 shadow-xs dark:border-indigo-400 dark:bg-indigo-950/60 ring-2 ring-indigo-500/30'
                 : 'border-indigo-200/80 bg-indigo-50/70 hover:border-indigo-300 hover:bg-indigo-100/60 dark:border-indigo-900/40 dark:bg-indigo-950/20 dark:hover:border-indigo-800'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-indigo-800 uppercase dark:text-indigo-400">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-indigo-800 uppercase dark:text-indigo-400">
                 In Service
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-indigo-600 dark:text-indigo-400">
                 {batchMetrics.inService}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-indigo-700/70 dark:text-indigo-400/70">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-indigo-700/70 dark:text-indigo-400/70">
                 Repairing / Testing
               </p>
             </div>
@@ -2626,22 +2648,22 @@ function ClientBatteriesPage() {
           <button
             type="button"
             onClick={() => setBatchStatusFilter('serviced')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'serviced'
                 ? 'border-teal-500 bg-teal-100/90 shadow-xs dark:border-teal-400 dark:bg-teal-950/60 ring-2 ring-teal-500/30'
                 : 'border-emerald-200/80 bg-emerald-50/70 hover:border-emerald-300 hover:bg-emerald-100/60 dark:border-emerald-900/40 dark:bg-emerald-950/20 dark:hover:border-emerald-800'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-teal-800 uppercase dark:text-teal-400">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-teal-800 uppercase dark:text-teal-400">
                 Completed
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-teal-600 dark:text-teal-400">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-teal-600 dark:text-teal-400">
                 {batchMetrics.serviced}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-teal-700/70 dark:text-teal-400/70">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-teal-700/70 dark:text-teal-400/70">
                 Repaired & ready
               </p>
             </div>
@@ -2651,22 +2673,22 @@ function ClientBatteriesPage() {
           <button
             type="button"
             onClick={() => setBatchStatusFilter('unserviceable')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'unserviceable'
                 ? 'border-rose-500 bg-rose-100/90 shadow-xs dark:border-rose-400 dark:bg-rose-950/60 ring-2 ring-rose-500/30'
                 : 'border-rose-200/80 bg-rose-50/70 hover:border-rose-300 hover:bg-rose-100/60 dark:border-rose-900/40 dark:bg-rose-950/20 dark:hover:border-rose-800'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-rose-800 uppercase dark:text-rose-400">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-rose-800 uppercase dark:text-rose-400">
                 Unserviceable
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-rose-600 dark:text-rose-400">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-rose-600 dark:text-rose-400">
                 {batchMetrics.unserviceable}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-rose-700/70 dark:text-rose-400/70">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-rose-700/70 dark:text-rose-400/70">
                 Cannot service
               </p>
             </div>
@@ -2676,22 +2698,22 @@ function ClientBatteriesPage() {
           <button
             type="button"
             onClick={() => setBatchStatusFilter('returned')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'returned'
                 ? 'border-sky-500 bg-sky-100/90 shadow-xs dark:border-sky-400 dark:bg-sky-950/60 ring-2 ring-sky-500/30'
                 : 'border-sky-200/80 bg-sky-50/70 hover:border-sky-300 hover:bg-sky-100/60 dark:border-sky-900/40 dark:bg-sky-950/20 dark:hover:border-sky-800'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-sky-800 uppercase dark:text-sky-400">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-sky-800 uppercase dark:text-sky-400">
                 Returned
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-sky-600 dark:text-sky-400">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-sky-600 dark:text-sky-400">
                 {batchMetrics.returned}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-sky-700/70 dark:text-sky-400/70">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-sky-700/70 dark:text-sky-400/70">
                 Delivered back
               </p>
             </div>
@@ -2701,80 +2723,218 @@ function ClientBatteriesPage() {
           <button
             type="button"
             onClick={() => setBatchStatusFilter('recycled')}
-            className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-3.5 text-left transition-all duration-200 cursor-pointer ${
+            className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-2 sm:p-3 text-left transition-all duration-200 cursor-pointer min-h-[58px] sm:min-h-[72px] ${
               batchStatusFilter === 'recycled'
                 ? 'border-neutral-800 bg-neutral-200/90 shadow-xs dark:border-neutral-300 dark:bg-neutral-800 ring-2 ring-neutral-500/30'
                 : 'border-neutral-200/80 bg-neutral-100/80 hover:border-neutral-300 hover:bg-neutral-200/60 dark:border-neutral-700/60 dark:bg-neutral-800/40 dark:hover:border-neutral-600'
             }`}
           >
             <div>
-              <span className="text-[10.5px] font-bold tracking-wider text-neutral-800 uppercase dark:text-neutral-300">
+              <span className="text-[9px] sm:text-[10.5px] font-bold tracking-wider text-neutral-800 uppercase dark:text-neutral-300">
                 Recycled
               </span>
             </div>
-            <div className="mt-2.5">
-              <span className="text-xl sm:text-2xl font-black text-neutral-900 dark:text-white">
+            <div className="mt-0.5 sm:mt-1.5">
+              <span className="text-base sm:text-2xl font-black text-neutral-900 dark:text-white">
                 {batchMetrics.recycled}
               </span>
-              <p className="mt-0.5 text-[10.5px] font-medium text-neutral-600 dark:text-neutral-400">
+              <p className="text-[8.5px] sm:text-[10px] font-medium text-neutral-600 dark:text-neutral-400">
                 Decommissioned
               </p>
             </div>
           </button>
         </div>
 
-        {/* ── Search in this Batch ────────────────────── */}
-        <div className="flex items-center justify-between gap-3">
+        {/* ── Search & Filter in this Batch ────────────────────── */}
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           {batchStatusFilter !== 'all' ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 dark:text-neutral-400">
-                Filtered by:{' '}
-                <span className="font-semibold text-slate-700 dark:text-neutral-200 capitalize">
-                  {batchStatusFilter === 'reached_workshop' ? 'Waiting for Service' : batchStatusFilter.replace(/_/g, ' ')}
-                </span>
+            <div className="flex items-center gap-1.5 text-xs text-slate-500 dark:text-neutral-400">
+              <span>Filtered by:</span>
+              <span className="font-semibold text-slate-700 dark:text-neutral-200 capitalize">
+                {batchStatusFilter === 'reached_workshop' ? 'Waiting for Service' : batchStatusFilter.replace(/_/g, ' ')}
               </span>
               <button
                 type="button"
                 onClick={() => setBatchStatusFilter('all')}
-                className="text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer"
+                className="font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400 hover:underline cursor-pointer ml-1"
               >
-                Clear filter
+                Clear
               </button>
             </div>
           ) : <div />}
 
-          {/* Search Input */}
-          <div className="relative w-full md:w-72 shrink-0">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-            >
-              <path
-                fillRule="evenodd"
-                d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
-                clipRule="evenodd"
+          <div className="flex items-center gap-2">
+            {/* Mobile View Switcher */}
+            <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 dark:border-white/10 dark:bg-surface-800 md:hidden">
+              <button
+                type="button"
+                onClick={() => setMobileBatteryView('cards')}
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                  mobileBatteryView === 'cards'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-neutral-400'
+                }`}
+              >
+                <FiGrid className="w-3 h-3" />
+                <span>Cards</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setMobileBatteryView('table')}
+                className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                  mobileBatteryView === 'table'
+                    ? 'bg-emerald-600 text-white shadow-xs'
+                    : 'text-slate-600 dark:text-neutral-400'
+                }`}
+              >
+                <FiList className="w-3 h-3" />
+                <span>Table</span>
+              </button>
+            </div>
+
+            {/* Search Input */}
+            <div className="relative w-full sm:w-64">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 20 20"
+                fill="currentColor"
+                className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400"
+              >
+                <path
+                  fillRule="evenodd"
+                  d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <input
+                type="text"
+                value={batchSearch}
+                onChange={(e) => setBatchSearch(e.target.value)}
+                placeholder="Search Battery ID, Serial, Status…"
+                className="w-full rounded-lg sm:rounded-xl border border-slate-200 bg-white py-1.5 pl-8 pr-3 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
               />
-            </svg>
-            <input
-              type="text"
-              value={batchSearch}
-              onChange={(e) => setBatchSearch(e.target.value)}
-              placeholder="Search Battery ID, Serial, Status…"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500"
-            />
+            </div>
           </div>
         </div>
 
-        {/* Detailed Full Table for this Truck Batch */}
-        <DataTable
-          columns={detailTableColumns}
-          rows={detailBatteries}
-          showRowNumber
-          emptyMessage="No batteries match your selected status filter or search in this truck batch."
-          maxHeight="calc(100vh - 300px)"
-        />
+        {/* Mobile Native Cards Grid for this Truck Batch */}
+        {mobileBatteryView === 'cards' && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:hidden">
+            {detailBatteries.length === 0 ? (
+              <div className="col-span-full rounded-xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center dark:border-white/10 dark:bg-surface-900">
+                <p className="text-xs font-bold text-slate-600 dark:text-neutral-300">
+                  No batteries match your selected status filter or search in this truck batch.
+                </p>
+              </div>
+            ) : (
+              detailBatteries.map((row, idx) => (
+                <div
+                  key={`${row.id || row.battery_code}-${idx}`}
+                  className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-2xs transition-all hover:border-blue-400 dark:border-white/10 dark:bg-surface-900"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                          <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
+                          <line x1="22" x2="22" y1="11" y2="13" />
+                        </svg>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[10px] font-semibold text-slate-400">#{idx + 1}</span>
+                          <Link
+                            to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                            state={{ from: location.pathname + location.search }}
+                            className="font-mono text-xs sm:text-sm font-black text-emerald-700 hover:underline dark:text-emerald-400 truncate block"
+                          >
+                            {row.battery_code}
+                          </Link>
+                        </div>
+                        <div className="text-[10px] text-slate-500 dark:text-neutral-400 font-medium">
+                          {row.serial_number ? (
+                            <span>SN: <strong className="text-slate-700 dark:text-neutral-200 font-mono">{row.serial_number}</strong></span>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => openSerialModal(row)}
+                              className="font-bold text-blue-600 hover:underline dark:text-blue-400"
+                            >
+                              + Add Serial
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <ClientStatusBadge
+                      status={row.status}
+                      isVerified={
+                        selectedBatch?.intakeStatus === 'verified' ||
+                        Boolean(selectedBatch?.verifiedAt) ||
+                        Boolean(row.verified_at) ||
+                        Boolean(row.return_verified_at)
+                      }
+                      returnStatus={row.return_status}
+                    />
+                  </div>
+
+                  {row.notes ? (
+                    <div className="mt-2 rounded bg-slate-50 px-2 py-1 text-[10px] text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
+                      <span className="font-semibold text-slate-400">Notes: </span>
+                      {row.notes}
+                    </div>
+                  ) : null}
+
+                  <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 dark:border-white/5">
+                    <div className="flex items-center gap-1.5">
+                      {effectiveBucket === 'packed' && selectedBatch?.intakeStatus !== 'verified' && !selectedBatch?.verifiedAt && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => openEditBattery(row)}
+                            className="inline-flex items-center gap-1 rounded bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 hover:bg-blue-600 hover:text-white dark:bg-surface-800 dark:text-neutral-200 transition-colors"
+                          >
+                            <FiEdit2 className="w-2.5 h-2.5" />
+                            <span>Edit</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setRemoveBatteryTarget({ battery: row, intakeId: selectedBatch.intakeId || 'awaiting_pickup' })}
+                            className="inline-flex items-center gap-1 rounded border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700 hover:bg-red-600 hover:text-white dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300 transition-colors"
+                          >
+                            <FiTrash2 className="w-2.5 h-2.5" />
+                            <span>Remove</span>
+                          </button>
+                        </>
+                      )}
+                    </div>
+
+                    <Link
+                      to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                      state={{ from: location.pathname + location.search }}
+                      className="inline-flex items-center gap-0.5 text-[11px] font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                    >
+                      <span>History</span>
+                      <span>→</span>
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        )}
+
+        {/* Detailed Full Table for this Truck Batch (desktop or table toggle on mobile) */}
+        <div className={mobileBatteryView === 'cards' ? 'hidden md:block' : 'block'}>
+          <DataTable
+            columns={detailTableColumns}
+            rows={detailBatteries}
+            showRowNumber
+            emptyMessage="No batteries match your selected status filter or search in this truck batch."
+            maxHeight="calc(100vh - 300px)"
+          />
+        </div>
 
         {/* Battery Number Assign / Update Modal */}
         {serialTarget && (
@@ -2852,28 +3012,28 @@ function ClientBatteriesPage() {
   // ── MAIN INTAKE BATCHES VIEW (TABLE & CARDS) ────────────────────────
   // ═════════════════════════════════════════════════════════════════════
   return (
-    <div className="space-y-6">
+    <div className="space-y-3.5 sm:space-y-6">
       {/* ── Page Header with Action Button & View Switcher ─────────── */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-5 dark:border-white/10">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-3 sm:pb-5 dark:border-white/10">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+          <h1 className="text-lg sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
             {meta.title}
           </h1>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
+          <p className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5 sm:mt-1">
             {meta.description}
           </p>
         </div>
 
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {effectiveBucket === 'packed' && (
+        <div className="flex items-center gap-2 flex-wrap">
+          {(effectiveBucket === 'packed' || effectiveBucket === 'received') && (
             <>
-              {/* View Switcher: Table | Cards for Packed Batches */}
-              <div className="flex items-center rounded-xl border border-slate-200 bg-slate-50 p-1 dark:border-white/10 dark:bg-surface-800">
+              {/* View Switcher: Table | Cards for Batches */}
+              <div className="flex items-center rounded-lg sm:rounded-xl border border-slate-200 bg-slate-50 p-0.5 sm:p-1 dark:border-white/10 dark:bg-surface-800">
                 <button
                   type="button"
                   onClick={() => setViewMode('batch_table')}
                   style={viewMode === 'batch_table' ? { backgroundColor: accent, color: '#ffffff' } : {}}
-                  className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                  className={`rounded-md sm:rounded-lg px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold transition-all ${
                     viewMode === 'batch_table'
                       ? 'shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
@@ -2885,7 +3045,7 @@ function ClientBatteriesPage() {
                   type="button"
                   onClick={() => setViewMode('cards')}
                   style={viewMode === 'cards' ? { backgroundColor: accent, color: '#ffffff' } : {}}
-                  className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all ${
+                  className={`rounded-md sm:rounded-lg px-2.5 sm:px-3.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-bold transition-all ${
                     viewMode === 'cards'
                       ? 'shadow-xs'
                       : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
@@ -2895,24 +3055,26 @@ function ClientBatteriesPage() {
                 </button>
               </div>
 
-              {/* Add Battery to Packed Action */}
-              <button
-                type="button"
-                onClick={() => {
-                  setPackModalOpen(true);
-                  setPickedSortGroupIds(new Set());
-                  setCameraOpen(false);
-                  setPackError(null);
-                  setPackSuccess(null);
-                }}
-                style={{ backgroundColor: accent }}
-                className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-98"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                  <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-                </svg>
-                <span>+ Add Intake</span>
-              </button>
+              {/* Add Battery to Packed Action (only for packed) */}
+              {effectiveBucket === 'packed' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPackModalOpen(true);
+                    setPickedSortGroupIds(new Set());
+                    setCameraOpen(false);
+                    setPackError(null);
+                    setPackSuccess(null);
+                  }}
+                  style={{ backgroundColor: accent }}
+                  className="inline-flex items-center gap-1.5 rounded-lg sm:rounded-xl px-3 py-1.5 sm:px-4 sm:py-2 text-[11px] sm:text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-98"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
+                    <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+                  </svg>
+                  <span>+ Add Intake</span>
+                </button>
+              )}
             </>
           )}
         </div>
@@ -2920,25 +3082,25 @@ function ClientBatteriesPage() {
 
       {/* ── Stat Summary Cards for All Batteries ────────────────────── */}
       {effectiveBucket === 'all' && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+        <div className="grid grid-cols-2 gap-1.5 sm:gap-3 sm:grid-cols-3 lg:grid-cols-5">
           {/* Card 1: Total Fleet */}
           <div
             onClick={() => setStatusFilter('')}
-            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+            className={`col-span-2 sm:col-span-1 min-h-[62px] sm:min-h-[82px] flex flex-col justify-between rounded-xl sm:rounded-2xl border p-2 sm:p-3 shadow-2xs transition-all cursor-pointer ${
               statusFilter === ''
                 ? 'border-slate-400 bg-slate-50/70 dark:border-white/30 dark:bg-surface-800 ring-2 ring-slate-400/20'
                 : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-slate-300'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+              <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                 Total Fleet
               </span>
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-300">
-                <FiLayers className="w-3.5 h-3.5" />
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md sm:rounded-lg bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-300">
+                <FiLayers className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </span>
             </div>
-            <p className="mt-1 text-2xl font-black text-slate-900 dark:text-white">
+            <p className="mt-0.5 sm:mt-1 text-base sm:text-2xl font-black text-slate-900 dark:text-white">
               {data.length}
             </p>
           </div>
@@ -2946,46 +3108,48 @@ function ClientBatteriesPage() {
           {/* Card 2: Active in Fleet */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'in_fleet' ? '' : 'in_fleet')}
-            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+            className={`min-h-[62px] sm:min-h-[82px] flex flex-col justify-between rounded-xl sm:rounded-2xl border p-2 sm:p-3 shadow-2xs transition-all cursor-pointer ${
               statusFilter === 'in_fleet'
                 ? 'border-emerald-500 bg-emerald-50/40 dark:border-emerald-600 dark:bg-emerald-950/30 ring-2 ring-emerald-500/20'
                 : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-emerald-300'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+              <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
                 Active in Fleet
               </span>
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
-                <FiCheckCircle className="w-3.5 h-3.5" />
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md sm:rounded-lg bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-300">
+                <FiCheckCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </span>
             </div>
-            <p className="mt-1 text-2xl font-black text-emerald-700 dark:text-emerald-400">
-              {data.filter((b) => b.status === 'returned' || b.status === 'registered').length}
-            </p>
-            <p className="text-[10px] text-slate-500 dark:text-neutral-400">
-              {data.filter((b) => b.status === 'registered').length} not serviced yet
-            </p>
+            <div>
+              <p className="mt-0.5 sm:mt-1 text-base sm:text-2xl font-black text-emerald-700 dark:text-emerald-400">
+                {data.filter((b) => b.status === 'returned' || b.status === 'registered').length}
+              </p>
+              <p className="text-[8.5px] sm:text-[10px] text-slate-500 dark:text-neutral-400">
+                {data.filter((b) => b.status === 'registered').length} not serviced yet
+              </p>
+            </div>
           </div>
 
           {/* Card 3: In Workshop Repair */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'in_service' ? '' : 'in_service')}
-            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+            className={`min-h-[62px] sm:min-h-[82px] flex flex-col justify-between rounded-xl sm:rounded-2xl border p-2 sm:p-3 shadow-2xs transition-all cursor-pointer ${
               statusFilter === 'in_service' || statusFilter === 'in_repair' || statusFilter === 'repaired'
                 ? 'border-amber-500 bg-amber-50/40 dark:border-amber-600 dark:bg-amber-950/30 ring-2 ring-amber-500/20'
                 : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-amber-300'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+              <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                 In Workshop Repair
               </span>
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300">
-                <FiActivity className="w-3.5 h-3.5" />
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md sm:rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-300">
+                <FiActivity className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </span>
             </div>
-            <p className="mt-1 text-2xl font-black text-amber-700 dark:text-amber-400">
+            <p className="mt-0.5 sm:mt-1 text-base sm:text-2xl font-black text-amber-700 dark:text-amber-400">
               {data.filter((b) => ['in_repair', 'in_progress', 'in_testing', 'testing', 'repair_testing', 'repaired'].includes(b.status)).length}
             </p>
           </div>
@@ -2993,21 +3157,21 @@ function ClientBatteriesPage() {
           {/* Card 4: Unserviceable */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'unserviceable' ? '' : 'unserviceable')}
-            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+            className={`min-h-[62px] sm:min-h-[82px] flex flex-col justify-between rounded-xl sm:rounded-2xl border p-2 sm:p-3 shadow-2xs transition-all cursor-pointer ${
               statusFilter === 'unserviceable'
                 ? 'border-rose-500 bg-rose-50/40 dark:border-rose-600 dark:bg-rose-950/30 ring-2 ring-rose-500/20'
                 : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-rose-300'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+              <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
                 Unserviceable
               </span>
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300">
-                <FiXCircle className="w-3.5 h-3.5" />
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md sm:rounded-lg bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-300">
+                <FiXCircle className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </span>
             </div>
-            <p className="mt-1 text-2xl font-black text-rose-700 dark:text-rose-400">
+            <p className="mt-0.5 sm:mt-1 text-base sm:text-2xl font-black text-rose-700 dark:text-rose-400">
               {data.filter((b) => ['unserviceable', 'tested_parts_removed', 'unserviceable_parts_removed'].includes(b.status)).length}
             </p>
           </div>
@@ -3015,21 +3179,21 @@ function ClientBatteriesPage() {
           {/* Card 5: Recycled */}
           <div
             onClick={() => setStatusFilter(statusFilter === 'recycled' ? '' : 'recycled')}
-            className={`rounded-2xl border p-4 shadow-2xs transition-all cursor-pointer ${
+            className={`min-h-[62px] sm:min-h-[82px] flex flex-col justify-between rounded-xl sm:rounded-2xl border p-2 sm:p-3 shadow-2xs transition-all cursor-pointer ${
               statusFilter === 'recycled'
                 ? 'border-purple-500 bg-purple-50/40 dark:border-purple-600 dark:bg-purple-950/30 ring-2 ring-purple-500/20'
                 : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-900 hover:border-purple-300'
             }`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
+              <span className="text-[9px] sm:text-[11px] font-bold uppercase tracking-wider text-purple-600 dark:text-purple-400">
                 Recycled
               </span>
-              <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300">
-                <FiRefreshCw className="w-3.5 h-3.5" />
+              <span className="flex h-5 w-5 sm:h-6 sm:w-6 items-center justify-center rounded-md sm:rounded-lg bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-300">
+                <FiRefreshCw className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
               </span>
             </div>
-            <p className="mt-1 text-2xl font-black text-purple-700 dark:text-purple-400">
+            <p className="mt-0.5 sm:mt-1 text-base sm:text-2xl font-black text-purple-700 dark:text-purple-400">
               {data.filter((b) => b.status === 'recycled').length}
             </p>
           </div>
@@ -3037,9 +3201,9 @@ function ClientBatteriesPage() {
       )}
 
       {/* ── Search & Filter Bar ────────────────────────────────────────── */}
-      <div className="grid grid-cols-1 gap-3 sm:flex sm:flex-wrap sm:items-end rounded-2xl border border-slate-200/80 bg-white p-3.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+      <div className="grid grid-cols-1 gap-2 sm:gap-3 sm:flex sm:flex-wrap sm:items-end rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2.5 sm:p-3.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
         <div className="w-full sm:w-auto min-w-0 sm:min-w-[14rem] sm:flex-none">
-          <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+          <label className="mb-1 block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
             {effectiveBucket === 'packed' ? 'Search Driver / Truck' : 'Search Battery / Serial'}
           </label>
           <input
@@ -3047,19 +3211,19 @@ function ClientBatteriesPage() {
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder={effectiveBucket === 'packed' ? 'e.g. John or TRK-102' : 'Search Code, Serial, Notes…'}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white sm:w-64"
+            className="w-full rounded-lg sm:rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white sm:w-64"
           />
         </div>
 
         {effectiveBucket === 'all' && (
           <div>
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+            <label className="mb-1 block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
               Filter Status
             </label>
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
+              className="w-full sm:w-auto rounded-lg sm:rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 sm:px-3 py-1.5 sm:py-2 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
             >
               <option value="">All Statuses</option>
               <option value="in_fleet">Active in Fleet</option>
@@ -3076,21 +3240,21 @@ function ClientBatteriesPage() {
 
         <div className="flex items-end gap-2">
           <div className="min-w-0 flex-1 sm:flex-none">
-            <label className="mb-1.5 block text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
+            <label className="mb-1 block text-[10px] sm:text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-neutral-300">
               {effectiveBucket === 'packed' ? 'Intake Date' : 'Date'}
             </label>
             <input
               type="date"
               value={date}
               onChange={(e) => setDate(e.target.value)}
-              className="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
+              className="w-full sm:w-auto rounded-lg sm:rounded-xl border border-slate-200 bg-slate-50/50 px-2.5 sm:px-3 py-1.5 text-xs font-medium text-slate-900 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white"
             />
           </div>
           {date && (
             <button
               type="button"
               onClick={() => setDate('')}
-              className="self-end pb-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+              className="self-end pb-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-neutral-400"
             >
               Clear
             </button>
@@ -3105,7 +3269,7 @@ function ClientBatteriesPage() {
               setDate('');
               setStatusFilter('');
             }}
-            className="self-end pb-2 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-neutral-400"
+            className="self-end pb-1.5 text-xs font-bold text-slate-500 hover:text-slate-700 dark:text-neutral-400"
           >
             Clear all
           </button>
@@ -3120,18 +3284,150 @@ function ClientBatteriesPage() {
           {/* ── Direct Fleet Table for 'all' Bucket ─────────────────── */}
           {effectiveBucket === 'all' ? (
             <div>
-              <DataTable
-                headerColor="blue"
-                columns={globalFleetTableColumns}
-                rows={visibleAllRows}
-                showRowNumber
-                emptyMessage={meta.empty}
-                defaultSortKey="battery_code"
-                defaultSortDirection="asc"
-                maxHeight="calc(100vh - 270px)"
-                onScrollBottom={hasMoreAll ? loadMoreAll : null}
-                tableLayout="fixed"
-              />
+              {/* Mobile View Switcher */}
+              <div className="mb-2.5 flex items-center justify-between md:hidden">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                  {filteredAllData.length} Batteries in Fleet
+                </span>
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 dark:border-white/10 dark:bg-surface-800">
+                  <button
+                    type="button"
+                    onClick={() => setMobileBatteryView('cards')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                      mobileBatteryView === 'cards'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-neutral-400'
+                    }`}
+                  >
+                    <FiGrid className="w-3 h-3" />
+                    <span>Cards</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileBatteryView('table')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                      mobileBatteryView === 'table'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-neutral-400'
+                    }`}
+                  >
+                    <FiList className="w-3 h-3" />
+                    <span>Table</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Native Cards Grid */}
+              {mobileBatteryView === 'cards' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:hidden">
+                  {visibleAllRows.length === 0 ? (
+                    <div className="col-span-full rounded-xl sm:rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center dark:border-white/10 dark:bg-surface-900">
+                      <p className="text-xs font-bold text-slate-600 dark:text-neutral-300">{meta.empty}</p>
+                    </div>
+                  ) : (
+                    visibleAllRows.map((row, idx) => (
+                      <div
+                        key={`${row.id}-${idx}`}
+                        className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-2xs transition-all hover:border-blue-400 dark:border-white/10 dark:bg-surface-900"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/40 dark:text-blue-400">
+                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
+                                <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
+                                <line x1="22" x2="22" y1="11" y2="13" />
+                              </svg>
+                            </div>
+                            <div className="min-w-0">
+                              <Link
+                                to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                                state={{ from: location.pathname + location.search }}
+                                className="font-mono text-xs sm:text-sm font-black text-blue-700 hover:underline dark:text-blue-400 truncate block"
+                              >
+                                {row.battery_code}
+                              </Link>
+                              <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-neutral-400 font-medium">
+                                {row.serial_number ? (
+                                  <span>SN: <strong className="text-slate-700 dark:text-neutral-200 font-mono">{row.serial_number}</strong></span>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={() => openSerialModal(row)}
+                                    className="font-bold text-blue-600 hover:underline dark:text-blue-400"
+                                  >
+                                    + Add Serial
+                                  </button>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <ClientStatusBadge
+                            status={row.status || 'registered'}
+                            isVerified={row.return_status === 'verified' || Boolean(row.return_verified_at)}
+                            returnStatus={row.return_status}
+                          />
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2 dark:border-white/5 text-[10px] sm:text-[11px]">
+                          {row.truck_number ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-surface-800 dark:text-neutral-300 font-semibold">
+                              <FiTruck className="w-2.5 h-2.5 text-slate-500" />
+                              Truck #{row.truck_number}
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1 text-slate-500 dark:text-neutral-400">
+                            <span>{row.last_repaired_at ? 'Repaired:' : 'Registered:'}</span>
+                            <span className="font-semibold text-slate-700 dark:text-neutral-200">
+                              {row.last_repaired_at
+                                ? new Date(row.last_repaired_at).toLocaleDateString('en-GB')
+                                : row.created_at
+                                ? new Date(row.created_at).toLocaleDateString('en-GB')
+                                : '—'}
+                            </span>
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-between border-t border-slate-100 pt-1.5 dark:border-white/5">
+                          {!row.serial_number ? (
+                            <button
+                              type="button"
+                              onClick={() => openSerialModal(row)}
+                              className="text-[11px] font-bold text-blue-600 hover:underline dark:text-blue-400 cursor-pointer"
+                            >
+                              + Set Serial
+                            </button>
+                          ) : <span />}
+                          <Link
+                            to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                            state={{ from: location.pathname + location.search }}
+                            className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                          >
+                            <span>View Battery</span>
+                            <span>→</span>
+                          </Link>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Desktop Table & Mobile fallback when 'table' view selected */}
+              <div className={mobileBatteryView === 'cards' ? 'hidden md:block' : 'block'}>
+                <DataTable
+                  headerColor="blue"
+                  columns={globalFleetTableColumns}
+                  rows={visibleAllRows}
+                  showRowNumber
+                  emptyMessage={meta.empty}
+                  defaultSortKey="battery_code"
+                  defaultSortDirection="asc"
+                  maxHeight="calc(100vh - 270px)"
+                  onScrollBottom={hasMoreAll ? loadMoreAll : null}
+                  tableLayout="fixed"
+                />
+              </div>
+
               <InfiniteScrollTrigger
                 hasMore={hasMoreAll}
                 loading={false}
@@ -3139,23 +3435,137 @@ function ClientBatteriesPage() {
               />
               {filteredAllData.length > 20 && (
                 <div className="mt-3 text-center text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                  Showing {visibleAllRows.length} of {filteredAllData.length} batteries • Scroll inside table to load more (20 per page)
+                  Showing {visibleAllRows.length} of {filteredAllData.length} batteries • {mobileBatteryView === 'cards' ? 'Scroll down to load more' : 'Scroll inside table to load more (20 per page)'}
                 </div>
               )}
             </div>
           ) : effectiveBucket === 'pending' ? (
             /* ── Direct per-battery table for In Service & Testing ────── */
             <div>
-              <DataTable
-                headerColor="blue"
-                columns={pendingTableColumns}
-                rows={visiblePendingRows}
-                showRowNumber
-                emptyMessage={meta.empty}
-                maxHeight="calc(100vh - 270px)"
-                onScrollBottom={hasMorePending ? loadMorePending : null}
-                tableLayout="fixed"
-              />
+              {/* Mobile View Switcher for In Service */}
+              <div className="mb-2.5 flex items-center justify-between md:hidden">
+                <span className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                  {filteredPendingData.length} Units in Service
+                </span>
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100/80 p-0.5 dark:border-white/10 dark:bg-surface-800">
+                  <button
+                    type="button"
+                    onClick={() => setMobileBatteryView('cards')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                      mobileBatteryView === 'cards'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-neutral-400'
+                    }`}
+                  >
+                    <FiGrid className="w-3 h-3" />
+                    <span>Cards</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileBatteryView('table')}
+                    className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-bold transition-all ${
+                      mobileBatteryView === 'table'
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'text-slate-600 dark:text-neutral-400'
+                    }`}
+                  >
+                    <FiList className="w-3 h-3" />
+                    <span>Table</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Mobile Cards for In Service */}
+              {mobileBatteryView === 'cards' && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 md:hidden">
+                  {visiblePendingRows.length === 0 ? (
+                    <div className="col-span-full rounded-xl sm:rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 text-center dark:border-white/10 dark:bg-surface-900">
+                      <p className="text-xs font-bold text-slate-600 dark:text-neutral-300">{meta.empty}</p>
+                    </div>
+                  ) : (
+                    visiblePendingRows.map((row, idx) => (
+                      <div
+                        key={`${row.id}-${idx}`}
+                        className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3.5 shadow-2xs transition-all hover:border-blue-400 dark:border-white/10 dark:bg-surface-900"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-7.5 w-7.5 shrink-0 items-center justify-center rounded-lg bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-400">
+                              <FiActivity className="h-4 w-4" />
+                            </div>
+                            <div className="min-w-0">
+                              <Link
+                                to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                                state={{ from: location.pathname + location.search }}
+                                className="font-mono text-xs sm:text-sm font-black text-blue-700 hover:underline dark:text-blue-400 truncate block"
+                              >
+                                {row.battery_code}
+                              </Link>
+                              <div className="text-[10px] sm:text-[11px] text-slate-500 dark:text-neutral-400 font-medium">
+                                {row.serial_number ? (
+                                  <span>SN: <strong className="text-slate-700 dark:text-neutral-200 font-mono">{row.serial_number}</strong></span>
+                                ) : (
+                                  <span className="italic text-slate-400">No serial assigned</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <ClientStatusBadge
+                            status={row.status || 'in_service'}
+                            isVerified={row.return_status === 'verified' || Boolean(row.return_verified_at)}
+                            returnStatus={row.return_status}
+                          />
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2 dark:border-white/5 text-[10px] sm:text-[11px]">
+                          {row.truck_number ? (
+                            <span className="inline-flex items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5 text-slate-600 dark:bg-surface-800 dark:text-neutral-300 font-semibold">
+                              <FiTruck className="w-2.5 h-2.5 text-slate-500" />
+                              Arrived Truck #{row.truck_number}
+                            </span>
+                          ) : null}
+                          <span className="inline-flex items-center gap-1 text-slate-500 dark:text-neutral-400">
+                            <span>In Workshop:</span>
+                            <span className="font-semibold text-slate-700 dark:text-neutral-200">
+                              {row.intake_at
+                                ? new Date(row.intake_at).toLocaleDateString('en-GB')
+                                : row.created_at
+                                ? new Date(row.created_at).toLocaleDateString('en-GB')
+                                : '—'}
+                            </span>
+                          </span>
+                        </div>
+
+                        <div className="mt-2 flex items-center justify-end border-t border-slate-100 pt-1.5 dark:border-white/5">
+                          <Link
+                            to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                            state={{ from: location.pathname + location.search }}
+                            className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-emerald-600 hover:text-emerald-700 dark:text-emerald-400"
+                          >
+                            <span>Live Diagnostics</span>
+                            <span>→</span>
+                          </Link>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+
+              {/* Desktop Table & Mobile fallback when 'table' view selected */}
+              <div className={mobileBatteryView === 'cards' ? 'hidden md:block' : 'block'}>
+                <DataTable
+                  headerColor="blue"
+                  columns={pendingTableColumns}
+                  rows={visiblePendingRows}
+                  showRowNumber
+                  emptyMessage={meta.empty}
+                  maxHeight="calc(100vh - 270px)"
+                  onScrollBottom={hasMorePending ? loadMorePending : null}
+                  tableLayout="fixed"
+                />
+              </div>
+
               <InfiniteScrollTrigger
                 hasMore={hasMorePending}
                 loading={false}
@@ -3163,7 +3573,7 @@ function ClientBatteriesPage() {
               />
               {filteredPendingData.length > 20 && (
                 <div className="mt-3 text-center text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                  Showing {visiblePendingRows.length} of {filteredPendingData.length} batteries • Scroll inside table to load more (20 per page)
+                  Showing {visiblePendingRows.length} of {filteredPendingData.length} batteries • {mobileBatteryView === 'cards' ? 'Scroll down to load more' : 'Scroll inside table to load more (20 per page)'}
                 </div>
               )}
             </div>
@@ -3192,7 +3602,7 @@ function ClientBatteriesPage() {
               </div>
             ) : (
               batches.length === 0 ? (
-                <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-white/10 dark:bg-surface-900">
+                <div className="rounded-2xl sm:rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-8 sm:p-12 text-center dark:border-white/10 dark:bg-surface-900">
                   <p className="text-sm font-semibold text-slate-700 dark:text-neutral-300">
                     {meta.empty}
                   </p>
@@ -3202,7 +3612,7 @@ function ClientBatteriesPage() {
                 </div>
               ) : (
                 <div>
-                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  <div className="grid grid-cols-1 gap-2.5 sm:gap-4 md:grid-cols-2 lg:grid-cols-3">
                     {visibleBatchRows.map((batch) => {
                       const count = batch.batteries.length;
 
@@ -3210,29 +3620,29 @@ function ClientBatteriesPage() {
                         <div
                           key={batch.key}
                           onClick={() => setActiveBatchKey(batch.key)}
-                          className="group relative flex cursor-pointer flex-col justify-between rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/80 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-blue-400/60"
+                          className="group relative flex cursor-pointer flex-col justify-between rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-blue-500/80 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-blue-400/60"
                         >
                           <div>
                             {/* Card Top Row */}
-                            <div className="flex items-center justify-between gap-3">
-                              <div className="flex items-center gap-2.5">
-                                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/40">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2 sm:gap-2.5">
+                                <div className="flex h-7.5 w-7.5 sm:h-9 sm:w-9 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-blue-50 text-blue-700 border border-blue-100 dark:bg-blue-950/40 dark:text-blue-400 dark:border-blue-800/40">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-4 w-4 sm:h-4.5 sm:w-4.5">
                                     <path d="M3.375 4.5C2.339 4.5 1.5 5.34 1.5 6.375V13.5h12V6.375c0-1.036-.84-1.875-1.875-1.875h-8.25ZM13.5 15h-12v2.625c0 1.035.84 1.875 1.875 1.875h.375a3 3 0 1 1 6 0h3a.75.75 0 0 0 .75-.75V15ZM15 6.75a.75.75 0 0 1 .75-.75h2.69a2.25 2.25 0 0 1 2.012 1.245l1.64 3.28A2.25 2.25 0 0 1 22.5 11.5v6a.75.75 0 0 1-.75.75h-.375a3 3 0 1 1-6 0v-4.5a.75.75 0 0 1 .75-.75H18a.75.75 0 0 0 .75-.75v-1.125a.75.75 0 0 0-.083-.342l-1.312-2.625A.75.75 0 0 0 16.69 7.5H15.75a.75.75 0 0 1-.75-.75ZM15 15h3.75a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-.75.75H15V15Z" />
                                   </svg>
                                 </div>
                                 <div>
-                                  <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                                    {batch.isAwaitingPickup ? 'Client Shipment' : 'Truck Intake'}
+                                  <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                                    {batch.isAwaitingPickup ? 'Client Shipment' : (effectiveBucket === 'received' || batch.isReturnDispatch) ? 'Return Dispatch' : 'Truck Intake'}
                                   </span>
-                                  <h3 className="font-mono text-base font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors dark:text-white dark:group-hover:text-blue-400">
+                                  <h3 className="font-mono text-xs sm:text-base font-extrabold text-slate-900 group-hover:text-blue-600 transition-colors dark:text-white dark:group-hover:text-blue-400">
                                     {batch.isAwaitingPickup ? 'Client Packed Batch' : batch.truckNumber}
                                   </h3>
                                 </div>
                               </div>
 
-                              <span className="inline-flex items-center gap-1 rounded-xl border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-xs font-extrabold text-emerald-800 shadow-2xs dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                              <span className="inline-flex items-center gap-1 rounded-lg sm:rounded-xl border border-emerald-200/80 bg-emerald-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[10px] sm:text-xs font-extrabold text-emerald-800 shadow-2xs dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3 w-3 sm:h-3.5 sm:w-3.5">
                                   <path fillRule="evenodd" d="M11.379 2.073a.75.75 0 0 1 .621.802l-.634 5.375h3.384a.75.75 0 0 1 .586 1.218l-7 8.5a.75.75 0 0 1-1.206-.867l1.04-4.726H4.75a.75.75 0 0 1-.684-1.06l3.5-7.5a.75.75 0 0 1 .813-.442Z" clipRule="evenodd" />
                                 </svg>
                                 <span>{count} {count === 1 ? 'Battery' : 'Batteries'}</span>
@@ -3240,10 +3650,10 @@ function ClientBatteriesPage() {
                             </div>
 
                             {/* Metadata Rows */}
-                            <div className="mt-4 space-y-2 rounded-xl bg-slate-50/80 p-3 text-xs dark:bg-white/5">
+                            <div className="mt-2 sm:mt-3 space-y-1 sm:space-y-1.5 rounded-lg sm:rounded-xl bg-slate-50/80 p-2 sm:p-2.5 text-[11px] sm:text-xs dark:bg-white/5">
                               <div className="flex items-center justify-between text-slate-600 dark:text-neutral-300">
                                 <span className="flex items-center gap-1.5 text-slate-400 dark:text-neutral-400">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                                     <path d="M10 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6ZM3.465 14.493a1.23 1.23 0 0 0 .41 1.412A9.957 9.957 0 0 0 10 18c2.31 0 4.438-.784 6.131-2.1.43-.333.604-.903.408-1.41a7.002 7.002 0 0 0-13.074.003Z" />
                                   </svg>
                                   Driver:
@@ -3255,7 +3665,7 @@ function ClientBatteriesPage() {
 
                               <div className="flex items-center justify-between text-slate-600 dark:text-neutral-300">
                                 <span className="flex items-center gap-1.5 text-slate-400 dark:text-neutral-400">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                                     <path fillRule="evenodd" d="M5.75 2a.75.75 0 0 1 .75.75V4h7V2.75a.75.75 0 0 1 1.5 0V4h.25A2.75 2.75 0 0 1 18 6.75v8.5A2.75 2.75 0 0 1 15.25 18H4.75A2.75 2.75 0 0 1 2 15.25v-8.5A2.75 2.75 0 0 1 4.75 4H5V2.75A.75.75 0 0 1 5.75 2Zm-1 5.5c-.69 0-1.25.56-1.25 1.25v6.5c0 .69.56 1.25 1.25 1.25h10.5c.69 0 1.25-.56 1.25-1.25v-6.5c0-.69-.56-1.25-1.25-1.25H4.75Z" clipRule="evenodd" />
                                   </svg>
                                   Date:
@@ -3265,9 +3675,9 @@ function ClientBatteriesPage() {
                                 </span>
                               </div>
 
-                              <div className="flex items-center justify-between text-slate-600 dark:text-neutral-300 border-t border-slate-200/50 pt-2 dark:border-white/5">
+                              <div className="flex items-center justify-between text-slate-600 dark:text-neutral-300 border-t border-slate-200/50 pt-1.5 dark:border-white/5">
                                 <span className="flex items-center gap-1.5 text-slate-400 dark:text-neutral-400">
-                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                                     <path fillRule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.483 4.79-1.88-1.88a.75.75 0 1 0-1.06 1.061l2.5 2.5a.75.75 0 0 0 1.137-.089l4-5.5Z" clipRule="evenodd" />
                                   </svg>
                                   Status:
@@ -3298,8 +3708,8 @@ function ClientBatteriesPage() {
                           </div>
 
                           {/* Card Bottom Links */}
-                          <div className="mt-4 flex items-center justify-between pt-2 border-t border-slate-100 dark:border-white/5">
-                            <div className="flex items-center gap-2">
+                          <div className="mt-2 sm:mt-3 flex items-center justify-between pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-white/5">
+                            <div className="flex items-center gap-1.5">
                               {effectiveBucket === 'packed' && batch.intakeStatus !== 'verified' && !batch.verifiedAt && (
                                 <button
                                   type="button"
@@ -3307,9 +3717,9 @@ function ClientBatteriesPage() {
                                     e.stopPropagation();
                                     openEditBatch(batch);
                                   }}
-                                  className="inline-flex items-center gap-1 rounded-lg border border-blue-200 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-300 transition-colors shadow-2xs"
+                                  className="inline-flex items-center gap-1 rounded-md sm:rounded-lg border border-blue-200 bg-blue-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-bold text-blue-700 hover:bg-blue-100 dark:border-blue-900/40 dark:bg-blue-950/40 dark:text-blue-300 transition-colors shadow-2xs"
                                 >
-                                  <FiEdit2 className="w-3 h-3" />
+                                  <FiEdit2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                                   <span>Edit</span>
                                 </button>
                               )}
@@ -3321,14 +3731,14 @@ function ClientBatteriesPage() {
                                       e.stopPropagation();
                                       setVerifyTargetReturn(batch);
                                     }}
-                                    className="inline-flex items-center gap-1 rounded-lg bg-blue-600 px-2.5 py-1 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 transition-colors"
+                                    className="inline-flex items-center gap-1 rounded-md sm:rounded-lg bg-blue-600 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-bold text-white shadow-2xs hover:bg-blue-700 transition-colors"
                                   >
                                     <span>📷</span>
                                     <span>Scan to Verify</span>
                                   </button>
                                 ) : isReturnRated(batch.intakeId || batch.returnId) ? (
-                                  <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
-                                    <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                  <span className="inline-flex items-center gap-1 rounded-md sm:rounded-lg bg-slate-100 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-bold text-slate-500 dark:bg-white/5 dark:text-neutral-400">
+                                    <FiStar className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-amber-400 text-amber-400" />
                                     <span>Rated</span>
                                   </span>
                                 ) : (
@@ -3346,15 +3756,15 @@ function ClientBatteriesPage() {
                                         returnId: batch.intakeId || batch.returnId || null,
                                       });
                                     }}
-                                    className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-bold text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs"
+                                    className="inline-flex items-center gap-1 rounded-md sm:rounded-lg border border-amber-300 bg-amber-50 px-2 py-0.5 sm:px-2.5 sm:py-1 text-[11px] sm:text-xs font-bold text-amber-800 hover:bg-amber-100 dark:bg-amber-950/40 dark:border-amber-900/50 dark:text-amber-300 transition-colors shadow-2xs"
                                   >
-                                    <FiStar className="w-3 h-3 fill-amber-400 text-amber-400" />
+                                    <FiStar className="w-2.5 h-2.5 sm:w-3 sm:h-3 fill-amber-400 text-amber-400" />
                                     <span>Rate</span>
                                   </button>
                                 )
                               )}
                             </div>
-                            <span className="inline-flex items-center gap-1 text-xs font-bold text-blue-600 group-hover:text-blue-700 group-hover:translate-x-0.5 transition-all dark:text-blue-400">
+                            <span className="inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold text-blue-600 group-hover:text-blue-700 group-hover:translate-x-0.5 transition-all dark:text-blue-400">
                               <span>View Details</span>
                               <span>→</span>
                             </span>
@@ -3437,22 +3847,33 @@ function ClientBatteriesPage() {
                 />
               </div>
 
-              {/* ── Scan / Add Batteries Box (Exact Admin Format) ─────── */}
-              <div className="flex min-h-0 flex-1 flex-col rounded-xl border border-blue-300 bg-slate-50 p-4 dark:border-blue-800/40 dark:bg-surface-950">
-                <div className="mb-1 flex shrink-0 items-center justify-between">
-                  <h3 className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-                    Scan Batteries (returning)
-                  </h3>
-                  <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-medium text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
+              {/* ── Scan / Add Batteries Box (Beautiful Modern Layout) ─────── */}
+              <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-5 shadow-xs dark:border-white/10 dark:bg-surface-900">
+                <div className="mb-2 flex shrink-0 items-center justify-between gap-2">
+                  <div className="flex items-center gap-2.5">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
+                      <FiSearch className="h-4 w-4" />
+                    </span>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                        Scan Batteries (returning)
+                      </h3>
+                      <p className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
+                        A handheld scanner types straight into the box below — or select from your registered battery list.
+                      </p>
+                    </div>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-bold border transition-all ${
+                    scannedBatteries.length > 0
+                      ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40'
+                      : 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-surface-800 dark:text-neutral-400 dark:border-white/10'
+                  }`}>
                     {scannedBatteries.length} scanned
                   </span>
                 </div>
-                <p className="mb-3 shrink-0 text-xs text-slate-500 dark:text-neutral-400">
-                  For batteries being packed or intaked for repair. A handheld scanner types straight into the box below — or select from your registered battery list.
-                </p>
 
                 {!isLogisticsReady && (
-                  <div className="mb-3 flex items-center gap-2 rounded-lg border border-amber-300/80 bg-amber-50 px-3 py-2 text-xs font-semibold text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300">
+                  <div className="my-2.5 flex items-center gap-2 rounded-xl border border-amber-300/80 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800 dark:border-amber-800/50 dark:bg-amber-950/40 dark:text-amber-300">
                     <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-200 text-[11px] font-black text-amber-900 dark:bg-amber-900 dark:text-amber-200">
                       !
                     </span>
@@ -3460,9 +3881,15 @@ function ClientBatteriesPage() {
                   </div>
                 )}
 
-                <div className="flex shrink-0 flex-wrap gap-2 sm:flex-nowrap">
-                  <div className="relative min-w-0 basis-full sm:basis-auto sm:flex-1">
-                    <input data-rfid-scan="client-pack"
+                {/* Primary Input & Actions Row (Uniform h-10 Heights & Proper Alignment) */}
+                <div className="mt-1 flex flex-col md:flex-row items-stretch md:items-center gap-2">
+                  {/* Search / Scan Input with inside icon */}
+                  <div className="relative flex-1">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                      <FiSearch className="h-4 w-4" />
+                    </div>
+                    <input
+                      data-rfid-scan="client-pack"
                       type="text"
                       disabled={!isLogisticsReady}
                       value={scanInput}
@@ -3480,41 +3907,59 @@ function ClientBatteriesPage() {
                           : 'Enter Truck Number & Driver Name above first…'
                       }
                       autoComplete="off"
-                      className={`${formInputClasses} ${
-                        !isLogisticsReady ? 'cursor-not-allowed opacity-60 bg-slate-100 dark:bg-surface-900' : ''
-                      }`}
+                      className="h-10 w-full rounded-xl border border-slate-300 bg-white pl-9.5 pr-3 text-xs sm:text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-60 transition-all dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500"
                     />
+                  </div>
+
+                  {/* Actions: Add + Use Camera + Pick from Sort */}
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={() => handleAddBattery(scanInput)}
+                      disabled={!isLogisticsReady || !scanInput.trim()}
+                      className="inline-flex h-10 flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 sm:px-5 text-xs sm:text-sm font-bold text-white shadow-xs transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                    >
+                      <FiPlus className="h-4 w-4" />
+                      <span>Add</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!isLogisticsReady}
+                      onClick={() => setCameraOpen((prev) => !prev)}
+                      className="inline-flex h-10 flex-1 sm:flex-initial items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 text-xs sm:text-sm font-semibold text-slate-700 shadow-2xs transition-all hover:bg-slate-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer"
+                    >
+                      <FiCamera className="h-4 w-4 text-slate-500 dark:text-neutral-400" />
+                      <span>{cameraOpen ? 'Close Camera' : 'Use Camera'}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      disabled={!isLogisticsReady}
+                      onClick={openPickFromSort}
+                      className="inline-flex h-10 flex-1 sm:flex-initial items-center justify-center gap-1.5 whitespace-nowrap rounded-xl border border-emerald-300 bg-emerald-50/70 px-3.5 text-xs sm:text-sm font-semibold text-emerald-800 shadow-2xs transition-all hover:bg-emerald-100/80 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-900/40 cursor-pointer"
+                      title={
+                        isLogisticsReady
+                          ? 'Import batteries from a pre-built Battery Sorting group'
+                          : 'Enter Truck Number & Driver Name first'
+                      }
+                    >
+                      <FiLayers className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                      <span>Pick from Sort</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Sub-bar: RFID Helper & Quick Tag Scanning (Aligned & Separated) */}
+                <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-white/5">
+                  <div className="flex items-center gap-2">
                     <RfidScanButton target="client-pack" />
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => handleAddBattery(scanInput)}
-                    disabled={!isLogisticsReady || !scanInput.trim()}
-                    className="flex-1 sm:flex-none shrink-0 rounded-md bg-brand-600 px-3.5 py-2.5 text-sm font-medium text-white shadow-xs hover:bg-brand-700 disabled:cursor-not-allowed disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                  >
-                    Add
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isLogisticsReady}
-                    onClick={() => setCameraOpen((prev) => !prev)}
-                    className="flex-1 sm:flex-none shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
-                  >
-                    {cameraOpen ? 'Close Camera' : 'Use Camera'}
-                  </button>
-                  <button
-                    type="button"
-                    disabled={!isLogisticsReady}
-                    onClick={openPickFromSort}
-                    className="flex-1 sm:flex-none shrink-0 whitespace-nowrap rounded-md border border-emerald-300 bg-emerald-50 px-3.5 py-2.5 text-sm font-medium text-emerald-700 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-300 dark:hover:bg-emerald-950/50"
-                    title={
-                      isLogisticsReady
-                        ? 'Import batteries from a pre-built Battery Sorting group'
-                        : 'Enter Truck Number & Driver Name first'
-                    }
-                  >
-                    Pick from Sort
-                  </button>
+                  <span className="hidden sm:inline-flex items-center gap-1 text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+                    <span>Press</span>
+                    <kbd className="rounded bg-slate-100 dark:bg-surface-800 px-1.5 py-0.5 font-mono text-[10px] font-bold text-slate-600 dark:text-neutral-300 border border-slate-200 dark:border-white/10">Enter ↵</kbd>
+                    <span>to quickly add scanned codes</span>
+                  </span>
                 </div>
 
                 {/* ── Inline Suggestions List (Fully visible, never clipped) ── */}
@@ -3656,7 +4101,7 @@ function ClientBatteriesPage() {
             </div>
 
             {/* Sticky Frosted-Glass Bottom Right Actions Bar */}
-            <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-3 border-t border-slate-200/90 bg-white/95 px-4 py-3.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
+            <div className="sticky bottom-0 z-20 -mx-4 -mb-4 sm:-mx-6 sm:-mb-5 mt-auto flex shrink-0 flex-col gap-2.5 border-t border-slate-200/90 bg-white/95 px-3.5 py-2.5 sm:flex-row sm:items-center sm:justify-between sm:px-6 sm:py-3.5 dark:border-white/10 dark:bg-surface-900/95 backdrop-blur-md">
               <div className="flex items-center gap-2">
                 {scannedBatteries.length > 0 ? (
                   <span className="inline-flex items-center gap-1.5 text-xs font-bold text-emerald-700 dark:text-emerald-300">
@@ -3664,24 +4109,24 @@ function ClientBatteriesPage() {
                     <span>{scannedBatteries.length} batteries staged for intake</span>
                   </span>
                 ) : (
-                  <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">
+                  <span className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-neutral-400">
                     Scan or pick batteries on the left to add them
                   </span>
                 )}
               </div>
 
-              <div className="flex items-center justify-end gap-2.5">
+              <div className="flex items-center justify-end gap-2 w-full sm:w-auto">
                 <button
                   type="button"
                   onClick={() => setPackModalOpen(false)}
-                  className="rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer"
+                  className="flex-1 sm:flex-none rounded-lg sm:rounded-xl border border-slate-300 bg-white px-3.5 sm:px-5 py-2 sm:py-2.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 shadow-2xs transition-colors cursor-pointer text-center"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={packing || (scannedBatteries.length === 0 && !scanInput.trim())}
-                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-6 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
+                  className="flex-2 sm:flex-none inline-flex items-center justify-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-emerald-600 px-4 sm:px-6 py-2 sm:py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer"
                 >
                   <span>✓</span>
                   <span>

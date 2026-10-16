@@ -33,6 +33,17 @@ function generateBatchId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
+// "45 min", "2 h 5 min" — how long ago a repair was started
+function sinceText(value) {
+  if (!value) return '';
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+  if (mins < 1) return 'less than a minute';
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h} h ${mins % 60} min`;
+  return `${Math.floor(h / 24)} day${h >= 48 ? 's' : ''} ${h % 24} h`;
+}
+
 const BLOCKED_STATUS_MESSAGES = {
   in_progress: 'This battery is already being worked on by another technician.',
   in_testing: 'This battery is currently in testing.',
@@ -195,14 +206,14 @@ function buildEvents(visits = [], history = [], returns = [], issues = [], servi
       key: `service-${s.id}`,
       type: isPassBack ? 'pass_back' : 'service',
       label: isPassBack
-        ? 'Passed to Technician (Rework Required)'
+        ? 'Passed to Technician (Remove Parts)'
         : isDiagFee
           ? 'Diagnostic Fee'
           : 'QA Testing Sign-off',
       icon: isPassBack ? 'alertTriangle' : 'flask',
       date: s.completed_at,
       primary: isPassBack
-        ? (isClient ? 'Returned for Rework' : `Returned for Rework · by ${s.staff_name || 'Supervisor'}`)
+        ? (isClient ? 'Passed to Technician to Remove Parts' : `Passed to Technician to Remove Parts · by ${s.staff_name || 'Supervisor'}`)
         : (isClient ? s.service_name : `${s.service_name}${s.staff_name ? ` · Verified by ${s.staff_name}` : ''}`),
       serviceName: s.service_name,
       staffName: isClient ? null : s.staff_name,
@@ -350,6 +361,10 @@ export default function BatteryDetailScreen() {
   const [testingElapsedSeconds, setTestingElapsedSeconds] = useState(0);
 
   const [blockedStatus, setBlockedStatus] = useState(null);
+  // the battery behind the "Not Available" popup (who started it, when)
+  const [blockedBattery, setBlockedBattery] = useState(null);
+  // own in-progress battery scanned again: "continue this battery?"
+  const [resumeInfo, setResumeInfo] = useState(null);
   const [showRepairedByModal, setShowRepairedByModal] = useState(false);
   const [repairedByInfo, setRepairedByInfo] = useState(null);
   const [showTestChoiceModal, setShowTestChoiceModal] = useState(false);
@@ -464,6 +479,8 @@ export default function BatteryDetailScreen() {
     fromScan,
     result?.battery?.status,
     result?.battery?.started_by_user_id,
+    result?.battery?.work_started_at,
+    result?.battery?.testing_started_at,
     selectedPartIds.length,
     selectedServiceIds.length,
     notes,
@@ -580,10 +597,10 @@ export default function BatteryDetailScreen() {
           setShowCantServiceAlertModal(true);
         } else if (
           fromScan &&
-          (data.battery?.status === 'unserviceable' || data.battery?.status === 'recycled')
+          ['unserviceable', 'tested_parts_removed', 'recycled'].includes(data.battery?.status)
         ) {
-          // tested_parts_removed is NOT here: rework is never allowed once the
-          // parts were reclaimed, so (as on the web) it gets "Not Available".
+          // unserviceable — with or without its parts removed — or recycled:
+          // the red "not serviceable" alert with the full history (as on the web)
           const latestIssue = (data.issues || [])[0];
           const latestReturn = (data.returns || [])[0];
           const latestPassBack = (data.services || []).find(
@@ -697,11 +714,17 @@ export default function BatteryDetailScreen() {
           });
           setShowRepairedByModal(true);
           }
+          } else if (isOwnInProgress) {
+            // the technician left this repair running and scanned it again
+            setResumeInfo({
+              batteryCode: data.battery.battery_code,
+              startedAt: data.battery.work_started_at || null,
+            });
           } else if (
             data.battery?.status !== 'in_repair' &&
-            !isOwnInProgress &&
             !hasPendingPartsRemoval
           ) {
+            setBlockedBattery(data.battery);
             setBlockedStatus(data.battery.status);
             return;
           }
@@ -821,7 +844,6 @@ export default function BatteryDetailScreen() {
     try {
       await apiClient.patch(`/batteries/${result.battery.id}/start-work`);
       await load();
-      setSuccessPopup({ title: 'Work Started', message: `You are now working on ${result.battery.battery_code}. The repair timer is running.`, autoCloseMs: 1600 });
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
     } finally {
@@ -841,7 +863,6 @@ export default function BatteryDetailScreen() {
     try {
       const { data: updatedBattery } = await apiClient.patch(`/batteries/${result.battery.id}/start-testing`);
       setResult((prev) => (prev ? { ...prev, battery: updatedBattery } : prev));
-      setSuccessPopup({ title: 'Testing Started', message: `The testing timer for ${result.battery.battery_code} is running.`, autoCloseMs: 1600 });
     } catch (err) {
       setActionError(err.response?.data?.message || err.message);
     } finally {
@@ -1514,10 +1535,35 @@ export default function BatteryDetailScreen() {
             <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-red-50 border border-red-200">
               <Text className="text-2xl">⏳</Text>
             </View>
-            <Text className="mb-1.5 text-lg font-bold text-slate-900">Not Available</Text>
-            <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
-              {BLOCKED_STATUS_MESSAGES[blockedStatus] || 'This battery is not available to start work on.'}
-            </Text>
+            {blockedStatus === 'in_progress' ? (
+              <>
+                <Text className="mb-1.5 text-lg font-bold text-slate-900">Work Already Started</Text>
+                <Text className="mb-3 text-xs text-slate-500 leading-relaxed">
+                  <Text className="font-bold text-slate-800">{blockedBattery?.battery_code || code}</Text> is being
+                  repaired by <Text className="font-bold text-slate-800">{blockedBattery?.started_by_name || 'another technician'}</Text>.
+                  The repair is paused / not finished yet, so you can't start work on it.
+                </Text>
+                <View className="mb-5 gap-1.5 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                  <Text className="text-[11px] text-amber-800">
+                    Technician: <Text className="font-bold">{blockedBattery?.started_by_name || '—'}</Text>
+                  </Text>
+                  {blockedBattery?.work_started_at ? (
+                    <Text className="text-[11px] text-amber-800">
+                      Started: <Text className="font-bold">{new Date(blockedBattery.work_started_at).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</Text>
+                      {' '}({sinceText(blockedBattery.work_started_at)} ago)
+                    </Text>
+                  ) : null}
+                  <Text className="text-[11px] text-amber-800">Ask them to finish it, or scan another battery.</Text>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text className="mb-1.5 text-lg font-bold text-slate-900">Not Available</Text>
+                <Text className="mb-5 text-xs text-slate-500 leading-relaxed">
+                  {BLOCKED_STATUS_MESSAGES[blockedStatus] || 'This battery is not available to start work on.'}
+                </Text>
+              </>
+            )}
             <View className="flex-row gap-2">
               <TouchableOpacity
                 onPress={() => {
@@ -1771,7 +1817,7 @@ export default function BatteryDetailScreen() {
               </Text>
             </View>
             <Text className="text-xs text-slate-500 dark:text-slate-400 text-center leading-relaxed mb-6">
-              Testing has stopped and this unit has been moved back to the repair queue for technician rework.
+              This battery is marked unserviceable and passed to a technician to remove its fitted parts.
             </Text>
             <View className="w-full gap-3">
               <TouchableOpacity
@@ -1932,7 +1978,7 @@ export default function BatteryDetailScreen() {
       .map((h) => h.batch_id)
   ).size;
   return (
-    <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-5 pb-16" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
+    <ScrollView className="flex-1 bg-slate-50" contentContainerClassName="p-3.5 pb-16" automaticallyAdjustKeyboardInsets keyboardShouldPersistTaps="handled">
       <SuccessPopup
         open={Boolean(successPopup)}
         title={successPopup?.title}
@@ -1940,10 +1986,31 @@ export default function BatteryDetailScreen() {
         autoCloseMs={successPopup?.autoCloseMs}
         onClose={() => setSuccessPopup(null)}
       />
+      {/* ── Top Navigation Bar ── */}
+      <View className="mb-3 flex-row items-center justify-between">
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          className="flex-row items-center gap-1.5 rounded-xl border border-slate-200/90 bg-white px-3 py-1.5 shadow-2xs active:bg-slate-50"
+          hitSlop={8}
+        >
+          <Icon name="arrowLeft" color="#334155" size={13} />
+          <Text className="text-xs font-bold text-slate-700">
+            {fromHistory ? 'Back to History' : 'Back'}
+          </Text>
+        </TouchableOpacity>
+        {isWorkshopRole && (
+          <View className="rounded-full bg-slate-100 px-2.5 py-0.5 border border-slate-200/60">
+            <Text className="text-[10px] font-semibold text-slate-600">
+              Workshop Service Detail
+            </Text>
+          </View>
+        )}
+      </View>
+
       {/* ── Executive Header ─────────────────────────────────────────────── */}
-      <View className="mb-5 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <View className="mb-3.5 rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
         <View className="flex-row items-center justify-between">
-          <Text className="text-2xl font-black text-slate-900">{battery.battery_code}</Text>
+          <Text className="text-xl font-black text-slate-900 font-mono">{battery.battery_code}</Text>
           {isAdminRole ? (
             <FleetStatusBadge status={battery.status} isPassedBack={battery.is_passed_back} hasPendingParts={pendingPartsRemoval.length > 0} />
           ) : isWorkshopRole ? (
@@ -2001,7 +2068,7 @@ export default function BatteryDetailScreen() {
 
       {/* ── Unserviceable Banner (if unserviceable, tested_parts_removed, or recycled) ─── */}
       {!isWorkshopRole && !(fromScan && isStaff) && (battery.status === 'unserviceable' || battery.status === 'tested_parts_removed' || battery.status === 'recycled') && issues?.[0] && (
-        <View className="mb-5 rounded-2xl border border-red-200 bg-red-50/80 p-4 shadow-sm">
+        <View className="mb-3.5 rounded-2xl border border-red-200 bg-red-50/80 p-3.5 shadow-2xs">
           <View className="flex-row items-center gap-2 mb-1">
             <Icon name="alertTriangle" color="#991b1b" size={16} />
             <Text className="text-sm font-bold text-red-800">
@@ -2061,7 +2128,7 @@ export default function BatteryDetailScreen() {
           const passBack = services.find((s) => s.service_name === 'Passed back to Technician');
           if (!passBack) return null;
           return (
-            <View className="mb-5 rounded-2xl border border-amber-300 bg-amber-50 p-4 shadow-sm">
+            <View className="mb-3.5 rounded-2xl border border-amber-300 bg-amber-50 p-3.5 shadow-2xs">
               <View className="flex-row items-center gap-2 mb-1">
                 <Icon name="alertTriangle" color="#b45309" size={18} />
                 <Text className="text-sm font-bold text-amber-900">
@@ -2085,7 +2152,7 @@ export default function BatteryDetailScreen() {
               <View className="flex-row items-center gap-1.5 pt-1 border-t border-amber-200/60">
                 <Icon name="wrench" color="#b45309" size={13} />
                 <Text className="text-[11px] font-bold text-amber-900">
-                  Action: Please remove any fitted parts below before restarting rework.
+                  Action: This battery is unserviceable — remove and restock every fitted part below.
                 </Text>
               </View>
             </View>
@@ -2097,7 +2164,7 @@ export default function BatteryDetailScreen() {
         fromScan &&
         (battery.status === 'unserviceable' || battery.status === 'in_repair') &&
         pendingPartsRemoval.length > 0 && (
-          <View className="mb-5 rounded-2xl border border-amber-200 bg-amber-50/70 p-4">
+          <View className="mb-3.5 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-2xs">
             <View className="mb-1 flex-row items-center gap-2">
               <Icon name="wrench" color="#b45309" size={16} />
               <Text className="text-sm font-bold text-amber-900">Mandatory: Remove All Fitted Parts</Text>
@@ -2697,34 +2764,34 @@ export default function BatteryDetailScreen() {
           )}
 
           {/* ── Summary Stats ────────────────────────────────────────────────── */}
-          <View className="mb-5 flex-row flex-wrap gap-3">
-        <View className="min-w-[40%] flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Repairs Logged' : 'Repairs'}</Text>
-          <Text className="mt-0.5 text-lg font-black text-slate-900">{isAdminRole || isWorkshopRole ? repairVisits : history.length}</Text>
-        </View>
-        <View className="min-w-[40%] flex-1 rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm">
-          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Return Shipments' : 'Returns'}</Text>
-          <Text className="mt-0.5 text-lg font-black text-slate-900">{returns.length}</Text>
-        </View>
-        {isSuperAdmin && (
-          <View className="min-w-[40%] flex-1 rounded-2xl border border-violet-200 bg-violet-50/70 p-3.5 shadow-sm">
-            <Text className="text-[10px] font-bold uppercase tracking-wider text-violet-700">Total Repair Time</Text>
-            <Text className="mt-0.5 text-sm font-black text-violet-900">{totalRepairDurationSeconds > 0 ? formatDuration(totalRepairDurationSeconds) : '—'}</Text>
+          <View className="mb-3.5 flex-row flex-wrap gap-2.5">
+            <View className="w-[48%] rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs">
+              <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Repairs Logged' : 'Repairs'}</Text>
+              <Text className="mt-0.5 text-base font-black text-slate-900">{isAdminRole || isWorkshopRole ? repairVisits : history.length}</Text>
+            </View>
+            <View className="w-[48%] rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs">
+              <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{isAdminRole || isWorkshopRole ? 'Return Shipments' : 'Returns'}</Text>
+              <Text className="mt-0.5 text-base font-black text-slate-900">{returns.length}</Text>
+            </View>
+            {isSuperAdmin && (
+              <View className="w-[48%] rounded-xl border border-violet-200/90 bg-violet-50/70 p-3 shadow-2xs">
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-violet-700">Total Repair Time</Text>
+                <Text className="mt-0.5 text-sm font-black text-violet-900">{totalRepairDurationSeconds > 0 ? formatDuration(totalRepairDurationSeconds) : '—'}</Text>
+              </View>
+            )}
+            {isSuperAdmin && !isWorkshopRole && (
+              <View className="w-[48%] rounded-xl border border-amber-200/90 bg-amber-50/70 p-3 shadow-2xs">
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Price</Text>
+                <Text className="mt-0.5 text-sm font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
+              </View>
+            )}
+            {isClient && (
+              <View className="w-[48%] rounded-xl border border-amber-200/90 bg-amber-50/70 p-3 shadow-2xs">
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Spent</Text>
+                <Text className="mt-0.5 text-base font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
+              </View>
+            )}
           </View>
-        )}
-        {isSuperAdmin && !isWorkshopRole && (
-          <View className="min-w-[40%] flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
-            <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Price</Text>
-            <Text className="mt-0.5 text-sm font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
-          </View>
-        )}
-        {isClient && (
-          <View className="min-w-[40%] flex-1 rounded-2xl border border-amber-200 bg-amber-50/70 p-3.5 shadow-sm">
-            <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-700">Total Spent</Text>
-            <Text className="mt-0.5 text-lg font-black text-amber-900">£{totalSpent.toFixed(2)}</Text>
-          </View>
-        )}
-      </View>
 
       {/* ── Complete Lifecycle & Repair Timeline (Cycle-Wise, Latest First) ──────── */}
       <View className="mb-3 flex-row items-center justify-between">
@@ -2765,10 +2832,10 @@ export default function BatteryDetailScreen() {
             return (
               <View
                 key={`cycle-${cycle.cycleNumber}`}
-                className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm"
+                className="overflow-hidden rounded-2xl border border-slate-200/90 bg-white shadow-2xs mb-3.5"
               >
                 {/* Cycle Header */}
-                <View className="flex-row items-center justify-between border-b border-slate-100 bg-slate-50 px-4 py-3">
+                <View className="flex-row items-center justify-between border-b border-slate-100 bg-slate-50/80 px-3.5 py-2.5">
                   <View className="flex-row items-center gap-2">
                     <Text className="text-xs font-black tracking-widest text-slate-800">
                       CYCLE {cycle.cycleNumber}
@@ -2828,7 +2895,7 @@ export default function BatteryDetailScreen() {
                 </View>
 
                 {/* Events List (Latest First) */}
-                <View className="p-4 gap-4">
+                <View className="p-3.5 gap-3">
                   {cycleEvents.map((event) => {
                     const isPassBack = event.type === 'pass_back';
                     const isRepair = event.type === 'repair';
@@ -2838,7 +2905,7 @@ export default function BatteryDetailScreen() {
                     return (
                       <View key={event.key} className="flex-row gap-3">
                         <View
-                          className={`h-9 w-9 items-center justify-center rounded-2xl border ${
+                          className={`h-8 w-8 items-center justify-center rounded-xl border ${
                             isPassBack
                               ? 'bg-amber-100 border-amber-200'
                               : isIssue
@@ -3938,10 +4005,10 @@ export default function BatteryDetailScreen() {
               </View>
 
               <Text className="text-lg font-black text-white tracking-tight">
-                Passed Back for Rework
+                Passed to You — Remove Parts
               </Text>
               <Text className="mt-0.5 text-xs text-amber-100 font-medium leading-relaxed">
-                This battery failed testing and was passed back for rework. Please remove any fitted parts before restarting repair work.
+                The supervisor marked this battery unserviceable and passed it to you to remove its fitted parts. Remove and restock every fitted part below.
               </Text>
             </View>
 
@@ -4122,7 +4189,7 @@ export default function BatteryDetailScreen() {
                     </View>
                   </View>
                   <Text className="text-[11px] text-amber-800 dark:text-amber-300 leading-snug mb-2">
-                    All fitted parts must be removed and restocked into inventory before closing rework.
+                    All fitted parts must be removed and restocked into inventory — the battery then stays unserviceable.
                   </Text>
                   <View className="space-y-1.5">
                     {cantServiceAlertData.parts.map((p, pIdx) => (
@@ -4165,7 +4232,7 @@ export default function BatteryDetailScreen() {
                   className="flex-row items-center justify-center gap-2 rounded-2xl bg-amber-600 py-3.5 shadow-md active:bg-amber-700"
                 >
                   <Icon name="play" color="#ffffff" size={16} />
-                  <Text className="text-sm font-bold text-white">Continue to Battery Rework</Text>
+                  <Text className="text-sm font-bold text-white">Continue to Remove Parts</Text>
                 </TouchableOpacity>
               )}
 
@@ -4330,6 +4397,56 @@ export default function BatteryDetailScreen() {
                   </Text>
                 </TouchableOpacity>
               </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* ── Resume Confirmation (own running repair scanned again) ────────────────── */}
+      <Modal
+        visible={!!resumeInfo}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setResumeInfo(null)}
+      >
+        <View className="flex-1 items-center justify-center bg-black/60 px-6">
+          <View className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl">
+            <View className="mb-4 h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 border border-blue-200">
+              <Icon name="clock" color="#2563eb" size={22} />
+            </View>
+            <Text className="mb-1.5 text-lg font-bold text-slate-900">Continue This Battery?</Text>
+            <Text className="mb-3 text-xs text-slate-500 leading-relaxed">
+              You already started work on <Text className="font-bold text-slate-800">{resumeInfo?.batteryCode}</Text> and
+              left it unfinished. Do you want to continue the repair?
+            </Text>
+            {resumeInfo?.startedAt ? (
+              <View className="mb-5 rounded-xl bg-blue-50/80 p-3 border border-blue-200/80">
+                <Text className="text-[11px] font-semibold text-blue-800">
+                  Started {new Date(resumeInfo.startedAt).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                  {' '}· running {sinceText(resumeInfo.startedAt)}
+                </Text>
+              </View>
+            ) : null}
+            <View className="gap-2.5">
+              <TouchableOpacity
+                onPress={() => setResumeInfo(null)}
+                className="items-center rounded-xl bg-blue-600 py-3.5 shadow-md shadow-blue-600/30"
+              >
+                <Text className="text-sm font-bold text-white">Yes, Continue Repair</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  setResumeInfo(null);
+                  allowExitRef.current = true;
+                  navigation.navigate('Main', {
+                    screen: scanScreen,
+                    params: { autoScan: Date.now() },
+                  });
+                }}
+                className="items-center rounded-xl bg-slate-100 py-3 border border-slate-200 shadow-none"
+              >
+                <Text className="text-xs font-semibold text-slate-700">No, Scan Another Battery</Text>
+              </TouchableOpacity>
             </View>
           </View>
         </View>

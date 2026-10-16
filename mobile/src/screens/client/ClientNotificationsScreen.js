@@ -1,32 +1,64 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  ActivityIndicator,
+  FlatList,
+  RefreshControl,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import Icon from '../../components/ui/Icon';
 
-// Battery Activity & Notifications — mobile version of the web
-// ClientNotificationsPage (GET /clients/me/notifications?limit=100): filter
-// tabs with counts, keyword search, the Truck / Driver / Packed / Received
-// grid on every card, and a batch view listing each battery of a multi-battery
-// notification.
-
 const TABS = [
-  { id: 'all', label: 'All Alerts' },
-  { id: 'intake', label: 'Verified Intakes' },
-  { id: 'return', label: 'Packed for Return' },
-  { id: 'invoice', label: 'Invoices & Bills' },
+  { id: 'all', short: 'All', countKey: 'all' },
+  { id: 'intake', short: 'Intake', countKey: 'intake' },
+  { id: 'return', short: 'Return', countKey: 'return' },
+  { id: 'invoice', short: 'Bills', countKey: 'invoice' },
 ];
 
-const TYPE_STYLE = {
-  intake: { icon: 'package', color: '#059669', bg: 'bg-emerald-50 dark:bg-emerald-950/40' },
-  repair: { icon: 'wrench', color: '#4f46e5', bg: 'bg-indigo-50 dark:bg-indigo-950/40' },
-  return: { icon: 'truck', color: '#0d9488', bg: 'bg-teal-50 dark:bg-teal-950/40' },
-  invoice: { icon: 'card', color: '#dc2626', bg: 'bg-red-50 dark:bg-red-950/40' },
+const TYPE_CONFIG = {
+  intake: {
+    icon: 'package',
+    color: '#059669',
+    bg: 'bg-emerald-50 dark:bg-emerald-950/60 border-emerald-100 dark:border-emerald-900/40',
+    tag: 'Intake',
+    textColor: 'text-emerald-700 dark:text-emerald-300',
+  },
+  repair: {
+    icon: 'wrench',
+    color: '#4f46e5',
+    bg: 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-100 dark:border-indigo-900/40',
+    tag: 'Service',
+    textColor: 'text-indigo-700 dark:text-indigo-300',
+  },
+  return: {
+    icon: 'truck',
+    color: '#0d9488',
+    bg: 'bg-teal-50 dark:bg-teal-950/60 border-teal-100 dark:border-teal-900/40',
+    tag: 'Return',
+    textColor: 'text-teal-700 dark:text-teal-300',
+  },
+  invoice: {
+    icon: 'fileText',
+    color: '#7c3aed',
+    bg: 'bg-purple-50 dark:bg-purple-950/60 border-purple-100 dark:border-purple-900/40',
+    tag: 'Bill',
+    textColor: 'text-purple-700 dark:text-purple-300',
+  },
 };
 
 function formatTimestamp(ts) {
-  if (!ts) return '';
-  return new Date(ts).toLocaleString('en-GB', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  if (!ts) return '—';
+  return new Date(ts).toLocaleString('en-GB', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
 }
 
 function timeAgo(ts) {
@@ -39,38 +71,6 @@ function timeAgo(ts) {
   if (hours < 24) return `${hours}h ago`;
   const days = Math.floor(hours / 24);
   return `${days}d ago`;
-}
-
-function SearchBox({ value, onChange, placeholder }) {
-  return (
-    <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 dark:border-slate-800 dark:bg-slate-900">
-      <Icon name="search" color="#94a3b8" size={16} />
-      <TextInput
-        value={value}
-        onChangeText={onChange}
-        placeholder={placeholder}
-        placeholderTextColor="#94a3b8"
-        autoCapitalize="none"
-        className="min-w-0 flex-1 py-2.5 text-sm text-slate-900 dark:text-white"
-      />
-      {value ? (
-        <TouchableOpacity onPress={() => onChange('')} hitSlop={8}>
-          <Icon name="x" color="#94a3b8" size={14} />
-        </TouchableOpacity>
-      ) : null}
-    </View>
-  );
-}
-
-function Meta({ label, children }) {
-  return (
-    <View className="w-1/2 py-1.5 pr-2">
-      <Text className="text-[9px] font-bold uppercase tracking-wider text-slate-400">{label}</Text>
-      {typeof children === 'string' ? (
-        <Text className="mt-0.5 text-xs font-semibold text-slate-800 dark:text-slate-200" numberOfLines={1}>{children}</Text>
-      ) : children}
-    </View>
-  );
 }
 
 export default function ClientNotificationsScreen() {
@@ -87,7 +87,9 @@ export default function ClientNotificationsScreen() {
   const fetchNotifications = useCallback(async () => {
     setError(null);
     try {
-      const { data } = await apiClient.get('/clients/me/notifications?limit=100');
+      const { data } = await apiClient.get(
+        '/clients/me/notifications?limit=100'
+      );
       setItems(data?.data || []);
     } catch (err) {
       setError(err.response?.data?.message || err.message);
@@ -106,123 +108,297 @@ export default function ClientNotificationsScreen() {
     fetchNotifications();
   }
 
-  const counts = useMemo(() => ({
-    all: items.length,
-    intake: items.filter((n) => n.type === 'intake').length,
-    return: items.filter((n) => n.type === 'return').length,
-    invoice: items.filter((n) => n.type === 'invoice').length,
-  }), [items]);
+  const counts = useMemo(
+    () => ({
+      all: items.length,
+      intake: items.filter((n) => n.type === 'intake').length,
+      return: items.filter((n) => n.type === 'return').length,
+      invoice: items.filter((n) => n.type === 'invoice').length,
+    }),
+    [items]
+  );
 
-  const filtered = useMemo(() => items.filter((item) => {
-    if (filterType !== 'all' && item.type !== filterType) return false;
-    const q = search.trim().toLowerCase();
-    if (!q) return true;
-    const codes = Array.isArray(item.battery_codes) ? item.battery_codes.join(' ').toLowerCase() : '';
-    return codes.includes(q)
-      || (item.message || '').toLowerCase().includes(q)
-      || (item.title || '').toLowerCase().includes(q)
-      || (item.truck_number || '').toLowerCase().includes(q);
-  }), [items, filterType, search]);
+  const filtered = useMemo(
+    () =>
+      items.filter((item) => {
+        if (filterType !== 'all' && item.type !== filterType) return false;
+        const q = search.trim().toLowerCase();
+        if (!q) return true;
+        const codes = Array.isArray(item.battery_codes)
+          ? item.battery_codes.join(' ').toLowerCase()
+          : '';
+        return (
+          codes.includes(q) ||
+          (item.message || '').toLowerCase().includes(q) ||
+          (item.title || '').toLowerCase().includes(q) ||
+          (item.truck_number || '').toLowerCase().includes(q) ||
+          (item.driver_name || '').toLowerCase().includes(q)
+        );
+      }),
+    [items, filterType, search]
+  );
 
-  const openBattery = (code) => navigation.navigate('BatteryDetail', { code, fromScan: false });
+  const openBattery = (code) =>
+    navigation.navigate('BatteryDetail', { code, fromScan: false });
 
-  // ── Batch view: every battery of one notification ────────────────────
+  // ── Batch Subview ──────────────────────────────────────────────────────────
   if (selectedBatch) {
     const codes = selectedBatch.battery_codes || [];
     const q = batchSearch.trim().toLowerCase();
-    const shown = codes.filter((c) => !q || String(c).toLowerCase().includes(q));
-    const action = selectedBatch.type === 'intake' ? 'Verified Workshop Intake' : selectedBatch.type === 'return' ? 'Packed for Return' : 'Invoice Document';
+    const shown = codes.filter(
+      (c) => !q || String(c).toLowerCase().includes(q)
+    );
+    const action =
+      selectedBatch.type === 'intake'
+        ? 'Verified Intake'
+        : selectedBatch.type === 'return'
+          ? 'Packed Return'
+          : 'Bill';
+
     return (
       <FlatList
         className="flex-1 bg-slate-50 dark:bg-slate-950"
         data={shown}
         keyExtractor={(c, i) => `${c}-${i}`}
-        contentContainerClassName="p-4 gap-2 pb-16"
+        contentContainerClassName="p-3 gap-2 pb-20"
         ListHeaderComponent={
-          <View className="mb-2 gap-3">
-            <TouchableOpacity onPress={() => { setSelectedBatch(null); setBatchSearch(''); }} className="flex-row items-center gap-1.5 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-              <Icon name="arrowLeft" color="#475569" size={14} />
-              <Text className="text-xs font-bold text-slate-700 dark:text-slate-200">Back to Notifications Feed</Text>
+          <View className="mb-2 gap-2">
+            <TouchableOpacity
+              onPress={() => {
+                setSelectedBatch(null);
+                setBatchSearch('');
+              }}
+              activeOpacity={0.7}
+              className="flex-row items-center gap-1 self-start rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 py-1 shadow-2xs"
+            >
+              <Icon name="arrowLeft" color="#475569" size={12} />
+              <Text className="text-[11px] font-bold text-slate-700 dark:text-slate-200">
+                Back
+              </Text>
             </TouchableOpacity>
-            <View>
-              <Text className="text-lg font-black text-slate-900 dark:text-white">{selectedBatch.title}</Text>
-              <Text className="mt-0.5 text-[11px] text-slate-500">
-                {selectedBatch.truck_number ? `Truck: ${selectedBatch.truck_number}` : ''}
-                {selectedBatch.driver_name ? ` • Driver: ${selectedBatch.driver_name}` : ''}
-                {` • Logged on ${formatTimestamp(selectedBatch.timestamp)}`}
-              </Text>
-              <Text className="mt-2 self-start rounded-full bg-blue-100 px-2.5 py-0.5 text-[11px] font-bold text-blue-800">
-                {codes.length} Batteries in this Batch
-              </Text>
-            </View>
-            {selectedBatch.message ? (
-              <View className="rounded-xl border border-blue-200 bg-blue-50 p-3 dark:border-blue-900/40 dark:bg-blue-950/30">
-                <Text className="text-xs text-blue-900 dark:text-blue-200">{selectedBatch.message}</Text>
+
+            <View className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 shadow-2xs">
+              <View className="flex-row items-center justify-between">
+                <Text
+                  className="text-xs font-bold text-slate-900 dark:text-white flex-1 mr-2"
+                  numberOfLines={1}
+                >
+                  {selectedBatch.title}
+                </Text>
+                <View className="rounded-full bg-blue-50 dark:bg-blue-950/60 px-2 py-0.2 border border-blue-200/60 dark:border-blue-900/40">
+                  <Text className="text-[9.5px] font-bold text-blue-700 dark:text-blue-300">
+                    {codes.length} Batteries
+                  </Text>
+                </View>
               </View>
-            ) : null}
-            <SearchBox value={batchSearch} onChange={setBatchSearch} placeholder="Search Battery Code in this batch…" />
+
+              {selectedBatch.message ? (
+                <Text className="mt-1 text-[11px] text-slate-600 dark:text-slate-400 leading-normal">
+                  {selectedBatch.message}
+                </Text>
+              ) : null}
+
+              <View className="mt-2 flex-row flex-wrap gap-1.5 pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+                {selectedBatch.truck_number && (
+                  <View className="rounded-md bg-slate-50 dark:bg-slate-950 px-1.5 py-0.5 border border-slate-100 dark:border-slate-800">
+                    <Text className="text-[8.5px] font-bold text-slate-400 uppercase">
+                      Truck: {selectedBatch.truck_number}
+                    </Text>
+                  </View>
+                )}
+                {selectedBatch.driver_name && (
+                  <View className="rounded-md bg-slate-50 dark:bg-slate-950 px-1.5 py-0.5 border border-slate-100 dark:border-slate-800">
+                    <Text className="text-[8.5px] font-bold text-slate-400 uppercase">
+                      Driver: {selectedBatch.driver_name}
+                    </Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            <View className="flex-row items-center gap-1.5 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 h-8.5 shadow-2xs">
+              <Icon name="search" color="#94a3b8" size={13} />
+              <TextInput
+                value={batchSearch}
+                onChangeText={setBatchSearch}
+                placeholder="Filter code in batch…"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="none"
+                className="flex-1 text-[11px] font-medium text-slate-900 dark:text-white"
+              />
+              {batchSearch ? (
+                <TouchableOpacity onPress={() => setBatchSearch('')} hitSlop={8}>
+                  <Icon name="x" color="#94a3b8" size={12} />
+                </TouchableOpacity>
+              ) : null}
+            </View>
           </View>
         }
-        ListEmptyComponent={<Text className="py-10 text-center text-xs text-slate-400">No batteries found in this batch.</Text>}
+        ListEmptyComponent={
+          <View className="items-center justify-center py-6">
+            <Text className="text-[11px] text-slate-400">
+              No batteries match in this batch.
+            </Text>
+          </View>
+        }
         renderItem={({ item: code, index }) => (
-          <TouchableOpacity onPress={() => openBattery(code)} className="flex-row items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
-            <Text className="w-6 text-[11px] font-bold text-slate-400">{index + 1}</Text>
-            <View className="flex-1">
-              <Text className="text-sm font-bold text-blue-700 dark:text-blue-400">{code}</Text>
-              <Text className="text-[11px] text-slate-500">{action}</Text>
+          <TouchableOpacity
+            onPress={() => openBattery(code)}
+            activeOpacity={0.7}
+            className="flex-row items-center justify-between rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-2xs"
+          >
+            <View className="flex-row items-center gap-2 flex-1 mr-2">
+              <View className="h-5 w-5 items-center justify-center rounded bg-slate-100 dark:bg-slate-800">
+                <Text className="text-[9.5px] font-bold text-slate-500">
+                  {index + 1}
+                </Text>
+              </View>
+              <View className="flex-1">
+                <Text className="font-mono text-xs font-bold text-blue-700 dark:text-blue-400">
+                  {code}
+                </Text>
+                <Text className="text-[9.5px] text-slate-400">{action}</Text>
+              </View>
             </View>
-            <Text className="text-[11px] font-bold text-blue-600">Track Battery Details →</Text>
+            <Icon name="chevronRight" size={11} color="#94a3b8" />
           </TouchableOpacity>
         )}
       />
     );
   }
 
+  // ── Main Compact Mobile Feed View (100% Fits Screen, No Horizontal Scroll) ─
   return (
     <FlatList
       className="flex-1 bg-slate-50 dark:bg-slate-950"
       data={loading || error ? [] : filtered}
       keyExtractor={(item) => String(item.id)}
-      contentContainerClassName="p-4 gap-3 pb-16"
-      refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor="#38bdf8" colors={['#38bdf8']} />}
+      contentContainerClassName="p-3 gap-2 pb-20"
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={refresh}
+          tintColor="#0f172a"
+          colors={['#0f172a']}
+        />
+      }
       ListHeaderComponent={
-        <View className="gap-3">
-          <View>
-            <Text className="text-xl font-black text-slate-900 dark:text-white">Battery Activity & Notifications</Text>
-            <Text className="mt-0.5 text-xs text-slate-500 dark:text-slate-400">
-              Verified workshop intakes, packed return dispatches, and invoice documents for your fleet.
-            </Text>
+        <View className="gap-2">
+          {/* Header */}
+          <View className="flex-row items-center justify-between pt-0.5">
+            <View>
+              <View className="flex-row items-center gap-1.5">
+                <Text className="text-sm font-black text-slate-900 dark:text-white">
+                  Notifications
+                </Text>
+                {counts.all > 0 && (
+                  <View className="rounded-full bg-slate-200 dark:bg-slate-800 px-1.5 py-0.2">
+                    <Text className="text-[9.5px] font-bold text-slate-700 dark:text-slate-300">
+                      {counts.all}
+                    </Text>
+                  </View>
+                )}
+              </View>
+              <Text className="text-[10px] text-slate-500 dark:text-slate-400">
+                Intakes, returns, and statements
+              </Text>
+            </View>
+
+            <TouchableOpacity
+              disabled={refreshing}
+              onPress={refresh}
+              activeOpacity={0.7}
+              className="flex-row items-center gap-1 rounded-lg border border-slate-200/90 dark:border-slate-800 bg-white dark:bg-slate-900 px-2 py-1 shadow-2xs"
+            >
+              <Icon name="rotateCcw" color="#475569" size={11} />
+              <Text className="text-[10.5px] font-bold text-slate-700 dark:text-slate-200">
+                {refreshing ? 'Updating…' : 'Refresh'}
+              </Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity disabled={refreshing} onPress={refresh} className="flex-row items-center justify-center gap-1.5 self-start rounded-xl border border-slate-200 bg-white px-3 py-2 dark:border-slate-800 dark:bg-slate-900">
-            <Icon name="rotateCcw" color="#475569" size={14} />
-            <Text className="text-xs font-bold text-slate-700 dark:text-slate-200">{refreshing ? 'Refreshing…' : 'Refresh Feed'}</Text>
-          </TouchableOpacity>
-          <View className="flex-row flex-wrap gap-2">
+
+          {/* ── 4-Segment Grid Bar (ZERO Horizontal Scroll) ── */}
+          <View className="flex-row gap-1 w-full">
             {TABS.map((tab) => {
               const active = filterType === tab.id;
               return (
                 <TouchableOpacity
                   key={tab.id}
                   onPress={() => setFilterType(tab.id)}
-                  className={`flex-row items-center gap-1.5 rounded-xl px-3 py-1.5 ${active ? 'bg-emerald-600' : 'border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'}`}
+                  activeOpacity={0.7}
+                  className={`flex-1 flex-row items-center justify-center gap-1 py-1 rounded-lg ${
+                    active
+                      ? 'bg-slate-900 dark:bg-white shadow-2xs'
+                      : 'border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900'
+                  }`}
                 >
-                  <Text className={`text-xs font-semibold ${active ? 'text-white' : 'text-slate-600 dark:text-slate-300'}`}>{tab.label}</Text>
-                  <Text className={`rounded-full px-1.5 text-[10px] font-bold ${active ? 'bg-white/25 text-white' : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'}`}>{counts[tab.id]}</Text>
+                  <Text
+                    className={`text-[10px] font-bold ${
+                      active
+                        ? 'text-white dark:text-slate-900'
+                        : 'text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {tab.short}
+                  </Text>
+                  <View
+                    className={`rounded-full px-1 ${
+                      active
+                        ? 'bg-white/20 dark:bg-slate-900/20'
+                        : 'bg-slate-100 dark:bg-slate-800'
+                    }`}
+                  >
+                    <Text
+                      className={`text-[9px] font-bold ${
+                        active
+                          ? 'text-white dark:text-slate-900'
+                          : 'text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      {counts[tab.countKey]}
+                    </Text>
+                  </View>
                 </TouchableOpacity>
               );
             })}
           </View>
-          <SearchBox value={search} onChange={setSearch} placeholder="Search by battery ID, truck or keyword…" />
+
+          {/* Compact Search Bar */}
+          <View className="flex-row items-center gap-2 rounded-lg border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 px-2.5 h-8.5 shadow-2xs">
+            <Icon name="search" color="#94a3b8" size={13} />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search serial, truck, driver…"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              className="flex-1 text-[11px] font-medium text-slate-900 dark:text-white"
+            />
+            {search ? (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                <Icon name="x" color="#94a3b8" size={12} />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
           {loading ? (
-            <View className="items-center py-16">
-              <ActivityIndicator color="#38bdf8" />
-              <Text className="mt-2 text-xs font-medium text-slate-500">Loading battery notifications…</Text>
+            <View className="items-center py-8">
+              <ActivityIndicator color="#0f172a" size="small" />
+              <Text className="mt-1.5 text-[10.5px] text-slate-500">
+                Checking for activity…
+              </Text>
             </View>
           ) : error ? (
-            <View className="items-center rounded-2xl border border-red-200 bg-red-50 p-6">
-              <Text className="text-center text-sm font-medium text-red-600">{error}</Text>
-              <TouchableOpacity onPress={fetchNotifications} className="mt-3 rounded-xl bg-red-600 px-5 py-2.5">
-                <Text className="text-xs font-bold text-white">Retry</Text>
+            <View className="items-center rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/30 p-3">
+              <Text className="text-center text-[11px] font-medium text-red-600 dark:text-red-400">
+                {error}
+              </Text>
+              <TouchableOpacity
+                onPress={fetchNotifications}
+                activeOpacity={0.8}
+                className="mt-2 rounded-lg bg-red-600 px-3 py-1"
+              >
+                <Text className="text-[10.5px] font-bold text-white">Retry</Text>
               </TouchableOpacity>
             </View>
           ) : null}
@@ -230,69 +406,174 @@ export default function ClientNotificationsScreen() {
       }
       ListEmptyComponent={
         loading || error ? null : (
-          <View className="items-center justify-center py-16">
-            <Text className="text-sm font-bold text-slate-900 dark:text-white">No notifications found</Text>
-            <Text className="mt-1 px-6 text-center text-xs text-slate-400">
-              {search ? 'No notifications match your search query.' : 'New batch alerts will appear here as your batteries are delivered, serviced, and returned.'}
+          <View className="items-center justify-center py-8 px-3">
+            <View className="h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 mb-2">
+              <Icon name="bell" size={18} color="#94a3b8" />
+            </View>
+            <Text className="text-xs font-bold text-slate-900 dark:text-white">
+              {search ? 'No matching notifications' : 'All caught up'}
+            </Text>
+            <Text className="mt-0.5 px-3 text-center text-[10.5px] text-slate-500 dark:text-slate-400 leading-normal">
+              {search
+                ? 'Try searching with another keyword.'
+                : 'Alerts appear here as batteries are received, serviced, or invoiced.'}
             </Text>
           </View>
         )
       }
       renderItem={({ item }) => {
-        const style = TYPE_STYLE[item.type] || TYPE_STYLE.intake;
+        const config = TYPE_CONFIG[item.type] || TYPE_CONFIG.intake;
         const isInvoice = item.type === 'invoice';
         const codes = item.battery_codes || [];
         const count = item.battery_count || codes.length || 1;
         const isBatch = count > 1;
+
         return (
-          <TouchableOpacity
-            activeOpacity={isBatch ? 0.7 : 1}
-            onPress={() => isBatch && setSelectedBatch(item)}
-            className="rounded-2xl border border-emerald-200/70 bg-white p-3.5 shadow-sm dark:border-slate-800 dark:bg-slate-900"
-          >
-            <View className="flex-row items-start gap-2.5">
-              <View className={`h-8 w-8 items-center justify-center rounded-lg ${style.bg}`}>
-                <Icon name={style.icon} color={style.color} size={16} />
-              </View>
-              <View className="flex-1">
-                <Text className="text-sm font-bold text-slate-900 dark:text-white">{item.title?.replace(/\s*\(\d+\s*Batteries\)/gi, '')}</Text>
-                <Text className="mt-0.5 text-[11px] leading-relaxed text-slate-500 dark:text-slate-400">{item.message}</Text>
-              </View>
-              {isInvoice ? (
-                <Text className="rounded-full bg-red-50 px-2 py-0.5 text-[9px] font-bold uppercase text-red-700">Official PDF Bill</Text>
-              ) : count > 0 ? (
-                <Text className="rounded-full bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-700">{count} {count === 1 ? 'Battery' : 'Batteries'}</Text>
-              ) : null}
-            </View>
+          <View className="rounded-xl border border-slate-200/80 dark:border-slate-800 bg-white dark:bg-slate-900 p-2.5 shadow-2xs">
+            {/* Tag Badge + Time */}
+            <View className="flex-row items-center justify-between">
+              <View className="flex-row items-center gap-1">
+                <View
+                  className={`flex-row items-center gap-1 rounded-full border px-1.5 py-0.2 ${config.bg}`}
+                >
+                  <Icon name={config.icon} color={config.color} size={10} />
+                  <Text className={`text-[9.5px] font-bold ${config.textColor}`}>
+                    {config.tag}
+                  </Text>
+                </View>
 
-            <View className="mt-2.5 flex-row flex-wrap rounded-xl bg-slate-50 px-3 py-1.5 dark:bg-slate-950">
-              <Meta label="Truck">{item.truck_number || '—'}</Meta>
-              <Meta label="Driver">{item.driver_name || '—'}</Meta>
-              <Meta label="Packed Time">{item.packed_at ? formatTimestamp(item.packed_at) : '—'}</Meta>
-              <Meta label="Received Shop">
-                {item.received_shop_at ? (
-                  <Text className="mt-0.5 text-xs font-semibold text-emerald-700" numberOfLines={1}>✓ {formatTimestamp(item.received_shop_at)}</Text>
-                ) : (
-                  <Text className="mt-0.5 text-xs font-semibold text-amber-600">● Pending Arrival</Text>
+                {count > 0 && !isInvoice && (
+                  <View className="rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2">
+                    <Text className="text-[9px] font-bold text-slate-700 dark:text-slate-300">
+                      {count} {count === 1 ? 'Battery' : 'Batteries'}
+                    </Text>
+                  </View>
                 )}
-              </Meta>
+              </View>
+
+              <Text className="text-[9.5px] font-medium text-slate-400">
+                {timeAgo(item.timestamp)}
+              </Text>
             </View>
 
-            <View className="mt-2 flex-row items-center justify-between">
-              <Text className="flex-1 text-[10px] text-slate-400">Logged: {formatTimestamp(item.timestamp)} • {timeAgo(item.timestamp)}</Text>
+            {/* Title & Message */}
+            <Text className="mt-1.5 text-xs font-bold text-slate-900 dark:text-white leading-snug">
+              {item.title?.replace(/\s*\(\d+\s*Batteries\)/gi, '')}
+            </Text>
+
+            {item.message ? (
+              <Text className="mt-0.5 text-[10.5px] text-slate-600 dark:text-slate-400 leading-normal">
+                {item.message}
+              </Text>
+            ) : null}
+
+            {/* Metadata Box */}
+            {(item.truck_number || item.driver_name || item.packed_at || item.received_shop_at) && (
+              <View className="mt-2 rounded-lg bg-slate-50/80 dark:bg-slate-950/60 p-2 border border-slate-100 dark:border-slate-800/80">
+                <View className="flex-row justify-between">
+                  <View className="flex-1 mr-2">
+                    <Text className="text-[8.5px] font-bold uppercase text-slate-400">
+                      Truck
+                    </Text>
+                    <Text
+                      className="font-mono text-[10.5px] font-bold text-slate-800 dark:text-slate-200"
+                      numberOfLines={1}
+                    >
+                      {item.truck_number || '—'}
+                    </Text>
+                  </View>
+                  <View className="flex-1">
+                    <Text className="text-[8.5px] font-bold uppercase text-slate-400">
+                      Driver
+                    </Text>
+                    <Text
+                      className="text-[10.5px] font-medium text-slate-800 dark:text-slate-200"
+                      numberOfLines={1}
+                    >
+                      {item.driver_name || '—'}
+                    </Text>
+                  </View>
+                </View>
+
+                {(item.packed_at || item.received_shop_at) && (
+                  <View className="mt-1.5 pt-1.5 border-t border-slate-200/60 dark:border-slate-800/60 flex-row justify-between">
+                    <View className="flex-1 mr-2">
+                      <Text className="text-[8.5px] font-bold uppercase text-slate-400">
+                        Packed
+                      </Text>
+                      <Text
+                        className="text-[10px] text-slate-700 dark:text-slate-300"
+                        numberOfLines={1}
+                      >
+                        {formatTimestamp(item.packed_at)}
+                      </Text>
+                    </View>
+                    <View className="flex-1">
+                      <Text className="text-[8.5px] font-bold uppercase text-slate-400">
+                        Workshop Arrival
+                      </Text>
+                      <Text
+                        className="text-[10px] font-semibold text-slate-700 dark:text-slate-300"
+                        numberOfLines={1}
+                      >
+                        {item.received_shop_at ? (
+                          <Text className="text-emerald-600 dark:text-emerald-400">
+                            ✓ {formatTimestamp(item.received_shop_at)}
+                          </Text>
+                        ) : (
+                          <Text className="text-amber-600 dark:text-amber-400">
+                            ● In Transit
+                          </Text>
+                        )}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Bottom Actions */}
+            <View className="mt-2 flex-row items-center justify-between pt-1.5 border-t border-slate-100 dark:border-slate-800/80">
+              <Text className="text-[9.5px] text-slate-400">
+                {formatTimestamp(item.timestamp)}
+              </Text>
+
               {isInvoice ? (
-                <TouchableOpacity onPress={() => navigation.navigate('Invoices')} hitSlop={6}>
-                  <Text className="text-[11px] font-bold text-red-600">Open PDF Bill →</Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('Invoices')}
+                  activeOpacity={0.7}
+                  className="flex-row items-center gap-0.5 rounded-md bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5"
+                >
+                  <Text className="text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                    Open PDF Bill
+                  </Text>
+                  <Icon name="chevronRight" size={10} color="#7c3aed" />
                 </TouchableOpacity>
               ) : isBatch ? (
-                <Text className="text-[11px] font-bold text-blue-600">View batch →</Text>
+                <TouchableOpacity
+                  onPress={() => setSelectedBatch(item)}
+                  activeOpacity={0.7}
+                  className="flex-row items-center gap-0.5 rounded-md bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5"
+                >
+                  <Text className="text-[10px] font-bold text-blue-700 dark:text-blue-300">
+                    View Batch ({count})
+                  </Text>
+                  <Icon name="chevronRight" size={10} color="#2563eb" />
+                </TouchableOpacity>
               ) : codes[0] ? (
-                <TouchableOpacity onPress={() => openBattery(codes[0])} hitSlop={6}>
-                  <Text className="text-[11px] font-bold text-blue-600">{codes[0]} →</Text>
+                <TouchableOpacity
+                  onPress={() => openBattery(codes[0])}
+                  activeOpacity={0.7}
+                  className="flex-row items-center gap-0.5 rounded-md bg-slate-100 dark:bg-slate-800 px-2 py-0.5"
+                >
+                  <Text className="font-mono text-[10px] font-bold text-slate-800 dark:text-slate-200">
+                    {codes[0]}
+                  </Text>
+                  <Icon name="chevronRight" size={10} color="#64748b" />
                 </TouchableOpacity>
               ) : null}
             </View>
-          </TouchableOpacity>
+          </View>
         );
       }}
     />

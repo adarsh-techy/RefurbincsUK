@@ -4,16 +4,21 @@ import {
   FiCalendar,
   FiDollarSign,
   FiTrendingUp,
-  FiFilter,
-  FiLayers,
   FiRefreshCw,
   FiTool,
   FiCheckCircle,
   FiAlertTriangle,
   FiZap,
+  FiSearch,
+  FiX,
+  FiGrid,
+  FiList,
+  FiTruck,
+  FiArrowRight,
+  FiUser,
+  FiInbox,
 } from 'react-icons/fi';
 import apiClient from '../../../services/api-client';
-import PageHeader from '../../../components/ui/primitives/PageHeader';
 import DataTable from '../../../components/ui/table/DataTable';
 import TableState from '../../../components/ui/table/TableState';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
@@ -22,7 +27,7 @@ import { StatusBadge } from '../../../components/ui/primitives/Badge';
 function getMonthKey(dateStr) {
   if (!dateStr) return '';
   const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
+  if (Number.isNaN(d.getTime())) return '';
   const y = d.getFullYear();
   const m = String(d.getMonth() + 1).padStart(2, '0');
   return `${y}-${m}`;
@@ -35,13 +40,55 @@ function formatMonthLabel(monthKey) {
   return date.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' });
 }
 
-// The client's billing history — every repair charge and testing/service fee
-// across every battery they've sent in, with monthly analytics and month filtering.
+function formatDate(val) {
+  if (!val) return '—';
+  const d = new Date(val);
+  if (Number.isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+}
+
+function getChargeCategory(row) {
+  if (row.charge_type === 'repair') {
+    return {
+      type: 'repair',
+      label: 'Repair Service',
+      badgeClass: 'bg-blue-50 text-blue-700 border-blue-200/80 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-900/50',
+      icon: FiTool,
+    };
+  }
+  if (row.battery_status === 'unserviceable' || row.battery_status === 'tested_parts_removed') {
+    return {
+      type: 'diagnostic',
+      label: 'Diagnostic Fee',
+      badgeClass: 'bg-rose-50 text-rose-700 border-rose-200/80 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/50',
+      icon: FiAlertTriangle,
+    };
+  }
+  return {
+    type: 'service',
+    label: 'Service & Testing',
+    badgeClass: 'bg-indigo-50 text-indigo-700 border-indigo-200/80 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-900/50',
+    icon: FiZap,
+  };
+}
+
 function ClientTransactionsPage() {
   const [data, setData] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // Filters
   const [selectedMonth, setSelectedMonth] = useState('ALL'); // 'ALL' or 'YYYY-MM'
+  const [chargeFilter, setChargeFilter] = useState('all'); // 'all' | 'repair' | 'service'
+  const [search, setSearch] = useState('');
+
+  // Default to compact cards on mobile (< 768px) to eliminate horizontal table scrolling
+  const [viewMode, setViewMode] = useState(() => {
+    if (typeof window !== 'undefined') {
+      return window.innerWidth < 768 ? 'cards' : 'table';
+    }
+    return 'cards';
+  });
 
   useEffect(() => {
     fetchTransactions();
@@ -78,47 +125,61 @@ function ClientTransactionsPage() {
       }));
   }, [data]);
 
-  // Filtered rows based on selected month
+  // Filtered rows
   const filteredRows = useMemo(() => {
-    if (selectedMonth === 'ALL') return data;
-    return data.filter((row) => getMonthKey(row.repaired_at) === selectedMonth);
-  }, [data, selectedMonth]);
+    return data.filter((row) => {
+      // Month filter
+      if (selectedMonth !== 'ALL' && getMonthKey(row.repaired_at) !== selectedMonth) {
+        return false;
+      }
 
-  // Filtered breakdown totals
-  const filteredTotal = useMemo(() => {
-    return filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  }, [filteredRows]);
+      // Charge category filter
+      if (chargeFilter === 'repair' && row.charge_type !== 'repair') return false;
+      if (chargeFilter === 'service' && row.charge_type !== 'service') return false;
 
-  const filteredRepairTotal = useMemo(() => {
-    return filteredRows
+      // Search filter
+      const q = search.trim().toLowerCase();
+      if (!q) return true;
+      return (
+        row.battery_code?.toLowerCase().includes(q) ||
+        row.part_name?.toLowerCase().includes(q) ||
+        String(row.truck_number || '').toLowerCase().includes(q) ||
+        row.staff_name?.toLowerCase().includes(q)
+      );
+    });
+  }, [data, selectedMonth, chargeFilter, search]);
+
+  // Breakdown metrics for current period
+  const metrics = useMemo(() => {
+    const totalAmount = filteredRows.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
+    const repairAmount = filteredRows
       .filter((r) => r.charge_type === 'repair')
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
-  }, [filteredRows]);
 
-  const repairLinesCount = useMemo(() => {
-    return filteredRows.filter((r) => r.charge_type === 'repair').length;
-  }, [filteredRows]);
+    const repairCount = filteredRows.filter((r) => r.charge_type === 'repair').length;
 
-  const filteredServiceTotal = useMemo(() => {
-    return filteredRows
+    const serviceAmount = filteredRows
       .filter((r) => r.charge_type === 'service')
       .reduce((sum, row) => sum + Number(row.amount || 0), 0);
+
+    const serviceCount = filteredRows.filter((r) => r.charge_type === 'service').length;
+
+    const uniqueBatteries = new Set(filteredRows.map((r) => r.battery_code).filter(Boolean)).size;
+    const avgPerBattery = uniqueBatteries ? totalAmount / uniqueBatteries : 0;
+
+    return {
+      totalAmount,
+      repairAmount,
+      repairCount,
+      serviceAmount,
+      serviceCount,
+      uniqueBatteries,
+      avgPerBattery,
+    };
   }, [filteredRows]);
 
-  const serviceLinesCount = useMemo(() => {
-    return filteredRows.filter((r) => r.charge_type === 'service').length;
-  }, [filteredRows]);
-
-  // Unique batteries serviced in this period
-  const uniqueBatteriesCount = useMemo(() => {
-    return new Set(filteredRows.map((r) => r.battery_code).filter(Boolean)).size;
-  }, [filteredRows]);
-
-  // Average cost per battery
-  const avgCostPerBattery = useMemo(() => {
-    if (!uniqueBatteriesCount) return 0;
-    return filteredTotal / uniqueBatteriesCount;
-  }, [filteredTotal, uniqueBatteriesCount]);
+  const anyFilter = Boolean(selectedMonth !== 'ALL' || chargeFilter !== 'all' || search);
 
   const columns = [
     {
@@ -126,13 +187,7 @@ function ClientTransactionsPage() {
       label: 'Date',
       render: (row) => (
         <span className="text-xs font-medium text-slate-600 dark:text-neutral-300 whitespace-nowrap">
-          {row.repaired_at
-            ? new Date(row.repaired_at).toLocaleDateString('en-GB', {
-                day: '2-digit',
-                month: 'short',
-                year: 'numeric',
-              })
-            : '—'}
+          {formatDate(row.repaired_at)}
         </span>
       ),
     },
@@ -140,18 +195,18 @@ function ClientTransactionsPage() {
       key: 'battery_code',
       label: 'Battery ID',
       render: (row) => (
-        <div className="flex flex-col">
+        <div className="flex flex-col py-0.5">
           <Link
             to={`/batteries/${encodeURIComponent(row.battery_code)}`}
-            className="font-mono font-bold text-brand-700 hover:underline dark:text-emerald-400"
+            className="font-mono font-bold text-xs sm:text-sm text-brand-700 hover:underline dark:text-emerald-400"
           >
             {row.battery_code}
           </Link>
-          {row.truck_number && (
-            <span className="text-[10.5px] text-slate-400 dark:text-neutral-500">
+          {row.truck_number ? (
+            <span className="text-[10px] text-slate-400 dark:text-neutral-500">
               Truck {row.truck_number}
             </span>
-          )}
+          ) : null}
         </div>
       ),
     },
@@ -164,26 +219,12 @@ function ClientTransactionsPage() {
       key: 'charge_type',
       label: 'Charge Category',
       render: (row) => {
-        if (row.charge_type === 'repair') {
-          return (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700 border border-blue-200/80 dark:bg-blue-950/50 dark:text-blue-300 dark:border-blue-900/50">
-              <FiTool className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
-              <span>Repair Service</span>
-            </span>
-          );
-        }
-        if (row.battery_status === 'unserviceable' || row.battery_status === 'tested_parts_removed') {
-          return (
-            <span className="inline-flex items-center gap-1.5 rounded-lg bg-rose-50 px-2.5 py-1 text-xs font-bold text-rose-700 border border-rose-200/80 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-900/50">
-              <FiAlertTriangle className="w-3.5 h-3.5 text-rose-600 dark:text-rose-400" />
-              <span>Testing & Diagnostic Fee</span>
-            </span>
-          );
-        }
+        const cat = getChargeCategory(row);
+        const IconComponent = cat.icon;
         return (
-          <span className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-bold text-indigo-700 border border-indigo-200/80 dark:bg-indigo-950/50 dark:text-indigo-300 dark:border-indigo-900/50">
-            <FiZap className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>Service & Testing Fee</span>
+          <span className={`inline-flex items-center gap-1.5 rounded-lg px-2 py-0.5 text-[10px] font-bold border ${cat.badgeClass}`}>
+            <IconComponent className="w-3 h-3" />
+            <span>{cat.label}</span>
           </span>
         );
       },
@@ -192,7 +233,7 @@ function ClientTransactionsPage() {
       key: 'amount',
       label: 'Amount',
       render: (row) => (
-        <span className="font-mono font-bold text-slate-900 dark:text-white">
+        <span className="font-mono font-black text-xs sm:text-sm text-slate-900 dark:text-white">
           £{Number(row.amount || 0).toFixed(2)}
         </span>
       ),
@@ -200,24 +241,32 @@ function ClientTransactionsPage() {
   ];
 
   return (
-    <div className="space-y-6 pb-12">
-      {/* Header with Refresh */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-white/10">
-        <div>
-          <PageHeader
-            title="Transactions & Billing"
-            description="Verified repair charges, diagnostic inspection fees, and service billing across all your batteries."
-          />
-        </div>
+    <div className="space-y-3 min-w-0 pb-10">
+      {/* 1. Page Header - Compact & refined */}
+      <div className="border-b border-slate-200/80 pb-2.5 dark:border-white/10">
+        <div className="flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+              Transactions & Billing
+            </h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-surface-800 dark:text-neutral-300 border border-slate-200 dark:border-white/10">
+              {filteredRows.length} Items
+            </span>
+          </div>
 
-        <button
-          type="button"
-          onClick={fetchTransactions}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors shadow-2xs cursor-pointer"
-        >
-          <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
-          <span>Refresh</span>
-        </button>
+          <button
+            type="button"
+            onClick={fetchTransactions}
+            className="inline-flex items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer shrink-0 transition-colors"
+            title="Refresh transactions"
+          >
+            <FiRefreshCw className={`h-3 w-3 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
+            <span>Refresh</span>
+          </button>
+        </div>
+        <p className="text-[10.5px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5 leading-tight">
+          Verified repair charges, diagnostic inspection fees, and service billing across your fleet.
+        </p>
       </div>
 
       {loading ? (
@@ -226,143 +275,351 @@ function ClientTransactionsPage() {
         <TableState tone="error">{error}</TableState>
       ) : (
         <>
-          {/* Classic Financial Stat Cards */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            {/* Card 1: Total Billed */}
-            <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-surface-900 shadow-2xs">
+          {/* 2. Top Metric Cards - Compact 2x2 Grid with Reduced Size */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-4">
+            {/* Total Billed */}
+            <div
+              onClick={() => setChargeFilter('all')}
+              className={`rounded-xl border p-2.5 sm:p-3 flex flex-col justify-between transition-all cursor-pointer ${
+                chargeFilter === 'all'
+                  ? 'border-emerald-300 bg-emerald-50/40 dark:border-emerald-800/60 dark:bg-emerald-950/20 shadow-2xs'
+                  : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 shadow-2xs'
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-                  {selectedMonth === 'ALL' ? 'Total Billed' : `${formatMonthLabel(selectedMonth)} Total`}
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-emerald-800 dark:text-emerald-400 truncate">
+                  {selectedMonth === 'ALL' ? 'Total Billed' : 'Month Total'}
                 </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400">
-                  <FiDollarSign className="w-4 h-4" />
+                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-emerald-100/80 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300 shrink-0">
+                  <FiDollarSign className="w-3 h-3" />
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  £{filteredTotal.toFixed(2)}
-                </span>
+              <div className="mt-1">
+                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                  £{metrics.totalAmount.toFixed(2)}
+                </div>
+                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                  {filteredRows.length} billing item{filteredRows.length === 1 ? '' : 's'}
+                </p>
               </div>
-              <p className="text-[11px] text-emerald-700 dark:text-emerald-400 mt-1 font-medium">
-                {filteredRows.length} total billing line{filteredRows.length === 1 ? '' : 's'}
-              </p>
             </div>
 
-            {/* Card 2: Repair Services */}
-            <div className="rounded-2xl border border-blue-200/90 bg-blue-50/50 p-4 dark:border-blue-900/40 dark:bg-surface-900 shadow-2xs">
+            {/* Repair Services */}
+            <div
+              onClick={() => setChargeFilter(chargeFilter === 'repair' ? 'all' : 'repair')}
+              className={`rounded-xl border p-2.5 sm:p-3 flex flex-col justify-between transition-all cursor-pointer ${
+                chargeFilter === 'repair'
+                  ? 'border-blue-500 bg-blue-50/70 dark:border-blue-500/70 dark:bg-blue-950/30 ring-1 ring-blue-400/30 shadow-2xs'
+                  : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 shadow-2xs'
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
-                  Repair Services
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-blue-800 dark:text-blue-400 truncate">
+                  Repairs
                 </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-600 dark:bg-blue-900/50 dark:text-blue-400">
-                  <FiTool className="w-4 h-4" />
+                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-blue-100/80 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300 shrink-0">
+                  <FiTool className="w-3 h-3" />
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  £{filteredRepairTotal.toFixed(2)}
-                </span>
+              <div className="mt-1">
+                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                  £{metrics.repairAmount.toFixed(2)}
+                </div>
+                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                  {metrics.repairCount} repair charge{metrics.repairCount === 1 ? '' : 's'}
+                </p>
               </div>
-              <p className="text-[11px] text-blue-700 dark:text-blue-400 mt-1 font-medium">
-                {repairLinesCount} repair service line{repairLinesCount === 1 ? '' : 's'} (refurbishment & service)
-              </p>
             </div>
 
-            {/* Card 3: Testing & Diagnostics */}
-            <div className="rounded-2xl border border-indigo-200/90 bg-indigo-50/50 p-4 dark:border-indigo-900/40 dark:bg-surface-900 shadow-2xs">
+            {/* Testing & Fees */}
+            <div
+              onClick={() => setChargeFilter(chargeFilter === 'service' ? 'all' : 'service')}
+              className={`rounded-xl border p-2.5 sm:p-3 flex flex-col justify-between transition-all cursor-pointer ${
+                chargeFilter === 'service'
+                  ? 'border-indigo-500 bg-indigo-50/70 dark:border-indigo-500/70 dark:bg-indigo-950/30 ring-1 ring-indigo-400/30 shadow-2xs'
+                  : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900 shadow-2xs'
+              }`}
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-indigo-800 dark:text-indigo-300 uppercase tracking-wider">
-                  Testing & Diagnostics
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-indigo-800 dark:text-indigo-400 truncate">
+                  Testing & Fees
                 </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400">
-                  <FiCheckCircle className="w-4 h-4" />
+                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-indigo-100/80 text-indigo-700 dark:bg-indigo-900/50 dark:text-indigo-300 shrink-0">
+                  <FiCheckCircle className="w-3 h-3" />
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  £{filteredServiceTotal.toFixed(2)}
-                </span>
+              <div className="mt-1">
+                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                  £{metrics.serviceAmount.toFixed(2)}
+                </div>
+                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                  {metrics.serviceCount} test fee{metrics.serviceCount === 1 ? '' : 's'}
+                </p>
               </div>
-              <p className="text-[11px] text-indigo-700 dark:text-indigo-400 mt-1 font-medium">
-                {serviceLinesCount} intake inspection & QA test{serviceLinesCount === 1 ? '' : 's'}
-              </p>
             </div>
 
-            {/* Card 4: Batteries Serviced & Unit Avg */}
-            <div className="rounded-2xl border border-amber-200/90 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-surface-900 shadow-2xs">
+            {/* Fleet Serviced */}
+            <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 flex flex-col justify-between dark:border-white/10 dark:bg-surface-900 shadow-2xs">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
-                  Batteries Serviced
+                <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-800 dark:text-amber-400 truncate">
+                  Fleet Serviced
                 </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-600 dark:bg-amber-900/50 dark:text-amber-400">
-                  <FiTrendingUp className="w-4 h-4" />
+                <div className="flex h-5.5 w-5.5 items-center justify-center rounded-md bg-amber-100/80 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">
+                  <FiTrendingUp className="w-3 h-3" />
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">
-                  {uniqueBatteriesCount} {uniqueBatteriesCount === 1 ? 'Battery' : 'Batteries'}
-                </span>
+              <div className="mt-1">
+                <div className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-tight">
+                  {metrics.uniqueBatteries} <span className="text-[10px] font-semibold text-slate-400">Units</span>
+                </div>
+                <p className="text-[9px] text-slate-400 dark:text-neutral-500 mt-0.5 font-medium truncate">
+                  Avg. £{metrics.avgPerBattery.toFixed(2)}/unit
+                </p>
               </div>
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-medium">
-                Avg. £{avgCostPerBattery.toFixed(2)} per battery
-              </p>
             </div>
           </div>
 
-          {/* Month Filter Bar */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200/90 shadow-2xs dark:bg-surface-900 dark:border-white/10">
-            <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
-                <FiFilter className="w-4 h-4" />
+          {/* 3. Search and Filter Bar - Compact sizing */}
+          <div className="space-y-1.5">
+            {/* Search Input with standard padding */}
+            <div className="relative w-full">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
+                <FiSearch className="h-3.5 w-3.5" />
               </div>
-              <span className="text-xs font-bold text-slate-700 dark:text-neutral-200">
-                Filter by Month:
-              </span>
-            </div>
-
-            <div className="flex items-center gap-2 flex-wrap">
-              {/* Dropdown Selector */}
-              <div className="relative">
-                <select
-                  value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-1.5 text-xs font-bold text-slate-800 focus:border-blue-500 focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-100 cursor-pointer"
-                >
-                  <option value="ALL">All Months ({data.length} records)</option>
-                  {availableMonths.map((m) => (
-                    <option key={m.key} value={m.key}>
-                      {m.label} ({m.count} records)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Reset to All Months button if filtered */}
-              {selectedMonth !== 'ALL' && (
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search battery ID, part or truck…"
+                className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-8 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden focus:ring-1 focus:ring-blue-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 shadow-2xs h-8"
+              />
+              {search && (
                 <button
                   type="button"
-                  onClick={() => setSelectedMonth('ALL')}
-                  className="rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-600 hover:bg-slate-100 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700 cursor-pointer transition-colors"
+                  onClick={() => setSearch('')}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-300 cursor-pointer"
+                  title="Clear search"
                 >
-                  Clear Filter
+                  <FiX className="h-3 w-3" />
                 </button>
               )}
             </div>
+
+            {/* Filter Pills & View Toggle Row */}
+            <div className="flex items-center justify-between gap-1.5 flex-wrap">
+              {/* Category Pills */}
+              <div className="flex items-center gap-1">
+                {[
+                  { id: 'all', label: 'All' },
+                  { id: 'repair', label: 'Repairs' },
+                  { id: 'service', label: 'Testing' },
+                ].map((tab) => {
+                  const active = chargeFilter === tab.id;
+                  return (
+                    <button
+                      key={tab.id}
+                      type="button"
+                      onClick={() => setChargeFilter(tab.id)}
+                      className={`inline-flex items-center rounded-lg px-2.5 py-1 text-[11px] font-bold transition-all cursor-pointer h-7.5 ${
+                        active
+                          ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
+                          : 'border border-slate-200/90 bg-white text-slate-600 hover:bg-slate-50 hover:text-slate-900 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300'
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex items-center gap-1.5">
+                {/* Month Dropdown Selector */}
+                <select
+                  value={selectedMonth}
+                  onChange={(e) => setSelectedMonth(e.target.value)}
+                  className="rounded-lg border border-slate-200/90 bg-white px-2 py-1 text-[11px] font-semibold text-slate-700 focus:border-blue-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer shadow-2xs h-7.5"
+                >
+                  <option value="ALL">All Months ({data.length})</option>
+                  {availableMonths.map((m) => (
+                    <option key={m.key} value={m.key}>
+                      {m.label} ({m.count})
+                    </option>
+                  ))}
+                </select>
+
+                {anyFilter && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSelectedMonth('ALL');
+                      setChargeFilter('all');
+                      setSearch('');
+                    }}
+                    className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-500 hover:text-slate-800 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 cursor-pointer shadow-2xs h-7.5"
+                    title="Reset all filters"
+                  >
+                    Clear
+                  </button>
+                )}
+
+                {/* View Mode Toggle: Cards vs Table */}
+                <div className="flex items-center rounded-lg border border-slate-200 bg-slate-100 p-0.5 dark:border-white/10 dark:bg-surface-800 h-7.5">
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('cards')}
+                    className={`rounded-md px-1.5 py-1 transition-colors cursor-pointer ${
+                      viewMode === 'cards'
+                        ? 'bg-white text-slate-900 shadow-2xs dark:bg-surface-700 dark:text-white'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200'
+                    }`}
+                    title="Card view (Mobile optimized)"
+                  >
+                    <FiGrid className="h-3 w-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setViewMode('table')}
+                    className={`rounded-md px-1.5 py-1 transition-colors cursor-pointer ${
+                      viewMode === 'table'
+                        ? 'bg-white text-slate-900 shadow-2xs dark:bg-surface-700 dark:text-white'
+                        : 'text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200'
+                    }`}
+                    title="Table view"
+                  >
+                    <FiList className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          {/* Transactions Data Table */}
-          <DataTable
-            columns={columns}
-            rows={filteredRows}
-            showRowNumber
-            headerColor="blue"
-            maxHeight="calc(100vh - 280px)"
-            emptyMessage={
-              selectedMonth === 'ALL'
-                ? 'No transactions yet.'
-                : `No transactions found for ${formatMonthLabel(selectedMonth)}.`
-            }
-          />
+          {/* 4. Content Area */}
+          {filteredRows.length === 0 ? (
+            /* Compact Solid Empty State */
+            <div className="rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-6 sm:p-8 text-center shadow-2xs dark:border-white/10 dark:bg-surface-900 space-y-2.5">
+              <div className="flex h-10 w-10 mx-auto items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-100 dark:bg-emerald-950/60 dark:text-emerald-400 dark:border-emerald-800/40 shadow-2xs">
+                <FiInbox className="h-5 w-5" />
+              </div>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">
+                {anyFilter ? 'No matching transactions' : 'No Transactions Recorded Yet'}
+              </h3>
+              <p className="text-[11px] text-slate-500 dark:text-neutral-400 max-w-sm mx-auto leading-relaxed">
+                {anyFilter
+                  ? 'No billing items match your current filter selection. Try clearing the search keyword or selecting a different month.'
+                  : 'Verified billing line items for diagnostic inspections, parts, and battery repairs will automatically populate here as jobs complete.'}
+              </p>
+              {anyFilter && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedMonth('ALL');
+                    setChargeFilter('all');
+                    setSearch('');
+                  }}
+                  className="inline-flex items-center gap-1 rounded-lg border border-slate-300 bg-white px-3 py-1 text-[11px] font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer"
+                >
+                  Reset Filters
+                </button>
+              )}
+            </div>
+          ) : viewMode === 'cards' ? (
+            /* Compact Mobile-First Card View (Zero horizontal scroll) */
+            <div className="grid grid-cols-1 gap-2 sm:gap-2.5 sm:grid-cols-2 lg:grid-cols-3">
+              {filteredRows.map((row, idx) => {
+                const cat = getChargeCategory(row);
+                const IconComponent = cat.icon;
+
+                return (
+                  <div
+                    key={`${row.charge_type}-${row.id || idx}-${row.battery_code}`}
+                    className="group flex flex-col justify-between rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs transition-all hover:border-slate-300 hover:shadow-xs dark:border-surface-700/80 dark:bg-surface-900"
+                  >
+                    <div>
+                      {/* Card Header: Battery ID + Amount */}
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="min-w-0 flex-1 flex items-center gap-1.5">
+                          <Link
+                            to={`/batteries/${encodeURIComponent(row.battery_code)}`}
+                            className="font-mono text-xs font-bold text-brand-700 dark:text-emerald-400 hover:underline inline-flex items-center gap-1 truncate"
+                          >
+                            <span>{row.battery_code}</span>
+                            <FiArrowRight className="w-2.5 h-2.5 opacity-60 shrink-0" />
+                          </Link>
+                          {row.truck_number ? (
+                            <span className="text-[9.5px] font-medium text-slate-400 dark:text-neutral-500 bg-slate-100 dark:bg-surface-800 px-1 py-0.5 rounded shrink-0">
+                              T{row.truck_number}
+                            </span>
+                          ) : null}
+                        </div>
+
+                        <span className="font-mono text-xs sm:text-sm font-black text-slate-900 dark:text-white shrink-0 bg-slate-50 dark:bg-surface-800 border border-slate-200/60 dark:border-white/5 px-1.5 py-0.5 rounded-md">
+                          £{Number(row.amount || 0).toFixed(2)}
+                        </span>
+                      </div>
+
+                      {/* Badge row: Category + Status */}
+                      <div className="mt-2 flex items-center justify-between gap-1 flex-wrap">
+                        <span className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9.5px] font-bold border ${cat.badgeClass}`}>
+                          <IconComponent className="w-2.5 h-2.5" />
+                          <span>{cat.label}</span>
+                        </span>
+
+                        {row.battery_status ? (
+                          <StatusBadge status={row.battery_status} />
+                        ) : null}
+                      </div>
+
+                      {/* Details row: Part name + Date */}
+                      <div className="mt-2 grid grid-cols-2 gap-1.5 rounded-lg bg-slate-50 p-1.5 text-[9.5px] dark:bg-surface-800/80 border border-slate-100 dark:border-white/5">
+                        <div>
+                          <span className="text-slate-400 dark:text-neutral-400 block font-semibold flex items-center gap-1">
+                            <FiCalendar className="w-2 h-2" /> Date
+                          </span>
+                          <span className="text-slate-700 dark:text-neutral-200 font-bold block truncate mt-0.5">
+                            {formatDate(row.repaired_at)}
+                          </span>
+                        </div>
+                        <div>
+                          <span className="text-slate-400 dark:text-neutral-400 block font-semibold flex items-center gap-1">
+                            <FiUser className="w-2 h-2" /> Staff
+                          </span>
+                          <span className="text-slate-700 dark:text-neutral-200 font-bold block truncate mt-0.5">
+                            {row.staff_name || 'Workshop'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Part Name if present */}
+                      {row.part_name ? (
+                        <p className="mt-1.5 text-[10px] text-slate-500 dark:text-neutral-400 truncate flex items-center gap-1">
+                          <FiTool className="w-2.5 h-2.5 text-slate-400 shrink-0" />
+                          <span className="font-semibold text-slate-600 dark:text-neutral-300 truncate">
+                            {row.part_name}
+                          </span>
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            /* Table View */
+            <div className="overflow-x-auto rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:border-surface-700/80 dark:bg-surface-900">
+              <DataTable
+                columns={columns}
+                rows={filteredRows}
+                showRowNumber
+                headerColor="blue"
+                maxHeight="calc(100vh - 280px)"
+                emptyMessage={
+                  selectedMonth === 'ALL'
+                    ? 'No transactions yet.'
+                    : `No transactions found for ${formatMonthLabel(selectedMonth)}.`
+                }
+              />
+            </div>
+          )}
         </>
       )}
     </div>

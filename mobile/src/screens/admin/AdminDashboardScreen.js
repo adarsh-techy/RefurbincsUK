@@ -63,18 +63,18 @@ function Sparkline({ values, color }) {
 
 function Kpi({ label, value, sub, change, changeLabel, trend, color, box, onPress, alert }) {
   return (
-    <TouchableOpacity onPress={onPress} activeOpacity={0.8} className={`w-[48%] rounded-2xl border p-3.5 ${box}`}>
+    <TouchableOpacity onPress={onPress} activeOpacity={0.8} className={`flex-1 rounded-xl border p-2.5 sm:p-3 shadow-2xs ${box}`}>
       <View className="flex-row items-center justify-between">
-        <Text className="flex-1 text-[10px] font-bold uppercase tracking-wide text-slate-500" numberOfLines={1}>{label}</Text>
-        {alert ? <View className="h-2 w-2 rounded-full bg-rose-500" /> : null}
+        <Text className="flex-1 text-[9.5px] font-bold uppercase tracking-wider text-slate-500" numberOfLines={1}>{label}</Text>
+        {alert ? <View className="h-1.5 w-1.5 rounded-full bg-rose-500" /> : null}
       </View>
-      <Text className="mt-1 text-2xl font-black text-slate-900">{Number(value || 0).toLocaleString()}</Text>
+      <Text className="mt-1 font-mono text-base sm:text-xl font-black text-slate-900">{Number(value || 0).toLocaleString()}</Text>
       {typeof change === 'number' ? (
-        <Text className="mt-0.5 text-[11px] font-bold text-emerald-600">
+        <Text className="mt-0.5 text-[9.5px] font-bold text-emerald-600">
           ↗ {change > 0 ? `+${change}%` : `${change}%`} <Text className="font-normal text-slate-400">{changeLabel}</Text>
         </Text>
       ) : sub ? (
-        <Text className="mt-0.5 text-[11px] font-medium text-slate-500" numberOfLines={1}>{sub}</Text>
+        <Text className="mt-0.5 text-[9.5px] font-medium text-slate-500" numberOfLines={1}>{sub}</Text>
       ) : null}
       {Array.isArray(trend) && trend.length > 0 ? <Sparkline values={trend} color={color} /> : null}
     </TouchableOpacity>
@@ -83,14 +83,14 @@ function Kpi({ label, value, sub, change, changeLabel, trend, color, box, onPres
 
 function Section({ icon, iconColor, title, sub, right, children }) {
   return (
-    <View className="rounded-3xl border border-slate-200 bg-white p-4">
-      <View className="mb-3 flex-row items-center gap-2.5 border-b border-slate-100 pb-3">
-        <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-50">
-          <Icon name={icon} color={iconColor} size={18} />
+    <View className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs">
+      <View className="mb-2.5 flex-row items-center gap-2 border-b border-slate-100 pb-2.5">
+        <View className="h-7 w-7 items-center justify-center rounded-lg bg-slate-50">
+          <Icon name={icon} color={iconColor} size={15} />
         </View>
-        <View className="flex-1">
-          <Text className="text-sm font-black text-slate-900">{title}</Text>
-          {sub ? <Text className="text-[11px] text-slate-500">{sub}</Text> : null}
+        <View className="flex-1 min-w-0">
+          <Text className="text-xs sm:text-sm font-black text-slate-900 truncate">{title}</Text>
+          {sub ? <Text className="text-[10px] text-slate-500" numberOfLines={1}>{sub}</Text> : null}
         </View>
         {right}
       </View>
@@ -102,23 +102,23 @@ function Section({ icon, iconColor, title, sub, right, children }) {
 function DurationList({ items, getLabel, onPress }) {
   const max = Math.max(1, ...items.map((i) => i.avgDurationSeconds || 0));
   return (
-    <View className="gap-2">
+    <View className="gap-1.5">
       {items.map((item, i) => {
         const percent = Math.max(8, Math.min(100, ((item.avgDurationSeconds || 0) / max) * 100));
         return (
-          <TouchableOpacity key={`${getLabel(item)}-${i}`} disabled={!onPress(item)} onPress={() => onPress(item)?.()} className="flex-row items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">
-            <View className="h-7 w-7 items-center justify-center rounded-lg bg-slate-200/70">
-              <Text className="text-xs font-black text-slate-700">{i + 1}</Text>
+          <TouchableOpacity key={`${getLabel(item)}-${i}`} disabled={!onPress(item)} onPress={() => onPress(item)?.()} className="flex-row items-center gap-2.5 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
+            <View className="h-6 w-6 items-center justify-center rounded-lg bg-slate-200/80">
+              <Text className="text-[10px] font-black text-slate-700">{i + 1}</Text>
             </View>
             <View className="flex-1">
-              <View className="mb-1.5 flex-row items-center justify-between gap-2">
+              <View className="mb-1 flex-row items-center justify-between gap-2">
                 <Text className="flex-1 text-xs font-bold text-slate-800" numberOfLines={1}>{getLabel(item)}</Text>
-                <Text className="font-mono text-xs font-bold text-blue-700">{formatDuration(item.avgDurationSeconds)}</Text>
+                <Text className="font-mono text-[11px] font-bold text-blue-700">{formatDuration(item.avgDurationSeconds)}</Text>
               </View>
-              <View className="h-2 w-full overflow-hidden rounded-full bg-slate-200/80">
+              <View className="h-1.5 w-full overflow-hidden rounded-full bg-slate-200/80">
                 <View className="h-full rounded-full bg-blue-600" style={{ width: `${percent}%` }} />
               </View>
-              <Text className="mt-1 text-[11px] text-slate-400">
+              <Text className="mt-1 text-[9.5px] text-slate-400">
                 {item.repairCount} service cycle{item.repairCount === 1 ? '' : 's'} logged
               </Text>
             </View>
@@ -191,51 +191,57 @@ export default function AdminDashboardScreen() {
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
       {/* Header */}
-      <View>
-        <Text className="text-xl font-black text-slate-900">Welcome back{user?.name ? `, ${user.name}` : ''}!</Text>
-        <Text className="mt-0.5 text-xs text-slate-500">
-          Real-time battery refurbishment overview, workshop throughput analytics & return dispatches
+      <View className="gap-1">
+        <Text className="text-lg font-black text-slate-900">Welcome back{user?.name ? `, ${user.name}` : ''}!</Text>
+        <Text className="text-[10.5px] text-slate-500">
+          Real-time battery refurbishment overview, workshop throughput analytics & returns
         </Text>
-        <View className="mt-3 flex-row flex-wrap gap-2">
+        <View className="mt-2 flex-row flex-wrap gap-1.5">
           {!isToday && (
-            <TouchableOpacity onPress={() => setDate(todayYmd())} className="flex-row items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2">
-              <Icon name="calendar" color="#3b82f6" size={14} />
-              <Text className="text-xs font-bold text-slate-700">Reset to Today</Text>
+            <TouchableOpacity onPress={() => setDate(todayYmd())} className="flex-row items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
+              <Icon name="calendar" color="#3b82f6" size={12} />
+              <Text className="text-[11px] font-bold text-slate-700">Reset Today</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => go('/notifications')} className="flex-row items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2">
-            <Icon name="zap" color="#fff" size={14} />
-            <Text className="text-xs font-black text-white">Operations Feed</Text>
+          <TouchableOpacity onPress={() => go('/notifications')} className="flex-row items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 shadow-xs">
+            <Icon name="zap" color="#fff" size={12} />
+            <Text className="text-[11px] font-black text-white">Operations Feed</Text>
             {lowStock > 0 && (
-              <View className="min-w-[18px] items-center rounded-full bg-rose-500 px-1">
-                <Text className="text-[10px] font-black text-white">{lowStock}</Text>
+              <View className="min-w-[16px] items-center rounded-full bg-rose-500 px-1">
+                <Text className="text-[9px] font-black text-white">{lowStock}</Text>
               </View>
             )}
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('Scan')} className="flex-row items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2">
-            <Icon name="camera" color="#0f172a" size={14} />
-            <Text className="text-xs font-bold text-slate-700">Scan Battery</Text>
+          <TouchableOpacity onPress={() => navigation.navigate('Scan')} className="flex-row items-center gap-1 rounded-xl border border-slate-200 bg-white px-2.5 py-1.5 shadow-2xs">
+            <Icon name="camera" color="#0f172a" size={12} />
+            <Text className="text-[11px] font-bold text-slate-700">Scan Battery</Text>
           </TouchableOpacity>
         </View>
       </View>
 
       {error ? (
-        <View className="rounded-2xl border border-red-200 bg-red-50 p-3">
+        <View className="rounded-xl border border-red-200 bg-red-50 p-2.5">
           <Text className="text-xs font-semibold text-red-700">{error}</Text>
         </View>
       ) : null}
 
-      {/* 6 KPI cards */}
+      {/* 6 KPI cards in structured 2x3 grid */}
       {loading && !data ? (
         <Text className="py-6 text-center text-xs font-bold text-slate-500">Loading Executive Dashboard…</Text>
       ) : (
-        <View className="flex-row flex-wrap justify-between gap-y-3">
-          <Kpi label="Total Batteries" value={totals.totalBatteries} change={changes.totalBatteries} changeLabel="vs mo." trend={trends.totalBatteries} color="#2563eb" box="border-slate-200 bg-white" onPress={() => go('/batteries')} />
-          <Kpi label="In Workshop" value={totals.pendingRepair} sub="Active service queue" trend={trends.pendingRepair} color="#d97706" box="border-amber-200 bg-amber-50/60" onPress={() => go('/batteries?status=in_repair')} />
-          <Kpi label="Repaired & Ready" value={totals.repaired} change={changes.repaired} changeLabel="throughput" trend={trends.repaired} color="#059669" box="border-emerald-200 bg-emerald-50/60" onPress={() => go('/batteries?status=repaired')} />
-          <Kpi label="Low Stock Parts" value={lowStock} sub={lowStock > 0 ? '⚠️ Replenishment needed' : '✓ Stock levels healthy'} alert={lowStock > 0} box={lowStock > 0 ? 'border-rose-300 bg-rose-50/60' : 'border-slate-200 bg-white'} onPress={() => go('/parts?lowStock=true')} />
-          <Kpi label="Unserviceable" value={totals.unserviceable} sub="Awaiting scrap batch" box="border-slate-200 bg-white" onPress={() => go('/batteries/unserviceable')} />
-          <Kpi label="Recycled & Saved" value={totals.recycled} sub="Diverted to recycling" box="border-slate-200 bg-white" onPress={() => go('/recycle')} />
+        <View className="gap-2">
+          <View className="flex-row gap-2">
+            <Kpi label="Total Units" value={totals.totalBatteries} change={changes.totalBatteries} changeLabel="vs mo." trend={trends.totalBatteries} color="#2563eb" box="border-slate-200/90 bg-white" onPress={() => go('/batteries')} />
+            <Kpi label="In Workshop" value={totals.pendingRepair} sub="Active queue" trend={trends.pendingRepair} color="#d97706" box="border-amber-200/80 bg-amber-50/50" onPress={() => go('/batteries?status=in_repair')} />
+          </View>
+          <View className="flex-row gap-2">
+            <Kpi label="Repaired" value={totals.repaired} change={changes.repaired} changeLabel="throughput" trend={trends.repaired} color="#059669" box="border-emerald-200/80 bg-emerald-50/50" onPress={() => go('/batteries?status=repaired')} />
+            <Kpi label="Low Stock" value={lowStock} sub={lowStock > 0 ? '⚠️ Restock needed' : '✓ Stock healthy'} alert={lowStock > 0} box={lowStock > 0 ? 'border-rose-300 bg-rose-50/60' : 'border-slate-200/90 bg-white'} onPress={() => go('/parts?lowStock=true')} />
+          </View>
+          <View className="flex-row gap-2">
+            <Kpi label="Unserviceable" value={totals.unserviceable} sub="Scrap batch" box="border-slate-200/90 bg-white" onPress={() => go('/batteries/unserviceable')} />
+            <Kpi label="Recycled" value={totals.recycled} sub="Saved & recycled" box="border-slate-200/90 bg-white" onPress={() => go('/recycle')} />
+          </View>
         </View>
       )}
 
@@ -279,24 +285,24 @@ export default function AdminDashboardScreen() {
             <Text className="mt-1 text-center text-[11px] text-slate-400">Select a different date on the mini calendar to inspect previous activity logs.</Text>
           </View>
         ) : (
-          <View className="gap-2">
+          <View className="gap-1.5">
             {todays.map((r) => (
-              <TouchableOpacity key={r.id} onPress={() => go(`/batteries/${encodeURIComponent(r.batteryCode)}`)} className="flex-row items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-3">
-                <View className="flex-1 flex-row items-center gap-3">
-                  <View className="h-9 w-9 items-center justify-center rounded-xl bg-blue-600">
-                    <Text className="text-xs font-black text-white">{initials(r.staffName)}</Text>
+              <TouchableOpacity key={r.id} onPress={() => go(`/batteries/${encodeURIComponent(r.batteryCode)}`)} className="flex-row items-center justify-between gap-2.5 rounded-xl border border-slate-100 bg-slate-50/60 p-2.5">
+                <View className="flex-1 flex-row items-center gap-2.5">
+                  <View className="h-8 w-8 items-center justify-center rounded-lg bg-blue-600">
+                    <Text className="text-[11px] font-black text-white">{initials(r.staffName)}</Text>
                   </View>
                   <View className="flex-1">
                     <View className="flex-row flex-wrap items-center gap-1.5">
                       <Text className="text-xs font-black text-slate-900" numberOfLines={1}>{r.staffName}</Text>
-                      <Text className="rounded-md bg-blue-100 px-1.5 font-mono text-[10px] font-bold text-blue-800">{r.batteryCode}</Text>
+                      <Text className="rounded-md bg-blue-100 px-1.5 font-mono text-[9.5px] font-bold text-blue-800">{r.batteryCode}</Text>
                     </View>
-                    <Text className="mt-0.5 text-[11px] text-slate-500" numberOfLines={1}>
+                    <Text className="mt-0.5 text-[10px] text-slate-500" numberOfLines={1}>
                       Serviced: <Text className="font-semibold text-slate-700">{r.partName}</Text>
                     </Text>
                   </View>
                 </View>
-                <Text className="rounded-lg bg-slate-100 px-2 py-1 font-mono text-[10px] font-bold text-slate-600">
+                <Text className="rounded-lg bg-slate-100 px-1.5 py-0.5 font-mono text-[9.5px] font-bold text-slate-600">
                   {r.repairedAt ? new Date(r.repairedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
                 </Text>
               </TouchableOpacity>
@@ -304,28 +310,28 @@ export default function AdminDashboardScreen() {
           </View>
         )}
 
-        <View className="mt-5 border-t border-slate-100 pt-4">
-          <View className="mb-3 flex-row items-center justify-between">
-            <Text className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <View className="mt-4 border-t border-slate-100 pt-3">
+          <View className="mb-2 flex-row items-center justify-between">
+            <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
               {isToday ? 'Hourly Workshop Velocity (Today)' : `Hourly Breakdown (${prettyYmd(date)})`}
             </Text>
           </View>
           {hasActivity ? (
             <View>
-              <View className="h-28 flex-row items-end gap-1">
+              <View className="h-24 flex-row items-end gap-1">
                 {hourly.map((h) => (
                   <View key={h.label} className="flex-1 items-center justify-end">
-                    {h.count > 0 ? <Text className="text-[9px] font-bold text-blue-700">{h.count}</Text> : null}
+                    {h.count > 0 ? <Text className="text-[8.5px] font-bold text-blue-700">{h.count}</Text> : null}
                     <View className={`w-full rounded-t ${h.count === maxHour ? 'bg-blue-700' : 'bg-blue-400'}`} style={{ height: `${Math.max(2, (h.count / maxHour) * 85)}%` }} />
                   </View>
                 ))}
               </View>
               <View className="mt-1 flex-row gap-1">
                 {hourly.map((h) => (
-                  <Text key={h.label} className="flex-1 text-center text-[8px] text-slate-400">{h.label}</Text>
+                  <Text key={h.label} className="flex-1 text-center text-[7.5px] text-slate-400">{h.label}</Text>
                 ))}
               </View>
-              <Text className="mt-1 text-right text-[10px] text-slate-400">Peak hours throughput analysis</Text>
+              <Text className="mt-1 text-right text-[9.5px] text-slate-400">Peak hours throughput analysis</Text>
             </View>
           ) : (
             <Text className="py-4 text-center text-xs text-slate-400">No hourly repairs distribution recorded for this date.</Text>
@@ -335,19 +341,19 @@ export default function AdminDashboardScreen() {
 
       {/* Quick command launcher */}
       <Section icon="zap" iconColor="#f59e0b" title="Quick Command Launcher">
-        <View className="gap-2">
+        <View className="gap-1.5">
           {QUICK_ACTIONS.filter((a) => hasPermission(user, a.permission)).map((a) => (
-            <TouchableOpacity key={a.to} onPress={() => go(a.to)} className="flex-row items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/60 p-2.5">
-              <View className="flex-1 flex-row items-center gap-2.5">
-                <View className="h-8 w-8 items-center justify-center rounded-xl bg-white">
-                  <Icon name={a.icon} color="#334155" size={16} />
+            <TouchableOpacity key={a.to} onPress={() => go(a.to)} className="flex-row items-center justify-between gap-2.5 rounded-xl border border-slate-100 bg-slate-50/60 p-2">
+              <View className="flex-1 flex-row items-center gap-2">
+                <View className="h-7 w-7 items-center justify-center rounded-lg bg-white shadow-2xs">
+                  <Icon name={a.icon} color="#334155" size={14} />
                 </View>
                 <View className="flex-1">
                   <Text className="text-xs font-bold text-slate-800" numberOfLines={1}>{a.label}</Text>
-                  <Text className="text-[10px] text-slate-400" numberOfLines={1}>{a.desc}</Text>
+                  <Text className="text-[9.5px] text-slate-400" numberOfLines={1}>{a.desc}</Text>
                 </View>
               </View>
-              <Text className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-600">{a.badge}</Text>
+              <Text className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[8.5px] font-black uppercase tracking-wider text-slate-600">{a.badge}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -361,30 +367,30 @@ export default function AdminDashboardScreen() {
         sub="Live dispatches of repaired packs returned to customer fleets"
       >
         {hasPermission(user, 'returns') && (
-          <TouchableOpacity onPress={() => go('/returns')} className="mb-3 self-start rounded-xl bg-teal-50 px-3 py-1.5">
-            <Text className="text-xs font-bold text-teal-700">Manage All Returns →</Text>
+          <TouchableOpacity onPress={() => go('/returns')} className="mb-2.5 self-start rounded-lg bg-teal-50 px-2.5 py-1">
+            <Text className="text-[11px] font-bold text-teal-700">Manage All Returns →</Text>
           </TouchableOpacity>
         )}
         {returns.length === 0 ? (
           <Text className="py-6 text-center text-xs text-slate-400">No recent client return dispatches recorded.</Text>
         ) : (
-          <View className="gap-2.5">
+          <View className="gap-2">
             {returns.map((ret) => (
-              <TouchableOpacity key={ret.id} onPress={() => go(`/returns/${ret.id}`)} className="rounded-2xl border border-slate-200 bg-white p-3.5">
+              <TouchableOpacity key={ret.id} onPress={() => go(`/returns/${ret.id}`)} className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs">
                 <View className="flex-row items-start justify-between gap-2">
                   <View className="flex-1">
-                    <Text className="self-start rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-teal-700">✓ Dispatched</Text>
-                    <Text className="mt-2 text-xs font-black text-slate-900" numberOfLines={1}>{ret.clientName}</Text>
+                    <Text className="self-start rounded-md bg-teal-50 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-teal-700">✓ Dispatched</Text>
+                    <Text className="mt-1.5 text-xs font-black text-slate-900" numberOfLines={1}>{ret.clientName}</Text>
                   </View>
-                  <Text className="rounded-xl bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-800">
+                  <Text className="rounded-lg bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-bold text-slate-800">
                     {ret.batteryCount} {ret.batteryCount === 1 ? 'pack' : 'packs'}
                   </Text>
                 </View>
-                <View className="mt-2.5 flex-row items-center justify-between border-t border-slate-100 pt-2">
-                  <Text className="flex-1 text-[11px] text-slate-400" numberOfLines={1}>
+                <View className="mt-2 flex-row items-center justify-between border-t border-slate-100 pt-1.5">
+                  <Text className="flex-1 text-[10px] text-slate-400" numberOfLines={1}>
                     Truck {ret.truckNumber || 'N/A'} {ret.driverName ? `• ${ret.driverName}` : ''}
                   </Text>
-                  <Text className="text-[11px] font-bold text-slate-400">
+                  <Text className="text-[10px] font-bold text-slate-400">
                     {ret.returnedAt ? new Date(ret.returnedAt).toLocaleDateString([], { day: '2-digit', month: 'short' }) : ''}
                   </Text>
                 </View>

@@ -19,6 +19,9 @@ import {
   FiPackage,
 } from 'react-icons/fi';
 
+// pendingExitHrefRef marker: the page's Back button, not a link
+const BACK = Symbol('back');
+
 // Why a scanned battery can't be started — mirrors mobile BatteryDetailScreen.
 export const BLOCKED_STATUS_MESSAGES = {
   in_progress: 'This battery is already being worked on by another technician.',
@@ -37,6 +40,40 @@ function fmtDateTime(value) {
   return `${d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })} · ${d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
 }
 
+// "45 min", "2 h 5 min" — how long ago a repair was started
+function sinceText(value) {
+  if (!value) return '';
+  const mins = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000));
+  if (mins < 1) return 'less than a minute';
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60);
+  if (h < 24) return `${h} h ${mins % 60} min`;
+  return `${Math.floor(h / 24)} day${h >= 48 ? 's' : ''} ${h % 24} h`;
+}
+
+// Title + body for a battery another technician started and left unfinished.
+export function WorkAlreadyStarted({ battery }) {
+  return (
+    <>
+      <h3 className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Work Already Started</h3>
+      <p className="mb-3 text-xs leading-relaxed text-slate-500 dark:text-neutral-400">
+        <span className="font-bold text-slate-800 dark:text-white">{battery?.battery_code}</span> is being repaired by{' '}
+        <span className="font-bold text-slate-800 dark:text-white">{battery?.started_by_name || 'another technician'}</span>.
+        The repair is paused / not finished yet, so you can't start work on it.
+      </p>
+      <div className="mb-5 space-y-1 rounded-xl border border-amber-200 bg-amber-50 p-3 text-left text-[11px] text-amber-800 dark:border-amber-800/60 dark:bg-amber-950/40 dark:text-amber-300">
+        <div>Technician: <span className="font-bold">{battery?.started_by_name || '—'}</span></div>
+        {battery?.work_started_at && (
+          <div>
+            Started: <span className="font-bold">{fmtDateTime(battery.work_started_at)}</span> ({sinceText(battery.work_started_at)} ago)
+          </div>
+        )}
+        <div>Ask them to finish it, or scan another battery.</div>
+      </div>
+    </>
+  );
+}
+
 function isSamePerson(name, user) {
   return Boolean(name && user?.name && name.trim().toLowerCase() === user.name.trim().toLowerCase());
 }
@@ -51,6 +88,7 @@ function TechnicianRepairPanel({
   returns = [],
   onUpdated,
   onDone,
+  onBack,
 }) {
   const navigate = useNavigate();
   const user = useSelector((state) => state.auth.user);
@@ -127,6 +165,8 @@ function TechnicianRepairPanel({
   // login sees the moment they scan a battery that isn't simply "ready to
   // start" — blocked, already repaired, unserviceable, passed back.
   const [blockedStatus, setBlockedStatus] = useState(null);
+  // own running repair scanned again: "continue this battery?"
+  const [showResumeModal, setShowResumeModal] = useState(false);
   const [showRepairedByModal, setShowRepairedByModal] = useState(false);
   const [showUnserviceableAlertModal, setShowUnserviceableAlertModal] = useState(false);
   const [showTestingDecisionModal, setShowTestingDecisionModal] = useState(false);
@@ -209,7 +249,7 @@ function TechnicianRepairPanel({
   })();
 
   // Passed-back / parts-pending card: who failed it in testing and what must
-  // come out before rework.
+  // come out (the battery is unserviceable).
   const cantServiceAlertData = (() => {
     const fittedParts = pendingPartsRemoval.length > 0 ? pendingPartsRemoval : activeHistory;
     const testerStaffName =
@@ -257,7 +297,9 @@ function TechnicianRepairPanel({
       setShowPassedBackScanModal(true);
       return;
     }
-    if (status === 'unserviceable' || status === 'recycled') {
+    // unserviceable — with or without its parts removed — or recycled: the red
+    // "not serviceable" alert with the full history (fitted, tested, removed)
+    if (status === 'unserviceable' || status === 'tested_parts_removed' || status === 'recycled') {
       setShowUnserviceableAlertModal(true);
       return;
     }
@@ -267,10 +309,11 @@ function TechnicianRepairPanel({
       }
       return;
     }
-    // tested_parts_removed falls through to "Not Available": rework is not
-    // allowed on a unit whose parts were reclaimed (handleStartWork and the
-    // backend both reject it), so never offer a Start Work button for it.
-    if (status !== 'in_repair' && !isOwnInProgress && !hasPending) {
+    if (isOwnInProgress) {
+      setShowResumeModal(true);
+      return;
+    }
+    if (status !== 'in_repair' && !hasPending) {
       setBlockedStatus(status);
     }
   }, [fromScan, battery?.id, battery?.status, isIntakeUnverified, isPassedBack, isOwnInProgress, pendingPartsRemoval?.length, user?.role, canTest]);
@@ -361,6 +404,13 @@ function TechnicianRepairPanel({
       e.returnValue = '';
     }
     function onClickCapture(e) {
+      if (e.target.closest?.('[data-exit-guard-back]')) {
+        e.preventDefault();
+        e.stopPropagation();
+        pendingExitHrefRef.current = BACK;
+        setShowExitConfirmModal(true);
+        return;
+      }
       const anchor = e.target.closest?.('a[href]');
       if (!anchor || anchor.target === '_blank' || anchor.hasAttribute('download')) return;
       const href = anchor.getAttribute('href');
@@ -383,7 +433,11 @@ function TechnicianRepairPanel({
     setShowExitConfirmModal(false);
     const href = pendingExitHrefRef.current;
     pendingExitHrefRef.current = null;
-    if (href && /^https?:\/\//.test(href)) {
+    allowExitRef.current = true;
+    if (href === BACK) {
+      if (onBack) onBack();
+      else navigate(-1);
+    } else if (href && /^https?:\/\//.test(href)) {
       window.location.href = href;
     } else {
       navigate(href || '/');
@@ -401,7 +455,6 @@ function TechnicianRepairPanel({
     try {
       await apiClient.patch(`/batteries/${battery.id}/start-testing`);
       if (onUpdated) onUpdated();
-      setSuccessPopup({ title: 'Testing Started', message: `The testing timer for ${battery.battery_code} is running.`, autoCloseMs: 1600 });
     } catch (err) {
       setError(err.response?.data?.message || err.message);
     } finally {
@@ -447,7 +500,6 @@ function TechnicianRepairPanel({
     try {
       await apiClient.patch(`/batteries/${battery.id}/start-work`);
       if (onUpdated) onUpdated();
-      setSuccessPopup({ title: 'Work Started', message: `You are now working on ${battery.battery_code}. The repair timer is running.`, autoCloseMs: 1600 });
     } catch (err) {
       const msg = err.response?.data?.message || err.message;
       setError(msg);
@@ -718,7 +770,7 @@ function TechnicianRepairPanel({
             </div>
           )}
           <div className="border-t border-amber-200/60 pt-1 text-[11px] font-bold text-amber-900 dark:text-amber-300">
-            Action: Please remove any fitted parts below before restarting rework.
+            Action: This battery is unserviceable — remove and restock every fitted part below.
           </div>
         </div>
       )}
@@ -1520,7 +1572,7 @@ function TechnicianRepairPanel({
                   {battery.battery_code}
                 </div>
                 <p className="mb-5 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed max-w-xs mx-auto">
-                  Testing has stopped and this unit has been moved back to the repair queue for technician rework.
+                  This battery is marked unserviceable and passed to a technician to remove its fitted parts.
                 </p>
                 <div className="flex flex-col gap-2.5">
                   <button
@@ -1618,7 +1670,7 @@ function TechnicianRepairPanel({
         </div>
       )}
 
-      {/* ── Scan Modal: Passed Back Battery (Rework Required) ── */}
+      {/* ── Scan Modal: Passed Back Battery (Remove Parts) ── */}
       {showPassedBackScanModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
           <div className="w-full max-w-sm rounded-3xl border border-amber-200 bg-white p-6 shadow-2xl dark:border-amber-900/60 dark:bg-surface-900 text-center animate-in fade-in zoom-in-95 duration-150">
@@ -1633,11 +1685,11 @@ function TechnicianRepairPanel({
             </div>
 
             <h3 className="mb-1 text-lg font-bold text-slate-900 dark:text-white">
-              Passed Back for Rework
+              Passed to You — Remove Parts
             </h3>
 
             <p className="mb-4 text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
-              This battery failed testing and was passed back for rework. Please remove any fitted parts before restarting repair work.
+              The supervisor marked this battery unserviceable and passed it to you to remove its fitted parts. Remove and restock every fitted part below.
             </p>
 
             {/* Scan Time & Battery Info Box */}
@@ -1749,7 +1801,7 @@ function TechnicianRepairPanel({
                   className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-amber-700 transition-colors cursor-pointer"
                 >
                   <span>▶</span>
-                  <span>Continue to Battery Rework</span>
+                  <span>Continue to Remove Parts</span>
                 </button>
               )}
               <button
@@ -1853,10 +1905,16 @@ function TechnicianRepairPanel({
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/80 backdrop-blur-xl p-4">
           <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150 text-center">
             <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl border border-red-200 bg-red-50 text-2xl dark:border-red-900/60 dark:bg-red-950/40">⏳</div>
-            <h3 className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Not Available</h3>
-            <p className="mb-5 text-xs leading-relaxed text-slate-500 dark:text-neutral-400">
-              {BLOCKED_STATUS_MESSAGES[blockedStatus] || 'This battery is not available to start work on.'}
-            </p>
+            {blockedStatus === 'in_progress' ? (
+              <WorkAlreadyStarted battery={battery} />
+            ) : (
+              <>
+                <h3 className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Not Available</h3>
+                <p className="mb-5 text-xs leading-relaxed text-slate-500 dark:text-neutral-400">
+                  {BLOCKED_STATUS_MESSAGES[blockedStatus] || 'This battery is not available to start work on.'}
+                </p>
+              </>
+            )}
             <div className="flex gap-2">
               <button
                 type="button"
@@ -2214,6 +2272,38 @@ function TechnicianRepairPanel({
           </div>
         );
       })()}
+
+      {/* ── Resume Confirmation (own running repair scanned again) ── */}
+      {showResumeModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-slate-200 bg-white p-6 shadow-2xl dark:border-white/10 dark:bg-surface-900 animate-in fade-in zoom-in-95 duration-150">
+            <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border border-blue-200 bg-blue-50 text-2xl dark:border-blue-800/60 dark:bg-blue-950/40">⏱</div>
+            <h3 className="mb-1.5 text-lg font-bold text-slate-900 dark:text-white">Continue This Battery?</h3>
+            <p className="mb-3 text-xs leading-relaxed text-slate-500 dark:text-neutral-400">
+              You already started work on <span className="font-bold text-slate-800 dark:text-white">{battery.battery_code}</span> and left it unfinished. Do you want to continue the repair?
+            </p>
+            {battery.work_started_at && (
+              <div className="mb-5 rounded-xl border border-blue-200/80 bg-blue-50/80 p-3 text-[11px] font-semibold text-blue-800 dark:border-blue-800/60 dark:bg-blue-950/40 dark:text-blue-300">
+                Started {fmtDateTime(battery.work_started_at)} · running {sinceText(battery.work_started_at)}
+              </div>
+            )}
+            <div className="flex flex-col gap-2.5">
+              <button type="button" onClick={() => setShowResumeModal(false)} className="w-full rounded-xl bg-blue-600 py-3.5 text-sm font-bold text-white shadow-md hover:bg-blue-700">Yes, Continue Repair</button>
+              <button
+                type="button"
+                onClick={() => {
+                  setShowResumeModal(false);
+                  allowExitRef.current = true;
+                  handleScanNext();
+                }}
+                className="w-full rounded-xl border border-slate-200 bg-slate-100 py-3 text-xs font-semibold text-slate-700 hover:bg-slate-200 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300"
+              >
+                No, Scan Another Battery
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Exit Confirmation (leaving an active scan / repair session) ── */}
       {showExitConfirmModal && (

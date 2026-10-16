@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Dimensions, Modal, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { Animated, Dimensions, Modal, ScrollView, Text, TouchableOpacity, View, Platform } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useDispatch, useSelector } from 'react-redux';
 import Svg, { Path } from 'react-native-svg';
@@ -107,8 +107,8 @@ export default function AdminSidebar({ visible, onClose }) {
 
   useEffect(() => {
     Animated.parallel([
-      Animated.timing(translateX, { toValue: visible ? 0 : PANEL_WIDTH, duration: 240, useNativeDriver: true }),
-      Animated.timing(backdropOpacity, { toValue: visible ? 1 : 0, duration: 240, useNativeDriver: true }),
+      Animated.timing(translateX, { toValue: visible ? 0 : PANEL_WIDTH, duration: 240, useNativeDriver: Platform.OS !== 'web' }),
+      Animated.timing(backdropOpacity, { toValue: visible ? 1 : 0, duration: 240, useNativeDriver: Platform.OS !== 'web' }),
     ]).start();
   }, [visible, translateX, backdropOpacity, PANEL_WIDTH]);
 

@@ -7,8 +7,9 @@ import { isLikelyRfidTag } from '../../../utils/scan-input';
 import extractBatteryCode from '../../../utils/extract-battery-code';
 import { StatusBadge } from '../../../components/ui/primitives/Badge';
 import { canTestBatteries, isIntakeUnverified } from '../../../utils/permissions';
+import { FiCamera, FiSearch, FiArrowRight, FiCpu, FiX } from 'react-icons/fi';
 
-const SUGGESTION_LIMIT = 8;
+const SUGGESTION_LIMIT = 20;
 const DEBOUNCE_MS = 250;
 
 // A technician's entry point to start work: scan a battery's QR code (with
@@ -143,87 +144,127 @@ function TechnicianHomePage() {
     setManualCode('');
   }
 
+  const roleName = effectiveUser?.staff_role === 'supervisor' ? 'Supervisor' : 'Technician';
+
   return (
-    <div className="flex min-h-[60vh] sm:min-h-[75vh] flex-col items-center justify-center px-3 py-4 sm:py-8 text-center">
-      <div className="mb-3 sm:mb-5 flex h-14 w-14 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-emerald-500/10 ring-1 ring-emerald-500/20">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="#059669"
-          strokeWidth="2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="h-6 w-6 sm:h-8 sm:w-8"
-        >
-          <path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z" />
-          <circle cx="12" cy="13" r="3" />
-        </svg>
-      </div>
-
-      <h1 className="text-base sm:text-lg font-semibold text-slate-900 dark:text-white">Scan a Battery to Begin</h1>
-      <p className="mt-1 sm:mt-2 max-w-xs text-center text-xs sm:text-sm text-slate-500 dark:text-neutral-400">
-        Scan the QR code on a battery to start work, log the parts you changed, and mark it complete.
-      </p>
-
-      <div className="mt-4 sm:mt-6 flex w-full max-w-xs flex-col items-center gap-2.5 sm:gap-3">
-        {cameraOpen ? (
-          <div className="w-full">
-            <QrScanner onScan={goToBattery} onClose={() => setCameraOpen(false)} />
+    <div className="min-h-[calc(100dvh-4rem)] flex flex-col items-center justify-center px-4 py-6 bg-slate-50/60 dark:bg-surface-950">
+      <div className="w-full max-w-sm sm:max-w-md mx-auto my-auto">
+        {/* ── Main Scan Hero Card ── */}
+        <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-6 sm:p-8 shadow-sm dark:border-white/10 dark:bg-surface-900 text-center">
+          {/* Emblem Icon */}
+          <div className="mx-auto mb-4 flex h-16 w-16 sm:h-18 sm:w-18 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 ring-1 ring-emerald-500/20 dark:bg-emerald-950/40 dark:text-emerald-400">
+            <FiCamera className="h-8 w-8 text-emerald-600 dark:text-emerald-400" />
           </div>
-        ) : (
-          <button
-            type="button"
-            onClick={() => setCameraOpen(true)}
-            disabled={checkingScan}
-            className="w-full rounded-xl bg-blue-600 px-4 py-2.5 sm:py-3.5 text-sm sm:text-base font-semibold text-white shadow-sm hover:bg-blue-700 active:bg-blue-800 disabled:opacity-50 transition-colors"
-          >
-            {checkingScan ? 'Checking Battery…' : 'Scan with Camera'}
-          </button>
-        )}
 
-        <div className="flex w-full items-center gap-2 text-[11px] sm:text-xs text-slate-400">
-          <div className="h-px flex-1 bg-slate-200 dark:bg-neutral-800" />
-          or search by code
-          <div className="h-px flex-1 bg-slate-200 dark:bg-neutral-800" />
-        </div>
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+            Scan a Battery to Begin
+          </h1>
+          <p className="mt-2 text-xs sm:text-sm text-slate-500 dark:text-neutral-400 max-w-xs mx-auto leading-relaxed">
+            Scan the QR code on a battery, tap an RFID reader, or enter the ID below to start work.
+          </p>
 
-        <div className="relative w-full">
-          <input
-            ref={inputRef}
-            type="text"
-            value={manualCode}
-            onChange={(e) => {
-              setManualCode(e.target.value);
-              setShowSuggestions(true);
-            }}
-            onKeyDown={handleManualKeyDown}
-            onFocus={() => setShowSuggestions(true)}
-            onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
-            placeholder="Type battery code"
-            autoCapitalize="characters"
-            autoComplete="off"
-            className="w-full rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 sm:px-3.5 sm:py-3 text-center text-sm sm:text-base font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/20 dark:border-blue-900/40 dark:bg-surface-900 dark:text-white dark:placeholder:text-neutral-500"
-          />
+          <div className="mt-6 flex flex-col items-center gap-3 w-full">
+            {cameraOpen ? (
+              <div className="w-full overflow-hidden rounded-2xl border border-slate-200 dark:border-white/10">
+                <QrScanner onScan={goToBattery} onClose={() => setCameraOpen(false)} />
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setCameraOpen(true)}
+                disabled={checkingScan}
+                className="w-full h-12 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white font-semibold text-sm sm:text-base flex items-center justify-center gap-2.5 shadow-xs transition-all disabled:opacity-50 cursor-pointer"
+              >
+                <FiCamera className="h-5 w-5" />
+                <span>{checkingScan ? 'Checking Battery…' : 'Scan with Camera'}</span>
+              </button>
+            )}
 
-          {showSuggestions && suggestions.length > 0 && (
-            <div className="absolute left-0 right-0 z-20 mt-1 max-h-64 overflow-y-auto rounded-xl border border-blue-200 bg-white shadow-xl dark:border-surface-700 dark:bg-surface-900 divide-y divide-slate-100 dark:divide-white/5">
-              {suggestions.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => goToBattery(item.battery_code)}
-                  className="flex w-full items-center justify-between px-3 py-2 sm:px-3.5 sm:py-3 text-left transition-colors hover:bg-slate-50 dark:hover:bg-surface-800"
-                >
-                  <span className="text-xs sm:text-sm font-semibold text-slate-900 dark:text-white">
-                    {item.battery_code}
-                  </span>
-                  <StatusBadge status={item.status} />
-                </button>
-              ))}
+            <div className="flex w-full items-center gap-3 text-xs font-medium text-slate-400 dark:text-neutral-500 my-2">
+              <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
+              <span>or search by code</span>
+              <div className="h-px flex-1 bg-slate-200 dark:bg-white/10" />
             </div>
-          )}
+
+            {/* Manual input & Quick submit */}
+            <div className="relative w-full text-left">
+              <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-slate-400">
+                <FiSearch className="h-4 w-4" />
+              </div>
+              <input
+                ref={inputRef}
+                type="text"
+                value={manualCode}
+                onChange={(e) => {
+                  setManualCode(e.target.value.toUpperCase());
+                  setShowSuggestions(true);
+                }}
+                onKeyDown={handleManualKeyDown}
+                onFocus={() => setShowSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                placeholder="Type battery code"
+                autoCapitalize="characters"
+                autoComplete="off"
+                className="h-11 w-full rounded-xl border border-slate-300 bg-slate-50/70 pl-11 pr-20 text-left text-xs sm:text-sm font-semibold tracking-wide text-slate-900 placeholder:text-left placeholder:normal-case placeholder:font-normal placeholder:tracking-normal placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500 transition-all uppercase"
+              />
+              {manualCode.trim() && (
+                <button
+                  type="button"
+                  onClick={() => setManualCode('')}
+                  className="absolute right-12 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+                >
+                  <FiX className="h-3.5 w-3.5" />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => {
+                  if (manualCode.trim()) {
+                    goToBattery(manualCode);
+                    setManualCode('');
+                  }
+                }}
+                disabled={!manualCode.trim()}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 h-8 px-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-30 disabled:hover:bg-emerald-600 text-white text-xs font-bold flex items-center gap-1 transition-all cursor-pointer"
+              >
+                <span>Go</span>
+                <FiArrowRight className="h-3.5 w-3.5" />
+              </button>
+
+              {/* Suggestions Dropdown (Longer & Richer) */}
+              {showSuggestions && suggestions.length > 0 && (
+                <div className="absolute left-0 right-0 z-30 mt-1.5 max-h-80 sm:max-h-96 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-1.5 shadow-2xl dark:border-white/10 dark:bg-surface-900 divide-y divide-slate-100 dark:divide-white/5">
+                  {suggestions.map((item) => (
+                    <button
+                      key={item.id}
+                      type="button"
+                      onMouseDown={(e) => e.preventDefault()}
+                      onClick={() => goToBattery(item.battery_code)}
+                      className="flex w-full items-center justify-between rounded-xl px-3.5 py-3 text-left transition-colors hover:bg-emerald-50/60 dark:hover:bg-surface-800 cursor-pointer"
+                    >
+                      <div className="flex flex-col min-w-0 pr-2">
+                        <span className="text-xs sm:text-sm font-bold tracking-wide text-slate-900 dark:text-white">
+                          {item.battery_code}
+                        </span>
+                        {item.client_name ? (
+                          <span className="text-[11px] text-slate-400 dark:text-neutral-400 truncate">
+                            {item.client_name}
+                          </span>
+                        ) : null}
+                      </div>
+                      <StatusBadge status={item.status} />
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Handheld & RFID hardware scan hint */}
+            <div className="mt-1 flex items-center justify-center gap-1.5 text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+              <FiCpu className="h-3.5 w-3.5 text-emerald-600 dark:text-emerald-400" />
+              <span>Handheld scanners &amp; RFID readers type directly</span>
+            </div>
+          </div>
         </div>
       </div>
 

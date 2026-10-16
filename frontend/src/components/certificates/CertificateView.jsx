@@ -280,40 +280,40 @@ function CertificateView({ certificate, clientName, showActions = true }) {
                   </svg>
 
                   {/* 1. Header & Registry Crest */}
-                  <div className="flex flex-row items-center justify-between border-b border-slate-200/90 dark:border-white/10 pb-4 gap-3">
-                    <div className="flex items-center gap-3 text-left">
-                      <div className={`flex h-11 w-11 items-center justify-center rounded-xl ${theme.accentBadge} shadow-xs shrink-0 ring-1 ring-black/5`}>
+                  <div className="flex flex-col sm:flex-row items-center justify-between border-b border-slate-200/90 dark:border-white/10 pb-4 gap-3 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row items-center gap-2.5 sm:gap-3">
+                      <div className={`flex h-10 w-10 sm:h-11 sm:w-11 items-center justify-center rounded-xl ${theme.accentBadge} shadow-xs shrink-0 ring-1 ring-black/5`}>
                         <FiShield className="w-5 h-5" />
                       </div>
                       <div>
-                        <span className="font-serif font-black text-sm sm:text-base tracking-[0.22em] uppercase text-slate-900 dark:text-white block">
+                        <span className="font-serif font-black text-xs sm:text-base tracking-[0.22em] uppercase text-slate-900 dark:text-white block">
                           Refurbnics International
                         </span>
-                        <span className="text-[10px] sm:text-[11px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-[0.16em] block">
+                        <span className="text-[9.5px] sm:text-[11px] text-slate-500 dark:text-neutral-400 font-bold uppercase tracking-[0.16em] block">
                           Global Battery Decarbonization Registry • ISO 14001:2015
                         </span>
                       </div>
                     </div>
 
-                    <div className="text-right flex items-center gap-2">
-                      <span className={`inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full ${theme.accentBadge} font-extrabold text-[11px] tracking-widest uppercase border shadow-xs`}>
-                        <FiAward className="w-4 h-4" />
+                    <div className="text-center sm:text-right flex items-center justify-center gap-2">
+                      <span className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-1 sm:py-1.5 rounded-full ${theme.accentBadge} font-extrabold text-[10px] sm:text-[11px] tracking-widest uppercase border shadow-xs`}>
+                        <FiAward className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{tier.badge} Tier Accreditation</span>
                       </span>
                     </div>
                   </div>
 
                   {/* 2. Certificate Title & Classical Presentation */}
-                  <div className="pt-4 pb-2 space-y-2">
-                    <span className={`text-xs sm:text-sm font-serif italic ${theme.accentText} uppercase tracking-[0.20em] block font-bold`}>
+                  <div className="pt-3 sm:pt-4 pb-2 space-y-1.5 sm:space-y-2">
+                    <span className={`text-[11px] sm:text-sm font-serif italic ${theme.accentText} uppercase tracking-[0.15em] sm:tracking-[0.20em] block font-bold leading-tight`}>
                       Official {tier.badge} Certificate of Environmental Leadership & Closed-Loop Decarbonization
                     </span>
-                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-serif font-black text-slate-900 dark:text-white tracking-wide uppercase leading-tight">
+                    <h1 className="text-xl sm:text-3xl md:text-4xl font-serif font-black text-slate-900 dark:text-white tracking-wide uppercase leading-tight">
                       Sustainability & Circular Economy Achievement
                     </h1>
 
                     {/* Classical Ornate Divider */}
-                    <div className="flex items-center justify-center gap-3 py-1.5 max-w-xl mx-auto">
+                    <div className="flex items-center justify-center gap-3 py-1 sm:py-1.5 max-w-xl mx-auto">
                       <div className="h-[1.5px] flex-1 bg-gradient-to-r from-transparent via-slate-400/80 to-slate-400 dark:via-white/30 dark:to-white/40" />
                       <div className="flex items-center gap-2 text-slate-500 dark:text-neutral-400">
                         <span className="w-1.5 h-1.5 rotate-45 border border-current" />
@@ -323,23 +323,23 @@ function CertificateView({ certificate, clientName, showActions = true }) {
                       <div className="h-[1.5px] flex-1 bg-gradient-to-l from-transparent via-slate-400/80 to-slate-400 dark:via-white/30 dark:to-white/40" />
                     </div>
 
-                    <p className="text-xs sm:text-sm text-slate-500 dark:text-neutral-400 italic font-serif pt-1">
+                    <p className="text-[11px] sm:text-sm text-slate-500 dark:text-neutral-400 italic font-serif pt-0.5 sm:pt-1">
                       By virtue of verified excellence in industrial zero-waste stewardship, this official accreditation is conferred upon
                     </p>
                   </div>
 
                   {/* 3. Recipient Enterprise Plaque */}
-                  <div className="my-4 flex justify-center">
-                    <div className={`py-4 sm:py-5 px-8 sm:px-16 rounded-2xl ${theme.plaqueBg} border-2 ${theme.plaqueBorder} shadow-md inline-block max-w-full text-center relative`}>
+                  <div className="my-3 sm:my-4 flex justify-center">
+                    <div className={`py-3 sm:py-5 px-5 sm:px-14 rounded-2xl ${theme.plaqueBg} border-2 ${theme.plaqueBorder} shadow-md inline-block max-w-full text-center relative`}>
                       <div className="absolute top-1.5 left-2 w-2.5 h-2.5 border-t border-l border-current opacity-30" />
                       <div className="absolute top-1.5 right-2 w-2.5 h-2.5 border-t border-r border-current opacity-30" />
                       <div className="absolute bottom-1.5 left-2 w-2.5 h-2.5 border-b border-l border-current opacity-30" />
                       <div className="absolute bottom-1.5 right-2 w-2.5 h-2.5 border-b border-r border-current opacity-30" />
 
-                      <h2 className="text-2xl sm:text-3xl md:text-4xl font-serif font-black text-slate-950 dark:text-white tracking-[0.16em] uppercase">
+                      <h2 className="text-xl sm:text-3xl md:text-4xl font-serif font-black text-slate-950 dark:text-white tracking-[0.14em] uppercase break-words">
                         {certClient}
                       </h2>
-                      <div className="mt-2 flex items-center justify-center gap-2.5 text-[10.5px] font-sans font-bold uppercase tracking-widest text-slate-600 dark:text-neutral-300">
+                      <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center justify-center gap-1.5 sm:gap-2.5 text-[9.5px] sm:text-[10.5px] font-sans font-bold uppercase tracking-widest text-slate-600 dark:text-neutral-300">
                         <span>Verified Enterprise Partner</span>
                         <span className="opacity-40">•</span>
                         <span className="font-mono">{certCode}</span>
@@ -348,56 +348,56 @@ function CertificateView({ certificate, clientName, showActions = true }) {
                   </div>
 
                   {/* 4. Certified ESG Impact Metrics Plaque Trio */}
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 my-4 max-w-4xl mx-auto w-full">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4 my-3 sm:my-4 max-w-4xl mx-auto w-full">
                     {/* Metric 1: Modules Recommissioned */}
-                    <div className={`p-4 rounded-xl border ${theme.innerBorder} ${theme.cardBg} flex items-center gap-3.5 text-left shadow-2xs`}>
-                      <div className={`w-11 h-11 rounded-xl ${theme.accentBadge} flex items-center justify-center shrink-0 shadow-xs ring-1 ring-black/5`}>
-                        <FiZap className="w-5 h-5" />
+                    <div className={`p-3 sm:p-4 rounded-xl border ${theme.innerBorder} ${theme.cardBg} flex items-center gap-3 text-left shadow-2xs`}>
+                      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl ${theme.accentBadge} flex items-center justify-center shrink-0 shadow-xs ring-1 ring-black/5`}>
+                        <FiZap className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 font-sans">
+                        <div className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 font-sans">
                           Recommissioned
                         </div>
-                        <div className="text-lg sm:text-xl font-serif font-black text-slate-900 dark:text-white leading-tight">
+                        <div className="text-base sm:text-xl font-serif font-black text-slate-900 dark:text-white leading-tight">
                           {count.toLocaleString()} <span className="text-xs font-sans font-bold text-slate-500 dark:text-neutral-400">Packs</span>
                         </div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-neutral-400 truncate font-sans">
+                        <div className="text-[9px] sm:text-[9.5px] text-slate-500 dark:text-neutral-400 truncate font-sans">
                           100% Closed-Loop Certified
                         </div>
                       </div>
                     </div>
 
                     {/* Metric 2: Carbon Abatement */}
-                    <div className={`p-4 rounded-xl border ${theme.innerBorder} ${theme.cardBg} flex items-center gap-3.5 text-left shadow-2xs`}>
-                      <div className={`w-11 h-11 rounded-xl ${theme.accentBadge} flex items-center justify-center shrink-0 shadow-xs ring-1 ring-black/5`}>
-                        <FiGlobe className="w-5 h-5" />
+                    <div className={`p-3 sm:p-4 rounded-xl border ${theme.innerBorder} ${theme.cardBg} flex items-center gap-3 text-left shadow-2xs`}>
+                      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl ${theme.accentBadge} flex items-center justify-center shrink-0 shadow-xs ring-1 ring-black/5`}>
+                        <FiGlobe className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 font-sans">
+                        <div className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 font-sans">
                           Carbon Abated
                         </div>
-                        <div className="text-lg sm:text-xl font-serif font-black text-slate-900 dark:text-white leading-tight">
+                        <div className="text-base sm:text-xl font-serif font-black text-slate-900 dark:text-white leading-tight">
                           ~{co2Tons} <span className="text-xs font-sans font-bold text-slate-500 dark:text-neutral-400">t CO₂e</span>
                         </div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-neutral-400 truncate font-sans">
+                        <div className="text-[9px] sm:text-[9.5px] text-slate-500 dark:text-neutral-400 truncate font-sans">
                           GHG Emissions Avoided
                         </div>
                       </div>
                     </div>
 
                     {/* Metric 3: Critical Metals Diverted */}
-                    <div className={`p-4 rounded-xl border ${theme.innerBorder} ${theme.cardBg} flex items-center gap-3.5 text-left shadow-2xs`}>
-                      <div className={`w-11 h-11 rounded-xl ${theme.accentBadge} flex items-center justify-center shrink-0 shadow-xs ring-1 ring-black/5`}>
-                        <FiLayers className="w-5 h-5" />
+                    <div className={`p-3 sm:p-4 rounded-xl border ${theme.innerBorder} ${theme.cardBg} flex items-center gap-3 text-left shadow-2xs`}>
+                      <div className={`w-9 h-9 sm:w-11 sm:h-11 rounded-xl ${theme.accentBadge} flex items-center justify-center shrink-0 shadow-xs ring-1 ring-black/5`}>
+                        <FiLayers className="w-4 h-4 sm:w-5 sm:h-5" />
                       </div>
                       <div className="min-w-0">
-                        <div className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 font-sans">
+                        <div className="text-[9.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 font-sans">
                           Circular Mass
                         </div>
-                        <div className="text-lg sm:text-xl font-serif font-black text-slate-900 dark:text-white leading-tight">
+                        <div className="text-base sm:text-xl font-serif font-black text-slate-900 dark:text-white leading-tight">
                           ~{ewasteKg} <span className="text-xs font-sans font-bold text-slate-500 dark:text-neutral-400">kg</span>
                         </div>
-                        <div className="text-[9.5px] text-slate-500 dark:text-neutral-400 truncate font-sans">
+                        <div className="text-[9px] sm:text-[9.5px] text-slate-500 dark:text-neutral-400 truncate font-sans">
                           Cathode & Mineral Salvage
                         </div>
                       </div>
@@ -405,17 +405,17 @@ function CertificateView({ certificate, clientName, showActions = true }) {
                   </div>
 
                   {/* 5. Formal Citation Body */}
-                  <p className="text-xs sm:text-sm text-slate-700 dark:text-neutral-300 max-w-3xl mx-auto leading-relaxed font-serif my-4 px-4">
+                  <p className="text-xs sm:text-sm text-slate-700 dark:text-neutral-300 max-w-3xl mx-auto leading-relaxed font-serif my-3 sm:my-4 px-2 sm:px-4">
                     For exceptional leadership in decarbonized urban mobility and zero-waste battery lifecycle governance. By reaching the <strong className="text-slate-900 dark:text-white font-bold">{tier.badge} milestone threshold</strong> and restoring, testing, and re-commissioning <strong className="text-slate-950 dark:text-white font-extrabold">{count.toLocaleString()} high-voltage battery modules</strong>, your enterprise has directly mitigated hazardous lithium contamination, extended valuable cell life, and significantly reduced global greenhouse emissions.
                   </p>
 
                   {/* 6. Footer Section: CEO Signature on Left, Rosette Medallion on Right */}
-                  <div className="w-full max-w-4xl mx-auto pt-8 mt-5 pb-5 border-t border-slate-200/90 dark:border-white/10 flex flex-row items-center justify-between px-6 sm:px-12 text-left">
+                  <div className="w-full max-w-4xl mx-auto pt-6 sm:pt-8 mt-4 sm:mt-5 pb-4 sm:pb-5 border-t border-slate-200/90 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6 px-4 sm:px-12 text-center sm:text-left">
                     {/* Left: CEO of Refurbnics Signature Block */}
-                    <div className="text-left flex flex-col items-start min-w-[240px]">
+                    <div className="flex flex-col items-center sm:items-start">
                       {/* Realistic Vector Handwritten Signature Stroke */}
-                      <div className="h-14 flex items-center justify-start">
-                        <svg viewBox="0 0 240 56" className="w-56 h-13 text-slate-800 dark:text-neutral-200" fill="none" xmlns="http://www.w3.org/2000/svg">
+                      <div className="h-12 sm:h-14 flex items-center justify-center sm:justify-start">
+                        <svg viewBox="0 0 240 56" className="w-48 sm:w-56 h-11 sm:h-13 text-slate-800 dark:text-neutral-200" fill="none" xmlns="http://www.w3.org/2000/svg">
                           <path
                             d="M 14 38 C 18 16, 26 8, 36 12 C 44 16, 36 44, 28 46 C 20 48, 24 32, 38 24 C 52 16, 68 28, 82 26 C 96 24, 98 38, 112 34 C 124 30, 138 18, 148 24 C 158 30, 152 42, 166 38 C 180 34, 194 20, 212 22 C 222 24, 230 32, 236 30 M 34 28 Q 70 24, 105 22 M 140 32 Q 175 28, 220 25"
                             stroke="currentColor"
@@ -425,50 +425,48 @@ function CertificateView({ certificate, clientName, showActions = true }) {
                           />
                         </svg>
                       </div>
-                      <div className="border-b-2 border-slate-300 dark:border-white/25 w-64 pb-1 text-left relative">
+                      <div className="border-b-2 border-slate-300 dark:border-white/25 w-56 sm:w-64 pb-1 text-center sm:text-left relative">
                         <span className="font-serif font-bold text-xs sm:text-sm text-slate-900 dark:text-white uppercase tracking-[0.14em] block whitespace-nowrap">
                           Chief Executive Officer
                         </span>
-                        <span className="absolute -bottom-1 right-0 w-1.5 h-1.5 rotate-45 bg-slate-400 dark:bg-white/40" />
+                        <span className="absolute -bottom-1 right-0 w-1.5 h-1.5 rotate-45 bg-slate-400 dark:bg-white/40 hidden sm:block" />
                       </div>
-                      <span className="text-[11px] text-slate-600 dark:text-neutral-300 uppercase tracking-wider block mt-1 font-sans font-bold">
+                      <span className="text-[10px] sm:text-[11px] text-slate-600 dark:text-neutral-300 uppercase tracking-wider block mt-1 font-sans font-bold">
                         Refurbnics International Ltd
                       </span>
                     </div>
 
                     {/* Right: 3D Starburst Rosette Medallion with Silk Ribbon Tails */}
-                    <div className="relative flex flex-col items-center justify-center shrink-0 min-w-[120px] pb-1">
-                      {/* Silk Ribbon Tails - Compact & Contained */}
-                      <div className="absolute top-7 flex gap-2.5 pointer-events-none">
+                    <div className="relative flex flex-col items-center justify-center shrink-0 min-w-[100px] sm:min-w-[120px] pb-1">
+                      {/* Silk Ribbon Tails */}
+                      <div className="absolute top-6 sm:top-7 flex gap-2 pointer-events-none">
                         <div
-                          className={`w-4.5 h-11 bg-gradient-to-b ${theme.ribbonGradient} shadow-md transform -rotate-12`}
+                          className={`w-3.5 sm:w-4.5 h-9 sm:h-11 bg-gradient-to-b ${theme.ribbonGradient} shadow-md transform -rotate-12`}
                           style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 50% 82%, 0% 100%)' }}
                         />
                         <div
-                          className={`w-4.5 h-11 bg-gradient-to-b ${theme.ribbonGradient} shadow-md transform rotate-12`}
+                          className={`w-3.5 sm:w-4.5 h-9 sm:h-11 bg-gradient-to-b ${theme.ribbonGradient} shadow-md transform rotate-12`}
                           style={{ clipPath: 'polygon(0% 0%, 100% 0%, 100% 100%, 50% 82%, 0% 100%)' }}
                         />
                       </div>
 
                       {/* Rosette Starburst Medallion */}
-                      <div className={`relative z-10 flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br ${theme.sealBg} text-white shadow-xl ring-2 ${theme.border}`}>
-                        {/* Metallic Concentric Edge Rings */}
+                      <div className={`relative z-10 flex h-16 w-16 sm:h-20 sm:w-20 items-center justify-center rounded-full bg-gradient-to-br ${theme.sealBg} text-white shadow-xl ring-2 ${theme.border}`}>
                         <svg className="absolute inset-0 w-full h-full text-white/30 pointer-events-none" viewBox="0 0 100 100">
                           <circle cx="50" cy="50" r="46" fill="none" stroke="currentColor" strokeWidth="1.5" strokeDasharray="3 2" />
                           <circle cx="50" cy="50" r="42" fill="none" stroke="currentColor" strokeWidth="0.75" />
                         </svg>
 
-                        {/* Inner Concentric Golden Rim */}
-                        <div className={`flex h-15 w-15 items-center justify-center rounded-full border-2 border-white/50 bg-gradient-to-br ${theme.sealInner} text-center p-1.5 shadow-inner`}>
+                        <div className={`flex h-12 w-12 sm:h-15 sm:w-15 items-center justify-center rounded-full border-2 border-white/50 bg-gradient-to-br ${theme.sealInner} text-center p-1 sm:p-1.5 shadow-inner`}>
                           <div className="text-center flex flex-col items-center justify-center">
-                            <span className="text-[7.5px] font-black tracking-widest text-amber-200 uppercase block leading-none">
+                            <span className="text-[6.5px] sm:text-[7.5px] font-black tracking-widest text-amber-200 uppercase block leading-none">
                               REFURBNICS
                             </span>
-                            <FiShield className="w-4 h-4 text-amber-300 mx-auto my-0.5" />
-                            <span className="text-[6.5px] font-black text-white/95 uppercase tracking-wider block leading-none">
+                            <FiShield className="w-3 h-3 sm:w-4 sm:h-4 text-amber-300 mx-auto my-0.5" />
+                            <span className="text-[5.5px] sm:text-[6.5px] font-black text-white/95 uppercase tracking-wider block leading-none">
                               OFFICIAL SEAL
                             </span>
-                            <span className="text-[6px] font-bold text-amber-200/90 uppercase tracking-tighter block leading-none mt-0.5">
+                            <span className="text-[5px] sm:text-[6px] font-bold text-amber-200/90 uppercase tracking-tighter block leading-none mt-0.5">
                               {tier.badge} TIER
                             </span>
                           </div>
@@ -478,7 +476,7 @@ function CertificateView({ certificate, clientName, showActions = true }) {
                   </div>
 
                   {/* 7. Bottom Security Registry Line & SHA-256 Hash Tag */}
-                  <div className="pt-3 mt-2 border-t border-slate-200/70 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between text-[10px] text-slate-400 dark:text-neutral-500 font-mono gap-1.5">
+                  <div className="pt-3 mt-2 border-t border-slate-200/70 dark:border-white/10 flex flex-col sm:flex-row items-center justify-between text-[9.5px] sm:text-[10px] text-slate-400 dark:text-neutral-500 font-mono gap-1 text-center sm:text-left">
                     <span>REGISTRY ID: {certCode}</span>
                     <span className="text-slate-500 dark:text-neutral-400 font-bold">{shaTag}</span>
                     <span>TIER: {tier.badge.toUpperCase()} • 100% CLOSED-LOOP COMPLIANT</span>
@@ -507,7 +505,35 @@ function CertificateView({ certificate, clientName, showActions = true }) {
             </span>
           </div>
 
-          <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 custom-scrollbar">
+          {/* Mobile Stacked Card View (< md) */}
+          <div className="block md:hidden space-y-2">
+            {breakdown.map((item, idx) => (
+              <div
+                key={idx}
+                className="p-3 rounded-xl border border-slate-200/90 bg-white dark:border-white/10 dark:bg-surface-900 shadow-2xs space-y-1.5 text-left"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-bold text-xs text-slate-900 dark:text-white">{item.nameEn}</span>
+                  <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-400 shrink-0">
+                    {item.formattedAmount}
+                  </span>
+                </div>
+                <div className="flex items-center gap-2 text-[10.5px] font-mono text-slate-600 dark:text-neutral-400">
+                  <span>{item.formula}</span>
+                  <span>•</span>
+                  <span>CAS {item.casNo}</span>
+                  <span>•</span>
+                  <span className="font-bold text-slate-700 dark:text-neutral-300">{item.weightPct}</span>
+                </div>
+                <p className="text-[10px] text-slate-500 dark:text-neutral-400 leading-snug">
+                  {item.role}
+                </p>
+              </div>
+            ))}
+          </div>
+
+          {/* Desktop Full Table View (>= md) */}
+          <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 custom-scrollbar">
             <table className="w-full text-left text-xs">
               <thead className="bg-slate-50 border-b border-slate-200 dark:bg-surface-800 dark:border-white/10">
                 <tr>

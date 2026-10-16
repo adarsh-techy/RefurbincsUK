@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshControl, ScrollView, Text, TouchableOpacity, View } from 'react-native';
+import { RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import apiClient from '../../services/api-client';
 import DateField from '../../components/admin/DateField';
-import { ErrorBox, PageHead, SearchBox, Stat, money } from '../../components/admin/sa4/ui';
+import { ErrorBox, money } from '../../components/admin/sa4/ui';
+import Icon from '../../components/ui/Icon';
 
-// Finance & Billing (super_admin) — the phone version of the web FinancePage:
-// GET /finance/summary?preset=&breakdown=&from=&to= → the six KPI cards, the
-// revenue trend chart and the monthly / daily breakdown. Tap a period (or
-// "View Statement") for FinanceDetail { type, period, label }.
+// Finance & Billing (super_admin)
+// Polished executive redesign with zero horizontal scrolling, responsive bar chart,
+// compact KPI grid, wrapping date filter pills, and itemized period cards.
 
 const PRESETS = [
   { id: 'all', label: 'All Time' },
@@ -22,43 +22,82 @@ const PRESETS = [
 ];
 
 export function avgPerUnit(t) {
-  return t.avgRevenuePerBattery || (t.batteriesCount > 0 ? (Number(t.repairRevenue || 0) + Number(t.servicesRevenue || 0)) / t.batteriesCount : 0);
+  if (!t) return 0;
+  return (
+    t.avgRevenuePerBattery ||
+    (t.batteriesCount > 0
+      ? (Number(t.repairRevenue || 0) + Number(t.servicesRevenue || 0)) / t.batteriesCount
+      : 0)
+  );
 }
 
-// the six KPI cards shared with the statement page
-export function FinanceKpis({ totals: t }) {
+// 6 Balanced Financial Stat Cards (shared with statement screen)
+export function FinanceKpis({ totals: t = {} }) {
+  const avg = avgPerUnit(t);
+
+  const kpis = [
+    { label: 'Total Revenue', value: money(t.totalRevenue), sub: 'All services & recycling', tone: 'text-emerald-700', bg: 'bg-emerald-50/70 border-emerald-200/90' },
+    { label: 'Parts Service', value: money(t.repairRevenue), sub: 'Fitting & part charges', tone: 'text-slate-900', bg: 'bg-white border-slate-200' },
+    { label: 'Service & Fees', value: money(t.servicesRevenue), sub: `${t.servicesCount || 0} diagnostic & tests`, tone: 'text-indigo-700', bg: 'bg-indigo-50/70 border-indigo-200/90' },
+    { label: 'Recycle Scrap', value: money(t.recycleRevenue), sub: 'End-of-life battery payout', tone: 'text-amber-700', bg: 'bg-amber-50/70 border-amber-200/90' },
+    { label: 'Units Serviced', value: `${t.batteriesCount || 0} units`, sub: 'Unique batteries handled', tone: 'text-slate-900', bg: 'bg-white border-slate-200' },
+    { label: 'Avg. per Unit', value: money(avg), sub: 'Average revenue / pack', tone: 'text-purple-700', bg: 'bg-purple-50/70 border-purple-200/90' },
+  ];
+
   return (
-    <View className="flex-row flex-wrap justify-between gap-y-3">
-      <Stat icon="zap" label="Total Revenue" value={money(t.totalRevenue)} tone="good" sub="All services & recycling" />
-      <Stat icon="wrench" label="Parts Service" value={money(t.repairRevenue)} tone="neutral" sub="Fitting & part charges" />
-      <Stat icon="grid" label="Service & Fees" value={money(t.servicesRevenue)} tone="info" sub={`${t.servicesCount || 0} diagnostic & tests`} />
-      <Stat icon="rotateCcw" label="Recycle Scrap" value={money(t.recycleRevenue)} tone="warning" sub="End-of-life battery payout" />
-      <Stat icon="battery" label="Units Serviced" value={`${t.batteriesCount || 0} units`} tone="good" sub="Unique batteries handled" />
-      <Stat icon="award" label="Avg. per Unit" value={money(avgPerUnit(t))} tone="purple" sub="Average revenue per battery" />
+    <View className="flex-row flex-wrap gap-2">
+      {kpis.map((k) => (
+        <View key={k.label} className={`min-w-[46%] flex-1 rounded-xl border p-2.5 shadow-2xs ${k.bg}`}>
+          <Text className="text-[9.5px] font-bold uppercase tracking-wider text-slate-500" numberOfLines={1}>
+            {k.label}
+          </Text>
+          <Text className={`mt-0.5 text-base font-black ${k.tone}`} numberOfLines={1}>
+            {k.value}
+          </Text>
+          <Text className="mt-0.5 text-[9px] text-slate-400 font-medium" numberOfLines={1}>
+            {k.sub}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
 
-function TrendChart({ series }) {
-  const max = Math.max(1, ...series.map((s) => Number(s.count) || 0));
+// Responsive Revenue Trend Chart — ZERO HORIZONTAL SCROLLING
+function ResponsiveTrendChart({ series }) {
+  // Fit up to the last 6 periods cleanly on screen without horizontal scroll
+  const displaySeries = useMemo(() => {
+    if (!series || series.length === 0) return [];
+    return series.slice(-6);
+  }, [series]);
+
+  const max = Math.max(1, ...displaySeries.map((s) => Number(s.count) || 0));
+
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      <View className="h-44 flex-row items-end gap-2 pr-2">
-        {series.map((s, i) => {
-          const v = Number(s.count) || 0;
-          const last = i === series.length - 1;
-          return (
-            <View key={`${s.label}-${i}`} className="w-12 items-center">
-              <Text className="mb-1 text-[9px] font-bold text-slate-500" numberOfLines={1}>{v ? `£${Math.round(v)}` : ''}</Text>
-              <View className="h-28 w-7 justify-end">
-                <View className={`w-full rounded-t-md ${last ? 'bg-emerald-700' : 'bg-emerald-500'}`} style={{ height: `${Math.max(v > 0 ? 6 : 2, (v / max) * 100)}%` }} />
-              </View>
-              <Text className="mt-1 text-center text-[9px] text-slate-500" numberOfLines={2}>{s.label}</Text>
+    <View className="h-40 flex-row items-end justify-between px-1 pt-2">
+      {displaySeries.map((s, i) => {
+        const v = Number(s.count) || 0;
+        const last = i === displaySeries.length - 1;
+        const heightPct = Math.max(v > 0 ? 8 : 3, Math.round((v / max) * 100));
+
+        return (
+          <View key={`${s.label}-${i}`} className="flex-1 items-center px-0.5">
+            <Text className="mb-1 text-[8.5px] font-bold text-slate-500" numberOfLines={1}>
+              {v >= 1000 ? `£${(v / 1000).toFixed(1)}k` : v ? `£${Math.round(v)}` : ''}
+            </Text>
+            <View className="h-24 w-full max-w-[28px] justify-end">
+              <View
+                className={`w-full rounded-t-md ${last ? 'bg-emerald-600' : 'bg-emerald-400'}`}
+                style={{ height: `${heightPct}%` }}
+              />
             </View>
-          );
-        })}
-      </View>
-    </ScrollView>
+            <Text className="mt-1 text-center text-[9px] font-medium text-slate-500" numberOfLines={2}>
+              {s.label}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
   );
 }
 
@@ -122,66 +161,171 @@ export default function AdminFinanceScreen() {
   return (
     <ScrollView
       className="flex-1 bg-slate-50"
-      contentContainerClassName="p-4 pb-16 gap-4"
+      contentContainerClassName="p-3.5 pb-20 gap-3"
+      keyboardShouldPersistTaps="handled"
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} />}
     >
-      <PageHead title="Finance & Billing" description="Comprehensive repair revenue, recycling revenue, and total financial performance." />
+      {/* Executive Header Card with Live Counters Strip */}
+      <View className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+        <View className="flex-row items-start justify-between gap-2">
+          <View className="flex-1">
+            <View className="flex-row items-center gap-1.5 flex-wrap">
+              <Text className="text-base font-black text-slate-900">Finance & Billing</Text>
+              <View className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5">
+                <Text className="text-[10px] font-bold text-emerald-800">Fiscal Governance</Text>
+              </View>
+            </View>
+            <Text className="mt-0.5 text-[11px] text-slate-500 leading-4">
+              Comprehensive repair revenue, recycling scrap payouts, and period billing performance.
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => { setLoading(true); load(); }}
+            className="flex-row items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 shadow-2xs"
+          >
+            <Icon name="refresh" size={11} color="#64748b" />
+            <Text className="text-[10.5px] font-semibold text-slate-700">Sync</Text>
+          </TouchableOpacity>
+        </View>
 
-      <View className="gap-3 rounded-2xl border border-slate-200 bg-white p-3">
-        <Text className="text-xs font-bold text-slate-500">Date Filter:</Text>
-        <View className="flex-row flex-wrap gap-1.5">
+        {/* Live Counters Strip */}
+        <View className="flex-row items-center gap-2 pt-2 mt-2 border-t border-slate-100 flex-wrap">
+          <Text className="text-[10.5px] text-slate-500">
+            Total: <Text className="font-black text-emerald-700">{money(totals.totalRevenue)}</Text>
+          </Text>
+          <Text className="text-slate-300">•</Text>
+          <Text className="text-[10.5px] text-slate-700">
+            Parts: <Text className="font-bold">{money(totals.repairRevenue)}</Text>
+          </Text>
+          <Text className="text-slate-300">•</Text>
+          <Text className="text-[10.5px] text-indigo-700">
+            Service: <Text className="font-bold">{money(totals.servicesRevenue)}</Text>
+          </Text>
+          <Text className="text-slate-300">•</Text>
+          <Text className="text-[10.5px] text-amber-700">
+            Recycle: <Text className="font-bold">{money(totals.recycleRevenue)}</Text>
+          </Text>
+          <Text className="text-slate-300">•</Text>
+          <Text className="text-[10.5px] text-slate-600">
+            Units: <Text className="font-bold">{totals.batteriesCount || 0}</Text>
+          </Text>
+        </View>
+      </View>
+
+      {/* Date Filter Toolbar — WRAPPING (Zero Horizontal Scrolling) */}
+      <View className="gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
+        <View className="flex-row items-center justify-between">
+          <Text className="text-[10.5px] font-bold uppercase tracking-wider text-slate-500">Date Filters</Text>
+          <View className="flex-row items-center gap-2">
+            <View className="flex-row rounded-lg bg-slate-100 p-0.5">
+              {[
+                { id: 'month', label: 'Monthly' },
+                { id: 'day', label: 'Daily' },
+              ].map((b) => (
+                <TouchableOpacity
+                  key={b.id}
+                  onPress={() => setBreakdownType(b.id)}
+                  className={`rounded-md px-2 py-0.5 ${breakdownType === b.id ? 'bg-white shadow-2xs' : ''}`}
+                >
+                  <Text className={`text-[10.5px] font-bold ${breakdownType === b.id ? 'text-slate-900' : 'text-slate-500'}`}>
+                    {b.label}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            {hasActiveFilters ? (
+              <TouchableOpacity onPress={clearAll} hitSlop={6}>
+                <Text className="text-[11px] font-bold text-rose-600">✕ Reset</Text>
+              </TouchableOpacity>
+            ) : null}
+          </View>
+        </View>
+
+        {/* Presets — WRAPPING */}
+        <View className="flex-row flex-wrap gap-1">
           {PRESETS.map((p) => {
             const active = datePreset === p.id;
             return (
-              <TouchableOpacity key={p.id} onPress={() => setDatePreset(p.id)} className={`rounded-lg px-3 py-1.5 ${active ? 'bg-blue-600' : 'bg-slate-100'}`}>
-                <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{p.label}</Text>
+              <TouchableOpacity
+                key={p.id}
+                onPress={() => setDatePreset(p.id)}
+                className={`rounded-lg border px-2 py-1 ${
+                  active ? 'border-slate-900 bg-slate-900' : 'border-slate-200 bg-slate-50/80'
+                }`}
+              >
+                <Text className={`text-[10px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>
+                  {p.label}
+                </Text>
               </TouchableOpacity>
             );
           })}
         </View>
-        <View className="flex-row items-center gap-2">
-          <Text className="text-xs font-bold text-slate-500">View By:</Text>
-          <View className="flex-1 flex-row rounded-xl bg-slate-100 p-1">
-            {[['month', 'Monthly'], ['day', 'Daily']].map(([id, label]) => (
-              <TouchableOpacity key={id} onPress={() => setBreakdownType(id)} className={`flex-1 items-center rounded-lg py-1.5 ${breakdownType === id ? 'bg-white' : ''}`}>
-                <Text className={`text-xs font-bold ${breakdownType === id ? 'text-slate-900' : 'text-slate-500'}`}>{label}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
+
+        {/* Custom Date Range */}
         {datePreset === 'custom' && (
-          <View className="gap-3 border-t border-slate-100 pt-3">
-            <DateField label="From:" value={customFrom} onChange={setCustomFrom} />
-            <DateField label="To:" value={customTo} onChange={setCustomTo} />
+          <View className="flex-row gap-2 pt-1 border-t border-slate-100">
+            <View className="flex-1">
+              <DateField label="From:" value={customFrom} onChange={setCustomFrom} quick={false} />
+            </View>
+            <View className="flex-1">
+              <DateField label="To:" value={customTo} onChange={setCustomTo} quick={false} />
+            </View>
           </View>
         )}
       </View>
 
-      {loading && !refreshing ? <Text className="py-6 text-center text-xs text-slate-400">Loading financial breakdown…</Text> : null}
+      {loading && !refreshing ? (
+        <Text className="py-6 text-center text-xs text-slate-400">Loading financial breakdown…</Text>
+      ) : null}
       <ErrorBox text={error} />
 
       {!loading && !error && (
         <>
+          {/* 6 Balanced Financial Stat Cards */}
           <FinanceKpis totals={totals} />
 
+          {/* Responsive Revenue Trend Chart (NO HORIZONTAL SCROLL) */}
           {chartSeries.length > 0 && (
-            <View className="rounded-2xl border border-slate-200 bg-white p-4">
-              <Text className="text-sm font-bold text-slate-900">{isMonth ? 'Monthly Revenue Trend' : 'Daily Revenue Trend'}</Text>
-              <Text className="mb-3 text-[11px] text-slate-500">
-                {breakdown.length} period{breakdown.length === 1 ? '' : 's'} tracked · {totals.batteriesCount || 0} total batteries
-              </Text>
-              <TrendChart series={chartSeries} />
+            <View className="rounded-2xl border border-slate-200 bg-white p-3.5 shadow-2xs">
+              <View className="flex-row items-center justify-between">
+                <Text className="text-xs font-bold text-slate-900">
+                  {isMonth ? 'Monthly Revenue Trend' : 'Daily Revenue Trend'}
+                </Text>
+                <Text className="text-[10px] text-slate-400 font-medium">
+                  {breakdown.length} period{breakdown.length === 1 ? '' : 's'} tracked
+                </Text>
+              </View>
+              <ResponsiveTrendChart series={chartSeries} />
             </View>
           )}
 
-          <View className="gap-3 rounded-2xl border border-slate-200 bg-white p-4">
-            <View>
-              <Text className="text-base font-bold text-slate-900">{isMonth ? 'Monthly Financial Breakdown' : 'Daily Financial Breakdown'}</Text>
-              <Text className="mt-0.5 text-xs text-slate-500">
-                Click on any {isMonth ? 'month' : 'day'} row to view its itemized statements, client distribution, battery fees, and technician logs.
+          {/* Breakdown Section: Stacked Cards (Zero Horizontal Scrolling) */}
+          <View className="gap-2.5 rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
+            <View className="flex-row items-center justify-between">
+              <Text className="text-xs font-bold text-slate-900">
+                {isMonth ? 'Monthly Breakdown' : 'Daily Breakdown'}
               </Text>
+              <Text className="text-[10px] text-slate-400">{filtered.length} entries</Text>
             </View>
-            <SearchBox value={searchQuery} onChangeText={setSearchQuery} placeholder="Search period…" />
+
+            {/* Search Input */}
+            <View className="flex-row items-center rounded-xl border border-slate-200 bg-slate-50/80 px-2.5 py-1.5">
+              <Icon name="search" size={13} color="#94a3b8" />
+              <TextInput
+                value={searchQuery}
+                onChangeText={setSearchQuery}
+                placeholder="Search period…"
+                placeholderTextColor="#94a3b8"
+                autoCapitalize="none"
+                className="ml-1.5 flex-1 p-0 text-xs text-slate-900"
+              />
+              {searchQuery ? (
+                <TouchableOpacity onPress={() => setSearchQuery('')} hitSlop={6}>
+                  <Icon name="x" size={12} color="#94a3b8" />
+                </TouchableOpacity>
+              ) : null}
+            </View>
+
             {filtered.length === 0 ? (
               <View className="items-center py-6">
                 <Text className="text-center text-xs text-slate-500">
@@ -197,20 +341,47 @@ export default function AdminFinanceScreen() {
               filtered.map((row, i) => {
                 const jobs = (row.repairsCount || 0) + (row.servicesCount || 0);
                 return (
-                  <TouchableOpacity key={row.key || i} activeOpacity={0.85} onPress={() => openStatement(row)} className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                  <TouchableOpacity
+                    key={row.key || i}
+                    activeOpacity={0.85}
+                    onPress={() => openStatement(row)}
+                    className="rounded-xl border border-slate-200/90 bg-white p-3 shadow-2xs gap-2"
+                  >
+                    {/* Header Row: Index, Period, Total Revenue, Action */}
                     <View className="flex-row items-center justify-between gap-2">
-                      <Text className="text-xs font-bold text-slate-400">{i + 1}</Text>
-                      <Text className="flex-1 text-sm font-extrabold text-blue-700">{row.label}</Text>
-                      <Text className="text-sm font-black text-emerald-700">{money(row.totalRevenue)}</Text>
+                      <View className="flex-row items-center gap-1.5 min-w-0 flex-1">
+                        <Text className="font-mono text-[10px] text-slate-400 w-4">#{i + 1}</Text>
+                        <Text className="flex-1 text-xs font-black text-blue-700" numberOfLines={1}>
+                          {row.label}
+                        </Text>
+                      </View>
+                      <View className="flex-row items-center gap-1 shrink-0">
+                        <Text className="font-mono text-xs font-black text-emerald-700">
+                          {money(row.totalRevenue)}
+                        </Text>
+                        <Text className="text-xs font-bold text-slate-400">›</Text>
+                      </View>
                     </View>
-                    <View className="mt-2 flex-row flex-wrap justify-between gap-y-1">
-                      <Text className="w-[48%] text-[11px] text-slate-500">Repair Cost <Text className="font-bold text-slate-800">{money(row.repairRevenue)}</Text></Text>
-                      <Text className="w-[48%] text-[11px] text-slate-500">Service &amp; Fees <Text className="font-bold text-slate-800">{money(row.servicesRevenue || 0)}</Text></Text>
-                      <Text className="w-[48%] text-[11px] text-slate-500">Recycle Revenue <Text className="font-bold text-slate-800">{money(row.recycleRevenue || 0)}</Text></Text>
-                      <Text className="w-[48%] text-[11px] text-slate-500">Jobs Logged <Text className="font-bold text-slate-800">{jobs} job{jobs === 1 ? '' : 's'}</Text></Text>
-                      <Text className="w-[48%] text-[11px] text-slate-500">Batteries Serviced <Text className="font-bold text-slate-800">{row.batteriesCount || 0} unit{row.batteriesCount === 1 ? '' : 's'}</Text></Text>
+
+                    {/* 4-Stat Micro Grid — WRAPPING */}
+                    <View className="flex-row flex-wrap justify-between gap-y-1.5 rounded-lg border border-slate-100 bg-slate-50/80 p-2">
+                      <View className="w-[48%]">
+                        <Text className="text-[9.5px] text-slate-400">Repair Cost</Text>
+                        <Text className="font-mono text-[11px] font-bold text-slate-800">{money(row.repairRevenue)}</Text>
+                      </View>
+                      <View className="w-[48%]">
+                        <Text className="text-[9.5px] text-slate-400">Service Fees</Text>
+                        <Text className="font-mono text-[11px] font-bold text-indigo-700">{money(row.servicesRevenue || 0)}</Text>
+                      </View>
+                      <View className="w-[48%]">
+                        <Text className="text-[9.5px] text-slate-400">Recycle Scrap</Text>
+                        <Text className="font-mono text-[11px] font-bold text-amber-700">{money(row.recycleRevenue || 0)}</Text>
+                      </View>
+                      <View className="w-[48%]">
+                        <Text className="text-[9.5px] text-slate-400">Volume</Text>
+                        <Text className="font-mono text-[11px] font-bold text-slate-700">{jobs}j · {row.batteriesCount || 0}u</Text>
+                      </View>
                     </View>
-                    <Text className="mt-2 text-right text-[11px] font-bold text-blue-600">View Statement →</Text>
                   </TouchableOpacity>
                 );
               })

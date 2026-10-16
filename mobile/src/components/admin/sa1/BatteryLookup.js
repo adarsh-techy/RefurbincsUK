@@ -38,8 +38,8 @@ export default function BatteryLookup() {
 
   return (
     <View>
-      <Text className="mb-1 text-xs font-medium text-slate-700">Look Up Battery by ID</Text>
-      <View className="flex-row gap-2">
+      <Text className="mb-1 text-[11px] font-semibold text-slate-700">Look Up Battery by ID</Text>
+      <View className="flex-row items-center gap-1.5">
         <TextInput
           value={code}
           onChangeText={(v) => { setCode(v); setOpen(true); }}
@@ -51,10 +51,14 @@ export default function BatteryLookup() {
           autoCapitalize="characters"
           autoCorrect={false}
           returnKeyType="go"
-          className="min-w-0 flex-1 rounded-xl border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900"
+          className="h-8.5 min-w-0 flex-1 rounded-lg border border-blue-200 bg-blue-50/60 px-2.5 py-1 text-xs text-slate-900"
         />
-        <TouchableOpacity disabled={!code.trim()} onPress={() => goTo(code.trim())} className={`justify-center rounded-xl bg-violet-700 px-3.5 ${code.trim() ? '' : 'opacity-50'}`}>
-          <Text className="text-xs font-bold text-white">View Battery</Text>
+        <TouchableOpacity
+          disabled={!code.trim()}
+          onPress={() => goTo(code.trim())}
+          className={`h-8.5 justify-center rounded-lg bg-violet-700 px-3 ${code.trim() ? 'active:opacity-80' : 'opacity-50'}`}
+        >
+          <Text className="text-[11px] font-bold text-white">View</Text>
         </TouchableOpacity>
       </View>
       {open && suggestions.length > 0 && (

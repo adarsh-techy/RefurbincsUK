@@ -380,29 +380,30 @@ function ClientHistoryPage() {
             </span>
           );
         }
-        return <span className="text-slate-400 dark:text-neutral-500">—</span>;
       },
     },
   ];
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-2.5 sm:space-y-4 pb-12">
       {/* ── Page Header ────────────────────────────────────────────── */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4">
         <div>
-          <PageHeader
-            title="History & Activity"
-            description="Complete chronological audit of your battery fleet — truck-wise packed batches, workshop intakes, and returns."
-          />
+          <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+            History &amp; Activity
+          </h1>
+          <p className="text-[10.5px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
+            Complete chronological audit of your battery fleet — packed batches, workshop intakes, and returns.
+          </p>
         </div>
-        <div className="flex items-center gap-2.5 flex-wrap">
+        <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto">
           <button
             type="button"
             onClick={fetchHistory}
             disabled={loading}
-            className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold text-slate-700 bg-white border border-slate-200 hover:bg-slate-50 dark:bg-white/5 dark:text-neutral-200 dark:border-white/10 dark:hover:bg-white/10 shadow-2xs transition-all cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs font-bold text-slate-700 bg-white border border-slate-200/90 hover:bg-slate-50 dark:bg-white/5 dark:text-neutral-200 dark:border-white/10 dark:hover:bg-white/10 shadow-2xs transition-all cursor-pointer"
           >
-            <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+            <FiRefreshCw className={`w-3 h-3 sm:w-3.5 sm:h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh</span>
           </button>
 
@@ -410,92 +411,92 @@ function ClientHistoryPage() {
             type="button"
             onClick={() => exportHistoryToCsv(filteredEvents)}
             disabled={!filteredEvents.length}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold text-white shadow-xs transition-all hover:brightness-110 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+            className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 px-2.5 py-1.5 sm:px-3.5 sm:py-2 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs font-bold text-white shadow-xs transition-all hover:brightness-110 active:scale-98 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             style={{ backgroundColor: accent }}
           >
-            <FiDownload className="w-3.5 h-3.5" />
+            <FiDownload className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
             <span>Export CSV</span>
           </button>
         </div>
       </div>
 
       {/* ── KPI Summary Cards ───────────────────────────────────────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
-        <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-white/10 dark:bg-surface-900 flex flex-col justify-between">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-3">
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-2.5 shadow-2xs dark:border-white/10 dark:bg-surface-900 flex flex-col justify-between min-h-[58px] sm:min-h-[74px]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
               Total Shipments
             </span>
-            <div className="p-2 rounded-xl bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
-              <FiTruck className="w-4 h-4" />
+            <div className="p-1 rounded-md sm:rounded-lg bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300">
+              <FiTruck className="w-3 h-3" />
             </div>
           </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black text-slate-900 dark:text-white">
+          <div className="mt-0.5 sm:mt-1">
+            <span className="text-sm sm:text-xl font-black text-slate-900 dark:text-white">
               {summary?.total_events ?? events.length}
             </span>
-            <p className="text-[11px] text-slate-400 dark:text-neutral-500 mt-0.5">Total truck batches</p>
+            <p className="text-[8.5px] sm:text-[10px] text-slate-400 dark:text-neutral-500 mt-0.5">Total truck batches</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white p-4 shadow-xs dark:border-indigo-900/40 dark:bg-surface-900 dark:from-indigo-950/30 dark:to-surface-900 flex flex-col justify-between">
+        <div className="rounded-xl sm:rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50/50 to-white p-2 sm:p-2.5 shadow-2xs dark:border-indigo-900/40 dark:bg-surface-900 dark:from-indigo-950/30 dark:to-surface-900 flex flex-col justify-between min-h-[58px] sm:min-h-[74px]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-indigo-600 dark:text-indigo-400">
               Packed Trucks
             </span>
-            <div className="p-2 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-              <FiPackage className="w-4 h-4" />
+            <div className="p-1 rounded-md sm:rounded-lg bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              <FiPackage className="w-3 h-3" />
             </div>
           </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black text-indigo-950 dark:text-indigo-200">
+          <div className="mt-0.5 sm:mt-1">
+            <span className="text-sm sm:text-xl font-black text-indigo-950 dark:text-indigo-200">
               {summary?.packed_count ?? 0}
             </span>
-            <p className="text-[11px] text-indigo-600/70 dark:text-indigo-400/70 mt-0.5">Packed for repair</p>
+            <p className="text-[8.5px] sm:text-[10px] text-indigo-600/70 dark:text-indigo-400/70 mt-0.5">Packed for repair</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-white p-4 shadow-xs dark:border-blue-900/40 dark:bg-surface-900 dark:from-blue-950/30 dark:to-surface-900 flex flex-col justify-between">
+        <div className="rounded-xl sm:rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50/50 to-white p-2 sm:p-2.5 shadow-2xs dark:border-blue-900/40 dark:bg-surface-900 dark:from-blue-950/30 dark:to-surface-900 flex flex-col justify-between min-h-[58px] sm:min-h-[74px]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-blue-600 dark:text-blue-400">
               Workshop Intakes
             </span>
-            <div className="p-2 rounded-xl bg-blue-500/10 text-blue-600 dark:text-blue-400">
-              <FiTruck className="w-4 h-4" />
+            <div className="p-1 rounded-md sm:rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+              <FiTruck className="w-3 h-3" />
             </div>
           </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black text-blue-950 dark:text-blue-200">
+          <div className="mt-0.5 sm:mt-1">
+            <span className="text-sm sm:text-xl font-black text-blue-950 dark:text-blue-200">
               {summary?.intake_count ?? 0}
             </span>
-            <p className="text-[11px] text-blue-600/70 dark:text-blue-400/70 mt-0.5">Workshop arrivals</p>
+            <p className="text-[8.5px] sm:text-[10px] text-blue-600/70 dark:text-blue-400/70 mt-0.5">Workshop arrivals</p>
           </div>
         </div>
 
-        <div className="rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-white p-4 shadow-xs dark:border-emerald-900/40 dark:bg-surface-900 dark:from-emerald-950/30 dark:to-surface-900 flex flex-col justify-between">
+        <div className="rounded-xl sm:rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/50 to-white p-2 sm:p-2.5 shadow-2xs dark:border-emerald-900/40 dark:bg-surface-900 dark:from-emerald-950/30 dark:to-surface-900 flex flex-col justify-between min-h-[58px] sm:min-h-[74px]">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+            <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
               Returned Trucks
             </span>
-            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
-              <FiCheckCircle className="w-4 h-4" />
+            <div className="p-1 rounded-md sm:rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <FiCheckCircle className="w-3 h-3" />
             </div>
           </div>
-          <div className="mt-2">
-            <span className="text-2xl font-black text-emerald-950 dark:text-emerald-200">
+          <div className="mt-0.5 sm:mt-1">
+            <span className="text-sm sm:text-xl font-black text-emerald-950 dark:text-emerald-200">
               {summary?.return_count ?? 0}
             </span>
-            <p className="text-[11px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">Delivered to fleet</p>
+            <p className="text-[8.5px] sm:text-[10px] text-emerald-600/70 dark:text-emerald-400/70 mt-0.5">Delivered to fleet</p>
           </div>
         </div>
       </div>
 
       {/* ── Filter & Search Control Panel ───────────────────────────── */}
-      <div className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs dark:border-white/10 dark:bg-surface-900 space-y-4">
-        {/* Top bar: Type Filter Buttons */}
-        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="rounded-xl sm:rounded-2xl border border-slate-200/80 bg-white p-2 sm:p-3 shadow-2xs dark:border-white/10 dark:bg-surface-900 space-y-2 sm:space-y-2.5">
+        {/* Top bar: Type Filter Buttons (Responsive 2x2 grid on mobile, no horizontal scrolling) */}
+        <div className="grid grid-cols-2 sm:flex sm:items-center gap-1.5 sm:gap-2">
           {[
-            { id: 'all', label: 'All Truck Shipments', count: events.length },
+            { id: 'all', label: 'All Shipments', count: events.length },
             { id: 'packed', label: 'Trucks Packed', count: summary?.packed_count },
             { id: 'intake', label: 'Workshop Intakes', count: summary?.intake_count },
             { id: 'return', label: 'Trucks Returned', count: summary?.return_count },
@@ -506,17 +507,17 @@ function ClientHistoryPage() {
                 key={tab.id}
                 type="button"
                 onClick={() => setSelectedType(tab.id)}
-                className={`shrink-0 flex items-center gap-2 px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                className={`flex items-center justify-between sm:justify-center gap-1.5 px-2 sm:px-3.5 py-1.5 rounded-lg sm:rounded-xl text-[10.5px] sm:text-xs font-bold transition-all cursor-pointer ${
                   active
-                    ? 'text-white shadow-xs'
+                    ? 'text-white shadow-2xs'
                     : 'bg-slate-100 text-slate-700 hover:bg-slate-200/70 dark:bg-surface-800 dark:text-neutral-300 dark:hover:bg-surface-700'
                 }`}
                 style={active ? { backgroundColor: accent } : {}}
               >
-                <span>{tab.label}</span>
+                <span className="truncate">{tab.label}</span>
                 {tab.count !== undefined && tab.count !== null && (
                   <span
-                    className={`px-1.5 py-0.5 text-[10px] rounded-full font-black ${
+                    className={`px-1.5 py-0.2 text-[9px] sm:text-[10px] rounded-full font-black ${
                       active
                         ? 'bg-white/20 text-white'
                         : 'bg-slate-200 text-slate-600 dark:bg-surface-700 dark:text-neutral-300'
@@ -530,23 +531,23 @@ function ClientHistoryPage() {
           })}
         </div>
 
-        {/* Search, Time Preset & View Mode Toggle */}
-        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-white/5">
+        {/* Search, Time Preset & View Mode Toggle (No horizontal scrolling on small screens) */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-1.5 sm:gap-2.5 pt-1.5 sm:pt-2 border-t border-slate-100 dark:border-white/5">
           {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <FiSearch className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 w-4 h-4 pointer-events-none" />
+          <div className="relative flex-1 max-w-full sm:max-w-md">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 w-3.5 h-3.5 pointer-events-none" />
             <input
               type="text"
-              placeholder="Search truck number, driver, battery ID, or details..."
+              placeholder="Search truck number, driver, battery ID..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full pl-10 pr-4 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 dark:bg-surface-800 dark:border-white/10 dark:text-white dark:placeholder:text-neutral-500 transition-all"
+              className="w-full pl-8.5 pr-8 py-1.5 sm:py-2 rounded-lg sm:rounded-xl bg-slate-50 border border-slate-200 text-[10.5px] sm:text-xs text-slate-900 placeholder:text-slate-400 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 dark:bg-surface-800 dark:border-white/10 dark:text-white dark:placeholder:text-neutral-500 transition-all"
             />
             {searchTerm && (
               <button
                 type="button"
                 onClick={() => setSearchTerm('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
               >
                 ✕
               </button>
@@ -554,22 +555,22 @@ function ClientHistoryPage() {
           </div>
 
           {/* Date Presets & View Mode Toggle */}
-          <div className="flex items-center gap-2.5 flex-wrap sm:flex-nowrap">
-            <div className="flex items-center gap-1.5 bg-slate-50 dark:bg-surface-800 p-1 rounded-xl border border-slate-200/80 dark:border-white/10">
-              <FiCalendar className="w-3.5 h-3.5 text-slate-400 ml-2" />
+          <div className="flex items-center justify-between sm:justify-end gap-1.5 sm:gap-2">
+            <div className="flex items-center gap-0.5 sm:gap-1 bg-slate-50 dark:bg-surface-800 p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-slate-200/80 dark:border-white/10 shrink-0">
+              <FiCalendar className="w-3 h-3 text-slate-400 ml-1 shrink-0 hidden min-[360px]:block" />
               {[
-                { id: 'all', label: 'All Time' },
-                { id: '30d', label: '30 Days' },
-                { id: '90d', label: '90 Days' },
-                { id: 'year', label: '1 Year' },
+                { id: 'all', label: 'All' },
+                { id: '30d', label: '30D' },
+                { id: '90d', label: '90D' },
+                { id: 'year', label: '1Y' },
               ].map((opt) => (
                 <button
                   key={opt.id}
                   type="button"
                   onClick={() => setDateFilter(opt.id)}
-                  className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  className={`px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-semibold rounded-md sm:rounded-lg transition-all cursor-pointer ${
                     dateFilter === opt.id
-                      ? 'bg-white shadow-2xs text-slate-900 dark:bg-surface-700 dark:text-white'
+                      ? 'bg-white shadow-2xs text-slate-900 dark:bg-surface-700 dark:text-white font-bold'
                       : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
                   }`}
                 >
@@ -579,32 +580,32 @@ function ClientHistoryPage() {
             </div>
 
             {/* View Mode Switch */}
-            <div className="flex items-center bg-slate-50 dark:bg-surface-800 p-1 rounded-xl border border-slate-200/80 dark:border-white/10">
+            <div className="flex items-center bg-slate-50 dark:bg-surface-800 p-0.5 sm:p-1 rounded-lg sm:rounded-xl border border-slate-200/80 dark:border-white/10 shrink-0">
               <button
                 type="button"
                 onClick={() => setViewMode('timeline')}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg transition-all cursor-pointer ${
                   viewMode === 'timeline'
                     ? 'bg-white shadow-2xs text-slate-900 dark:bg-surface-700 dark:text-white'
                     : 'text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
                 }`}
-                title="Timeline View"
+                title="Cards View"
               >
-                <FiClock className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Cards View</span>
+                <FiClock className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <span>Cards</span>
               </button>
               <button
                 type="button"
                 onClick={() => setViewMode('table')}
-                className={`flex items-center gap-1.5 px-3 py-1 text-xs font-bold rounded-lg transition-all cursor-pointer ${
+                className={`flex items-center gap-1 px-1.5 sm:px-2.5 py-0.5 sm:py-1 text-[10px] sm:text-xs font-bold rounded-md sm:rounded-lg transition-all cursor-pointer ${
                   viewMode === 'table'
                     ? 'bg-white shadow-2xs text-slate-900 dark:bg-surface-700 dark:text-white'
                     : 'text-slate-500 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
                 }`}
                 title="Table View"
               >
-                <FiList className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">Table</span>
+                <FiList className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
+                <span>Table</span>
               </button>
             </div>
           </div>
@@ -625,7 +626,7 @@ function ClientHistoryPage() {
       )}
 
       {!loading && !error && filteredEvents.length === 0 && (
-        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-white/10 p-12 text-center bg-white/50 dark:bg-surface-900">
+        <div className="rounded-2xl border border-dashed border-slate-300 dark:border-white/10 p-8 sm:p-12 text-center bg-white/50 dark:bg-surface-900">
           <div className="mx-auto w-12 h-12 rounded-2xl bg-slate-100 dark:bg-surface-800 flex items-center justify-center text-slate-400 dark:text-neutral-500 mb-3">
             <FiTruck className="w-6 h-6" />
           </div>
@@ -655,149 +656,172 @@ function ClientHistoryPage() {
 
       {/* ── Truck-Wise Cards Timeline View ──────────────────────────── */}
       {!loading && !error && filteredEvents.length > 0 && viewMode === 'timeline' && (
-        <div className="space-y-10">
+        <div className="space-y-4 sm:space-y-6">
           {groupedTimeline.map((group) => (
             <div key={group.date} className="relative">
-              {/* Day Header Pill */}
-              <div className="sticky top-20 z-10 mb-5 flex items-center gap-3">
-                <span className="px-4 py-1.5 rounded-full text-xs font-extrabold uppercase tracking-wider bg-slate-900 text-white dark:bg-surface-800 dark:text-white dark:border dark:border-white/10 shadow-sm flex items-center gap-2">
-                  <FiCalendar className="w-3.5 h-3.5 opacity-70" />
+              {/* Day Header Pill (no sticky on mobile to avoid colliding with fixed top bar) */}
+              <div className="mb-2 sm:mb-3 sm:sticky sm:top-20 z-10 flex items-center gap-2 sm:gap-2.5">
+                <span className="px-2 py-0.5 sm:px-3 sm:py-1.5 rounded-full text-[9.5px] sm:text-xs font-black uppercase tracking-wider bg-slate-900 text-white dark:bg-surface-800 dark:text-white dark:border dark:border-white/10 shadow-2xs flex items-center gap-1.5 shrink-0">
+                  <FiCalendar className="w-3 h-3 opacity-70" />
                   <span>{group.date}</span>
                 </span>
                 <div className="flex-1 h-px bg-slate-200 dark:bg-white/10" />
-                <span className="text-xs font-semibold text-slate-400 dark:text-neutral-500">
-                  {group.items.length} truck {group.items.length === 1 ? 'shipment' : 'shipments'}
+                <span className="text-[9.5px] sm:text-xs font-semibold text-slate-400 dark:text-neutral-500 shrink-0">
+                  {group.items.length} {group.items.length === 1 ? 'shipment' : 'shipments'}
                 </span>
               </div>
 
               {/* Day Items Vertical Track */}
-              <div className="relative pl-6 sm:pl-8 space-y-6 sm:space-y-7 before:absolute before:left-2.5 sm:before:left-3.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-white/10">
+              <div className="relative pl-2.5 sm:pl-7 space-y-2 sm:space-y-3 before:absolute before:left-1 sm:before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200 dark:before:bg-white/10">
                 {group.items.map((event) => {
                   const conf = EVENT_CONFIG[event.type] || EVENT_CONFIG.intake;
                   const Icon = conf.icon;
                   const count = event.battery_count || (event.batteries_list ? event.batteries_list.length : 1);
                   const truckTitle = event.vehicle_number ? `Truck ${event.vehicle_number}` : (event.reference || 'Shipment Batch');
+                  const list = Array.isArray(event.batteries_list) ? event.batteries_list : [];
 
                   return (
                     <div
                       key={event.id}
                       onClick={() => navigate(`/my/history/${event.id}`)}
-                      className="group relative overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-5 sm:p-6 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20 cursor-pointer pl-6 sm:pl-8"
+                      className="group relative overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-2 sm:p-3.5 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-sm dark:border-white/10 dark:bg-surface-900 dark:hover:border-white/20 cursor-pointer pl-3 sm:pl-5 active:scale-[0.99]"
                     >
                       {/* Left Classic Colored Accent Stripe */}
-                      <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${conf.stripe || 'bg-slate-400'}`} />
+                      <div className={`absolute left-0 top-0 bottom-0 w-1 sm:w-1.5 ${conf.stripe || 'bg-slate-400'}`} />
 
                       {/* Timeline Node Dot */}
                       <span
-                        className={`absolute -left-6 sm:-left-8 top-6 flex h-4 w-4 -translate-x-1/2 items-center justify-center rounded-full ring-4 ring-white dark:ring-surface-950 ${conf.dot}`}
+                        className={`absolute -left-2.5 sm:-left-6 top-3.5 sm:top-5 flex h-2.5 w-2.5 sm:h-3 sm:w-3 -translate-x-1/2 items-center justify-center rounded-full ring-2 ring-white dark:ring-surface-950 ${conf.dot}`}
                       />
 
                       {/* Top Header: Truck ID, Stage Badge & Time */}
-                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100 dark:border-white/5">
-                        <div className="flex items-center gap-3">
-                          <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${conf.iconBg} shadow-2xs`}>
-                            <Icon className="h-5 w-5" />
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2 pb-1.5 sm:pb-2 border-b border-slate-100 dark:border-white/5">
+                        <div className="flex items-start sm:items-center gap-1.5 sm:gap-2.5">
+                          <div className={`flex h-6.5 w-6.5 sm:h-8.5 sm:w-8.5 shrink-0 items-center justify-center rounded-lg ${conf.iconBg} shadow-2xs mt-0.5 sm:mt-0`}>
+                            <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
                           </div>
-                          <div>
-                            <div className="flex items-center gap-2.5 flex-wrap">
-                              <h4 className="font-bold text-sm sm:text-base text-slate-900 dark:text-white tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <h4 className="font-black text-xs sm:text-sm text-slate-900 dark:text-white tracking-tight group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
                                 {truckTitle}
                               </h4>
-                              <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-bold border tracking-wide uppercase ${conf.bg}`}>
-                                <span className={`h-1.5 w-1.5 rounded-full ${conf.dot}`} />
+                              <span className={`inline-flex items-center gap-1 px-1.5 py-0.2 sm:px-2 sm:py-0.5 rounded-full text-[8px] sm:text-[9.5px] font-bold border tracking-wide uppercase ${conf.bg}`}>
+                                <span className={`h-1 w-1 rounded-full ${conf.dot}`} />
                                 <span>{event.type_label || conf.label}</span>
                               </span>
                             </div>
-                            <p className="text-xs text-slate-400 dark:text-neutral-500 mt-0.5">
-                              {event.reference ? `Reference: ${event.reference}` : 'Consignment Batch'}
-                              {event.staff_name ? ` • Handled by ${event.staff_name}` : ''}
+                            <p className="text-[9.5px] sm:text-xs text-slate-400 dark:text-neutral-500 mt-0.5 truncate">
+                              {event.reference ? `Ref: ${event.reference}` : 'Consignment Batch'}
+                              {event.staff_name ? ` • By ${event.staff_name}` : ''}
                             </p>
                           </div>
                         </div>
 
                         {/* Timestamp & Relative Badge */}
-                        <div className="flex sm:flex-col sm:items-end justify-between sm:justify-center gap-0.5 text-xs shrink-0">
-                          <div className="flex items-center gap-1.5 font-bold text-slate-700 dark:text-neutral-200">
-                            <FiClock className="h-3.5 w-3.5 text-slate-400" />
+                        <div className="flex sm:flex-col sm:items-end justify-between sm:justify-center gap-0.5 text-xs shrink-0 pl-8 sm:pl-0">
+                          <div className="flex items-center gap-1 font-bold text-slate-700 dark:text-neutral-200 text-[10px] sm:text-xs">
+                            <FiClock className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-slate-400" />
                             <span>{formatEventTime(event.timestamp)}</span>
                           </div>
-                          <span className="text-[11px] font-semibold text-slate-400 dark:text-neutral-400">
+                          <span className="text-[9px] sm:text-[10.5px] font-medium text-slate-400 dark:text-neutral-400">
                             {formatRelativeTime(event.timestamp)}
                           </span>
                         </div>
                       </div>
 
-                      {/* Key Logistics Metrics Grid */}
-                      <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                      {/* Key Logistics Metrics: 3-column compact grid on all screen sizes */}
+                      <div className="mt-1.5 sm:mt-2 grid grid-cols-3 gap-1 sm:gap-2">
                         {/* Battery Volume */}
-                        <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 dark:bg-surface-800/80 px-3.5 py-2.5 border border-slate-100 dark:border-white/5">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                            <FiPackage className="h-4 w-4" />
+                        <div className="flex items-center gap-1 sm:gap-2 rounded-lg bg-slate-50 dark:bg-surface-800/80 px-1.5 py-1 sm:px-2.5 sm:py-1.5 border border-slate-100 dark:border-white/5 min-w-0">
+                          <div className="flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-md bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                            <FiPackage className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </div>
                           <div className="min-w-0">
-                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                              Shipment Volume
+                            <span className="block text-[7.5px] sm:text-[8.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                              Volume
                             </span>
-                            <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
-                              {count} {count === 1 ? 'Battery' : 'Batteries'} Loaded
+                            <span className="block truncate text-[10px] sm:text-xs font-black text-slate-900 dark:text-white">
+                              {count} {count === 1 ? 'Bat' : 'Units'}
                             </span>
                           </div>
                         </div>
 
                         {/* Logistics Driver */}
-                        <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 dark:bg-surface-800/80 px-3.5 py-2.5 border border-slate-100 dark:border-white/5">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-200/70 text-slate-700 dark:bg-surface-700 dark:text-neutral-300">
-                            <FiUser className="h-4 w-4" />
+                        <div className="flex items-center gap-1 sm:gap-2 rounded-lg bg-slate-50 dark:bg-surface-800/80 px-1.5 py-1 sm:px-2.5 sm:py-1.5 border border-slate-100 dark:border-white/5 min-w-0">
+                          <div className="flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-md bg-slate-200/70 text-slate-700 dark:bg-surface-700 dark:text-neutral-300">
+                            <FiUser className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                           </div>
                           <div className="min-w-0">
-                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                              Transport / Driver
+                            <span className="block text-[7.5px] sm:text-[8.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                              Driver
                             </span>
-                            <span className="block truncate text-xs font-bold text-slate-800 dark:text-neutral-100">
-                              {event.driver_name ? event.driver_name : (event.staff_name || 'Fleet Transport')}
+                            <span className="block truncate text-[10px] sm:text-xs font-bold text-slate-800 dark:text-neutral-100">
+                              {event.driver_name ? event.driver_name : (event.staff_name || 'Fleet')}
                             </span>
                           </div>
                         </div>
 
                         {/* Delivery Status */}
-                        <div className="flex items-center gap-2.5 rounded-xl bg-slate-50 dark:bg-surface-800/80 px-3.5 py-2.5 border border-slate-100 dark:border-white/5">
-                          <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${
+                        <div className="flex items-center gap-1 sm:gap-2 rounded-lg bg-slate-50 dark:bg-surface-800/80 px-1.5 py-1 sm:px-2.5 sm:py-1.5 border border-slate-100 dark:border-white/5 min-w-0">
+                          <div className={`flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-md ${
                             event.verified_by_client
                               ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300'
                               : 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
                           }`}>
-                            {event.verified_by_client ? <FiCheckCircle className="h-4 w-4" /> : <FiShield className="h-4 w-4" />}
+                            {event.verified_by_client ? <FiCheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" /> : <FiShield className="h-3 w-3 sm:h-3.5 sm:w-3.5" />}
                           </div>
                           <div className="min-w-0">
-                            <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-                              Delivery Status
+                            <span className="block text-[7.5px] sm:text-[8.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                              Status
                             </span>
-                            <span className={`block truncate text-xs font-bold ${
+                            <span className={`block truncate text-[10px] sm:text-xs font-bold ${
                               event.verified_by_client
                                 ? 'text-emerald-700 dark:text-emerald-300'
                                 : 'text-amber-700 dark:text-amber-300'
                             }`}>
-                              {event.verified_by_client ? 'Verified Delivery' : 'In Transit / Pending'}
+                              {event.verified_by_client ? 'Verified' : 'Transit'}
                             </span>
                           </div>
                         </div>
                       </div>
 
+                      {/* Battery Serial Pills Preview (if list available) */}
+                      {list.length > 0 && (
+                        <div className="mt-1.5 sm:mt-2 flex flex-wrap items-center gap-1 pt-1 sm:pt-1.5 border-t border-slate-100 dark:border-white/5">
+                          <span className="text-[8.5px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500 mr-0.5">
+                            Serials:
+                          </span>
+                          {list.slice(0, 3).map((b, idx) => (
+                            <span
+                              key={b.code || idx}
+                              className="font-mono text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md bg-slate-100 dark:bg-surface-800 text-slate-700 dark:text-neutral-300 border border-slate-200/60 dark:border-white/5"
+                            >
+                              {b.code}
+                            </span>
+                          ))}
+                          {list.length > 3 && (
+                            <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 dark:text-neutral-500">
+                              +{list.length - 3} more
+                            </span>
+                          )}
+                        </div>
+                      )}
+
                       {/* Event Details / Notes */}
                       {event.details && (
-                        <p className="mt-3 text-xs font-medium text-slate-600 dark:text-neutral-300 leading-relaxed">
+                        <p className="mt-1.5 text-[10.5px] sm:text-xs font-medium text-slate-600 dark:text-neutral-300 leading-snug line-clamp-1 sm:line-clamp-2">
                           {event.details}
                         </p>
                       )}
 
                       {/* Footer with Action Cue */}
-                      <div className="mt-3.5 flex items-center justify-between pt-2.5 border-t border-slate-100 dark:border-white/5 text-xs">
-                        <span className="text-[11px] font-medium text-slate-400 dark:text-neutral-500">
-                          Click card to view complete batch manifest table
+                      <div className="mt-1.5 sm:mt-2 flex items-center justify-between pt-1 sm:pt-1.5 border-t border-slate-100 dark:border-white/5 text-[9.5px] sm:text-xs">
+                        <span className="text-[9.5px] sm:text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+                          Tap to view full manifest
                         </span>
-                        <span className="inline-flex items-center gap-1.5 font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-200">
+                        <span className="inline-flex items-center gap-1 font-bold text-blue-600 dark:text-blue-400 group-hover:translate-x-1 transition-transform duration-200">
                           <span>View Manifest</span>
-                          <FiArrowRight className="h-3.5 w-3.5" />
+                          <FiArrowRight className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                         </span>
                       </div>
                     </div>
@@ -811,14 +835,68 @@ function ClientHistoryPage() {
 
       {/* ── Table View ──────────────────────────────────────────────── */}
       {!loading && !error && filteredEvents.length > 0 && viewMode === 'table' && (
-        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden dark:border-white/10 dark:bg-surface-900">
-          <DataTable
-            columns={tableColumns}
-            rows={filteredEvents}
-            showRowNumber
-            emptyMessage="No events found matching your filter criteria."
-          />
-        </div>
+        <>
+          {/* Mobile compact table cards (zero horizontal scroll) */}
+          <div className="md:hidden space-y-2">
+            {filteredEvents.map((e, idx) => {
+              const conf = EVENT_CONFIG[e.type] || EVENT_CONFIG.intake;
+              const count = e.battery_count || (e.batteries_list ? e.batteries_list.length : 1);
+              return (
+                <div
+                  key={e.id || idx}
+                  onClick={() => navigate(`/my/history/${e.id}`)}
+                  className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs dark:border-white/10 dark:bg-surface-900 cursor-pointer active:scale-[0.99] transition-all"
+                >
+                  <div className="flex items-center justify-between gap-1.5">
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[8.5px] font-bold border ${conf.bg}`}>
+                      <span className={`h-1 w-1 rounded-full ${conf.dot}`} />
+                      <span>{e.type_label || conf.label}</span>
+                    </span>
+                    <span className="text-[9.5px] font-semibold text-slate-400 dark:text-neutral-500">
+                      {formatEventTime(e.timestamp)}
+                    </span>
+                  </div>
+
+                  <div className="mt-1 flex items-center justify-between gap-2">
+                    <h4 className="text-xs font-black text-slate-900 dark:text-white truncate">
+                      {e.vehicle_number ? `Truck #${e.vehicle_number}` : (e.reference || 'Shipment Batch')}
+                    </h4>
+                    <span className="text-[10px] font-bold text-slate-500 dark:text-neutral-400 shrink-0">
+                      {count} {count === 1 ? 'Battery' : 'Batteries'}
+                    </span>
+                  </div>
+
+                  {e.details && (
+                    <p className="mt-1 text-[10.5px] text-slate-600 dark:text-neutral-300 line-clamp-1">
+                      {e.details}
+                    </p>
+                  )}
+
+                  <div className="mt-1.5 flex items-center justify-between pt-1 border-t border-slate-100 dark:border-white/5 text-[9.5px]">
+                    <div className="flex items-center gap-2 text-slate-500 dark:text-neutral-400">
+                      {e.driver_name && <span>Driver: <strong className="text-slate-700 dark:text-neutral-200">{e.driver_name}</strong></span>}
+                      {e.verified_by_client && <span className="text-emerald-600 font-bold">✓ Verified</span>}
+                    </div>
+                    <span className="font-bold text-blue-600 dark:text-blue-400 inline-flex items-center gap-0.5">
+                      <span>Details</span>
+                      <FiArrowRight className="w-2.5 h-2.5" />
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {/* Desktop Table View */}
+          <div className="hidden md:block rounded-2xl border border-slate-200/80 bg-white shadow-xs overflow-hidden dark:border-white/10 dark:bg-surface-900">
+            <DataTable
+              columns={tableColumns}
+              rows={filteredEvents}
+              showRowNumber
+              emptyMessage="No events found matching your filter criteria."
+            />
+          </div>
+        </>
       )}
     </div>
   );

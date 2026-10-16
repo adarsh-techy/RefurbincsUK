@@ -43,7 +43,7 @@ function Badge({ tone = 'neutral', status, children }) {
   }
   return (
     <span
-      className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${TONES[tone] || TONES.neutral}`}
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] sm:text-[11px] font-semibold ${TONES[tone] || TONES.neutral}`}
     >
       {children}
     </span>
@@ -52,7 +52,8 @@ function Badge({ tone = 'neutral', status, children }) {
 
 // Convenience wrapper for the battery status enum specifically, since it
 // shows up on the Batteries table, the lookup panel, and the Repair form.
-export function StatusBadge({ status, hasPendingParts, isPassedBack }) {
+export function StatusBadge({ status, hasPendingParts, isPassedBack, size = 'md' }) {
+  const isSmall = size === 'xs' || size === 'sm';
   const isPendingRemoval =
     status === 'passed_to_remove' ||
     status === 'passed_for_part_removal' ||
@@ -60,16 +61,16 @@ export function StatusBadge({ status, hasPendingParts, isPassedBack }) {
 
   if (isPendingRemoval) {
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5 text-xs font-bold text-amber-900 shadow-2xs dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-400/30"></span>
+      <span className={`inline-flex items-center ${isSmall ? 'gap-1 px-1.5 py-0.5 text-[9px] sm:text-[10px]' : 'gap-1.5 px-2 py-0.5 text-[10px] sm:text-[11px]'} whitespace-nowrap rounded-full border border-amber-300 bg-amber-50 font-bold text-amber-900 shadow-2xs dark:border-amber-700/60 dark:bg-amber-950/40 dark:text-amber-200`}>
+        <span className={`${isSmall ? 'h-1 w-1' : 'h-1.5 w-1.5'} shrink-0 rounded-full bg-amber-500 ring-2 ring-amber-400/30`}></span>
         <span>Passed to Remove Parts</span>
       </span>
     );
   }
   if (!status || status === 'null' || status === 'undefined') {
     return (
-      <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${TONES.neutral}`}>
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-slate-400"></span>
+      <span className={`inline-flex items-center ${isSmall ? 'gap-1 px-1.5 py-0.5 text-[9px] sm:text-[10px]' : 'gap-1.5 px-2 py-0.5 text-[10px] sm:text-[11px]'} whitespace-nowrap rounded-full font-bold ${TONES.neutral}`}>
+        <span className={`${isSmall ? 'h-1 w-1' : 'h-1.5 w-1.5'} shrink-0 rounded-full bg-slate-400`}></span>
         <span>Registered</span>
       </span>
     );
@@ -83,13 +84,13 @@ export function StatusBadge({ status, hasPendingParts, isPassedBack }) {
   const toneClass = TONES[meta.tone] || TONES.neutral;
 
   return (
-    <span className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-xs font-bold ${toneClass}`}>
-      <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${meta.dot || 'bg-slate-400'}`}></span>
+    <span className={`inline-flex items-center ${isSmall ? 'gap-1 px-1.5 py-0.5 text-[9px] sm:text-[10px]' : 'gap-1.5 px-2 py-0.5 text-[10px] sm:text-[11px]'} whitespace-nowrap rounded-full font-bold ${toneClass}`}>
+      <span className={`${isSmall ? 'h-1 w-1' : 'h-1.5 w-1.5'} shrink-0 rounded-full ${meta.dot || 'bg-slate-400'}`}></span>
       <span>{meta.label}</span>
       {meta.subLabel && (
         <>
           <span className="opacity-40">·</span>
-          <span className="text-[10px] font-bold opacity-90">{meta.subLabel}</span>
+          <span className={`${isSmall ? 'text-[8px] sm:text-[9px]' : 'text-[9px] sm:text-[10px]'} font-bold opacity-90`}>{meta.subLabel}</span>
         </>
       )}
     </span>
@@ -136,11 +137,11 @@ export function ClientStatusBadge({ status, isVerified, returnStatus }) {
   };
   if (meta.subLabel) {
     return (
-      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200/90 bg-red-50/90 px-2.5 py-0.5 text-xs font-semibold text-red-700 shadow-2xs dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+      <span className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border border-red-200/90 bg-red-50/90 px-2 py-0.5 text-[10px] sm:text-[11px] font-semibold text-red-700 shadow-2xs dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-red-500 ring-2 ring-red-400/30"></span>
         <span>{meta.label}</span>
         <span className="font-normal text-red-300 dark:text-red-600">·</span>
-        <span className="text-[11px] font-bold text-red-600 dark:text-red-400">{meta.subLabel}</span>
+        <span className="text-[9.5px] sm:text-[10px] font-bold text-red-600 dark:text-red-400">{meta.subLabel}</span>
       </span>
     );
   }

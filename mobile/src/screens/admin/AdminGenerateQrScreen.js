@@ -47,30 +47,45 @@ function useNextNumber(clientName) {
 
 function ClientPicker({ clients, value, onChange }) {
   return (
-    <View className="flex-row flex-wrap gap-2">
-      {clients.map((c) => {
-        const active = value === c.name;
-        return (
-          <TouchableOpacity key={c.id} onPress={() => onChange(active ? '' : c.name)} className={`rounded-xl border px-3 py-2 ${active ? 'border-violet-600 bg-violet-600' : 'border-blue-200 bg-blue-50/60'}`}>
-            <Text className={`text-xs font-bold ${active ? 'text-white' : 'text-slate-700'}`}>{c.name}</Text>
+    <View className="gap-1.5">
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5 py-0.5">
+        {clients.map((c) => {
+          const active = value === c.name;
+          return (
+            <TouchableOpacity
+              key={c.id}
+              onPress={() => onChange(active ? '' : c.name)}
+              className={`rounded-lg border px-2.5 py-1.5 ${active ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-slate-50'}`}
+            >
+              <Text className={`text-xs ${active ? 'font-bold text-white' : 'font-medium text-slate-700'}`}>{c.name}</Text>
+            </TouchableOpacity>
+          );
+        })}
+        {clients.length === 0 && <Text className="text-xs text-slate-400">Loading clients…</Text>}
+      </ScrollView>
+      {value ? (
+        <View className="flex-row items-center gap-1.5 self-start">
+          <Text className="text-[11px] text-slate-500">Selected:</Text>
+          <Text className="text-[11px] font-bold text-violet-700">{value}</Text>
+          <TouchableOpacity onPress={() => onChange('')} hitSlop={6}>
+            <Text className="text-[11px] font-bold text-slate-400">✕ Clear</Text>
           </TouchableOpacity>
-        );
-      })}
-      {clients.length === 0 && <Text className="text-xs text-slate-400">Loading clients…</Text>}
+        </View>
+      ) : null}
     </View>
   );
 }
 
 function Label({ children, hint }) {
   return (
-    <Text className="mb-1.5 text-sm font-medium text-slate-700">
+    <Text className="mb-1 text-xs font-semibold text-slate-700">
       {children}
-      {hint ? <Text className="text-xs font-normal text-slate-400"> {hint}</Text> : null}
+      {hint ? <Text className="text-[10px] font-normal text-slate-400"> {hint}</Text> : null}
     </Text>
   );
 }
 
-const input = 'rounded-xl border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900';
+const input = 'rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs text-slate-900';
 
 export default function AdminGenerateQrScreen() {
   const navigation = useNavigation();
@@ -324,177 +339,258 @@ export default function AdminGenerateQrScreen() {
   const columnsNum = Math.max(Number(sheetColumns) || DEFAULT_COLUMNS, 1);
 
   const header = (
-    <View className="gap-4 pb-3">
-      <View>
-        <Text className="text-2xl font-bold text-green-600">Generate QR Code</Text>
-        <Text className="text-xs text-slate-500">Create QR codes for batteries — scan one to open its full history.</Text>
-        <View className="mt-2 flex-row items-center gap-2 self-start rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5">
-          <View className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-          <Text className="text-xs font-semibold text-emerald-800">
-            Total Generated QR Codes: <Text className="font-bold text-emerald-950">{listTotal.toLocaleString()}</Text>
-          </Text>
+    <View className="gap-3 pb-2">
+      {/* Executive Header */}
+      <View className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
+        <View className="flex-row items-start justify-between gap-2">
+          <View className="flex-1">
+            <View className="flex-row items-center gap-1.5 flex-wrap">
+              <Text className="text-lg font-extrabold text-slate-900">Generate QR Code</Text>
+              <View className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5">
+                <Text className="text-[10px] font-bold text-violet-700">Asset Identifiers</Text>
+              </View>
+            </View>
+            <Text className="mt-0.5 text-xs text-slate-500">Create & manage trackable battery QR identities</Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('RfidAssignment')}
+            className="flex-row items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5"
+          >
+            <Icon name="rfid" color="#6d28d9" size={13} />
+            <Text className="text-xs font-bold text-violet-700">RFID →</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity onPress={() => navigation.navigate('RfidAssignment')} className="mt-2 self-start">
-          <Text className="text-xs font-bold text-violet-700">RFID Assignment →</Text>
-        </TouchableOpacity>
+
+        <View className="mt-2.5 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
+          <View className="flex-row items-center gap-1.5 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1">
+            <View className="h-2 w-2 rounded-full bg-emerald-500" />
+            <Text className="text-[11px] font-semibold text-emerald-800">
+              Total Generated: <Text className="font-extrabold text-emerald-950">{listTotal.toLocaleString()}</Text>
+            </Text>
+          </View>
+          <Text className="text-[10px] text-slate-400">Scan QR to open lifecycle</Text>
+        </View>
       </View>
 
-      <View className="flex-row gap-1 rounded-2xl border border-slate-200 bg-white p-1">
-        {[['individual', 'Individual QR Code'], ['bulk', 'Bulk Generation']].map(([id, label]) => (
-          <TouchableOpacity
-            key={id}
-            onPress={() => { setTab(id); if (id === 'individual') { setError(null); setQrResult(null); } else { setBulkError(null); setBulkResult(null); } }}
-            className={`flex-1 items-center rounded-xl py-2.5 ${tab === id ? 'bg-violet-600' : ''}`}
-          >
-            <Text className={`text-xs font-bold ${tab === id ? 'text-white' : 'text-slate-500'}`}>{label}</Text>
-          </TouchableOpacity>
-        ))}
+      {/* Segmented Pill Navigation */}
+      <View className="flex-row rounded-xl border border-slate-200 bg-slate-100/90 p-1">
+        {[['individual', 'Individual QR Code'], ['bulk', 'Bulk Generation']].map(([id, label]) => {
+          const active = tab === id;
+          return (
+            <TouchableOpacity
+              key={id}
+              onPress={() => {
+                setTab(id);
+                if (id === 'individual') { setError(null); setQrResult(null); }
+                else { setBulkError(null); setBulkResult(null); }
+              }}
+              className={`flex-1 items-center rounded-lg py-2 ${active ? 'bg-white shadow-2xs' : ''}`}
+            >
+              <Text className={`text-xs ${active ? 'font-bold text-violet-700' : 'font-semibold text-slate-500'}`}>{label}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       {tab === 'individual' ? (
         <>
-          <View className="gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <View className="gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
             <View>
-              <Label hint="(optional — can be added later)">Battery Number</Label>
-              <TextInput value={serialNumber} onChangeText={setSerialNumber} placeholder="e.g. SN-88213 — the number printed on the battery" placeholderTextColor="#94a3b8" autoCorrect={false} className={input} />
-              <Text className="mt-1 text-[11px] text-slate-400">The manufacturer's serial number physically printed on the battery. Leave blank if unknown — Admin or Client can add it later.</Text>
+              <Label hint="(optional — physical serial)">Battery Number</Label>
+              <TextInput
+                value={serialNumber}
+                onChangeText={setSerialNumber}
+                placeholder="e.g. SN-88213"
+                placeholderTextColor="#94a3b8"
+                autoCorrect={false}
+                className={input}
+              />
+              <Text className="mt-1 text-[10.5px] text-slate-400">Physical number printed on battery. Leave blank if unknown — can add later.</Text>
             </View>
+
             <View>
               <Label>Client <Text className="text-red-500">*</Text></Label>
               <ClientPicker clients={clients} value={clientName} onChange={setClientName} />
-              <Text className="mt-1 text-[11px] text-slate-400">Select the client/company that owns this battery.</Text>
             </View>
+
             <View>
-              <Label>Battery ID</Label>
-              <Text className={`${input} font-mono opacity-75`}>{computedBatteryId || 'Select a client to auto-generate'}</Text>
-              <Text className="mt-1 text-[11px] text-slate-400">Automatically generated from the client name. The QR code encodes a link to this ID.</Text>
+              <Label>Battery ID Preview</Label>
+              <View className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+                <Text className="font-mono text-xs font-bold text-slate-900">{computedBatteryId || 'Select a client to auto-generate'}</Text>
+                {computedBatteryId ? (
+                  <View className="rounded bg-violet-100 px-1.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-violet-700">Auto</Text>
+                  </View>
+                ) : null}
+              </View>
+              <Text className="mt-1 text-[10.5px] text-slate-400">Prefix + next sequence number for this client.</Text>
             </View>
+
             {error ? <Text className="text-xs font-semibold text-red-600">{error}</Text> : null}
-            <View className="flex-row justify-end gap-2">
-              <TouchableOpacity onPress={handleReset} className="rounded-xl border border-slate-200 px-4 py-2.5">
-                <Text className="text-sm font-medium text-slate-600">Reset</Text>
+
+            <View className="flex-row justify-end gap-2 pt-1 border-t border-slate-100">
+              <TouchableOpacity onPress={handleReset} className="rounded-lg border border-slate-200 bg-white px-3.5 py-2">
+                <Text className="text-xs font-medium text-slate-600">Reset</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleSubmit} disabled={submitting || !clientName.trim()} className={`rounded-xl bg-violet-600 px-4 py-2.5 ${submitting || !clientName.trim() ? 'opacity-50' : ''}`}>
-                <Text className="text-sm font-bold text-white">{submitting ? 'Generating…' : 'Generate QR Code'}</Text>
+              <TouchableOpacity
+                onPress={handleSubmit}
+                disabled={submitting || !clientName.trim()}
+                className={`rounded-lg bg-violet-700 px-4 py-2 ${submitting || !clientName.trim() ? 'opacity-50' : 'shadow-xs'}`}
+              >
+                <Text className="text-xs font-bold text-white">{submitting ? 'Generating…' : 'Generate QR Code'}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View className="items-center rounded-2xl border border-dashed border-slate-300 bg-white p-4">
+          {/* QR Result / Placeholder Preview */}
+          <View className="items-center rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs">
             {qrResult ? (
-              <>
-                <QrImage code={qrResult.batteryCode} size={180} />
-                <Text className="mt-2 font-mono text-base font-bold text-slate-900">{qrResult.batteryCode}</Text>
-                {qrResult.clientName ? <Text className="text-xs text-slate-500">Client: {qrResult.clientName}</Text> : null}
-                <Text className="mt-1 text-center text-[11px] text-slate-400" selectable>{qrContentFor(qrResult.batteryCode)}</Text>
-                <TouchableOpacity onPress={() => shareSingleQr(qrResult.batteryCode).catch((e) => Alert.alert('QR code', e.message))} className="mt-3 rounded-xl bg-violet-600 px-4 py-2.5">
-                  <Text className="text-sm font-bold text-white">Download (PDF)</Text>
+              <View className="items-center w-full">
+                <View className="rounded-xl border border-slate-200 bg-white p-3 shadow-xs">
+                  <QrImage code={qrResult.batteryCode} size={150} />
+                </View>
+                <Text className="mt-2.5 font-mono text-sm font-extrabold text-slate-900">{qrResult.batteryCode}</Text>
+                {qrResult.clientName ? <Text className="text-xs text-slate-500">Client: <Text className="font-semibold text-slate-700">{qrResult.clientName}</Text></Text> : null}
+                <Text className="mt-1 max-w-[90%] text-center text-[10.5px] text-slate-400" numberOfLines={2} selectable>{qrContentFor(qrResult.batteryCode)}</Text>
+                <TouchableOpacity
+                  onPress={() => shareSingleQr(qrResult.batteryCode).catch((e) => Alert.alert('QR code', e.message))}
+                  className="mt-3 flex-row items-center gap-1.5 rounded-lg bg-violet-700 px-4 py-2 shadow-xs"
+                >
+                  <Icon name="download" color="#ffffff" size={13} />
+                  <Text className="text-xs font-bold text-white">Download PDF</Text>
                 </TouchableOpacity>
-              </>
+              </View>
             ) : (
-              <Text className="py-6 text-center text-xs text-slate-400">Select a client and generate its QR code to preview it here.</Text>
+              <View className="py-4 items-center">
+                <Icon name="battery" color="#cbd5e1" size={26} />
+                <Text className="mt-2 text-center text-xs font-medium text-slate-400">Select a client and click Generate to preview QR code here.</Text>
+              </View>
             )}
           </View>
         </>
       ) : (
         <>
-          <View className="gap-4 rounded-2xl border border-slate-200 bg-white p-4">
+          <View className="gap-3 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
             <View>
               <Label>Client <Text className="text-red-500">*</Text></Label>
               <ClientPicker clients={clients} value={bulkClientName} onChange={setBulkClientName} />
             </View>
-            <View>
-              <Label hint={hasBulkClient ? `(next for ${bulkClientName}: ${bulkSuggestedStart})` : '(Select a client first)'}>Starting Number</Label>
-              <TextInput
-                value={bulkStartNumber}
-                onChangeText={setBulkStartNumber}
-                editable={hasBulkClient}
-                keyboardType="number-pad"
-                placeholder={hasBulkClient ? String(bulkSuggestedStart) : 'Select a client first'}
-                placeholderTextColor="#94a3b8"
-                className={`${input} ${hasBulkClient ? '' : 'opacity-50'}`}
-              />
-              <Text className="mt-1 text-[11px] text-slate-400">Leave blank to auto-continue from the last generated number for this client.</Text>
+
+            <View className="flex-row gap-2">
+              <View className="flex-1">
+                <Label hint={hasBulkClient ? `(next: ${bulkSuggestedStart})` : ''}>Start #</Label>
+                <TextInput
+                  value={bulkStartNumber}
+                  onChangeText={setBulkStartNumber}
+                  editable={hasBulkClient}
+                  keyboardType="number-pad"
+                  placeholder={hasBulkClient ? String(bulkSuggestedStart) : 'Select client'}
+                  placeholderTextColor="#94a3b8"
+                  className={`${input} ${hasBulkClient ? '' : 'opacity-50'}`}
+                />
+              </View>
+
+              <View className="flex-1">
+                <Label>Quantity</Label>
+                <TextInput
+                  value={bulkCount}
+                  onChangeText={setBulkCount}
+                  editable={hasBulkClient}
+                  keyboardType="number-pad"
+                  placeholder={hasBulkClient ? 'e.g. 100' : 'Select client'}
+                  placeholderTextColor="#94a3b8"
+                  className={`${input} ${hasBulkClient ? '' : 'opacity-50'}`}
+                />
+              </View>
             </View>
+
+            {/* Quick Presets */}
             <View>
-              <Label hint={hasBulkClient ? undefined : '(Select a client first)'}>How many QR Codes</Label>
-              <View className="mb-2 flex-row flex-wrap gap-1.5">
+              <Text className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-400">Quick Presets</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1 py-0.5">
                 {BULK_PRESETS.map((p) => {
                   const active = hasBulkClient && bulkCount === String(p);
                   return (
-                    <TouchableOpacity key={p} disabled={!hasBulkClient} onPress={() => setBulkCount(String(p))} className={`rounded-md border px-2.5 py-1 ${active ? 'border-violet-500 bg-violet-100' : 'border-slate-200 bg-white'} ${hasBulkClient ? '' : 'opacity-40'}`}>
-                      <Text className={`text-xs font-medium ${active ? 'text-violet-700' : 'text-slate-600'}`}>{p >= 1000 ? `${p / 1000}k` : p}</Text>
+                    <TouchableOpacity
+                      key={p}
+                      disabled={!hasBulkClient}
+                      onPress={() => setBulkCount(String(p))}
+                      className={`rounded-lg border px-2.5 py-1 ${active ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-slate-50'} ${hasBulkClient ? '' : 'opacity-40'}`}
+                    >
+                      <Text className={`text-xs ${active ? 'font-bold text-white' : 'font-medium text-slate-600'}`}>
+                        {p >= 1000 ? `${p / 1000}k` : p}
+                      </Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
-              <TextInput
-                value={bulkCount}
-                onChangeText={setBulkCount}
-                editable={hasBulkClient}
-                keyboardType="number-pad"
-                placeholder={hasBulkClient ? 'e.g. 500' : 'Select a client first'}
-                placeholderTextColor="#94a3b8"
-                className={`${input} ${hasBulkClient ? '' : 'opacity-50'}`}
-              />
-              <Text className="mt-1 text-[11px] text-slate-400">
-                {hasBulkClient ? 'Maximum 50,000 per batch. Battery Numbers can be assigned later by Admin or Client.' : 'Select a client above before choosing how many QR codes to generate.'}
-              </Text>
+              </ScrollView>
             </View>
+
             {bulkError ? <Text className="text-xs font-semibold text-red-600">{bulkError}</Text> : null}
-            <View className="flex-row justify-end gap-2">
-              <TouchableOpacity onPress={handleBulkReset} className="rounded-xl border border-slate-200 px-4 py-2.5">
-                <Text className="text-sm font-medium text-slate-600">Reset</Text>
+
+            <View className="flex-row justify-end gap-2 pt-1 border-t border-slate-100">
+              <TouchableOpacity onPress={handleBulkReset} className="rounded-lg border border-slate-200 bg-white px-3.5 py-2">
+                <Text className="text-xs font-medium text-slate-600">Reset</Text>
               </TouchableOpacity>
-              <TouchableOpacity onPress={handleBulkSubmit} disabled={bulkSubmitting || !hasBulkClient} className={`rounded-xl bg-violet-600 px-4 py-2.5 ${bulkSubmitting || !hasBulkClient ? 'opacity-50' : ''}`}>
-                <Text className="text-sm font-bold text-white">{bulkSubmitting ? 'Generating…' : 'Generate Bulk QR Codes'}</Text>
+              <TouchableOpacity
+                onPress={handleBulkSubmit}
+                disabled={bulkSubmitting || !hasBulkClient}
+                className={`rounded-lg bg-violet-700 px-4 py-2 ${bulkSubmitting || !hasBulkClient ? 'opacity-50' : 'shadow-xs'}`}
+              >
+                <Text className="text-xs font-bold text-white">{bulkSubmitting ? 'Generating…' : 'Generate Bulk'}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
-          <View className="rounded-2xl border border-violet-200 bg-violet-50/50 p-4">
+          {/* Bulk Result / Range Preview */}
+          <View className="rounded-2xl border border-violet-200/90 bg-violet-50/50 p-3.5 shadow-2xs">
             {bulkResult ? (
               <View className="items-center">
-                <Icon name="checkCircle" color="#059669" size={30} />
-                <Text className="mt-2 text-base font-bold text-slate-900">{Number(bulkResult.count || 0).toLocaleString()} QR Codes Generated!</Text>
+                <Icon name="checkCircle" color="#059669" size={26} />
+                <Text className="mt-1.5 text-sm font-extrabold text-slate-900">{Number(bulkResult.count || 0).toLocaleString()} QR Codes Generated!</Text>
                 <Text className="text-xs text-slate-500">Client: <Text className="font-semibold text-slate-800">{bulkResult.clientName}</Text></Text>
-                <View className="mt-3 w-full flex-row gap-2">
-                  <View className="flex-1 rounded-xl bg-white p-2.5">
+                <View className="mt-2.5 w-full flex-row gap-2">
+                  <View className="flex-1 rounded-xl border border-slate-200/80 bg-white p-2">
                     <Text className="text-[10px] font-bold uppercase text-slate-400">First ID</Text>
                     <Text className="font-mono text-xs font-bold text-slate-900">{bulkResult.firstCode}</Text>
                   </View>
-                  <View className="flex-1 rounded-xl bg-white p-2.5">
+                  <View className="flex-1 rounded-xl border border-slate-200/80 bg-white p-2">
                     <Text className="text-[10px] font-bold uppercase text-slate-400">Last ID</Text>
                     <Text className="font-mono text-xs font-bold text-slate-900">{bulkResult.lastCode}</Text>
                   </View>
                 </View>
-                <View className="mt-3 w-full flex-row gap-2">
-                  <TouchableOpacity disabled={Boolean(resultPrinting)} onPress={() => printResult('print')} className="flex-1 items-center rounded-xl bg-emerald-600 py-2.5">
-                    <Text className="text-xs font-bold text-white">{resultPrinting === 'print' ? 'Building…' : 'Print QR sheet'}</Text>
+                <View className="mt-2.5 w-full flex-row gap-2">
+                  <TouchableOpacity disabled={Boolean(resultPrinting)} onPress={() => printResult('print')} className="flex-1 items-center rounded-lg bg-emerald-600 py-2">
+                    <Text className="text-xs font-bold text-white">{resultPrinting === 'print' ? 'Building…' : 'Print Sheet'}</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity disabled={Boolean(resultPrinting)} onPress={() => printResult('share')} className="flex-1 items-center rounded-xl border border-emerald-300 bg-white py-2.5">
-                    <Text className="text-xs font-bold text-emerald-700">{resultPrinting === 'share' ? 'Building…' : 'Download Sheet (PDF)'}</Text>
+                  <TouchableOpacity disabled={Boolean(resultPrinting)} onPress={() => printResult('share')} className="flex-1 items-center rounded-lg border border-emerald-300 bg-white py-2">
+                    <Text className="text-xs font-bold text-emerald-700">{resultPrinting === 'share' ? 'Building…' : 'Download PDF'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             ) : (
               <>
-                <Text className="mb-2 text-sm font-semibold text-slate-600">Range Preview</Text>
+                <View className="flex-row items-center justify-between mb-2">
+                  <Text className="text-xs font-bold uppercase tracking-wider text-slate-700">Range Preview</Text>
+                  <View className="rounded bg-violet-100 px-1.5 py-0.5">
+                    <Text className="text-[10px] font-bold text-violet-700">Live</Text>
+                  </View>
+                </View>
                 {[
                   ['Client', bulkClientName || 'Not selected'],
-                  ['Count', hasBulkClient && Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '—'],
+                  ['Quantity', hasBulkClient && Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '—'],
                   ['First ID', hasBulkClient ? bulkFirstPreview : '—'],
                   ['Last ID', hasBulkClient ? bulkLastPreview : '—'],
                 ].map(([k, v]) => (
-                  <View key={k} className="flex-row justify-between border-b border-violet-100 py-1.5">
+                  <View key={k} className="flex-row justify-between border-b border-violet-100/80 py-1">
                     <Text className="text-xs text-slate-500">{k}</Text>
                     <Text className="font-mono text-xs font-bold text-slate-900">{v}</Text>
                   </View>
                 ))}
-                <Text className="mt-2 text-[11px] text-slate-500">
+                <Text className="mt-1.5 text-[10.5px] text-slate-500">
                   {hasBulkClient
-                    ? `All ${Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '…'} batteries will be created instantly. Battery Numbers (physical serials) are optional — Admin or Client can fill them in after printing.`
-                    : 'Select a client above to configure quantity and preview the generated ID range.'}
+                    ? `All ${Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '…'} batteries will be created instantly. Physical serials can be assigned later.`
+                    : 'Select a client above to preview the generated ID range.'}
                 </Text>
               </>
             )}
@@ -502,67 +598,99 @@ export default function AdminGenerateQrScreen() {
         </>
       )}
 
-      {/* Generated QR Codes */}
-      <View className="gap-3 rounded-2xl border border-slate-200 bg-white p-4">
+      {/* Generated QR Codes List Header & Print Sheet Card */}
+      <View className="gap-2.5 rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-2xs">
         <View className="flex-row items-center justify-between">
-          <Text className="text-sm font-bold uppercase tracking-wide text-slate-500">Generated QR Codes</Text>
-          <Text className="text-xs text-slate-500">Total: <Text className="font-bold text-slate-900">{listTotal.toLocaleString()}</Text></Text>
+          <Text className="text-xs font-extrabold uppercase tracking-wider text-slate-700">Generated QR Codes</Text>
+          <Text className="text-xs font-semibold text-slate-500">Total: <Text className="font-extrabold text-slate-900">{listTotal.toLocaleString()}</Text></Text>
         </View>
-        <View className="flex-row items-center gap-2 rounded-xl border border-slate-300 px-3">
-          <Icon name="search" color="#94a3b8" size={14} />
-          <TextInput value={listSearchInput} onChangeText={setListSearchInput} placeholder="Search by Battery ID or Client Name" placeholderTextColor="#94a3b8" autoCorrect={false} className="min-w-0 flex-1 py-2 text-sm text-slate-900" />
+
+        {/* Compact Search */}
+        <View className="flex-row items-center gap-2 rounded-xl border border-slate-200 bg-slate-50/70 px-2.5 py-1.5">
+          <Icon name="search" color="#94a3b8" size={13} />
+          <TextInput
+            value={listSearchInput}
+            onChangeText={setListSearchInput}
+            placeholder="Search Battery ID or Client"
+            placeholderTextColor="#94a3b8"
+            autoCorrect={false}
+            className="min-w-0 flex-1 py-0.5 text-xs text-slate-900"
+          />
           {listSearchInput ? (
             <TouchableOpacity onPress={() => { setListSearchInput(''); setListSearch(''); }} hitSlop={8}>
-              <Icon name="x" color="#64748b" size={14} />
+              <Icon name="x" color="#64748b" size={13} />
             </TouchableOpacity>
           ) : null}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
+
+        {/* Horizontal Client Filters */}
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1 py-0.5">
           {[{ id: 'all', name: '' }, ...clients].map((c) => {
             const active = listClientFilter === c.name;
             return (
-              <TouchableOpacity key={String(c.id)} onPress={() => setListClientFilter(c.name)} className={`rounded-xl border px-3 py-1.5 ${active ? 'border-blue-600 bg-blue-600' : 'border-slate-200 bg-white'}`}>
-                <Text className={`text-[11px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{c.name || 'All Clients'}</Text>
+              <TouchableOpacity
+                key={String(c.id)}
+                onPress={() => setListClientFilter(c.name)}
+                className={`rounded-lg border px-2.5 py-1 ${active ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-slate-50'}`}
+              >
+                <Text className={`text-[11px] ${active ? 'font-bold text-white' : 'font-medium text-slate-600'}`}>{c.name || 'All Clients'}</Text>
               </TouchableOpacity>
             );
           })}
         </ScrollView>
+
         {isSuperAdmin && (
-          <TouchableOpacity onPress={() => setShowBlocked((v) => !v)} className="flex-row items-center gap-2 self-start">
-            <View className={`h-5 w-5 items-center justify-center rounded border-2 ${showBlocked ? 'border-violet-600 bg-violet-600' : 'border-slate-300'}`}>
-              {showBlocked ? <Text className="text-[10px] font-black text-white">✓</Text> : null}
+          <TouchableOpacity onPress={() => setShowBlocked((v) => !v)} className="flex-row items-center gap-2 self-start py-0.5">
+            <View className={`h-4 w-4 items-center justify-center rounded border ${showBlocked ? 'border-violet-600 bg-violet-600' : 'border-slate-300 bg-white'}`}>
+              {showBlocked ? <Text className="text-[9px] font-black text-white">✓</Text> : null}
             </View>
-            <Text className="text-xs font-semibold text-slate-700">Show blocked</Text>
+            <Text className="text-xs font-medium text-slate-700">Show blocked</Text>
           </TouchableOpacity>
         )}
 
-        <View className="gap-2 rounded-xl border border-violet-200 bg-violet-50/40 p-3">
-          <View className="flex-row gap-2">
-            {[['Print QR Sheet — start from #', sheetStart, setSheetStart], ['How many', sheetCount, setSheetCount], ['Per row', sheetColumns, setSheetColumns]].map(([label, v, set]) => (
-              <View key={label} className="flex-1">
-                <Text className="mb-1 text-[11px] font-medium text-slate-700" numberOfLines={2}>{label}</Text>
-                <TextInput value={v} onChangeText={set} keyboardType="number-pad" className="rounded-lg border border-slate-300 bg-white px-2.5 py-2 text-sm text-slate-900" />
-              </View>
-            ))}
+        {/* Compact Print QR Sheet */}
+        <View className="gap-2 rounded-xl border border-violet-100 bg-violet-50/40 p-2.5">
+          <View className="flex-row items-center justify-between">
+            <Text className="text-[11px] font-bold text-violet-900">Print QR Sheet (A4 PDF)</Text>
+            <Text className="text-[10px] text-violet-700 font-medium">{columnsNum * ROWS} per sheet</Text>
           </View>
-          <Text className="text-[11px] text-slate-500">
-            One A4 sheet = {columnsNum * ROWS} QR codes ({columnsNum} across × {ROWS} down), oldest-generated first, each labeled with its Battery ID. Asking for more spills onto extra sheets in the same PDF.
-          </Text>
-          <View className="flex-row gap-2">
-            <TouchableOpacity disabled={Boolean(sheetLoading)} onPress={() => runSheet('view')} className={`flex-1 items-center rounded-xl border border-violet-300 bg-white py-2.5 ${sheetLoading ? 'opacity-60' : ''}`}>
-              <Text className="text-xs font-bold text-violet-700">{sheetLoading === 'view' ? 'Building sheet…' : 'View Sheet'}</Text>
+          <View className="flex-row gap-1.5">
+            <View className="flex-1">
+              <Text className="mb-0.5 text-[10px] font-medium text-slate-600">Start #</Text>
+              <TextInput value={sheetStart} onChangeText={setSheetStart} keyboardType="number-pad" className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 text-center" />
+            </View>
+            <View className="flex-1">
+              <Text className="mb-0.5 text-[10px] font-medium text-slate-600">Count</Text>
+              <TextInput value={sheetCount} onChangeText={setSheetCount} keyboardType="number-pad" className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 text-center" />
+            </View>
+            <View className="flex-1">
+              <Text className="mb-0.5 text-[10px] font-medium text-slate-600">Cols</Text>
+              <TextInput value={sheetColumns} onChangeText={setSheetColumns} keyboardType="number-pad" className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs text-slate-900 text-center" />
+            </View>
+          </View>
+          <View className="flex-row gap-2 mt-0.5">
+            <TouchableOpacity
+              disabled={Boolean(sheetLoading)}
+              onPress={() => runSheet('view')}
+              className={`flex-1 items-center rounded-lg border border-violet-300 bg-white py-1.5 ${sheetLoading ? 'opacity-60' : ''}`}
+            >
+              <Text className="text-xs font-bold text-violet-700">{sheetLoading === 'view' ? 'Building…' : 'View Sheet'}</Text>
             </TouchableOpacity>
-            <TouchableOpacity disabled={Boolean(sheetLoading)} onPress={() => runSheet('download')} className={`flex-1 items-center rounded-xl bg-violet-600 py-2.5 ${sheetLoading ? 'opacity-60' : ''}`}>
-              <Text className="text-xs font-bold text-white">{sheetLoading === 'download' ? 'Building sheet…' : 'Download Sheet (PDF)'}</Text>
+            <TouchableOpacity
+              disabled={Boolean(sheetLoading)}
+              onPress={() => runSheet('download')}
+              className={`flex-1 items-center rounded-lg bg-violet-700 py-1.5 ${sheetLoading ? 'opacity-60' : 'shadow-2xs'}`}
+            >
+              <Text className="text-xs font-bold text-white">{sheetLoading === 'download' ? 'Building…' : 'Download PDF'}</Text>
             </TouchableOpacity>
           </View>
           {sheetError ? <Text className="text-xs font-semibold text-red-600">{sheetError}</Text> : null}
         </View>
 
         {listError ? <Text className="text-xs font-semibold text-red-600">{listError}</Text> : null}
-        <Text className="text-xs font-semibold text-slate-500">
+        <Text className="text-[11px] font-medium text-slate-500">
           Showing <Text className="font-bold text-slate-800">{rows.length}</Text> of <Text className="font-bold text-slate-800">{listTotal.toLocaleString()}</Text>{' '}
-          {listTotal === 1 ? 'battery QR code' : 'battery QR codes'}{listSearch || listClientFilter ? ' (filtered)' : ''}
+          {listTotal === 1 ? 'battery' : 'batteries'}{listSearch || listClientFilter ? ' (filtered)' : ''}
         </Text>
       </View>
     </View>
@@ -573,7 +701,7 @@ export default function AdminGenerateQrScreen() {
       <FlatList
         data={rows}
         keyExtractor={(r) => String(r.id)}
-        contentContainerClassName="p-4 gap-2 pb-16"
+        contentContainerClassName="p-3 gap-2 pb-16"
         ListHeaderComponent={header}
         keyboardShouldPersistTaps="handled"
         refreshControl={<RefreshControl refreshing={false} onRefresh={refetchList} />}
@@ -584,53 +712,58 @@ export default function AdminGenerateQrScreen() {
         renderItem={({ item: r, index }) => {
           const clientLocked = r.serial_number_added_by_role === 'client' && r.serial_number;
           return (
-            <View className={`rounded-2xl border bg-white p-3.5 ${r.is_blocked ? 'border-red-200' : 'border-slate-200'}`}>
+            <View className={`rounded-xl border bg-white p-3 shadow-2xs ${r.is_blocked ? 'border-red-200 bg-red-50/20' : 'border-slate-200/90'}`}>
               <View className="flex-row items-center justify-between gap-2">
-                <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: r.battery_code, fromScan: false })} className="flex-1 flex-row items-center gap-2">
-                  <Text className="text-[11px] font-semibold text-slate-400">{index + 1}.</Text>
-                  <Text className="text-sm font-extrabold text-blue-700">{r.battery_code}</Text>
-                  {r.is_blocked ? <Text className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold text-red-700">Blocked</Text> : null}
+                <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: r.battery_code, fromScan: false })} className="flex-1 flex-row items-center gap-1.5">
+                  <Text className="text-[10.5px] font-semibold text-slate-400">#{index + 1}</Text>
+                  <Text className="font-mono text-xs font-extrabold text-violet-700">{r.battery_code}</Text>
+                  {r.is_blocked ? <Text className="rounded bg-red-100 px-1.5 py-0.5 text-[9px] font-bold text-red-700">Blocked</Text> : null}
                 </TouchableOpacity>
-                <Text className="text-[11px] text-slate-400">{r.qr_generated_at ? new Date(r.qr_generated_at).toLocaleString() : ''}</Text>
+                <Text className="text-[10px] text-slate-400">{r.qr_generated_at ? new Date(r.qr_generated_at).toLocaleDateString() : ''}</Text>
               </View>
-              <Text className="mt-1 text-xs text-slate-600">Client: <Text className="font-semibold text-slate-800">{r.client_name || '—'}</Text></Text>
-              <View className="mt-1.5 flex-row flex-wrap items-center gap-2">
-                <Text className="text-[10px] font-bold uppercase text-slate-400">Battery Number</Text>
-                {!r.serial_number ? (
-                  <TouchableOpacity onPress={() => setSerialTarget(r)} className="rounded-lg border border-blue-200 bg-blue-50 px-2 py-1">
-                    <Text className="text-[11px] font-bold text-blue-700">+ Add Number</Text>
-                  </TouchableOpacity>
-                ) : (
-                  <>
-                    <Text className="text-xs font-semibold text-slate-800">{r.serial_number}</Text>
-                    {clientLocked ? (
-                      <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold text-amber-800">🔒 Set by Client</Text>
-                    ) : r.serial_number_added_by_role ? (
-                      <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-600">Set by {r.serial_number_added_by_role}</Text>
-                    ) : null}
-                    {(!clientLocked || isAdmin) && (
-                      <TouchableOpacity onPress={() => setSerialTarget(r)} hitSlop={6}>
-                        <Text className="text-[11px] font-bold text-blue-600">Edit</Text>
-                      </TouchableOpacity>
-                    )}
-                  </>
-                )}
+
+              <View className="mt-1.5 flex-row items-center justify-between flex-wrap gap-1">
+                <Text className="text-xs text-slate-500">Client: <Text className="font-semibold text-slate-800">{r.client_name || '—'}</Text></Text>
+                
+                {/* Battery Number */}
+                <View className="flex-row items-center gap-1">
+                  {!r.serial_number ? (
+                    <TouchableOpacity onPress={() => setSerialTarget(r)} className="rounded-md border border-violet-200 bg-violet-50 px-2 py-0.5">
+                      <Text className="text-[10.5px] font-bold text-violet-700">+ Add No.</Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <View className="flex-row items-center gap-1">
+                      <Text className="font-mono text-xs font-bold text-slate-900">{r.serial_number}</Text>
+                      {clientLocked ? (
+                        <Text className="rounded bg-amber-100 px-1 py-0.2 text-[9px] font-bold text-amber-800">🔒 Client</Text>
+                      ) : null}
+                      {(!clientLocked || isAdmin) && (
+                        <TouchableOpacity onPress={() => setSerialTarget(r)} hitSlop={6}>
+                          <Text className="text-[10.5px] font-bold text-blue-600">Edit</Text>
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  )}
+                </View>
               </View>
-              <View className="mt-2.5 flex-row flex-wrap gap-2 border-t border-slate-100 pt-2.5">
-                <TouchableOpacity onPress={() => setViewingQr(r)} className="flex-row items-center gap-1 rounded-lg border border-slate-200 px-2.5 py-1.5">
-                  <Icon name="eye" color="#334155" size={13} />
-                  <Text className="text-[11px] font-bold text-slate-700">View QR</Text>
+
+              {/* Action Buttons Row */}
+              <View className="mt-2 flex-row flex-wrap items-center gap-1.5 border-t border-slate-100 pt-2">
+                <TouchableOpacity onPress={() => setViewingQr(r)} className="flex-row items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1">
+                  <Icon name="eye" color="#475569" size={12} />
+                  <Text className="text-xs font-semibold text-slate-700">View</Text>
                 </TouchableOpacity>
-                <TouchableOpacity disabled={busyRow === r.id} onPress={() => downloadRow(r)} className="rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1.5">
-                  <Text className="text-[11px] font-bold text-violet-700">{busyRow === r.id ? '…' : 'Download'}</Text>
+                <TouchableOpacity disabled={busyRow === r.id} onPress={() => downloadRow(r)} className="flex-row items-center gap-1 rounded-lg border border-violet-200 bg-violet-50 px-2.5 py-1">
+                  <Icon name="download" color="#6d28d9" size={12} />
+                  <Text className="text-xs font-bold text-violet-700">{busyRow === r.id ? '…' : 'PDF'}</Text>
                 </TouchableOpacity>
                 {isSuperAdmin && (
                   <>
-                    <TouchableOpacity disabled={busyRow === r.id} onPress={() => toggleBlock(r)} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5">
-                      <Text className="text-[11px] font-bold text-amber-800">{r.is_blocked ? 'Unblock' : 'Block'}</Text>
+                    <TouchableOpacity disabled={busyRow === r.id} onPress={() => toggleBlock(r)} className="rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1">
+                      <Text className="text-xs font-bold text-amber-800">{r.is_blocked ? 'Unblock' : 'Block'}</Text>
                     </TouchableOpacity>
-                    <TouchableOpacity onPress={() => confirmDelete(r)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1.5">
-                      <Text className="text-[11px] font-bold text-red-700">Delete</Text>
+                    <TouchableOpacity onPress={() => confirmDelete(r)} className="rounded-lg border border-red-200 bg-red-50 px-2.5 py-1">
+                      <Text className="text-xs font-bold text-red-700">Delete</Text>
                     </TouchableOpacity>
                   </>
                 )}

@@ -166,12 +166,12 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
           ) : null}
 
           {/* Star Rating Interactive Bar */}
-          <div className="text-center py-4 px-3 bg-slate-50/70 rounded-2xl border border-slate-200/60 dark:bg-surface-850/60 dark:border-white/5">
-            <span className="text-[11px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-wider block mb-2.5">
+          <div className="text-center py-2.5 sm:py-4 px-2 sm:px-3 bg-slate-50/70 rounded-xl sm:rounded-2xl border border-slate-200/60 dark:bg-surface-850/60 dark:border-white/5">
+            <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 dark:text-neutral-400 uppercase tracking-wider block mb-2 sm:mb-2.5">
               Select Your Rating
             </span>
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-1.5 sm:gap-3">
               {[1, 2, 3, 4, 5].map((star) => {
                 const filled = star <= (hoverRating || rating);
                 return (
@@ -181,11 +181,11 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
                     onClick={() => setRating(star)}
                     onMouseEnter={() => setHoverRating(star)}
                     onMouseLeave={() => setHoverRating(0)}
-                    className="p-1.5 transition-all hover:scale-125 active:scale-95 focus:outline-hidden cursor-pointer"
+                    className="p-1 sm:p-1.5 transition-all hover:scale-125 active:scale-95 focus:outline-hidden cursor-pointer"
                     title={`${star} Star${star > 1 ? 's' : ''}`}
                   >
                     <FiStar
-                      className={`w-9 h-9 sm:w-10 sm:h-10 transition-colors ${
+                      className={`w-7 h-7 sm:w-10 sm:h-10 transition-colors ${
                         filled
                           ? 'text-amber-400 fill-amber-400 filter drop-shadow-md'
                           : 'text-slate-300 dark:text-neutral-600'
@@ -196,8 +196,8 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
               })}
             </div>
 
-            <div className="mt-3 flex justify-center">
-              <span className={`inline-flex items-center px-3.5 py-1 rounded-full text-xs font-bold border ${ratingInfo.color}`}>
+            <div className="mt-2.5 sm:mt-3 flex justify-center">
+              <span className={`inline-flex items-center px-3 sm:px-3.5 py-0.5 sm:py-1 rounded-full text-[11px] sm:text-xs font-bold border ${ratingInfo.color}`}>
                 {ratingInfo.title}
               </span>
             </div>
@@ -214,7 +214,7 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
               {PRESET_FEEDBACK_OPTIONS.map((tag) => {
                 const isSelected = selectedTags.includes(tag);
                 return (
@@ -222,7 +222,7 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
                     key={tag}
                     type="button"
                     onClick={() => toggleTag(tag)}
-                    className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none text-left ${
+                    className={`inline-flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 sm:py-2 rounded-lg sm:rounded-xl text-[11px] sm:text-xs font-semibold transition-all cursor-pointer select-none text-left ${
                       isSelected
                         ? 'bg-blue-600 text-white shadow-sm ring-2 ring-blue-500/30 dark:bg-blue-500'
                         : 'bg-slate-100/90 text-slate-700 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-white/10 border border-slate-200/80 dark:border-white/5'
@@ -242,31 +242,31 @@ function RatingModal({ batteryCode, batteryCodes = [], truckNumber, driverName, 
 
           {/* Custom Feedback Text Area */}
           <div className="space-y-1.5">
-            <label className="text-xs font-bold text-slate-700 dark:text-neutral-300 uppercase tracking-wider block">
+            <label className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-neutral-300 uppercase tracking-wider block">
               Additional Notes, Feedback, or Special Requests (Optional)
             </label>
             <textarea
-              rows={4}
+              rows={3}
               value={customFeedback}
               onChange={(e) => setCustomFeedback(e.target.value)}
               placeholder="Share any specific details about the battery performance, fleet deployment status, packaging, or communication..."
-              className="w-full rounded-2xl border border-slate-300 bg-slate-50/70 p-3.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 leading-relaxed"
+              className="w-full rounded-xl sm:rounded-2xl border border-slate-300 bg-slate-50/70 p-2.5 sm:p-3.5 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/20 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 leading-relaxed"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-between gap-3 pt-4 border-t border-slate-200 dark:border-white/10">
+          <div className="flex items-center justify-between gap-2 sm:gap-3 pt-3 sm:pt-4 border-t border-slate-200 dark:border-white/10">
             <button
               type="button"
               onClick={onClose}
-              className="rounded-xl border border-slate-200 px-4 py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5 cursor-pointer transition-colors"
+              className="rounded-lg sm:rounded-xl border border-slate-200 px-3.5 sm:px-4 py-2 sm:py-2.5 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-400 dark:hover:bg-white/5 cursor-pointer transition-colors"
             >
               Skip / Dismiss
             </button>
             <button
               type="submit"
               disabled={submitting}
-              className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-7 py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 active:scale-95 disabled:opacity-50 cursor-pointer transition-all dark:bg-blue-600 dark:hover:bg-blue-500"
+              className="inline-flex items-center gap-1.5 sm:gap-2 rounded-lg sm:rounded-xl bg-slate-900 px-5 sm:px-7 py-2 sm:py-2.5 text-xs sm:text-sm font-bold text-white shadow-md hover:bg-slate-800 active:scale-95 disabled:opacity-50 cursor-pointer transition-all dark:bg-blue-600 dark:hover:bg-blue-500"
             >
               <FiSend className="w-3.5 h-3.5" />
               <span>{submitting ? 'Submitting…' : 'Submit Feedback'}</span>

@@ -29,6 +29,7 @@ const STATUS_META = {
   unchanged: { label: '✓ Already has this tag', done: '✓ Already has this tag', cls: 'text-slate-600 bg-slate-100 border-slate-200' },
   created: { label: '✓ New battery — will be registered', done: '✓ Registered + tag assigned', cls: 'text-violet-700 bg-violet-50 border-violet-200' },
   not_found: { label: '✕ Battery number not found', done: '✕ Skipped — battery not found', cls: 'text-rose-700 bg-rose-50 border-rose-200' },
+  already_tagged: { label: '✕ Battery already has a tag', done: '✕ Skipped — battery already has a tag', cls: 'text-rose-700 bg-rose-50 border-rose-200' },
   tag_in_use: { label: '✕ Tag belongs to another battery', done: '✕ Skipped — tag belongs to another battery', cls: 'text-amber-800 bg-amber-50 border-amber-200' },
   duplicate_in_sheet: { label: '✕ Repeated in this file', done: '✕ Skipped — repeated in this file', cls: 'text-amber-800 bg-amber-50 border-amber-200' },
   client_mismatch: { label: '✕ Client name does not match', done: '✕ Skipped — client name does not match', cls: 'text-amber-800 bg-amber-50 border-amber-200' },
@@ -39,7 +40,7 @@ const FILTERS = [
   { id: 'all', label: 'All rows' },
   { id: 'ok', label: 'Matched ✓', test: (r) => ['assigned', 'replaced', 'unchanged', 'created'].includes(r.status) },
   { id: 'not_found', label: 'Battery not found ✕', test: (r) => r.status === 'not_found' },
-  { id: 'problem', label: 'Other problems ✕', test: (r) => ['tag_in_use', 'duplicate_in_sheet', 'client_mismatch', 'error'].includes(r.status) },
+  { id: 'problem', label: 'Other problems ✕', test: (r) => ['already_tagged', 'tag_in_use', 'duplicate_in_sheet', 'client_mismatch', 'error'].includes(r.status) },
 ];
 
 const PAGE = 10;
@@ -91,6 +92,7 @@ export default function AdminRfidScreen() {
   const [resultClient, setResultClient] = useState('');
   const [shown, setShown] = useState(RESULT_PAGE);
   const [templateBusy, setTemplateBusy] = useState(false);
+  const [showGuide, setShowGuide] = useState(false);
 
   // tags-by-battery list
   const [listClient, setListClient] = useState('');
@@ -108,8 +110,9 @@ export default function AdminRfidScreen() {
   useEffect(() => {
     apiClient.get('/clients').then(({ data }) => {
       const list = Array.isArray(data) ? data : data?.data || [];
-      setClients(list.filter((c) => c.user_role !== 'recycle_client').map((c) => c.name).sort());
-      setAllClients(list.map((c) => c.name).sort());
+      const fleetOnly = list.filter((c) => c.user_role !== 'recycle_client').map((c) => c.name).sort();
+      setClients(fleetOnly);
+      setAllClients(fleetOnly);
     }).catch(() => {});
   }, []);
 
@@ -275,138 +278,174 @@ export default function AdminRfidScreen() {
   const busy = stage === 'checking' || stage === 'assigning';
 
   const header = (
-    <View className="gap-3 pb-2">
-      <View>
-        <Text className="text-2xl font-bold text-violet-700">RFID Assignment</Text>
-        <Text className="text-xs text-slate-500">
-          Upload a sheet of battery numbers and RFID tags. Each battery number is matched to a battery created on the Generate QR Code page and its tag is assigned.
-        </Text>
-        <View className="mt-2 flex-row flex-wrap gap-2">
-          <TouchableOpacity disabled={templateBusy} onPress={onTemplate} className="rounded-xl border border-slate-300 bg-white px-3 py-2">
-            <Text className="text-xs font-bold text-slate-700">{templateBusy ? 'Downloading…' : 'Download template (.xlsx)'}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate('GenerateQr')} className="rounded-xl border border-violet-200 bg-violet-50 px-3 py-2">
-            <Text className="text-xs font-bold text-violet-700">Generate QR Codes →</Text>
-          </TouchableOpacity>
+    <View className="gap-2 pb-1.5">
+      {/* Executive Header */}
+      <View className="flex-row items-center justify-between">
+        <View className="flex-1 mr-2">
+          <View className="flex-row items-center gap-1.5">
+            <Text className="text-sm font-black text-slate-900">RFID Fleet Assignment</Text>
+            <View className="rounded-full bg-violet-100 px-1.5 py-0.2">
+              <Text className="text-[9px] font-bold text-violet-800">Bulk Sync</Text>
+            </View>
+          </View>
+          <Text className="text-[9.5px] text-slate-500">Assign tags via sheet or register individually</Text>
         </View>
+        <TouchableOpacity
+          onPress={() => navigation.navigate('GenerateQr')}
+          className="rounded-lg border border-violet-200 bg-violet-50 px-2 py-1 flex-row items-center gap-1"
+        >
+          <Text className="text-[10px] font-bold text-violet-700">QR Codes →</Text>
+        </TouchableOpacity>
       </View>
 
-      {/* Upload */}
-      <View className="rounded-3xl border border-slate-200 bg-white p-4">
-        <Text className="text-sm font-extrabold text-slate-900">1. Pick the client, then upload the sheet</Text>
-        <Text className="mt-1 text-xs text-slate-500">
-          .xlsx or .csv with columns <Text className="font-bold">Battery Number</Text>, <Text className="font-bold">RFID Tag</Text> and <Text className="font-bold">Client Name</Text> (header row required). The client you pick here is used for every row; a row with its own Client Name must match the battery's client. Tags are stored as upper-case letters and digits; colons and spaces are ignored. Up to 5,000 rows.
-        </Text>
-        {file && (
-          <Text className="mt-2 text-[11px] text-slate-500">
-            Selected: <Text className="font-semibold text-slate-700">{file.name}</Text>{file.size ? ` (${Math.round(file.size / 1024)} KB)` : ''}
+      {/* Upload Card */}
+      <View className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-row items-center gap-1.5">
+            <View className="h-4.5 w-4.5 items-center justify-center rounded-md bg-violet-100">
+              <Text className="text-[9.5px] font-black text-violet-700">1</Text>
+            </View>
+            <Text className="text-[11.5px] font-black text-slate-900">Upload Spreadsheet</Text>
+          </View>
+          <View className="flex-row items-center gap-2">
+            <TouchableOpacity disabled={templateBusy} onPress={onTemplate}>
+              <Text className="text-[10px] font-bold text-slate-600">
+                {templateBusy ? 'Downloading…' : 'Template'}
+              </Text>
+            </TouchableOpacity>
+            <Text className="text-[10px] text-slate-300">•</Text>
+            <TouchableOpacity onPress={() => setShowGuide((v) => !v)}>
+              <Text className="text-[10px] font-bold text-violet-600">{showGuide ? 'Hide Guide' : 'Format Guide'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {showGuide ? (
+          <Text className="mt-1 rounded-lg bg-slate-50 p-1.5 text-[9.5px] text-slate-500">
+            Columns: Battery Number, RFID Tag, and optional Client Name. Tags are stored in uppercase; colons and spaces are ignored.
           </Text>
+        ) : null}
+
+        {file && (
+          <View className="mt-1 flex-row items-center gap-1.5 rounded-lg bg-violet-50 px-2 py-0.5">
+            <Text className="text-[9.5px] font-bold text-violet-800" numberOfLines={1}>
+              📄 {file.name} ({Math.round(file.size / 1024)} KB)
+            </Text>
+          </View>
         )}
-        <Text className="mb-1 mt-3 text-[11px] font-bold uppercase text-slate-500">Select client *</Text>
-        <View className="flex-row flex-wrap gap-2">
+
+        {/* Fleet Client Selection Wrapping Track (Zero Horizontal Scrolling) */}
+        <Text className="mb-1 mt-1.5 text-[9px] font-bold uppercase tracking-wider text-slate-400">Select fleet client *</Text>
+        <View className="flex-row flex-wrap gap-1">
           {clients.map((c) => (
-            <TouchableOpacity key={c} disabled={busy} onPress={() => { setClient(c); setError(null); }} className={`rounded-xl border px-3 py-2 ${client === c ? 'border-violet-600 bg-violet-600' : 'border-slate-300 bg-white'}`}>
-              <Text className={`text-xs font-bold ${client === c ? 'text-white' : 'text-slate-700'}`}>{c}</Text>
+            <TouchableOpacity
+              key={c}
+              disabled={busy}
+              onPress={() => { setClient(c); setError(null); }}
+              className={`rounded-lg border px-2 py-1 ${client === c ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-slate-50'}`}
+            >
+              <Text className={`text-[10px] font-bold ${client === c ? 'text-white' : 'text-slate-700'}`}>{c}</Text>
             </TouchableOpacity>
           ))}
         </View>
-        <View className="mt-3 flex-row gap-2">
-          <TouchableOpacity disabled={!client || busy} onPress={pick} className={`flex-1 flex-row items-center justify-center gap-2 rounded-2xl bg-violet-700 py-3 ${!client || busy ? 'opacity-50' : ''}`}>
-            <Icon name="photo" color="#fff" size={16} />
-            <Text className="text-sm font-bold text-white">{stage === 'checking' ? 'Reading sheet…' : file ? 'Choose another file' : 'Choose file'}</Text>
+
+        <View className="mt-2 flex-row gap-1.5">
+          <TouchableOpacity
+            disabled={!client || busy}
+            onPress={pick}
+            className={`h-8 flex-1 flex-row items-center justify-center gap-1.5 rounded-lg bg-violet-700 ${!client || busy ? 'opacity-50' : 'active:opacity-80'}`}
+          >
+            <Icon name="photo" color="#fff" size={13} />
+            <Text className="text-[11px] font-bold text-white">
+              {stage === 'checking' ? 'Reading sheet…' : file ? 'Change file' : 'Choose file'}
+            </Text>
           </TouchableOpacity>
           {file ? (
-            <TouchableOpacity onPress={reset} className="items-center justify-center rounded-2xl border border-slate-200 px-4">
-              <Text className="text-sm font-bold text-slate-600">Clear</Text>
+            <TouchableOpacity onPress={reset} className="h-8 items-center justify-center rounded-lg border border-slate-200 bg-slate-50 px-2.5">
+              <Text className="text-[11px] font-bold text-slate-600">Clear</Text>
             </TouchableOpacity>
           ) : null}
         </View>
-        {error ? <Text className="mt-2 rounded-xl bg-rose-50 p-2.5 text-xs font-semibold text-rose-700">{error}</Text> : null}
+
+        {error ? <Text className="mt-1.5 rounded-lg bg-rose-50 p-1.5 text-[10px] font-bold text-rose-700">✕ {error}</Text> : null}
       </View>
 
       {result ? (
         <>
-          <View className="rounded-3xl border border-slate-200 bg-white p-4">
-            <Text className="text-sm font-extrabold text-slate-900">
-              {committed ? '3. Done — tags saved' : '2. Check the table below, then press Assign'}
-              <Text className="text-xs font-semibold text-violet-700">  Client: {client}</Text>
+          <View className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+            <Text className="text-xs font-black text-slate-900">
+              {committed ? '3. Done — tags saved' : '2. Review matches, then press Assign'}
+              <Text className="text-[11px] font-bold text-violet-700"> · Client: {client}</Text>
             </Text>
             {!committed && (
-              <Text className="mt-1 text-xs text-slate-500">
-                Nothing has been saved yet. Rows marked ✓ will get their tag when you press <Text className="font-bold">Assign</Text>; rows marked ✕ are skipped and the reason is shown with each row.
+              <Text className="mt-0.5 text-[10.5px] text-slate-500">
+                Rows marked ✓ get tags assigned; rows marked ✕ are skipped.
               </Text>
             )}
-            <View className="mt-3 flex-row flex-wrap gap-1.5">
-              <Stat label="rows in file" value={resultRows.length} />
-              <Stat label={committed ? 'tags assigned' : 'ready to assign'} value={committed ? result.written ?? matched : matched} tone="emerald" />
-              {(summary.unchanged || 0) > 0 && <Stat label="already had this tag" value={summary.unchanged} />}
-              {(summary.created || 0) > 0 && <Stat label="new batteries registered" value={summary.created} tone="violet" />}
-              {(summary.not_found || 0) - willCreate > 0 && <Stat label="battery not found" value={summary.not_found - willCreate} tone="rose" />}
-              {(summary.tag_in_use || 0) > 0 && <Stat label="tag belongs to another battery" value={summary.tag_in_use} tone="amber" />}
-              {(summary.duplicate_in_sheet || 0) > 0 && <Stat label="repeated in file" value={summary.duplicate_in_sheet} tone="amber" />}
-              {(summary.client_mismatch || 0) > 0 && <Stat label="client name mismatch" value={summary.client_mismatch} tone="amber" />}
-              {(summary.error || 0) > 0 && <Stat label="incomplete rows" value={summary.error} tone="rose" />}
+            <View className="mt-2 flex-row flex-wrap gap-1">
+              <Stat label="rows" value={resultRows.length} />
+              <Stat label={committed ? 'tags assigned' : 'ready'} value={committed ? result.written ?? matched : matched} tone="emerald" />
+              {(summary.unchanged || 0) > 0 && <Stat label="already tagged" value={summary.unchanged} />}
+              {(summary.created || 0) > 0 && <Stat label="new registered" value={summary.created} tone="violet" />}
+              {(summary.not_found || 0) - willCreate > 0 && <Stat label="not found" value={summary.not_found - willCreate} tone="rose" />}
+              {(summary.already_tagged || 0) > 0 && <Stat label="already tagged" value={summary.already_tagged} tone="rose" />}
+              {(summary.tag_in_use || 0) > 0 && <Stat label="tag in use" value={summary.tag_in_use} tone="amber" />}
+              {(summary.duplicate_in_sheet || 0) > 0 && <Stat label="repeated" value={summary.duplicate_in_sheet} tone="amber" />}
+              {(summary.client_mismatch || 0) > 0 && <Stat label="client mismatch" value={summary.client_mismatch} tone="amber" />}
+              {(summary.error || 0) > 0 && <Stat label="incomplete" value={summary.error} tone="rose" />}
             </View>
             {!committed && creatable.length > 0 && (
-              <TouchableOpacity onPress={() => setCreateMissing((v) => !v)} className={`mt-3 flex-row items-start gap-2.5 rounded-2xl border p-3 ${createMissing ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white'}`}>
-                <View className={`mt-0.5 h-5 w-5 items-center justify-center rounded-md border-2 ${createMissing ? 'border-violet-600 bg-violet-600' : 'border-violet-300 bg-white'}`}>
-                  {createMissing ? <Text className="text-[11px] font-black text-white">✓</Text> : null}
+              <TouchableOpacity onPress={() => setCreateMissing((v) => !v)} className={`mt-2.5 flex-row items-start gap-2 rounded-xl border p-2.5 ${createMissing ? 'border-violet-500 bg-violet-50' : 'border-violet-200 bg-white'}`}>
+                <View className={`mt-0.5 h-4 w-4 items-center justify-center rounded border ${createMissing ? 'border-violet-600 bg-violet-600' : 'border-violet-300 bg-white'}`}>
+                  {createMissing ? <Text className="text-[10px] font-black text-white">✓</Text> : null}
                 </View>
-                <Text className="flex-1 text-xs text-violet-900">
-                  <Text className="font-bold">Also register {creatable.length} new batter{creatable.length === 1 ? 'y' : 'ies'} for {client}</Text>
-                  {` (${creatable[0].batteryCode}${creatable.length > 1 ? ` … ${creatable[creatable.length - 1].batteryCode}` : ''}) and assign their tags. These numbers are in the sheet but not in the system yet — same as generating them on the QR page. Leave unticked to skip them.`}
+                <Text className="flex-1 text-[11px] text-violet-900">
+                  <Text className="font-bold">Also register {creatable.length} new batteries</Text> and assign their tags. Leave unticked to skip.
                 </Text>
               </TouchableOpacity>
             )}
-            {!committed && (summary.not_found || 0) - creatable.length > 0 && (
-              <Text className="mt-2 text-xs text-rose-700">
-                {summary.not_found - creatable.length} battery number{summary.not_found - creatable.length === 1 ? '' : 's'} can't be matched or registered (wrong prefix or unknown client) — see the reason on each row. Those rows will be skipped.
-              </Text>
-            )}
             {committed && (
-              <Text className="mt-2 text-xs font-semibold text-emerald-700">
-                {result.written} tag{result.written === 1 ? '' : 's'} saved{result.created ? `, including ${result.created} newly registered batter${result.created === 1 ? 'y' : 'ies'}` : ''}. Scanning any of these tags now opens the battery just like its QR code.
+              <Text className="mt-2 text-[11px] font-bold text-emerald-700">
+                ✓ {result.written} tag{result.written === 1 ? '' : 's'} saved{result.created ? `, including ${result.created} new registered batteries` : ''}.
               </Text>
             )}
-            <View className="mt-3 flex-row gap-2">
-              <TouchableOpacity onPress={exportResults} className="flex-1 items-center rounded-2xl border border-slate-300 py-3">
-                <Text className="text-xs font-bold text-slate-700">Export results (.csv)</Text>
+            <View className="mt-2.5 flex-row gap-1.5">
+              <TouchableOpacity onPress={exportResults} className="h-8.5 flex-1 items-center justify-center rounded-xl border border-slate-200 bg-white">
+                <Text className="text-[11px] font-bold text-slate-700">Export CSV</Text>
               </TouchableOpacity>
               {!committed ? (
-                <TouchableOpacity disabled={matched === 0 || stage === 'assigning'} onPress={assign} className={`flex-1 items-center rounded-2xl bg-emerald-600 py-3 ${matched === 0 ? 'opacity-50' : ''}`}>
-                  <Text className="text-xs font-bold text-white">{stage === 'assigning' ? 'Assigning…' : `Assign ${matched} tag${matched === 1 ? '' : 's'}`}</Text>
+                <TouchableOpacity disabled={matched === 0 || stage === 'assigning'} onPress={assign} className={`h-8.5 flex-1 items-center justify-center rounded-xl bg-emerald-600 ${matched === 0 ? 'opacity-50' : 'active:opacity-80'}`}>
+                  <Text className="text-[11px] font-bold text-white">{stage === 'assigning' ? 'Assigning…' : `Assign ${matched} Tags`}</Text>
                 </TouchableOpacity>
               ) : (
-                <TouchableOpacity onPress={reset} className="flex-1 items-center rounded-2xl bg-violet-700 py-3">
-                  <Text className="text-xs font-bold text-white">Upload another sheet</Text>
+                <TouchableOpacity onPress={reset} className="h-8.5 flex-1 items-center justify-center rounded-xl bg-violet-700">
+                  <Text className="text-[11px] font-bold text-white">Upload Another Sheet</Text>
                 </TouchableOpacity>
               )}
             </View>
           </View>
 
-          {/* Rows of the sheet */}
-          <View className="rounded-3xl border border-slate-200 bg-white p-4">
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
+          {/* Rows of the sheet - Zero Horizontal Scrolling */}
+          <View className="rounded-2xl border border-slate-200 bg-white p-3 shadow-2xs">
+            <View className="flex-row flex-wrap gap-1">
               {FILTERS.map((f) => {
                 const n = f.test ? resultRows.filter(f.test).length : resultRows.length;
                 const on = filter === f.id;
                 return (
-                  <TouchableOpacity key={f.id} onPress={() => setFilter(f.id)} className={`rounded-xl px-3 py-1.5 ${on ? 'bg-violet-600' : 'bg-slate-100'}`}>
-                    <Text className={`text-[11px] font-bold ${on ? 'text-white' : 'text-slate-600'}`}>{f.label} ({n})</Text>
+                  <TouchableOpacity key={f.id} onPress={() => setFilter(f.id)} className={`rounded-lg px-2.5 py-1 ${on ? 'bg-violet-600' : 'bg-slate-100'}`}>
+                    <Text className={`text-[10px] font-bold ${on ? 'text-white' : 'text-slate-600'}`}>{f.label} ({n})</Text>
                   </TouchableOpacity>
                 );
               })}
-            </ScrollView>
-            {clientsInFile.length > 1 && (
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5 pt-2">
-                {['', ...clientsInFile].map((c) => (
-                  <TouchableOpacity key={c || 'all'} onPress={() => setResultClient(c)} className={`rounded-xl border px-3 py-1.5 ${resultClient === c ? 'border-violet-600 bg-violet-600' : 'border-slate-200'}`}>
-                    <Text className={`text-[11px] font-bold ${resultClient === c ? 'text-white' : 'text-slate-600'}`}>{c || 'All clients'}</Text>
-                  </TouchableOpacity>
-                ))}
-              </ScrollView>
-            )}
-            <TextInput value={resultSearch} onChangeText={setResultSearch} placeholder="Search battery number or tag…" placeholderTextColor="#94a3b8" autoCorrect={false} className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-900" />
+            </View>
+            <TextInput
+              value={resultSearch}
+              onChangeText={setResultSearch}
+              placeholder="Search battery number or tag…"
+              placeholderTextColor="#94a3b8"
+              autoCorrect={false}
+              className="mt-2 h-8.5 rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs text-slate-900"
+            />
             <View className="mt-2 gap-1.5">
               {visible.length === 0 ? (
                 <Text className="py-4 text-center text-xs text-slate-400">No rows match this filter.</Text>
@@ -417,77 +456,103 @@ export default function AdminRfidScreen() {
                   const bad = (r.status === 'not_found' && !toCreate) || r.status === 'error';
                   const why = r.status === 'assigned' ? '' : r.status === 'replaced' ? `Currently has ${r.previousTag}; it will be replaced` : r.message;
                   return (
-                    <View key={`${r.rowNumber}-${r.batteryCode}`} className={`rounded-xl border p-2.5 ${bad ? 'border-rose-200 bg-rose-50/60' : 'border-slate-200'}`}>
-                      <View className="flex-row items-center gap-2">
-                        <Text className="text-[11px] font-semibold text-slate-400">#{idx + 1}</Text>
-                        {r.batteryId ? (
-                          <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: r.batteryCode, fromScan: false })}>
-                            <Text className="text-xs font-bold text-blue-700">{r.batteryCode}</Text>
-                          </TouchableOpacity>
-                        ) : (
-                          <Text className="text-xs font-bold text-slate-900">{r.batteryCode || 'empty'}</Text>
-                        )}
-                        <Text className="flex-1 text-right font-mono text-[11px] text-slate-600" numberOfLines={1}>{r.rfidTag || 'empty'}</Text>
+                    <View key={`${r.rowNumber}-${r.batteryCode}`} className={`rounded-xl border p-2 ${bad ? 'border-rose-200 bg-rose-50/60' : 'border-slate-100 bg-slate-50/40'}`}>
+                      <View className="flex-row items-center justify-between gap-1.5">
+                        <View className="flex-row items-center gap-1.5 min-w-0">
+                          <Text className="text-[10px] font-bold text-slate-400">#{idx + 1}</Text>
+                          {r.batteryId ? (
+                            <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: r.batteryCode, fromScan: false })}>
+                              <Text className="font-mono text-xs font-bold text-blue-700">🔋 {r.batteryCode}</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <Text className="font-mono text-xs font-bold text-slate-900">{r.batteryCode || 'empty'}</Text>
+                          )}
+                        </View>
+                        <Text className={`rounded-full border px-2 py-0.2 text-[9.5px] font-bold ${meta.cls}`}>{committed ? meta.done : meta.label}</Text>
                       </View>
-                      {r.sheetBatteryCode ? <Text className="text-[10px] text-slate-400">written as {r.sheetBatteryCode}</Text> : null}
-                      <Text className={`mt-1 self-start rounded-full border px-2 py-0.5 text-[10px] font-bold ${meta.cls}`}>{committed ? meta.done : meta.label}</Text>
-                      {why ? <Text className="mt-1 text-[11px] text-slate-500">{why}</Text> : null}
+                      <View className="mt-1 flex-row items-center justify-between text-[10.5px]">
+                        <Text className="text-[10px] text-slate-400">RFID Tag:</Text>
+                        <Text className="font-mono text-[10.5px] font-bold text-slate-800">{r.rfidTag || '—'}</Text>
+                      </View>
+                      {why ? <Text className="mt-1 text-[10px] text-slate-500">{why}</Text> : null}
                     </View>
                   );
                 })
               )}
               {visible.length > 0 && (
                 shown < visible.length ? (
-                  <TouchableOpacity onPress={() => setShown((n) => Math.min(n + RESULT_PAGE, visible.length))} className="items-center rounded-xl border border-slate-200 py-2">
-                    <Text className="text-xs font-bold text-slate-600">Show more ({Math.min(shown, visible.length)} of {visible.length})</Text>
+                  <TouchableOpacity onPress={() => setShown((n) => Math.min(n + RESULT_PAGE, visible.length))} className="items-center rounded-xl border border-slate-200 py-1.5 mt-1">
+                    <Text className="text-[11px] font-bold text-slate-600">Show more ({Math.min(shown, visible.length)} of {visible.length})</Text>
                   </TouchableOpacity>
                 ) : (
-                  <Text className="text-center text-[11px] text-slate-400">Showing all {visible.length} rows</Text>
+                  <Text className="text-center text-[10px] text-slate-400 py-1">Showing all {visible.length} rows</Text>
                 )
               )}
             </View>
           </View>
         </>
-      ) : stage === 'idle' ? (
-        <View className="items-center rounded-3xl border border-dashed border-slate-300 bg-white p-5">
-          <Text className="text-sm font-bold text-slate-700">No sheet uploaded yet</Text>
-          <Text className="mt-1 text-center text-xs text-slate-500">
-            Export the battery numbers from the Battery Fleet page, add the RFID tag beside each one, and upload the file here.
-          </Text>
-        </View>
       ) : null}
 
       {/* Tags by battery */}
-      <View className="rounded-3xl border border-slate-200 bg-white p-4">
-        <Text className="text-sm font-extrabold text-slate-900">RFID tags by battery</Text>
-        <Text className="text-[11px] text-slate-500">{listClient || 'All clients'} · in battery-number order</Text>
-        <View className="mt-3 flex-row gap-2">
-          {[['Tagged', counts.assigned.toLocaleString(), 'text-emerald-700'], ['Without tag', counts.unassigned.toLocaleString(), 'text-rose-700'], ['Coverage', `${pct}%`, 'text-violet-700']].map(([label, v, color]) => (
-            <View key={label} className="flex-1 rounded-xl bg-slate-50 p-2">
-              <Text className="text-[10px] font-bold uppercase text-slate-400">{label}</Text>
-              <Text className={`text-base font-black ${color}`}>{listLoading ? '…' : v}</Text>
+      <View className="gap-1.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+        <View className="flex-row items-center justify-between">
+          <View>
+            <View className="flex-row items-center gap-1">
+              <Text className="text-[11.5px] font-black text-slate-900">RFID Tags by Battery</Text>
+              <View className="rounded-full bg-emerald-100 px-1.5 py-0.2">
+                <Text className="text-[8.5px] font-black text-emerald-800">LIVE</Text>
+              </View>
+            </View>
+            <Text className="text-[9.5px] text-slate-400">{listClient || 'All clients'} · Ordered by battery ID</Text>
+          </View>
+          <View className="rounded-full bg-emerald-50 px-2 py-0.5 border border-emerald-200">
+            <Text className="text-[9.5px] font-black text-emerald-800">{pct}% Tagged</Text>
+          </View>
+        </View>
+
+        <View className="flex-row gap-1">
+          {[['Tagged', counts.assigned.toLocaleString(), 'text-emerald-700'], ['Without tag', counts.unassigned.toLocaleString(), 'text-rose-700'], ['Total', (counts.assigned + counts.unassigned).toLocaleString(), 'text-slate-700']].map(([label, v, color]) => (
+            <View key={label} className="flex-1 rounded-lg bg-slate-50/80 p-1 border border-slate-100">
+              <Text className="text-[8.5px] font-bold uppercase text-slate-400">{label}</Text>
+              <Text className={`text-xs font-black ${color}`}>{listLoading ? '…' : v}</Text>
             </View>
           ))}
         </View>
-        <View className="mt-2 h-1.5 overflow-hidden rounded-full bg-slate-100">
+        <View className="h-1 overflow-hidden rounded-full bg-slate-100">
           <View className="h-full rounded-full bg-emerald-500" style={{ width: `${pct}%` }} />
         </View>
-        <View className="mt-3 flex-row rounded-xl bg-slate-100 p-1">
+
+        {/* Tagged segmented tabs */}
+        <View className="flex-row rounded-lg bg-slate-100 p-0.5">
           {[['all', 'All', counts.assigned + counts.unassigned], ['yes', 'Assigned', counts.assigned], ['no', 'Not assigned', counts.unassigned]].map(([id, label, n]) => (
-            <TouchableOpacity key={id} onPress={() => setTagged(id)} className={`flex-1 items-center rounded-lg py-1.5 ${tagged === id ? 'bg-white' : ''}`}>
-              <Text className={`text-xs font-bold ${tagged === id ? 'text-violet-700' : 'text-slate-500'}`}>{label} {listLoading ? '…' : n.toLocaleString()}</Text>
+            <TouchableOpacity key={id} onPress={() => setTagged(id)} className={`flex-1 items-center rounded-md py-0.5 ${tagged === id ? 'bg-white shadow-2xs' : ''}`}>
+              <Text className={`text-[10px] font-bold ${tagged === id ? 'text-violet-700' : 'text-slate-500'}`}>
+                {label} {listLoading ? '…' : n.toLocaleString()}
+              </Text>
             </TouchableOpacity>
           ))}
         </View>
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5 pt-2">
-          {['', ...allClients].map((c) => (
-            <TouchableOpacity key={c || 'all'} onPress={() => setListClient(c)} className={`rounded-xl border px-3 py-1.5 ${listClient === c ? 'border-violet-600 bg-violet-600' : 'border-slate-200'}`}>
-              <Text className={`text-[11px] font-bold ${listClient === c ? 'text-white' : 'text-slate-600'}`}>{c || 'All clients'}</Text>
+
+        {/* Fleet Client filter wrapping track (Zero Horizontal Scrolling) */}
+        <View className="flex-row flex-wrap gap-1">
+          {['', ...clients].map((c) => (
+            <TouchableOpacity key={c || 'all'} onPress={() => setListClient(c)} className={`rounded-lg border px-2 py-1 ${listClient === c ? 'border-violet-600 bg-violet-600' : 'border-slate-200 bg-slate-50'}`}>
+              <Text className={`text-[10px] font-bold ${listClient === c ? 'text-white' : 'text-slate-600'}`}>{c || 'All Fleet Clients'}</Text>
             </TouchableOpacity>
           ))}
-        </ScrollView>
-        <TextInput value={listSearch} onChangeText={setListSearch} placeholder="Search battery number or tag…" placeholderTextColor="#94a3b8" autoCapitalize="characters" autoCorrect={false} className="mt-2 rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2 text-sm text-slate-900" />
-        {listError ? <Text className="mt-2 text-xs font-semibold text-red-600">{listError}</Text> : null}
+        </View>
+
+        {/* Search */}
+        <TextInput
+          value={listSearch}
+          onChangeText={setListSearch}
+          placeholder="Search battery number or tag…"
+          placeholderTextColor="#94a3b8"
+          autoCapitalize="characters"
+          autoCorrect={false}
+          className="h-8 rounded-lg border border-slate-200 bg-slate-50 px-2 py-1 text-xs text-slate-900"
+        />
+        {listError ? <Text className="text-[11px] font-semibold text-rose-600">{listError}</Text> : null}
       </View>
     </View>
   );
@@ -529,30 +594,55 @@ export default function AdminRfidScreen() {
           ) : null
         }
         renderItem={({ item: r, index }) => (
-          <View className="rounded-2xl border border-slate-200 bg-white p-3">
-            <View className="flex-row flex-wrap items-center justify-between gap-2">
-              <View className="flex-row items-center gap-2">
-                <Text className="font-mono text-xs font-bold text-slate-400">#{index + 1}</Text>
+          <View className="rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
+            <View className="flex-row items-center justify-between gap-1.5">
+              <View className="flex-row items-center gap-1.5 min-w-0">
+                <Text className="font-mono text-[10px] font-bold text-slate-400">#{index + 1}</Text>
                 <TouchableOpacity onPress={() => navigation.navigate('BatteryDetail', { code: r.battery_code, fromScan: false })}>
-                  <Text className="text-sm font-bold text-blue-700">{r.battery_code}</Text>
+                  <Text className="font-mono text-xs font-black text-blue-600">🔋 {r.battery_code}</Text>
                 </TouchableOpacity>
               </View>
               <StatusBadge status={r.status} />
             </View>
-            <View className="mt-2 flex-row items-center gap-2">
+
+            <View className="mt-1 flex-row flex-wrap items-center gap-1 text-[10px]">
+              {r.client_name ? (
+                <View className="rounded bg-slate-100 px-1.5 py-0.2">
+                  <Text className="text-[9.5px] font-bold text-slate-700">{r.client_name}</Text>
+                </View>
+              ) : null}
+              <Text className="text-[9.5px] font-mono text-slate-500">
+                SN: {r.serial_number || '—'}
+              </Text>
+            </View>
+
+            <View className="mt-2 pt-1.5 border-t border-slate-100 flex-row items-center justify-between gap-2">
               {r.rfid_tag ? (
-                <View className="flex-1 flex-row items-center gap-1.5">
-                  <Text className="shrink font-mono text-[11px] text-emerald-700" numberOfLines={1} selectable>● {r.rfid_tag}</Text>
+                <View className="flex-1 flex-row items-center gap-1 min-w-0">
+                  <View className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                  <Text className="shrink font-mono text-[11px] font-bold text-emerald-800" numberOfLines={1} selectable>
+                    {r.rfid_tag}
+                  </Text>
                   <CopyButton value={r.rfid_tag} />
                 </View>
               ) : (
-                <View className="flex-1"><Text className="self-start rounded-full bg-rose-50 px-2 py-0.5 text-[10px] font-bold text-rose-700">● No tag yet</Text></View>
+                <View className="flex-1">
+                  <Text className="self-start rounded-full bg-rose-50 px-2 py-0.2 text-[9.5px] font-bold text-rose-700 border border-rose-200">
+                    ● No tag yet
+                  </Text>
+                </View>
               )}
-              <TouchableOpacity onPress={() => setAssigning(r)} hitSlop={6} className={`rounded-lg border px-2.5 py-1.5 ${r.rfid_tag ? 'border-slate-200 bg-white' : 'border-violet-200 bg-violet-50'}`}>
-                <Text className={`text-[11px] font-bold ${r.rfid_tag ? 'text-slate-600' : 'text-violet-700'}`}>{r.rfid_tag ? 'Change' : '+ Assign tag'}</Text>
+
+              <TouchableOpacity
+                onPress={() => setAssigning(r)}
+                hitSlop={6}
+                className={`rounded-lg px-2.5 py-1 ${r.rfid_tag ? 'border border-slate-200 bg-slate-50' : 'bg-violet-700'}`}
+              >
+                <Text className={`text-[10.5px] font-bold ${r.rfid_tag ? 'text-slate-700' : 'text-white'}`}>
+                  {r.rfid_tag ? 'Change' : '+ Assign tag'}
+                </Text>
               </TouchableOpacity>
             </View>
-            <Text className="mt-1 text-[11px] text-slate-500">Serial: {r.serial_number || '—'}{r.client_name ? ` · ${r.client_name}` : ''}</Text>
           </View>
         )}
       />

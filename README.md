@@ -52,7 +52,7 @@ Runs the whole stack (Postgres + backend + frontend + Caddy for automatic HTTPS)
 cp .env.example .env
 ```
 
-Fill in every value in `.env` — `DOMAIN`/`API_DOMAIN` (point their DNS A records at the server first), `DB_PASSWORD`, `JWT_SECRET`, `CLIENT_URL`, `VITE_API_URL`. Every value is required; the stack refuses to start if any are missing, on purpose — there's no safe default for a database password or a signing secret. `.env` is git-ignored and untouched by `git pull`, so this is a one-time step per server, not a per-deploy one.
+Fill in every value in `.env` — `SITE_ADDRESS` (`:80` for IP-only HTTP, or a hostname with its DNS A record pointed at the server for automatic HTTPS), `DB_PASSWORD`, `JWT_SECRET`, `CLIENT_URL`, `VITE_API_URL`. On a fresh DigitalOcean droplet run `deploy/server-setup.sh` as root first (installs Docker, firewall, swap, nightly DB backups, clones the repo). Every value is required; the stack refuses to start if any are missing, on purpose — there's no safe default for a database password or a signing secret. `.env` is git-ignored and untouched by `git pull`, so this is a one-time step per server, not a per-deploy one.
 
 ### Every deploy after that
 
@@ -61,10 +61,10 @@ git pull
 docker compose up -d --build
 ```
 
-- Caddy is the only thing with public ports (`80`/`443`) — it terminates HTTPS with an automatically-issued Let's Encrypt certificate and reverse-proxies `DOMAIN` to the frontend and `API_DOMAIN` to the backend. Postgres, the backend, and the frontend containers publish **no** ports to the host — only reachable from each other over the internal Compose network.
-- `VITE_API_URL` is baked into the frontend bundle at *build* time — changing it requires `docker compose build frontend`, and it must be the public URL a browser can reach (`https://api.yourdomain.com/api`), not the internal `backend` service name.
-- `CLIENT_URL` must match `DOMAIN`'s public URL, or the API rejects the browser's requests (CORS).
+- Caddy is the only thing with public ports (`80`/`443`) — it terminates HTTPS (automatic Let's Encrypt certificate when `SITE_ADDRESS` is a hostname) and path-routes one address: `/api`, `/uploads`, `/socket.io` go to the backend, everything else to the frontend. Postgres, the backend, and the frontend containers publish **no** ports to the host — only reachable from each other over the internal Compose network.
+- `VITE_API_URL` is baked into the frontend bundle at *build* time — changing it requires `docker compose build frontend`, and it must be the public URL a browser can reach (`http://<ip>/api` or `https://app.yourdomain.com/api`), not the internal `backend` service name.
+- `CLIENT_URL` must match the public URL the browser opens the app at, or the API rejects the browser's requests (CORS).
 - Migrations run automatically on every backend start (tracked in a `schema_migrations` table, so re-applying is a safe no-op once applied) — no separate migration step to remember.
 - Backend and frontend both run as non-root users, have healthchecks, and log with rotation (`max-size: 10m`, `max-file: 3`) so container logs don't fill the disk.
-- Local testing without a real domain: set `DOMAIN=localhost:8078` and `API_DOMAIN=localhost:8079` in `.env`, add a temporary `docker-compose.override.yml` publishing those two ports on the `caddy` service, and hit `https://localhost:8078` — Caddy serves a locally-trusted cert for `localhost` automatically. Don't commit that override file.
-- Backups aren't automated — `docker compose exec db pg_dump -U postgres refurbinics | gzip > backup-$(date +%F).sql.gz`, ideally on a cron job.
+- Every deploy after setup: `bash deploy/deploy.sh` on the server (`git pull` + rebuild).
+- `deploy/server-setup.sh` installs a nightly `pg_dump` cron into `/var/backups/refurbnics` (14 days kept).

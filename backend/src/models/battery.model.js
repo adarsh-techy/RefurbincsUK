@@ -676,21 +676,17 @@ async function removeParts(batteryId, repairIds = [], staffId) {
       );
     }
 
-    // A battery the supervisor passed back for rework ('in_repair') stays in
-    // the repair queue so the technician can Start Work again; anything else
-    // (failed testing / unserviceable) becomes 'tested_parts_removed'.
-    const isRework = current[0]?.status === 'in_repair';
+    // Parts only come out of a battery the supervisor declared unserviceable —
+    // whether the supervisor removes them or passes the battery to a
+    // technician to do it. Either way it ends as unserviceable with its parts
+    // removed ('tested_parts_removed'); it is never reworked.
     const { rows: batteryRows } = await client.query(
       `UPDATE batteries
-       SET status = $2
+       SET status = 'tested_parts_removed'
        WHERE id = $1
        RETURNING *`,
-      [batteryId, isRework ? 'in_repair' : 'tested_parts_removed']
+      [batteryId]
     );
-    if (isRework) {
-      await client.query('COMMIT');
-      return { removedCount: targets.length, battery: batteryRows[0] };
-    }
 
     // If no issue record exists yet for this battery, record that it failed testing / was marked unserviceable with parts removed
     const { rows: existingIssue } = await client.query(
@@ -956,7 +952,7 @@ async function passToTech(id, { staffId = null, note = null } = {}) {
     await client.query(
       `INSERT INTO battery_services (battery_id, service_id, service_name, rate, staff_id, notes, completed_at)
        VALUES ($1, NULL, 'Passed back to Technician', 0, $2, $3, now())`,
-      [id, staffId, note || 'Marked can\'t service during testing and passed back to technician for rework / parts removal.']
+      [id, staffId, note || 'Marked unserviceable during testing and passed to a technician to remove its fitted parts.']
     );
 
     await client.query('COMMIT');
@@ -1181,7 +1177,10 @@ const WRITABLE = new Set(['assigned', 'replaced', 'created']);
 // HUM-0000501…510 but only 500 were generated) for the row's client — only
 // when the number carries that client's own prefix, so a typo can't create a
 // battery for the wrong fleet.
-async function assignRfidTags(rows, { commit = false, createMissing = false } = {}) {
+// allowReplace: false (sheet uploads) — a battery that already has a
+// different tag is refused instead of re-tagged; replacing a tag is done one
+// battery at a time from the table (manual "Change").
+async function assignRfidTags(rows, { commit = false, createMissing = false, allowReplace = true } = {}) {
   const { rows: clientRows } = await db.query('SELECT name, battery_prefix FROM clients');
   const clientByLower = new Map(clientRows.map((c) => [c.name.trim().toLowerCase(), c.name]));
   const prefixByLower = new Map(clientRows.map((c) => [c.name.trim().toLowerCase(), c.battery_prefix || derivedPrefix(c.name)]));
@@ -1280,7 +1279,12 @@ async function assignRfidTags(rows, { commit = false, createMissing = false } = 
       continue;
     }
     if (r.previousTag === r.rfidTag) Object.assign(r, { status: 'unchanged', message: 'Already assigned' });
-    else if (r.previousTag) Object.assign(r, { status: 'replaced', message: `Replaces previous tag ${r.previousTag}` });
+    else if (r.previousTag && !allowReplace) {
+      Object.assign(r, {
+        status: 'already_tagged',
+        message: `${r.batteryCode} already has tag ${r.previousTag} (assigned earlier) — not changed. To replace it, use Change on this battery in the table`,
+      });
+    } else if (r.previousTag) Object.assign(r, { status: 'replaced', message: `Replaces previous tag ${r.previousTag}` });
     else Object.assign(r, { status: 'assigned', message: 'Assigned' });
   }
 

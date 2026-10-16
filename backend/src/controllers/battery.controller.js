@@ -865,7 +865,9 @@ async function assignRfidSheet(req, res, next) {
     const createMissing = String(req.query.createMissing ?? req.body?.createMissing) === 'true';
     let result;
     try {
-      result = await batteryModel.assignRfidTags(rows, { commit, createMissing });
+      // a sheet never re-tags a battery that already has a tag; the table's
+      // one-battery "Change" (JSON assignments) still can
+      result = await batteryModel.assignRfidTags(rows, { commit, createMissing, allowReplace: !req.file });
     } catch (err) {
       if (err.status === 409) return res.status(409).json({ message: err.message });
       throw err;

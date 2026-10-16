@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { FlatList, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useSelector } from 'react-redux';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -13,7 +13,7 @@ import { isIntakeUnverified } from '../../utils/intake';
 import UnverifiedIntakeModal from '../../components/technician/t1/UnverifiedIntakeModal';
 import { canTestBatteries, hasPermission, useLiveStaffUser } from '../../components/technician/t1/staff-role';
 
-const SUGGESTION_LIMIT = 8;
+const SUGGESTION_LIMIT = 20;
 const DEBOUNCE_MS = 250;
 
 // A technician's entry point to start work: scan a battery's QR code with
@@ -129,11 +129,14 @@ export default function ServiceScreen() {
     goToBattery(data);
   }
 
+  const roleName = effectiveUser?.staff_role === 'supervisor' ? 'Supervisor' : 'Technician';
+  const userName = currentUser?.name || 'Technician';
+
   return (
-    <View className="flex-1 bg-slate-50 px-5">
+    <View className="flex-1 bg-slate-100">
       {cameraOpen ? (
-        <View className="flex-1 gap-3 pt-8">
-          <View className="flex-1 overflow-hidden rounded-2xl border border-blue-200">
+        <View className="flex-1 gap-3 p-4 pt-8">
+          <View className="flex-1 overflow-hidden rounded-2xl border border-slate-300">
             <CameraView
               style={{ flex: 1 }}
               facing="back"
@@ -143,71 +146,108 @@ export default function ServiceScreen() {
           </View>
           <TouchableOpacity
             onPress={() => setCameraOpen(false)}
-            className="items-center rounded-md bg-slate-200 py-3"
+            className="items-center rounded-xl bg-slate-800 py-3.5 active:opacity-90"
           >
-            <Text className="text-sm font-medium text-slate-700">Stop Scanning</Text>
+            <Text className="text-sm font-bold text-white">Stop Scanning</Text>
           </TouchableOpacity>
         </View>
       ) : (
-        <View className="flex-1 items-center justify-center">
-          <View className="mb-5 h-20 w-20 items-center justify-center rounded-full bg-emerald-500/10">
-            <Icon name="camera" color="#059669" size={30} />
-          </View>
-          <Text className="text-lg font-semibold text-slate-900">Scan a Battery to Begin</Text>
-          <Text className="mt-2 max-w-xs text-center text-sm text-slate-500">
-            Scan the QR code on a battery to start work, log the parts you changed, and mark it
-            complete.
-          </Text>
-
-          <View className="mt-6 w-full max-w-xs gap-3">
-            <TouchableOpacity
-              onPress={handleOpenCamera}
-              disabled={checkingScan}
-              className={`items-center rounded-md bg-blue-600 px-4 py-3.5 ${checkingScan ? 'opacity-50' : ''}`}
-            >
-              <Text className="text-base font-semibold text-white">
-                {checkingScan ? 'Checking Battery…' : 'Scan with Camera'}
-              </Text>
-            </TouchableOpacity>
-
-            <RfidLookupButton onScan={goToBattery} />
-
-            <View className="flex-row items-center gap-2">
-              <View className="h-px flex-1 bg-slate-200" />
-              <Text className="text-xs text-slate-400">or search by code</Text>
-              <View className="h-px flex-1 bg-slate-200" />
-            </View>
-
-            <TextInput
-              value={manualCode}
-              onChangeText={setManualCode}
-              onSubmitEditing={() => goToBattery(manualCode)}
-              placeholder="Type battery code"
-              placeholderTextColor="#6b7280"
-              autoCapitalize="characters"
-              autoCorrect={false}
-              className="rounded-md border border-blue-200 bg-blue-50 px-3.5 py-3 text-center text-base text-slate-900"
-            />
-
-            {suggestions.length > 0 && (
-              <View className="max-h-64 overflow-hidden rounded-md border border-blue-200 bg-white">
-                <FlatList
-                  data={suggestions}
-                  keyExtractor={(item) => String(item.id)}
-                  renderItem={({ item }) => (
-                    <TouchableOpacity
-                      onPress={() => goToBattery(item.battery_code)}
-                      className="flex-row items-center justify-between border-b border-slate-100 px-3 py-3 last:border-b-0"
-                    >
-                      <Text className="font-medium text-slate-900">{item.battery_code}</Text>
-                      <StatusBadge status={item.status} />
-                    </TouchableOpacity>
-                  )}
-                />
+        <ScrollView
+          contentContainerStyle={{ flexGrow: 1, justifyContent: 'center', alignItems: 'center', paddingHorizontal: 16, paddingVertical: 24 }}
+          keyboardShouldPersistTaps="handled"
+        >
+          <View className="w-full max-w-sm self-center my-auto">
+            {/* ── Main Scan Hero Card ── */}
+            <View className="items-center rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
+              {/* Emblem Icon */}
+              <View className="mb-4 h-16 w-16 items-center justify-center rounded-2xl border border-emerald-200 bg-emerald-50">
+                <Icon name="camera" color="#059669" size={28} />
               </View>
-            )}
+
+              <Text className="text-lg font-bold text-slate-900">Scan a Battery to Begin</Text>
+              <Text className="mt-1.5 text-center text-xs text-slate-500 leading-relaxed max-w-xs">
+                Scan the QR code on a battery, tap RFID reader, or enter the ID below to start work.
+              </Text>
+
+              {/* Primary Action Button */}
+              <TouchableOpacity
+                onPress={handleOpenCamera}
+                disabled={checkingScan}
+                className={`mt-5 w-full flex-row items-center justify-center gap-2 rounded-xl bg-emerald-600 py-3.5 shadow-xs active:opacity-90 ${checkingScan ? 'opacity-50' : ''}`}
+              >
+                <Icon name="camera" color="#ffffff" size={18} />
+                <Text className="text-sm font-bold text-white">
+                  {checkingScan ? 'Checking Battery…' : 'Scan with Camera'}
+                </Text>
+              </TouchableOpacity>
+
+              {/* RFID Lookup Button */}
+              <View className="w-full mt-2.5">
+                <RfidLookupButton onScan={goToBattery} />
+              </View>
+
+              {/* Divider */}
+              <View className="my-3 flex-row items-center gap-2 w-full">
+                <View className="h-px flex-1 bg-slate-200" />
+                <Text className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">or search by code</Text>
+                <View className="h-px flex-1 bg-slate-200" />
+              </View>
+
+              {/* Search Input with Icon & Submit */}
+              <View className="w-full flex-row items-center rounded-xl border border-slate-300 bg-slate-50 px-3 py-1">
+                <Icon name="search" color="#94a3b8" size={16} />
+                <TextInput
+                  value={manualCode}
+                  onChangeText={setManualCode}
+                  onSubmitEditing={() => goToBattery(manualCode)}
+                  placeholder="Type battery code"
+                  placeholderTextColor="#94a3b8"
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                  className="flex-1 px-2.5 py-2 text-xs font-semibold text-slate-900 text-left"
+                />
+                {manualCode.trim().length > 0 && (
+                  <View className="flex-row items-center gap-1.5">
+                    <TouchableOpacity onPress={() => setManualCode('')} className="p-1">
+                      <Icon name="close" color="#94a3b8" size={14} />
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => goToBattery(manualCode)}
+                      className="flex-row items-center gap-1 rounded-lg bg-emerald-600 px-2 py-1"
+                    >
+                      <Text className="text-[11px] font-bold text-white">Go</Text>
+                      <Icon name="arrowRight" color="#ffffff" size={10} />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
+
+              {/* Suggestions Dropdown (Longer & Richer) */}
+              {suggestions.length > 0 && (
+                <View className="mt-2 w-full max-h-80 overflow-hidden rounded-2xl border border-slate-200 bg-white">
+                  <FlatList
+                    data={suggestions}
+                    keyExtractor={(item) => String(item.id)}
+                    renderItem={({ item }) => (
+                      <TouchableOpacity
+                        onPress={() => goToBattery(item.battery_code)}
+                        className="flex-row items-center justify-between border-b border-slate-100 px-3.5 py-3 last:border-b-0 active:bg-slate-50"
+                      >
+                        <View className="flex-1 pr-2">
+                          <Text className="text-xs font-bold text-slate-900">{item.battery_code}</Text>
+                          {item.client_name ? (
+                            <Text className="text-[10px] text-slate-400 mt-0.5">{item.client_name}</Text>
+                          ) : null}
+                        </View>
+                        <StatusBadge status={item.status} />
+                      </TouchableOpacity>
+                    )}
+                  />
+                </View>
+              )}
+            </View>
           </View>
-        </View>
+        </ScrollView>
       )}
 
       <UnverifiedIntakeModal

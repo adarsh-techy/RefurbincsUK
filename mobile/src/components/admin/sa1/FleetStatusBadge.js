@@ -10,9 +10,9 @@ export default function FleetStatusBadge({ status, isPassedBack, hasPendingParts
     (['in_repair', 'unserviceable'].includes(status) && (isPassedBack || hasPendingParts));
   if (pendingRemoval) {
     return (
-      <View className="flex-row items-center gap-1.5 self-start rounded-full border border-amber-300 bg-amber-50 px-2.5 py-0.5">
+      <View className="flex-row items-center gap-1 self-start rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5">
         <View className="h-1.5 w-1.5 rounded-full bg-amber-500" />
-        <Text className="text-xs font-bold text-amber-900">Passed to Remove Parts</Text>
+        <Text className="text-[10px] font-bold text-amber-900">Passed to Remove Parts</Text>
       </View>
     );
   }

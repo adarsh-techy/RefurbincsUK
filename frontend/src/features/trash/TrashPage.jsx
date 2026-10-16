@@ -1,35 +1,91 @@
 import { useEffect, useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import {
+  FiTrash2,
+  FiRefreshCw,
+  FiSearch,
+  FiX,
+  FiRotateCcw,
+  FiEye,
+  FiCalendar,
+  FiAlertTriangle,
+  FiChevronLeft,
+  FiChevronRight,
+  FiBox,
+  FiUser,
+  FiTruck,
+  FiFileText,
+  FiTool,
+  FiShield,
+  FiArchive,
+} from 'react-icons/fi';
 import apiClient from '../../services/api-client';
-import PageHeader from '../../components/ui/primitives/PageHeader';
-import Badge from '../../components/ui/primitives/Badge';
-import Button from '../../components/ui/primitives/Button';
 import TableState from '../../components/ui/table/TableState';
 import ConfirmModal from '../../components/ui/overlays/ConfirmModal';
 import RestoreModal from './RestoreModal';
-import { useSelector } from 'react-redux';
 
 const ITEM_TYPES = [
   { value: 'all', label: 'All Items' },
-  { value: 'battery', label: 'Batteries' },
-  { value: 'truck_intake', label: 'Truck Intakes' },
-  { value: 'staff', label: 'Staff' },
-  { value: 'part', label: 'Parts' },
-  { value: 'invoice', label: 'Invoices' },
-  { value: 'client', label: 'Clients' },
-  { value: 'service', label: 'Services' },
-  { value: 'issue_reason', label: 'Issue Reasons' },
+  { value: 'battery', label: 'Batteries', icon: FiBox },
+  { value: 'truck_intake', label: 'Truck Intakes', icon: FiTruck },
+  { value: 'staff', label: 'Staff', icon: FiUser },
+  { value: 'part', label: 'Parts', icon: FiTool },
+  { value: 'invoice', label: 'Invoices', icon: FiFileText },
+  { value: 'client', label: 'Clients', icon: FiShield },
+  { value: 'service', label: 'Services', icon: FiTool },
+  { value: 'issue_reason', label: 'Issue Reasons', icon: FiAlertTriangle },
 ];
 
 const TYPE_CONFIG = {
-  battery: { label: 'Battery', tone: 'good', bg: 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20' },
-  truck_intake: { label: 'Truck Intake', tone: 'info', bg: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20' },
-  staff: { label: 'Staff Member', tone: 'testing', bg: 'bg-purple-500/10 text-purple-600 dark:text-purple-400 border-purple-500/20' },
-  part: { label: 'Inventory Part', tone: 'warning', bg: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/20' },
-  invoice: { label: 'Invoice', tone: 'critical', bg: 'bg-rose-500/10 text-rose-600 dark:text-rose-400 border-rose-500/20' },
-  client: { label: 'Client', tone: 'info', bg: 'bg-cyan-500/10 text-cyan-600 dark:text-cyan-400 border-cyan-500/20' },
-  service: { label: 'Service', tone: 'neutral', bg: 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border-indigo-500/20' },
-  issue_reason: { label: 'Issue Reason', tone: 'warning', bg: 'bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/20' },
+  battery: {
+    label: 'Battery',
+    bg: 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-800/40',
+    iconBg: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-100 dark:border-emerald-800/50',
+    icon: FiBox,
+  },
+  truck_intake: {
+    label: 'Truck Intake',
+    bg: 'bg-blue-50 text-blue-700 border-blue-200 dark:bg-blue-950/40 dark:text-blue-300 dark:border-blue-800/40',
+    iconBg: 'bg-blue-50 text-blue-600 dark:bg-blue-950/60 dark:text-blue-400 border-blue-100 dark:border-blue-800/50',
+    icon: FiTruck,
+  },
+  staff: {
+    label: 'Staff Member',
+    bg: 'bg-purple-50 text-purple-700 border-purple-200 dark:bg-purple-950/40 dark:text-purple-300 dark:border-purple-800/40',
+    iconBg: 'bg-purple-50 text-purple-600 dark:bg-purple-950/60 dark:text-purple-400 border-purple-100 dark:border-purple-800/50',
+    icon: FiUser,
+  },
+  part: {
+    label: 'Inventory Part',
+    bg: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/40',
+    iconBg: 'bg-amber-50 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400 border-amber-100 dark:border-amber-800/50',
+    icon: FiTool,
+  },
+  invoice: {
+    label: 'Invoice',
+    bg: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/40',
+    iconBg: 'bg-rose-50 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400 border-rose-100 dark:border-rose-800/50',
+    icon: FiFileText,
+  },
+  client: {
+    label: 'Client',
+    bg: 'bg-cyan-50 text-cyan-700 border-cyan-200 dark:bg-cyan-950/40 dark:text-cyan-300 dark:border-cyan-800/40',
+    iconBg: 'bg-cyan-50 text-cyan-600 dark:bg-cyan-950/60 dark:text-cyan-400 border-cyan-100 dark:border-cyan-800/50',
+    icon: FiShield,
+  },
+  service: {
+    label: 'Service',
+    bg: 'bg-indigo-50 text-indigo-700 border-indigo-200 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-800/40',
+    iconBg: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/60 dark:text-indigo-400 border-indigo-100 dark:border-indigo-800/50',
+    icon: FiTool,
+  },
+  issue_reason: {
+    label: 'Issue Reason',
+    bg: 'bg-orange-50 text-orange-700 border-orange-200 dark:bg-orange-950/40 dark:text-orange-300 dark:border-orange-800/40',
+    iconBg: 'bg-orange-50 text-orange-600 dark:bg-orange-950/60 dark:text-orange-400 border-orange-100 dark:border-orange-800/50',
+    icon: FiAlertTriangle,
+  },
 };
 
 function formatRelativeTime(dateString) {
@@ -70,7 +126,7 @@ export default function TrashPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Filters & pagination
+  // Filters & Pagination
   const [search, setSearch] = useState('');
   const [selectedType, setSelectedType] = useState('all');
   const [startDate, setStartDate] = useState('');
@@ -123,7 +179,7 @@ export default function TrashPage() {
     fetchTrash();
   }, [page, selectedType, startDate, endDate]);
 
-  // Search debounce
+  // Debounced search
   useEffect(() => {
     const timer = setTimeout(() => {
       setPage(1);
@@ -152,6 +208,7 @@ export default function TrashPage() {
     try {
       await apiClient.delete('/trash');
       setEmptyTrashModal(false);
+      setPage(1);
       fetchStats();
       fetchTrash();
     } catch (err) {
@@ -161,158 +218,189 @@ export default function TrashPage() {
     }
   };
 
+  const isFiltered = Boolean(search || selectedType !== 'all' || startDate || endDate);
+  const resetFilters = () => {
+    setSearch('');
+    setSelectedType('all');
+    setStartDate('');
+    setEndDate('');
+    setPage(1);
+  };
+
   return (
-    <div className="space-y-6 pb-12">
-      {/* Top Header */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 text-red-600 dark:bg-red-500/20 dark:text-red-400">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-5 w-5">
-                <path d="M3 6h18" />
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-                <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-                <line x1="10" x2="10" y1="11" y2="17" />
-                <line x1="14" x2="14" y1="11" y2="17" />
-              </svg>
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
+    <div className="space-y-2.5 sm:space-y-4 pb-12 w-full max-w-full overflow-x-hidden">
+      {/* Executive Header Card — COMPACT */}
+      <div className="rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-base sm:text-xl font-extrabold tracking-tight text-slate-900 dark:text-neutral-100">
                 Trash Bin
               </h1>
-              <p className="text-sm text-slate-500 dark:text-neutral-400">
-                Audit trail of deleted items with detailed logs of who deleted them and when.
-              </p>
+              <span className="inline-flex items-center rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300">
+                Audit Archive
+              </span>
             </div>
+            <p className="mt-0.5 text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
+              Audit trail of deleted records across batteries, truck intakes, parts, staff, and invoices.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-1.5 self-start sm:self-auto">
+            <button
+              type="button"
+              onClick={() => {
+                fetchStats();
+                fetchTrash();
+              }}
+              className="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 active:bg-slate-200 px-2.5 py-1 text-[11px] font-semibold text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 shadow-2xs transition-colors cursor-pointer"
+            >
+              <FiRefreshCw className={`h-3 w-3 ${loading ? 'animate-spin text-rose-600' : 'text-slate-500'}`} />
+              <span>Refresh</span>
+            </button>
+
+            {isSuperAdmin && stats.total > 0 && (
+              <button
+                type="button"
+                onClick={() => setEmptyTrashModal(true)}
+                className="inline-flex items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 hover:bg-rose-100 active:bg-rose-200 px-2.5 py-1 text-[11px] font-bold text-rose-700 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300 shadow-2xs transition-colors cursor-pointer"
+              >
+                <FiTrash2 className="h-3 w-3 text-rose-600" />
+                <span>Empty Trash</span>
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="flex items-center gap-2.5">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              fetchStats();
-              fetchTrash();
-            }}
-            className="flex items-center gap-1.5"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <path d="M3 12a9 9 0 0 1 9-9 9.75 9.75 0 0 1 6.74 2.74L21 8" />
-              <path d="M21 3v5h-5" />
-              <path d="M21 12a9 9 0 0 1-9 9 9.75 9.75 0 0 1-6.74-2.74L3 16" />
-              <path d="M3 21v-5h5" />
-            </svg>
-            Refresh
-          </Button>
-
-          {isSuperAdmin && stats.total > 0 && (
-            <Button
-              variant="danger"
-              onClick={() => setEmptyTrashModal(true)}
-              className="flex items-center gap-1.5 whitespace-nowrap border border-red-300 dark:border-red-800"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                <path d="M3 6h18" />
-                <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              </svg>
-              Empty Trash
-            </Button>
-          )}
+        {/* Live Counters Strip — Ultra-compact Single Line */}
+        <div className="mt-2.5 flex items-center gap-2 text-[10.5px] text-slate-500 dark:text-neutral-400 border-t border-slate-100 pt-2 dark:border-white/5 flex-wrap">
+          <span>
+            Total Deleted:{' '}
+            <strong className="font-bold text-slate-900 dark:text-neutral-100">
+              {stats.total || 0}
+            </strong>
+          </span>
+          <span className="text-slate-300 dark:text-neutral-600">•</span>
+          <span>
+            Batteries:{' '}
+            <strong className="font-bold text-emerald-700 dark:text-emerald-300">
+              {stats.byType?.battery || 0}
+            </strong>
+          </span>
+          <span className="text-slate-300 dark:text-neutral-600">•</span>
+          <span>
+            Intakes:{' '}
+            <strong className="font-bold text-blue-700 dark:text-blue-300">
+              {stats.byType?.truck_intake || 0}
+            </strong>
+          </span>
+          <span className="text-slate-300 dark:text-neutral-600">•</span>
+          <span>
+            Parts:{' '}
+            <strong className="font-bold text-amber-700 dark:text-amber-300">
+              {stats.byType?.part || 0}
+            </strong>
+          </span>
+          <span className="text-slate-300 dark:text-neutral-600">•</span>
+          <span>
+            Staff:{' '}
+            <strong className="font-bold text-purple-700 dark:text-purple-300">
+              {stats.byType?.staff || 0}
+            </strong>
+          </span>
         </div>
       </div>
 
-      {/* Summary KPI Cards */}
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 lg:grid-cols-6">
-        <div
-          onClick={() => { setSelectedType('all'); setPage(1); }}
-          className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
-            selectedType === 'all'
-              ? 'border-red-500 bg-red-50/50 shadow-sm dark:border-red-500/50 dark:bg-red-950/20'
-              : 'border-slate-200 bg-white hover:border-slate-300 dark:border-surface-700 dark:bg-surface-800'
-          }`}
-        >
-          <div className="text-xs font-medium text-slate-500 dark:text-neutral-400">Total Deleted</div>
-          <div className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{stats.total || 0}</div>
-        </div>
-
-        {Object.entries(TYPE_CONFIG).map(([typeKey, cfg]) => {
-          const count = stats.byType?.[typeKey] || 0;
-          const isSelected = selectedType === typeKey;
+      {/* Type Filter Pills Bar — WRAPPING (Zero Horizontal Scrolling) */}
+      <div className="flex flex-wrap items-center gap-1 pb-0.5">
+        {ITEM_TYPES.map((t) => {
+          const isSelected = selectedType === t.value;
+          const count = t.value === 'all' ? stats.total || 0 : stats.byType?.[t.value] || 0;
           return (
-            <div
-              key={typeKey}
-              onClick={() => { setSelectedType(isSelected ? 'all' : typeKey); setPage(1); }}
-              className={`cursor-pointer rounded-xl border p-3.5 transition-all ${
+            <button
+              key={t.value}
+              type="button"
+              onClick={() => {
+                setSelectedType(t.value);
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] sm:text-[11px] font-bold transition-colors cursor-pointer ${
                 isSelected
-                  ? 'border-brand-500 bg-brand-50/50 shadow-sm dark:border-brand-500/50 dark:bg-brand-950/20'
-                  : 'border-slate-200 bg-white hover:border-slate-300 dark:border-surface-700 dark:bg-surface-800'
+                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-xs'
+                  : 'border border-slate-200 bg-white text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300'
               }`}
             >
-              <div className="text-xs font-medium text-slate-500 dark:text-neutral-400">{cfg.label === 'Battery' ? 'Batteries' : `${cfg.label}s`}</div>
-              <div className="mt-1 text-2xl font-bold text-slate-900 dark:text-white">{count}</div>
-            </div>
+              <span>{t.label}</span>
+              <span
+                className={`rounded px-1 text-[9px] sm:text-[9.5px] font-extrabold ${
+                  isSelected
+                    ? 'bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900'
+                    : 'bg-slate-100 text-slate-600 dark:bg-surface-700 dark:text-neutral-300'
+                }`}
+              >
+                {count}
+              </span>
+            </button>
           );
         })}
       </div>
 
-      {/* Filter and Search Bar */}
-      <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm dark:border-surface-700 dark:bg-surface-800 md:flex-row md:items-center md:justify-between">
-        <div className="relative flex-1">
-          <span className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-              <circle cx="11" cy="11" r="8" />
-              <line x1="21" x2="16.65" y1="21" y2="16.65" />
-            </svg>
-          </span>
+      {/* Toolbar: Search & Date Range Filters — COMPACT & FULLY RESPONSIVE */}
+      <div className="rounded-xl border border-slate-200/90 bg-white p-2 sm:p-2.5 shadow-2xs dark:border-white/10 dark:bg-surface-900 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+        {/* Search Box */}
+        <div className="relative w-full sm:w-auto sm:min-w-[200px] flex-1 sm:max-w-md">
+          <FiSearch className="absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400" />
           <input
             type="text"
-            placeholder="Search deleted items by title, detail, or user..."
+            placeholder="Search by title, detail, or user…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full rounded-xl border border-slate-200 bg-slate-50/50 py-2 pl-9 pr-4 text-sm text-slate-900 placeholder-slate-400 focus:border-brand-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-surface-600 dark:bg-surface-700/50 dark:text-neutral-100 dark:placeholder-neutral-400 dark:focus:border-brand-400 dark:focus:bg-surface-800"
+            className="w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-8 pr-7 py-1 text-xs text-slate-800 placeholder-slate-400 focus:border-rose-500 focus:bg-white focus:outline-none dark:border-white/10 dark:bg-surface-800 dark:text-neutral-100 transition-colors"
           />
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={selectedType}
-            onChange={(e) => { setSelectedType(e.target.value); setPage(1); }}
-            className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-2 text-sm text-slate-700 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/20 dark:border-surface-600 dark:bg-surface-700 dark:text-neutral-200"
-          >
-            {ITEM_TYPES.map((t) => (
-              <option key={t.value} value={t.value}>
-                {t.label}
-              </option>
-            ))}
-          </select>
-
-          <input
-            type="date"
-            value={startDate}
-            onChange={(e) => { setStartDate(e.target.value); setPage(1); }}
-            title="Start date"
-            className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-sm text-slate-700 focus:border-brand-500 focus:outline-none dark:border-surface-600 dark:bg-surface-700 dark:text-neutral-200"
-          />
-
-          <input
-            type="date"
-            value={endDate}
-            onChange={(e) => { setEndDate(e.target.value); setPage(1); }}
-            title="End date"
-            className="rounded-xl border border-slate-200 bg-slate-50/50 px-3 py-1.5 text-sm text-slate-700 focus:border-brand-500 focus:outline-none dark:border-surface-600 dark:bg-surface-700 dark:text-neutral-200"
-          />
-
-          {(search || selectedType !== 'all' || startDate || endDate) && (
+          {search && (
             <button
               type="button"
-              onClick={() => {
-                setSearch('');
-                setSelectedType('all');
-                setStartDate('');
-                setEndDate('');
+              onClick={() => setSearch('')}
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+            >
+              <FiX className="h-3 w-3" />
+            </button>
+          )}
+        </div>
+
+        {/* Date Controls & Reset */}
+        <div className="flex items-center gap-1.5 flex-wrap sm:flex-nowrap w-full sm:w-auto justify-between sm:justify-start">
+          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-neutral-400 flex-1 sm:flex-none min-w-0">
+            <span className="shrink-0">From:</span>
+            <input
+              type="date"
+              value={startDate}
+              onChange={(e) => {
+                setStartDate(e.target.value);
                 setPage(1);
               }}
-              className="rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 hover:text-slate-700 dark:text-neutral-400 dark:hover:bg-surface-700 dark:hover:text-neutral-200"
+              className="w-full sm:w-auto rounded-md border border-slate-200 bg-slate-50/70 px-1.5 py-0.5 text-xs text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200"
+            />
+          </div>
+
+          <div className="flex items-center gap-1 text-[11px] text-slate-500 dark:text-neutral-400 flex-1 sm:flex-none min-w-0">
+            <span className="shrink-0">To:</span>
+            <input
+              type="date"
+              value={endDate}
+              onChange={(e) => {
+                setEndDate(e.target.value);
+                setPage(1);
+              }}
+              className="w-full sm:w-auto rounded-md border border-slate-200 bg-slate-50/70 px-1.5 py-0.5 text-xs text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200"
+            />
+          </div>
+
+          {isFiltered && (
+            <button
+              type="button"
+              onClick={resetFilters}
+              className="rounded-md px-2 py-0.5 text-[11px] font-bold text-rose-600 hover:bg-rose-50 dark:hover:bg-surface-800 dark:text-rose-400 transition-colors cursor-pointer shrink-0"
             >
               Reset
             </button>
@@ -320,216 +408,354 @@ export default function TrashPage() {
         </div>
       </div>
 
-      {/* Main Content Area */}
       {error && <TableState tone="error">{error}</TableState>}
 
       {loading ? (
-        <div className="flex h-64 flex-col items-center justify-center rounded-2xl border border-slate-200 bg-white dark:border-surface-700 dark:bg-surface-800">
-          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-500 border-t-transparent" />
-          <p className="mt-3 text-sm text-slate-500 dark:text-neutral-400">Loading trash bin...</p>
+        <div className="flex h-44 flex-col items-center justify-center rounded-xl border border-slate-200/90 bg-white dark:border-white/10 dark:bg-surface-900 shadow-2xs">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-rose-500 border-t-transparent" />
+          <p className="mt-2 text-xs text-slate-500 dark:text-neutral-400">Loading trash bin…</p>
         </div>
       ) : items.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-slate-300 bg-slate-50/60 px-6 py-16 text-center dark:border-surface-700 dark:bg-surface-800/40">
-          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-surface-700 dark:text-neutral-400">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="h-8 w-8">
-              <path d="M3 6h18" />
-              <path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" />
-              <path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" />
-            </svg>
-          </div>
-          <h3 className="mt-4 text-base font-semibold text-slate-800 dark:text-neutral-200">
-            {search || selectedType !== 'all' ? 'No matching deleted items' : 'Trash Bin is Empty'}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-6 text-center dark:border-white/10 dark:bg-surface-900 shadow-2xs">
+          <FiArchive className="mx-auto h-6 w-6 text-slate-400" />
+          <h3 className="mt-2 text-xs font-semibold text-slate-800 dark:text-neutral-200">
+            {isFiltered ? 'No matching deleted items' : 'Trash Bin is Empty'}
           </h3>
-          <p className="mt-1 max-w-sm text-sm text-slate-500 dark:text-neutral-400">
-            {search || selectedType !== 'all'
-              ? 'Try changing your search term or adjusting filters to find what you are looking for.'
-              : 'Items deleted across batteries, truck intakes, parts, and staff will appear here with an audit of who deleted them and when.'}
+          <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-400 max-w-sm mx-auto">
+            {isFiltered
+              ? 'Try modifying your search query or adjusting type/date filters.'
+              : 'Deleted batteries, truck intakes, parts, staff, and invoices will appear here with an audit log.'}
           </p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-surface-700 dark:bg-surface-800">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-sm">
-              <thead className="border-b border-slate-200 bg-slate-50/75 text-xs font-semibold uppercase tracking-wider text-slate-500 dark:border-surface-700 dark:bg-surface-900/50 dark:text-neutral-400">
-                <tr>
-                  <th scope="col" className="px-5 py-3.5">Item & Details</th>
-                  <th scope="col" className="px-5 py-3.5">Type</th>
-                  <th scope="col" className="px-5 py-3.5">Deleted By</th>
-                  <th scope="col" className="px-5 py-3.5">Deleted When</th>
-                  <th scope="col" className="px-5 py-3.5 text-right">Actions</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-surface-700">
-                {items.map((item) => {
-                  const cfg = TYPE_CONFIG[item.item_type] || {
-                    label: item.item_type,
-                    tone: 'neutral',
-                    bg: 'bg-slate-500/10 text-slate-600 dark:text-neutral-300',
-                  };
-                  return (
-                    <tr
-                      key={item.id}
-                      className="group transition-colors hover:bg-slate-50/75 dark:hover:bg-surface-750"
-                    >
-                      {/* Item Title & Subtitle */}
-                      <td className="px-5 py-4">
-                        <div className="flex items-start gap-3">
-                          <div>
-                            <Link
-                              to={`/trash/${item.id}`}
-                              className="font-semibold text-slate-900 hover:text-brand-600 hover:underline dark:text-white dark:hover:text-brand-400"
-                            >
-                              {item.title}
-                            </Link>
-                            {item.subtitle && (
-                              <p className="mt-0.5 text-xs text-slate-500 dark:text-neutral-400">
-                                {item.subtitle}
-                              </p>
-                            )}
-                            {item.original_id && (
-                              <span className="mt-1 inline-block rounded bg-slate-100 px-1.5 py-0.5 text-[10px] font-mono text-slate-600 dark:bg-surface-700 dark:text-neutral-300">
-                                Original ID: #{item.original_id}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
+        <>
+          {/* ──────────────── DESKTOP VIEW (>= lg) ──────────────── */}
+          <div className="hidden lg:block overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:border-surface-700 dark:bg-surface-900/50 dark:text-neutral-400">
+                  <tr>
+                    <th scope="col" className="px-4 py-3">Item & Details</th>
+                    <th scope="col" className="px-3 py-3">Type</th>
+                    <th scope="col" className="px-3 py-3">Deleted By</th>
+                    <th scope="col" className="px-3 py-3">Deleted When</th>
+                    <th scope="col" className="px-4 py-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 dark:divide-surface-700">
+                  {items.map((item) => {
+                    const cfg = TYPE_CONFIG[item.item_type] || {
+                      label: item.item_type,
+                      bg: 'bg-slate-100 text-slate-600 border-slate-200',
+                      iconBg: 'bg-slate-100 text-slate-600 border-slate-200',
+                      icon: FiBox,
+                    };
+                    const ItemIcon = cfg.icon || FiBox;
 
-                      {/* Type Badge */}
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <span
-                          className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${cfg.bg}`}
-                        >
-                          {cfg.label}
-                        </span>
-                      </td>
-
-                      {/* Deleted By (User info) */}
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="flex items-center gap-2.5">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-200 text-xs font-bold text-slate-700 dark:bg-surface-600 dark:text-neutral-100">
-                            {getInitials(item.deleted_by_name)}
-                          </div>
-                          <div>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-medium text-slate-900 dark:text-neutral-100">
-                                {item.deleted_by_name || 'System / Admin'}
-                              </span>
-                              {item.deleted_by_role && (
-                                <span className="rounded bg-slate-100 px-1.5 py-0.2 text-[10px] uppercase font-semibold text-slate-600 dark:bg-surface-700 dark:text-neutral-300">
-                                  {item.deleted_by_role.replace(/_/g, ' ')}
+                    return (
+                      <tr
+                        key={item.id}
+                        className="group transition-colors hover:bg-slate-50/75 dark:hover:bg-surface-750"
+                      >
+                        {/* Title & Details */}
+                        <td className="px-4 py-3">
+                          <div className="flex items-start gap-2.5">
+                            <div className={`h-7 w-7 rounded-md border flex items-center justify-center shrink-0 ${cfg.iconBg}`}>
+                              <ItemIcon className="h-3.5 w-3.5" />
+                            </div>
+                            <div>
+                              <Link
+                                to={`/trash/${item.id}`}
+                                className="font-bold text-slate-900 hover:text-rose-600 hover:underline dark:text-white dark:hover:text-rose-400"
+                              >
+                                {item.title}
+                              </Link>
+                              {item.subtitle && (
+                                <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-400">
+                                  {item.subtitle}
+                                </p>
+                              )}
+                              {item.original_id && (
+                                <span className="mt-0.5 inline-block rounded bg-slate-100 px-1 py-0.2 text-[9.5px] font-mono text-slate-600 dark:bg-surface-700 dark:text-neutral-300">
+                                  Original ID: #{item.original_id}
                                 </span>
                               )}
                             </div>
-                            {item.deleted_by_email && (
-                              <p className="text-xs text-slate-500 dark:text-neutral-400">
-                                {item.deleted_by_email}
-                              </p>
-                            )}
                           </div>
-                        </div>
-                      </td>
+                        </td>
 
-                      {/* Deleted When (Timestamp) */}
-                      <td className="px-5 py-4 whitespace-nowrap">
-                        <div className="text-xs font-medium text-slate-800 dark:text-neutral-200">
-                          {new Date(item.deleted_at).toLocaleString([], {
-                            dateStyle: 'medium',
-                            timeStyle: 'short',
-                          })}
-                        </div>
-                        <div className="mt-0.5 text-[11px] text-slate-400 dark:text-neutral-500">
-                          {formatRelativeTime(item.deleted_at)}
-                        </div>
-                      </td>
+                        {/* Type Badge */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <span className={`inline-flex items-center rounded-full border px-2 py-0.2 text-[10px] font-bold ${cfg.bg}`}>
+                            {cfg.label}
+                          </span>
+                        </td>
 
-                      {/* Actions */}
-                      <td className="px-5 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <Link
-                            to={`/trash/${item.id}`}
-                            className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-medium text-slate-700 shadow-2xs hover:bg-slate-50 hover:text-brand-600 dark:border-surface-600 dark:bg-surface-700 dark:text-neutral-200 dark:hover:bg-surface-650"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                              <path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7Z" />
-                              <circle cx="12" cy="12" r="3" />
-                            </svg>
-                            Inspect
-                          </Link>
+                        {/* Deleted By */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="flex items-center gap-2">
+                            <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[10px] font-bold text-slate-700 dark:bg-surface-600 dark:text-neutral-100">
+                              {getInitials(item.deleted_by_name)}
+                            </div>
+                            <div>
+                              <div className="flex items-center gap-1">
+                                <span className="font-semibold text-slate-900 dark:text-neutral-100">
+                                  {item.deleted_by_name || 'System / Admin'}
+                                </span>
+                                {item.deleted_by_role && (
+                                  <span className="rounded bg-slate-100 px-1 py-0.2 text-[9px] uppercase font-bold text-slate-600 dark:bg-surface-700 dark:text-neutral-300">
+                                    {item.deleted_by_role.replace(/_/g, ' ')}
+                                  </span>
+                                )}
+                              </div>
+                              {item.deleted_by_email && (
+                                <p className="text-[10px] text-slate-400 dark:text-neutral-400">
+                                  {item.deleted_by_email}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </td>
 
-                          {item.restorable ? (
+                        {/* Deleted When */}
+                        <td className="px-3 py-3 whitespace-nowrap">
+                          <div className="font-semibold text-slate-800 dark:text-neutral-200">
+                            {new Date(item.deleted_at).toLocaleDateString([], {
+                              day: '2-digit',
+                              month: 'short',
+                              year: 'numeric',
+                            })}
+                          </div>
+                          <div className="text-[10px] text-slate-400 dark:text-neutral-500">
+                            {formatRelativeTime(item.deleted_at)}
+                          </div>
+                        </td>
+
+                        {/* Actions */}
+                        <td className="px-4 py-3 whitespace-nowrap text-right">
+                          <div className="flex items-center justify-end gap-1.5">
+                            <Link
+                              to={`/trash/${item.id}`}
+                              className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white hover:bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 transition-colors"
+                            >
+                              <FiEye className="h-2.5 w-2.5 text-slate-400" />
+                              <span>Inspect</span>
+                            </Link>
+
+                            {item.restorable ? (
+                              <button
+                                type="button"
+                                onClick={() => setRestoreTarget(item)}
+                                className="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 shadow-2xs dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300 transition-colors cursor-pointer"
+                              >
+                                <FiRotateCcw className="h-2.5 w-2.5 text-emerald-600" />
+                                <span>Restore</span>
+                              </button>
+                            ) : (
+                              <span
+                                title={item.restore_blocked_reason || 'This item can’t be restored'}
+                                className="text-[10px] font-medium text-slate-400 dark:text-neutral-500 cursor-help px-1"
+                              >
+                                Locked
+                              </span>
+                            )}
+
                             <button
                               type="button"
-                              onClick={() => setRestoreTarget(item)}
-                              className="inline-flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2.5 py-1.5 text-xs font-medium text-emerald-700 shadow-2xs hover:bg-emerald-100 dark:border-emerald-900/50 dark:bg-emerald-950/30 dark:text-emerald-400 dark:hover:bg-emerald-950/50"
+                              onClick={() => setDeleteTarget(item)}
+                              title="Delete Permanently"
+                              className="inline-flex items-center rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 p-1 text-rose-600 shadow-2xs dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300 transition-colors cursor-pointer"
                             >
-                              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5">
-                                <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
-                                <path d="M3 3v5h5" />
-                              </svg>
-                              Restore
+                              <FiTrash2 className="h-2.5 w-2.5" />
                             </button>
-                          ) : (
-                            <span
-                              title={item.restore_blocked_reason || 'This item can’t be restored'}
-                              className="cursor-help rounded-lg px-2 py-1.5 text-[11px] font-medium text-slate-400 dark:text-neutral-500"
-                            >
-                              Can’t restore
-                            </span>
-                          )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
 
-                          <button
-                            type="button"
-                            onClick={() => setDeleteTarget(item)}
-                            title="Delete Permanently"
-                            className="rounded-lg p-1.5 text-slate-400 hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 dark:hover:text-red-400"
-                          >
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4">
-                              <line x1="18" x2="6" y1="6" y2="18" />
-                              <line x1="6" x2="18" y1="6" y2="18" />
-                            </svg>
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            {/* Pagination Controls */}
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between border-t border-slate-200 px-4 py-2.5 dark:border-surface-700">
+                <div className="text-[11px] text-slate-500 dark:text-neutral-400">
+                  Showing <strong className="font-bold text-slate-700 dark:text-neutral-200">{(page - 1) * pagination.limit + 1}</strong> to{' '}
+                  <strong className="font-bold text-slate-700 dark:text-neutral-200">{Math.min(page * pagination.limit, pagination.total)}</strong> of{' '}
+                  <strong className="font-bold text-slate-700 dark:text-neutral-200">{pagination.total}</strong> items
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    disabled={page <= 1}
+                    onClick={() => setPage((p) => Math.max(1, p - 1))}
+                    className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 shadow-2xs transition-colors"
+                  >
+                    <FiChevronLeft className="h-3 w-3" />
+                    <span>Prev</span>
+                  </button>
+                  <span className="text-[10.5px] font-bold text-slate-600 dark:text-neutral-300 px-1">
+                    {page} / {pagination.totalPages}
+                  </span>
+                  <button
+                    type="button"
+                    disabled={page >= pagination.totalPages}
+                    onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                    className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 shadow-2xs transition-colors"
+                  >
+                    <span>Next</span>
+                    <FiChevronRight className="h-3 w-3" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Pagination Footer */}
-          {pagination.totalPages > 1 && (
-            <div className="flex items-center justify-between border-t border-slate-200 px-5 py-3 dark:border-surface-700">
-              <div className="text-xs text-slate-500 dark:text-neutral-400">
-                Showing <span className="font-medium text-slate-700 dark:text-neutral-200">{(page - 1) * pagination.limit + 1}</span> to{' '}
-                <span className="font-medium text-slate-700 dark:text-neutral-200">{Math.min(page * pagination.limit, pagination.total)}</span> of{' '}
-                <span className="font-medium text-slate-700 dark:text-neutral-200">{pagination.total}</span> items
-              </div>
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="secondary"
+          {/* ──────────────── MOBILE CARDS STREAM (< lg) — ZERO HORIZONTAL SCROLLING ──────────────── */}
+          <div className="block lg:hidden space-y-2">
+            {items.map((item, idx) => {
+              const cfg = TYPE_CONFIG[item.item_type] || {
+                label: item.item_type,
+                bg: 'bg-slate-100 text-slate-600 border-slate-200',
+                iconBg: 'bg-slate-100 text-slate-600 border-slate-200',
+                icon: FiBox,
+              };
+              const ItemIcon = cfg.icon || FiBox;
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs dark:border-white/10 dark:bg-surface-900 space-y-1.5 transition-all hover:border-slate-300 dark:hover:border-white/20"
+                >
+                  {/* Top Row: Avatar + Title + Type Badge */}
+                  <div className="flex items-start justify-between gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div className={`h-6 w-6 rounded-md border flex items-center justify-center shrink-0 ${cfg.iconBg}`}>
+                        <ItemIcon className="h-3 w-3" />
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <Link
+                          to={`/trash/${item.id}`}
+                          className="font-bold text-xs text-slate-900 dark:text-neutral-100 hover:text-rose-600 truncate block"
+                        >
+                          {item.title}
+                        </Link>
+                      </div>
+                    </div>
+
+                    <span className={`inline-flex items-center rounded-full border px-1.5 py-0.2 text-[9.5px] font-bold shrink-0 ${cfg.bg}`}>
+                      {cfg.label}
+                    </span>
+                  </div>
+
+                  {/* Subtitle & Original ID */}
+                  {(item.subtitle || item.original_id) && (
+                    <div className="flex items-center gap-1.5 flex-wrap text-[10.5px] text-slate-500 dark:text-neutral-400">
+                      {item.subtitle && <span>{item.subtitle}</span>}
+                      {item.original_id && (
+                        <span className="rounded bg-slate-100 dark:bg-surface-800 px-1 py-0.2 font-mono text-[9px] text-slate-600 dark:text-neutral-300">
+                          #{item.original_id}
+                        </span>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Deleted By User & Time Container */}
+                  <div className="rounded-lg border border-slate-100 bg-slate-50/70 p-2 dark:border-white/5 dark:bg-surface-800/60 flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                      <div className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-slate-200 text-[9px] font-bold text-slate-700 dark:bg-surface-600 dark:text-neutral-100">
+                        {getInitials(item.deleted_by_name)}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1 flex-wrap">
+                          <span className="font-semibold text-[10.5px] text-slate-800 dark:text-neutral-200 truncate">
+                            {item.deleted_by_name || 'System / Admin'}
+                          </span>
+                          {item.deleted_by_role && (
+                            <span className="rounded bg-slate-200/60 dark:bg-surface-700 px-1 py-0.2 text-[8.5px] font-bold uppercase text-slate-600 dark:text-neutral-300">
+                              {item.deleted_by_role.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="text-right shrink-0">
+                      <span className="text-[10px] font-medium text-slate-500 dark:text-neutral-400 block">
+                        {formatRelativeTime(item.deleted_at)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Actions Row */}
+                  <div className="flex items-center justify-between pt-0.5">
+                    <Link
+                      to={`/trash/${item.id}`}
+                      className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white hover:bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 shadow-2xs"
+                    >
+                      <FiEye className="h-2.5 w-2.5 text-slate-400" />
+                      <span>Inspect</span>
+                    </Link>
+
+                    <div className="flex items-center gap-1">
+                      {item.restorable ? (
+                        <button
+                          type="button"
+                          onClick={() => setRestoreTarget(item)}
+                          className="inline-flex items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:border-emerald-800/40 dark:bg-emerald-950/40 dark:text-emerald-300 shadow-2xs cursor-pointer"
+                        >
+                          <FiRotateCcw className="h-2.5 w-2.5 text-emerald-600" />
+                          <span>Restore</span>
+                        </button>
+                      ) : (
+                        <span className="text-[9.5px] text-slate-400 font-medium px-1">
+                          Can't restore
+                        </span>
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => setDeleteTarget(item)}
+                        title="Delete Permanently"
+                        className="inline-flex items-center rounded border border-rose-200 bg-rose-50 hover:bg-rose-100 p-1 text-rose-600 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300 shadow-2xs cursor-pointer"
+                      >
+                        <FiTrash2 className="h-2.5 w-2.5" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Mobile Pagination */}
+            {pagination.totalPages > 1 && (
+              <div className="flex items-center justify-between rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+                <button
+                  type="button"
                   disabled={page <= 1}
                   onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  className="px-2.5 py-1 text-xs"
+                  className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 shadow-2xs"
                 >
-                  Previous
-                </Button>
-                <span className="text-xs font-medium text-slate-600 dark:text-neutral-300">
+                  <FiChevronLeft className="h-3 w-3" />
+                  <span>Prev</span>
+                </button>
+                <span className="text-[10.5px] font-bold text-slate-600 dark:text-neutral-300">
                   Page {page} of {pagination.totalPages}
                 </span>
-                <Button
-                  variant="secondary"
+                <button
+                  type="button"
                   disabled={page >= pagination.totalPages}
                   onClick={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
-                  className="px-2.5 py-1 text-xs"
+                  className="inline-flex items-center gap-0.5 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10.5px] font-semibold text-slate-700 disabled:opacity-40 disabled:cursor-not-allowed dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 shadow-2xs"
                 >
-                  Next
-                </Button>
+                  <span>Next</span>
+                  <FiChevronRight className="h-3 w-3" />
+                </button>
               </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Restore Item Modal */}
@@ -548,13 +774,10 @@ export default function TrashPage() {
       {/* Delete Item Modal */}
       {deleteTarget && (
         <ConfirmModal
-          open={Boolean(deleteTarget)}
           title="Permanently Delete Item?"
           message={`Are you sure you want to permanently purge "${deleteTarget.title}" from the trash bin? This action cannot be undone.`}
           confirmLabel="Permanently Delete"
-          cancelLabel="Cancel"
-          tone="critical"
-          isLoading={actionLoading}
+          requireTyping={false}
           onConfirm={handlePermanentDelete}
           onCancel={() => setDeleteTarget(null)}
         />
@@ -563,13 +786,10 @@ export default function TrashPage() {
       {/* Empty Trash Modal */}
       {emptyTrashModal && (
         <ConfirmModal
-          open={emptyTrashModal}
           title="Empty Entire Trash Bin?"
           message="Are you sure you want to permanently delete all archived items in the trash? All deleted history records will be completely removed."
           confirmLabel="Empty Trash"
-          cancelLabel="Cancel"
-          tone="critical"
-          isLoading={actionLoading}
+          requireTyping={false}
           onConfirm={handleEmptyTrash}
           onCancel={() => setEmptyTrashModal(false)}
         />

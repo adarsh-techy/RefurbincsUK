@@ -23,11 +23,16 @@ import {
   FiCheckCircle,
   FiTrash2,
   FiArrowRight,
+  FiArrowLeft,
+  FiCheck,
   FiSearch,
   FiCamera,
   FiPlus,
   FiAlertCircle,
   FiX,
+  FiDownload,
+  FiGrid,
+  FiList,
 } from 'react-icons/fi';
 
 const formInputClasses =
@@ -94,9 +99,14 @@ function ClientBatterySortPage() {
   const [nameTargetId, setNameTargetId] = useState(null);
   const [duplicateNameAlert, setDuplicateNameAlert] = useState(null);
 
-  // Active group detail view
+  // Active group detail view (defaults to 'cards' on mobile <768px, 'table' on desktop)
   const [activeGroupId, setActiveGroupId] = useState(null);
-  const [detailViewMode, setDetailViewMode] = useState('table'); // 'table' | 'cards'
+  const [detailViewMode, setDetailViewMode] = useState(() => {
+    if (typeof window !== 'undefined' && window.innerWidth < 768) {
+      return 'cards';
+    }
+    return 'table';
+  });
   const [scanInput, setScanInput] = useState('');
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [cameraOpen, setCameraOpen] = useState(false);
@@ -577,153 +587,156 @@ function ClientBatterySortPage() {
     }).length;
 
     return (
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-3">
+      <div className="space-y-3 sm:space-y-4">
+        {/* Top Navigation & Action Row */}
+        <div className="flex flex-col gap-2 sm:gap-2.5 border-b border-slate-200/80 pb-2.5 sm:pb-3.5 dark:border-white/10">
+          <div className="flex items-center justify-between gap-2">
             <button
               type="button"
               onClick={handleBackClick}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs transition-all hover:bg-slate-100 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200/90 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 cursor-pointer"
             >
-              <span>←</span>
-              <span>Back to Sort Groups</span>
+              <FiArrowLeft className="h-3.5 w-3.5 text-slate-500" />
+              <span>Back to Groups</span>
             </button>
-            <div>
-              <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-                {activeGroup.name}
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-neutral-400 mt-0.5">
-                Created {formatDate(activeGroup.createdAt)} • {activeGroup.batteries.length}{' '}
-                {activeGroup.batteries.length === 1 ? 'battery' : 'batteries'} sorted
-                {activePackedCount > 0 && (
-                  <span className="ml-1.5 font-bold text-red-600 dark:text-red-400">
-                    • {activePackedCount} packed to service
-                  </span>
-                )}
-                {hasUnsavedChanges && (
-                  <span className="ml-1.5 font-semibold text-amber-600 dark:text-amber-400">
-                    • (Unsaved changes)
-                  </span>
-                )}
-              </p>
+
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={handleSaveGroup}
+                style={hasUnsavedChanges ? { backgroundColor: accent } : undefined}
+                className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-xs font-bold shadow-2xs transition-all cursor-pointer ${
+                  hasUnsavedChanges
+                    ? 'text-white ring-2 ring-emerald-400/50 animate-pulse'
+                    : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
+                }`}
+              >
+                <FiCheck className="h-3.5 w-3.5" />
+                <span>{hasUnsavedChanges ? 'Save Group ●' : 'Save'}</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => openRenameModal(activeGroup)}
+                className="rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer"
+              >
+                Rename
+              </button>
+              <button
+                type="button"
+                onClick={() => requestDeleteGroup(activeGroup)}
+                className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700 hover:bg-rose-100 dark:border-rose-900/40 dark:bg-rose-950/30 dark:text-rose-300 cursor-pointer"
+              >
+                Delete
+              </button>
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleSaveGroup}
-              style={hasUnsavedChanges ? { backgroundColor: accent } : undefined}
-              className={`inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold shadow-xs transition-all hover:opacity-90 active:scale-98 ${
-                hasUnsavedChanges
-                  ? 'text-white ring-2 ring-emerald-400/50 animate-pulse'
-                  : 'border border-slate-200 bg-white text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
-              }`}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <path fillRule="evenodd" d="M16.704 4.153a.75.75 0 0 1 .143 1.052l-8 10.5a.75.75 0 0 1-1.127.075l-4.5-4.5a.75.75 0 0 1 1.06-1.06l3.894 3.893 7.48-9.817a.75.75 0 0 1 1.05-.143Z" clipRule="evenodd" />
-              </svg>
-              <span>{hasUnsavedChanges ? 'Save Group ●' : 'Save Group'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => openRenameModal(activeGroup)}
-              className="rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-100 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
-            >
-              Rename
-            </button>
-            <button
-              type="button"
-              onClick={() => requestDeleteGroup(activeGroup)}
-              className="rounded-xl border border-red-200 bg-red-50 px-3.5 py-2 text-xs font-bold text-red-700 shadow-2xs hover:bg-red-100 dark:border-red-900/40 dark:bg-red-950/30 dark:text-red-300"
-            >
-              Delete Group
-            </button>
+          {/* Group Identity & Meta */}
+          <div className="flex flex-col sm:flex-row sm:items-baseline sm:justify-between gap-1 pt-0.5">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
+              <span className="text-[9px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500">Group</span>
+              <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white tracking-tight truncate">
+                {activeGroup.name}
+              </h1>
+              <span className="inline-flex items-center gap-1 rounded-md bg-slate-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:text-neutral-300 border border-slate-200/60 dark:border-white/5">
+                <span className="font-mono">{activeGroup.batteries.length}</span>
+                <span className="text-slate-400 dark:text-neutral-500 font-medium">{activeGroup.batteries.length === 1 ? 'unit' : 'units'}</span>
+              </span>
+              {activePackedCount > 0 && (
+                <span className="inline-flex items-center gap-1 rounded-md bg-rose-100 dark:bg-rose-950/60 px-1.5 py-0.5 text-[10px] font-bold text-rose-700 dark:text-rose-300 border border-rose-200/50 dark:border-rose-900/40">
+                  <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
+                  {activePackedCount} in service
+                </span>
+              )}
+              {hasUnsavedChanges && (
+                <span className="inline-flex items-center rounded-md bg-amber-100 dark:bg-amber-950/60 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 dark:text-amber-300 border border-amber-200/60 dark:border-amber-900/40">
+                  Unsaved changes
+                </span>
+              )}
+            </div>
+
+            <p className="text-[10px] sm:text-[11px] text-slate-400 dark:text-neutral-500 font-medium">
+              Created {formatDate(activeGroup.createdAt)}
+            </p>
           </div>
         </div>
 
-        {/* Scan / Type Add Box */}
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-5 shadow-xs dark:border-surface-700/80 dark:bg-surface-900 transition-all">
+        {/* Scan & Add Battery Box */}
+        <div className="rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-2.5 sm:p-4 shadow-xs dark:border-surface-700/80 dark:bg-surface-900 transition-all">
           {/* Header */}
-          <div className="mb-3.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2.5">
-            <div>
-              <div className="flex items-center gap-2">
-                <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-                  <FiSearch className="h-4 w-4" />
-                </div>
-                <h3 className="text-sm font-bold text-slate-900 dark:text-neutral-100">
-                  Scan or Type a Battery to Sort
-                </h3>
+          <div className="mb-2 sm:mb-2.5 flex items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="flex h-5 w-5 sm:h-6 sm:w-6 shrink-0 items-center justify-center rounded-lg bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                <FiSearch className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
               </div>
-              <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-                Use a handheld scanner (types directly into the box), camera, or type the code / serial.
-              </p>
+              <h3 className="text-xs sm:text-sm font-bold text-slate-900 dark:text-neutral-100 truncate">
+                Add Batteries to Group
+              </h3>
             </div>
             {availableFleetBatteries.length > 0 && (
-              <div className="flex items-center gap-1.5 self-start sm:self-auto rounded-full bg-slate-100 dark:bg-surface-800 px-3 py-1 text-xs font-semibold text-slate-600 dark:text-neutral-300 border border-slate-200/60 dark:border-white/5">
+              <div className="flex items-center gap-1 shrink-0 rounded-full bg-slate-100 dark:bg-surface-800 px-2 py-0.5 text-[10px] font-semibold text-slate-600 dark:text-neutral-300 border border-slate-200/60 dark:border-white/5">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span>{availableFleetBatteries.length} available to sort</span>
+                <span>{availableFleetBatteries.length} available</span>
               </div>
             )}
           </div>
 
-          {/* Input & Action Buttons Bar */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
-            <div ref={scanBoxRef} className="relative flex-1">
-              <div className="relative flex items-center">
-                <span className="pointer-events-none absolute left-3.5 text-slate-400 dark:text-neutral-500">
-                  <FiSearch className="h-4 w-4" />
-                </span>
-                <input
-                  data-rfid-scan="client-sort"
-                  ref={scanInputRef}
-                  type="text"
-                  value={scanInput}
-                  onChange={(e) => {
-                    setScanInput(e.target.value.toUpperCase());
+          {/* Unified Input + Camera + Add Row */}
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <div ref={scanBoxRef} className="relative flex-1 min-w-0">
+              <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-neutral-500">
+                <FiSearch className="h-3.5 w-3.5" />
+              </span>
+              <input
+                data-rfid-scan="client-sort"
+                ref={scanInputRef}
+                type="text"
+                value={scanInput}
+                onChange={(e) => {
+                  setScanInput(e.target.value.toUpperCase());
+                  if (addError) setAddError(null);
+                  setShowSuggestions(true);
+                }}
+                onKeyDown={handleScanKeyDown}
+                onFocus={() => setShowSuggestions(true)}
+                onClick={() => setShowSuggestions(true)}
+                placeholder="Scan or type code / serial…"
+                autoComplete="off"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-8 pr-7 py-2 text-xs font-mono font-semibold text-slate-900 placeholder:text-slate-400 placeholder:font-sans focus:border-blue-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-blue-500/15 dark:border-surface-700 dark:bg-surface-800/80 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:bg-surface-800 transition-all"
+              />
+              {scanInput.trim().length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setScanInput('');
                     if (addError) setAddError(null);
-                    setShowSuggestions(true);
+                    scanInputRef.current?.focus();
                   }}
-                  onKeyDown={handleScanKeyDown}
-                  onFocus={() => setShowSuggestions(true)}
-                  onClick={() => setShowSuggestions(true)}
-                  placeholder="Scan or type battery code / serial…"
-                  autoComplete="off"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50/70 pl-10 pr-9 py-2.5 text-sm font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:bg-white focus:outline-hidden focus:ring-3 focus:ring-blue-500/15 dark:border-surface-700 dark:bg-surface-800/80 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:bg-surface-800 dark:focus:ring-blue-400/20 transition-all"
-                />
-                {scanInput.trim().length > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setScanInput('');
-                      if (addError) setAddError(null);
-                      scanInputRef.current?.focus();
-                    }}
-                    className="absolute right-3 rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-surface-700 dark:hover:text-neutral-200 transition-colors"
-                    title="Clear"
-                  >
-                    <FiX className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full p-1 text-slate-400 hover:bg-slate-200 hover:text-slate-600 dark:hover:bg-surface-700 dark:hover:text-neutral-200 transition-colors cursor-pointer"
+                  title="Clear"
+                >
+                  <FiX className="h-3 w-3" />
+                </button>
+              )}
 
+              {/* Suggestions Dropdown */}
               {showSuggestions && (
                 <div
                   onMouseDown={(e) => e.preventDefault()}
-                  className="absolute left-0 right-0 top-full z-40 mt-1 max-h-72 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-800"
+                  className="absolute left-0 right-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-2xl dark:border-surface-700 dark:bg-surface-800"
                 >
-                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-slate-50/95 px-3.5 py-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 backdrop-blur-xs dark:border-surface-700 dark:bg-surface-900/95 dark:text-neutral-400">
+                  <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-100 bg-slate-50/95 px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 backdrop-blur-xs dark:border-surface-700 dark:bg-surface-900/95 dark:text-neutral-400">
                     <span>
                       {scanInput.trim() ? 'Matching Fleet Batteries' : 'Available Fleet Batteries'}
                     </span>
-                    <span className="rounded-full bg-slate-200 px-2 py-0.5 text-[10px] text-slate-700 dark:bg-surface-700 dark:text-neutral-200 font-bold">
+                    <span className="rounded-full bg-slate-200 px-1.5 py-0.5 text-[9px] text-slate-700 dark:bg-surface-700 dark:text-neutral-200 font-bold">
                       {scanSuggestions.length}
                       {!scanInput.trim() && availableFleetBatteries.length > scanSuggestions.length ? ` of ${availableFleetBatteries.length}` : ''}
                     </span>
                   </div>
 
                   {scanSuggestions.length === 0 ? (
-                    <div className="p-4 text-center text-xs text-slate-500 dark:text-neutral-400">
+                    <div className="p-3 text-center text-xs text-slate-500 dark:text-neutral-400">
                       {scanInput.trim()
                         ? `No available battery matches "${scanInput}".`
                         : 'All available batteries are already sorted into groups.'}
@@ -739,19 +752,19 @@ function ClientBatterySortPage() {
                           scanInputRef.current?.focus();
                           setShowSuggestions(true);
                         }}
-                        className="group flex w-full items-center justify-between border-b border-slate-100 px-3.5 py-2.5 text-left text-xs transition-colors hover:bg-emerald-50 dark:border-surface-700/50 dark:hover:bg-surface-700 last:border-0 cursor-pointer"
+                        className="group flex w-full items-center justify-between border-b border-slate-100 px-3 py-2 text-left text-xs transition-colors hover:bg-emerald-50 dark:border-surface-700/50 dark:hover:bg-surface-700 last:border-0 cursor-pointer"
                       >
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 min-w-0">
                           <span className="font-mono font-semibold text-slate-800 dark:text-neutral-100 group-hover:text-emerald-700 dark:group-hover:text-emerald-400">
                             {b.battery_code}
                           </span>
                           {b.serial_number && (
-                            <span className="text-xs text-slate-500 dark:text-neutral-400 font-mono">
-                              (SN: {b.serial_number})
+                            <span className="text-[11px] text-slate-400 dark:text-neutral-500 font-mono truncate">
+                              ({b.serial_number})
                             </span>
                           )}
                         </div>
-                        <div className="flex items-center gap-2.5">
+                        <div className="flex items-center gap-2 shrink-0">
                           {hasBeenServiced(b) ? (
                             <ClientStatusBadge
                               status={b.status}
@@ -759,9 +772,9 @@ function ClientBatterySortPage() {
                               returnStatus={b.return_status}
                             />
                           ) : (
-                            <span className="text-xs text-slate-400 dark:text-neutral-500">—</span>
+                            <span className="text-[11px] text-slate-400 dark:text-neutral-500">—</span>
                           )}
-                          <span className="rounded-lg bg-emerald-600 px-2 py-0.5 text-[11px] font-bold text-white shadow-2xs group-hover:bg-emerald-700 transition-colors">
+                          <span className="rounded-md bg-emerald-600 px-1.5 py-0.5 text-[10px] font-bold text-white shadow-2xs group-hover:bg-emerald-700 transition-colors">
                             + Add
                           </span>
                         </div>
@@ -772,54 +785,53 @@ function ClientBatterySortPage() {
               )}
             </div>
 
-            {/* Buttons Group */}
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => addBatteryToActiveGroup(scanInput)}
-                disabled={!scanInput.trim()}
-                style={{ backgroundColor: scanInput.trim() ? accent : undefined }}
-                className={`flex items-center justify-center gap-1.5 rounded-xl px-5 py-2.5 text-sm font-bold text-white shadow-xs transition-all ${
-                  scanInput.trim()
-                    ? 'hover:opacity-95 active:scale-98 cursor-pointer'
-                    : 'bg-slate-300 dark:bg-surface-700 text-slate-500 dark:text-neutral-400 cursor-not-allowed opacity-70'
-                }`}
-              >
-                <FiPlus className="h-4 w-4" />
-                <span>Add</span>
-              </button>
+            {/* Camera QR Button */}
+            <button
+              type="button"
+              onClick={() => setCameraOpen(true)}
+              className="inline-flex items-center justify-center h-8.5 px-2.5 sm:px-3 rounded-xl border border-slate-200 bg-white text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-all cursor-pointer shrink-0"
+              title="Scan with camera"
+            >
+              <FiCamera className="h-3.5 w-3.5 sm:mr-1 text-slate-600 dark:text-neutral-300" />
+              <span className="hidden sm:inline text-xs font-semibold">Camera</span>
+            </button>
 
-              <button
-                type="button"
-                onClick={() => setCameraOpen(true)}
-                className="flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2.5 text-sm font-semibold text-slate-700 shadow-2xs hover:bg-slate-50 hover:border-slate-300 active:scale-98 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-all cursor-pointer"
-                title="Scan with camera"
-              >
-                <FiCamera className="h-4 w-4 text-slate-600 dark:text-neutral-300" />
-                <span className="text-xs font-bold">Camera</span>
-              </button>
-            </div>
+            {/* Add Button */}
+            <button
+              type="button"
+              onClick={() => addBatteryToActiveGroup(scanInput)}
+              disabled={!scanInput.trim()}
+              style={{ backgroundColor: scanInput.trim() ? accent : undefined }}
+              className={`inline-flex items-center justify-center h-8.5 px-3 sm:px-4 rounded-xl text-xs font-bold text-white shadow-xs transition-all shrink-0 ${
+                scanInput.trim()
+                  ? 'hover:opacity-95 active:scale-98 cursor-pointer'
+                  : 'bg-slate-200 dark:bg-surface-700 text-slate-400 dark:text-neutral-500 cursor-not-allowed opacity-60'
+              }`}
+            >
+              <FiPlus className="h-3.5 w-3.5 mr-0.5" />
+              <span>Add</span>
+            </button>
           </div>
 
-          {/* Helper / RFID Bar */}
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3 dark:border-surface-800">
-            <RfidScanButton target="client-sort" className="mt-0" />
-            <span className="text-[11px] text-slate-400 dark:text-neutral-500">
-              Press <kbd className="rounded border border-slate-200 bg-slate-100 px-1 py-0.5 font-mono text-[10px] text-slate-600 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-300">Enter</kbd> to add
+          {/* Bottom Bar: RFID Scan + Keyboard Hint */}
+          <div className="mt-2 flex items-center justify-between gap-2 border-t border-slate-100 pt-2 dark:border-surface-800">
+            <RfidScanButton target="client-sort" className="mt-0" hideHint />
+            <span className="text-[10px] text-slate-400 dark:text-neutral-500">
+              Press <kbd className="rounded border border-slate-200 bg-slate-100 px-1 py-0.5 font-mono text-[9px] text-slate-600 dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-300">Enter</kbd> to add
             </span>
           </div>
 
           {/* Error Message Alert */}
           {addError && (
-            <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border border-red-200/80 bg-red-50/90 px-3.5 py-2.5 text-xs font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300 animate-in fade-in duration-200">
-              <div className="flex items-center gap-2">
-                <FiAlertCircle className="h-4 w-4 shrink-0 text-red-500 dark:text-red-400" />
-                <span>{addError}</span>
+            <div className="mt-2 flex items-center justify-between gap-2 rounded-xl border border-red-200/80 bg-red-50/90 px-3 py-2 text-xs font-semibold text-red-700 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300 animate-in fade-in duration-200">
+              <div className="flex items-center gap-1.5">
+                <FiAlertCircle className="h-3.5 w-3.5 shrink-0 text-red-500 dark:text-red-400" />
+                <span className="text-[11px]">{addError}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setAddError(null)}
-                className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/50"
+                className="rounded p-0.5 text-red-500 hover:bg-red-100 hover:text-red-700 dark:hover:bg-red-900/50 cursor-pointer"
               >
                 <FiX className="h-3.5 w-3.5" />
               </button>
@@ -838,49 +850,46 @@ function ClientBatterySortPage() {
         )}
 
         {/* Toolbar: Excel Export & View Switcher (Table vs Cards) */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
+        <div className="flex items-center justify-between gap-2">
+          {activeGroup.batteries.length > 0 ? (
             <button
               type="button"
               onClick={handleExportExcel}
-              disabled={activeGroup.batteries.length === 0}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-2 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 disabled:opacity-50 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-2.5 py-1 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-300 dark:hover:bg-emerald-900/40 transition-colors cursor-pointer"
               title="Download sorted batteries as Excel spreadsheet (.xlsx)"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-                <path fillRule="evenodd" d="M4.5 2A1.5 1.5 0 0 0 3 3.5v13A1.5 1.5 0 0 0 4.5 18h11a1.5 1.5 0 0 0 1.5-1.5V7.621a1.5 1.5 0 0 0-.44-1.06l-4.12-4.122A1.5 1.5 0 0 0 11.378 2H4.5Zm4.75 6.75a.75.75 0 0 1 1.5 0v3.69l1.22-1.22a.75.75 0 1 1 1.06 1.06l-2.5 2.5a.75.75 0 0 1-1.06 0l-2.5-2.5a.75.75 0 1 1 1.06-1.06l1.22 1.22V8.75Z" clipRule="evenodd" />
-              </svg>
-              <span>Download Excel (.xlsx)</span>
+              <FiDownload className="h-3.5 w-3.5" />
+              <span>Download Excel</span>
             </button>
-          </div>
+          ) : (
+            <div className="text-[11px] font-semibold text-slate-400 dark:text-neutral-500">
+              0 sorted batteries
+            </div>
+          )}
 
-          <div className="flex items-center rounded-xl border border-slate-200 bg-white p-1 shadow-2xs dark:border-white/10 dark:bg-surface-800">
+          <div className="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs dark:border-white/10 dark:bg-surface-800">
             <button
               type="button"
               onClick={() => setDetailViewMode('table')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold transition-all cursor-pointer ${
                 detailViewMode === 'table'
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                <path fillRule="evenodd" d="M2 4.75A.75.75 0 0 1 2.75 4h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 4.75ZM2 10a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75A.75.75 0 0 1 2 10Zm0 5.25a.75.75 0 0 1 .75-.75h14.5a.75.75 0 0 1 0 1.5H2.75a.75.75 0 0 1-.75-.75Z" clipRule="evenodd" />
-              </svg>
+              <FiList className="h-3.5 w-3.5" />
               <span>Table</span>
             </button>
             <button
               type="button"
               onClick={() => setDetailViewMode('cards')}
-              className={`flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all ${
+              className={`flex items-center gap-1 rounded-md px-2 py-1 text-xs font-bold transition-all cursor-pointer ${
                 detailViewMode === 'cards'
                   ? 'bg-blue-600 text-white shadow-2xs'
                   : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
               }`}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                <path d="M4.25 2A2.25 2.25 0 0 0 2 4.25v2.5A2.25 2.25 0 0 0 4.25 9h2.5A2.25 2.25 0 0 0 9 6.75v-2.5A2.25 2.25 0 0 0 6.75 2h-2.5Zm0 9A2.25 2.25 0 0 0 2 13.25v2.5A2.25 2.25 0 0 0 4.25 18h2.5A2.25 2.25 0 0 0 9 15.75v-2.5A2.25 2.25 0 0 0 6.75 11h-2.5Zm9-9A2.25 2.25 0 0 0 11 4.25v2.5A2.25 2.25 0 0 0 13.25 9h2.5A2.25 2.25 0 0 0 18 6.75v-2.5A2.25 2.25 0 0 0 15.75 2h-2.5Zm0 9A2.25 2.25 0 0 0 11 13.25v2.5A2.25 2.25 0 0 0 13.25 18h2.5A2.25 2.25 0 0 0 18 15.75v-2.5A2.25 2.25 0 0 0 15.75 11h-2.5Z" />
-              </svg>
+              <FiGrid className="h-3.5 w-3.5" />
               <span>Cards</span>
             </button>
           </div>
@@ -888,11 +897,16 @@ function ClientBatterySortPage() {
 
         {/* Sorted Battery List */}
         {activeGroup.batteries.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-white/10 dark:bg-surface-900">
-            <p className="text-sm font-semibold text-slate-700 dark:text-neutral-300">
-              No batteries sorted into this group yet.
+          <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-6 sm:p-8 text-center dark:border-white/10 dark:bg-surface-900">
+            <div className="mx-auto mb-2 flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 text-slate-400 dark:bg-surface-800 dark:text-neutral-500">
+              <FiLayers className="h-4 w-4" />
+            </div>
+            <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-neutral-200">
+              No batteries sorted into this group yet
             </p>
-            <p className="mt-1 text-xs text-slate-400">Scan or type a battery code above to add it.</p>
+            <p className="mt-0.5 text-[10px] sm:text-[11px] text-slate-400">
+              Scan or type a battery code above to add it.
+            </p>
           </div>
         ) : detailViewMode === 'table' ? (
           <DataTable
@@ -907,7 +921,7 @@ function ClientBatterySortPage() {
             maxHeight="calc(100vh - 360px)"
           />
         ) : (
-          <div className="grid max-h-[calc(100vh-340px)] grid-cols-1 gap-5 overflow-y-auto p-1 pr-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid max-h-[calc(100vh-340px)] grid-cols-1 gap-2.5 sm:gap-4 overflow-y-auto p-0.5 sm:p-1 pr-1 sm:pr-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {sortedBatteryCodes(activeGroup.batteries).map((code) => {
               const match = codeToBattery.get(code.toUpperCase());
               const isPackedForRepair = isBatteryPackedForRepair(match);
@@ -916,17 +930,17 @@ function ClientBatterySortPage() {
               return (
                 <div
                   key={code}
-                  className={`group relative flex flex-col justify-between gap-4 rounded-2xl border p-5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+                  className={`group relative flex flex-col justify-between gap-2.5 sm:gap-4 rounded-xl sm:rounded-2xl border p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
                     isPackedForRepair
                       ? 'border-rose-300/80 bg-rose-50/70 dark:border-rose-900/40 dark:bg-rose-950/20'
                       : 'border-slate-200/90 bg-white hover:border-slate-300 dark:border-white/10 dark:bg-surface-900'
                   }`}
                 >
-                  <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start justify-between gap-2 sm:gap-3">
                     <div className="min-w-0">
                       <Link
                         to={`/batteries/${encodeURIComponent(code)}`}
-                        className={`block truncate font-mono text-sm font-black hover:underline ${
+                        className={`block truncate font-mono text-xs sm:text-sm font-black hover:underline ${
                           isPackedForRepair
                             ? 'text-rose-700 dark:text-rose-400 dark:hover:text-rose-300'
                             : 'text-slate-900 hover:text-emerald-600 dark:text-white dark:hover:text-emerald-400'
@@ -935,7 +949,7 @@ function ClientBatterySortPage() {
                         {code}
                       </Link>
                       {match?.serial_number && (
-                        <p className="text-[11px] font-mono text-slate-500 dark:text-neutral-400 mt-0.5">
+                        <p className="text-[10px] sm:text-[11px] font-mono text-slate-500 dark:text-neutral-400 mt-0.5">
                           SN: {match.serial_number}
                         </p>
                       )}
@@ -943,17 +957,17 @@ function ClientBatterySortPage() {
                     <button
                       type="button"
                       onClick={() => removeBatteryFromActiveGroup(code)}
-                      className="shrink-0 rounded-xl p-1.5 text-slate-400 hover:bg-rose-100 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/50 dark:hover:text-rose-300 transition-colors cursor-pointer"
+                      className="shrink-0 rounded-lg sm:rounded-xl p-1 text-slate-400 hover:bg-rose-100 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/50 dark:hover:text-rose-300 transition-colors cursor-pointer"
                       title="Remove from group"
                     >
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5 sm:h-4 sm:w-4">
                         <path fillRule="evenodd" d="M8.75 1A2.75 2.75 0 0 0 6 3.75v.443c-.795.077-1.584.176-2.365.298a.75.75 0 1 0 .23 1.482l.149-.022.841 10.518A2.75 2.75 0 0 0 7.596 19h4.807a2.75 2.75 0 0 0 2.742-2.53l.841-10.52.149.023a.75.75 0 0 0 .23-1.482A41.03 41.03 0 0 0 14 4.193V3.75A2.75 2.75 0 0 0 11.25 1h-2.5ZM10 4c.84 0 1.673.025 2.5.075V3.75c0-.69-.56-1.25-1.25-1.25h-2.5c-.69 0-1.25.56-1.25 1.25v.325C8.327 4.025 9.16 4 10 4ZM8.58 7.72a.75.75 0 0 0-1.5.06l.3 7.5a.75.75 0 1 0 1.5-.06l-.3-7.5Zm4.34.06a.75.75 0 1 0-1.5-.06l-.3 7.5a.75.75 0 1 0 1.5.06l.3-7.5Z" clipRule="evenodd" />
                       </svg>
                     </button>
                   </div>
 
-                  <div className="space-y-2 pt-3 border-t border-slate-100 dark:border-white/5">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                  <div className="space-y-1.5 sm:space-y-2 pt-2 sm:pt-3 border-t border-slate-100 dark:border-white/5">
+                    <div className="flex items-center justify-between gap-1.5 sm:gap-2 flex-wrap">
                       {match && hasBeenServiced(match) ? (
                         <ClientStatusBadge
                           status={match.status}
@@ -961,24 +975,24 @@ function ClientBatterySortPage() {
                           returnStatus={match.return_status}
                         />
                       ) : match ? (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                           Not yet serviced
                         </span>
                       ) : (
-                        <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
+                        <span className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">
                           Not in your fleet
                         </span>
                       )}
 
                       {isPackedForRepair && (
-                        <span className="rounded-full bg-rose-100 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-rose-800 dark:border dark:border-rose-500/30 dark:bg-rose-950/60 dark:text-rose-300">
+                        <span className="rounded-full bg-rose-100 px-2 py-0.5 text-[9px] sm:text-[10px] font-black uppercase tracking-wide text-rose-800 dark:border dark:border-rose-500/30 dark:bg-rose-950/60 dark:text-rose-300">
                           Packed to Service
                         </span>
                       )}
                     </div>
 
                     {isPackedForRepair && packedDate && (
-                      <p className="text-[11px] font-semibold text-rose-700 dark:text-rose-400">
+                      <p className="text-[10px] sm:text-[11px] font-semibold text-rose-700 dark:text-rose-400">
                         Packed to Service: <span className="font-normal text-slate-600 dark:text-rose-200/90">{formatDate(packedDate)}</span>
                         {match?.truck_number ? ` • Truck ${match.truck_number}` : ''}
                       </p>
@@ -994,6 +1008,7 @@ function ClientBatterySortPage() {
           <Modal
             title={nameModalMode === 'create' ? 'New Sort Group' : 'Rename Sort Group'}
             onClose={() => setNameModalOpen(false)}
+            centered
           >
             <form onSubmit={handleNameSubmit} className="flex flex-col gap-4">
               <div>
@@ -1055,6 +1070,7 @@ function ClientBatterySortPage() {
           <Modal
             title="Unsaved Changes"
             onClose={() => setShowUnsavedModal(false)}
+            centered
           >
             <div className="flex flex-col gap-4">
               <div className="flex items-start gap-3 rounded-xl bg-amber-50 p-4 border border-amber-200 dark:border-amber-900/40 dark:bg-amber-950/40">
@@ -1105,36 +1121,41 @@ function ClientBatterySortPage() {
 
   // ── Groups Overview List ──────────────────────────────────────────────
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col gap-4 border-b border-slate-200/80 pb-5 dark:border-white/10 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900 dark:text-white">
-            Battery Sorting
-          </h1>
-          <p className="text-xs text-slate-500 dark:text-neutral-400 mt-1">
-            Organize your batteries into your own groups — by requirement, site, or order —
-            by scanning or typing battery codes into a card.
-          </p>
-        </div>
+    <div className="space-y-3 min-w-0 pb-10">
+      {/* 1. Page Header - Compact & refined */}
+      <div className="border-b border-slate-200/80 pb-2.5 dark:border-white/10">
+        <div className="flex items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2 flex-wrap min-w-0">
+            <h1 className="text-base sm:text-xl font-black tracking-tight text-slate-900 dark:text-white">
+              Battery Sorting
+            </h1>
+            <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-700 dark:bg-surface-800 dark:text-neutral-300 border border-slate-200 dark:border-white/10">
+              {groups.length} {groups.length === 1 ? 'Group' : 'Groups'}
+            </span>
+          </div>
 
-        <button
-          type="button"
-          onClick={openCreateModal}
-          style={{ backgroundColor: accent }}
-          className="inline-flex items-center gap-2 self-start rounded-xl px-4 py-2 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-98"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-            <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
-          </svg>
-          <span>New Sort Group</span>
-        </button>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={openCreateModal}
+              style={{ backgroundColor: accent }}
+              className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-1 text-[11px] font-bold text-white shadow-2xs hover:opacity-90 active:scale-98 cursor-pointer"
+            >
+              <FiPlus className="h-3.5 w-3.5" />
+              <span>New Sort Group</span>
+            </button>
+          </div>
+        </div>
+        <p className="text-[10.5px] sm:text-xs text-slate-500 dark:text-neutral-400 mt-0.5 leading-tight">
+          Organize your batteries into custom groups by requirement, site, or order through scanning or typing battery codes.
+        </p>
       </div>
 
       {savedSuccessInfo && (
-        <div className="flex items-center justify-between rounded-2xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-900 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200">
-          <div className="flex items-center gap-2.5">
-            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100 font-bold">✓</span>
-            <span>
+        <div className="flex items-center justify-between rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-900 shadow-2xs dark:border-emerald-800/60 dark:bg-emerald-950/40 dark:text-emerald-200">
+          <div className="flex items-center gap-2">
+            <span className="flex h-5 w-5 items-center justify-center rounded-full bg-emerald-200 text-emerald-800 dark:bg-emerald-800 dark:text-emerald-100 font-bold text-[10px]">✓</span>
+            <span className="text-[11px]">
               Group <span className="font-bold">&quot;{savedSuccessInfo.name}&quot;</span> saved successfully ({savedSuccessInfo.count} {savedSuccessInfo.count === 1 ? 'battery' : 'batteries'}).
             </span>
           </div>
@@ -1148,120 +1169,121 @@ function ClientBatterySortPage() {
         </div>
       )}
 
-      {/* 4-Card Overview Metric Strip */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-5">
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+      {/* 2. Top Metric Overview Cards - Compact 2x2 Grid */}
+      <div className="grid grid-cols-2 gap-2 sm:gap-2.5 lg:grid-cols-4">
+        {/* Sort Groups */}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 flex flex-col justify-between dark:border-surface-700 dark:bg-surface-900 shadow-2xs">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
               Sort Groups
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
-              <FiLayers className="w-4 h-4" />
+            <div className="flex h-5.5 w-5.5 sm:h-6 sm:w-6 items-center justify-center rounded-lg bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300">
+              <FiLayers className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white font-mono">
-            {groups.length}
-          </p>
-          <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5 block">
-            Custom sorting pools
-          </span>
+          <div className="mt-1.5">
+            <p className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-none font-mono">
+              {groups.length}
+            </p>
+            <p className="text-[9px] text-slate-400 dark:text-neutral-400 mt-0.5 font-medium truncate">
+              Custom Pools
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-              Total Sorted Units
+        {/* Total Sorted Units */}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 flex flex-col justify-between dark:border-surface-700 dark:bg-surface-900 shadow-2xs">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
+              Sorted Units
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
-              <FiPackage className="w-4 h-4" />
+            <div className="flex h-5.5 w-5.5 sm:h-6 sm:w-6 items-center justify-center rounded-lg bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300">
+              <FiPackage className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-black text-slate-900 dark:text-white font-mono">
-            {totalSortedBatteries}
-          </p>
-          <span className="text-[11px] text-slate-500 dark:text-neutral-400 mt-0.5 block">
-            Allocated into groups
-          </span>
+          <div className="mt-1.5">
+            <p className="text-sm sm:text-lg font-black text-slate-900 dark:text-white leading-none font-mono">
+              {totalSortedBatteries}
+            </p>
+            <p className="text-[9px] text-blue-600/80 dark:text-blue-400/80 mt-0.5 font-medium truncate">
+              In Active Groups
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-              Available in Fleet
+        {/* Available in Fleet */}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 flex flex-col justify-between dark:border-surface-700 dark:bg-surface-900 shadow-2xs">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
+              Available Fleet
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
-              <FiCheckCircle className="w-4 h-4" />
+            <div className="flex h-5.5 w-5.5 sm:h-6 sm:w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300">
+              <FiCheckCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-black text-emerald-700 dark:text-emerald-400 font-mono">
-            {totalAvailableBatteries}
-          </p>
-          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-0.5 block font-medium">
-            Active &amp; operational
-          </span>
+          <div className="mt-1.5">
+            <p className="text-sm sm:text-lg font-black text-emerald-600 dark:text-emerald-400 leading-none font-mono">
+              {totalAvailableBatteries}
+            </p>
+            <p className="text-[9px] text-emerald-600/80 dark:text-emerald-400/80 mt-0.5 font-medium truncate">
+              Ready &amp; Operational
+            </p>
+          </div>
         </div>
 
-        <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
-              In Maintenance
+        {/* In Maintenance */}
+        <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 flex flex-col justify-between dark:border-surface-700 dark:bg-surface-900 shadow-2xs">
+          <div className="flex items-center justify-between gap-1.5">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-rose-700 dark:text-rose-300">
+              In Repair
             </span>
-            <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
-              <FiTruck className="w-4 h-4" />
+            <div className="flex h-5.5 w-5.5 sm:h-6 sm:w-6 items-center justify-center rounded-lg bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+              <FiTruck className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
             </div>
           </div>
-          <p className="mt-2 text-2xl font-black text-rose-700 dark:text-rose-400 font-mono">
-            {totalInServiceBatteries}
-          </p>
-          <span className="text-[11px] text-rose-600 dark:text-rose-400 mt-0.5 block font-medium">
-            Packed to service / testing
-          </span>
+          <div className="mt-1.5">
+            <p className="text-sm sm:text-lg font-black text-rose-600 dark:text-rose-400 leading-none font-mono">
+              {totalInServiceBatteries}
+            </p>
+            <p className="text-[9px] text-rose-600/80 dark:text-rose-400/80 mt-0.5 font-medium truncate">
+              Packed / In Service
+            </p>
+          </div>
         </div>
       </div>
 
-      {/* Search and Filter Bar */}
+      {/* 3. Search and Filter Bar */}
       {groups.length > 0 && (
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-          <div className="relative w-full sm:w-96">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"
-            >
-              <path
-                fillRule="evenodd"
-                d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
-                clipRule="evenodd"
-              />
-            </svg>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+          <div className="relative flex-1 sm:max-w-xs">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-slate-400 dark:text-neutral-500 pointer-events-none" />
             <input
-              type="text"
+              type="search"
               value={groupSearch}
               onChange={(e) => setGroupSearch(e.target.value)}
-              placeholder="Search sort group name or battery code…"
-              className="w-full rounded-xl border border-slate-200 bg-white py-2 pl-9 pr-3.5 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500 shadow-2xs"
+              placeholder="Search group name or battery code…"
+              className="w-full rounded-lg border border-slate-200 bg-white pl-9 pr-7 py-1.5 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-surface-700 dark:bg-surface-800 dark:text-neutral-100 shadow-2xs"
             />
             {groupSearch.trim() && (
               <button
                 type="button"
                 onClick={() => setGroupSearch('')}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-200 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-neutral-300"
               >
-                ✕
+                <FiX className="h-3 w-3" />
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-3">
-            <span className="text-xs font-bold text-slate-500 dark:text-neutral-400">
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-500 dark:text-neutral-400">
               Showing {filteredGroups.length} of {groups.length} {groups.length === 1 ? 'group' : 'groups'}
             </span>
             {groupSearch.trim() && (
               <button
                 type="button"
                 onClick={() => setGroupSearch('')}
-                className="text-xs font-bold text-emerald-600 hover:underline dark:text-emerald-400 cursor-pointer"
+                className="text-[11px] font-bold text-emerald-600 hover:underline dark:text-emerald-400 cursor-pointer"
               >
                 Clear filter
               </button>
@@ -1288,7 +1310,7 @@ function ClientBatterySortPage() {
           <p className="text-sm font-semibold text-rose-700 dark:text-rose-300">{groupsLoadError}</p>
         </div>
       ) : groups.length === 0 ? (
-        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-12 text-center dark:border-white/10 dark:bg-surface-900">
+        <div className="rounded-3xl border border-dashed border-slate-200 bg-slate-50/50 p-8 sm:p-12 text-center dark:border-white/10 dark:bg-surface-900">
           <div className="flex h-12 w-12 mx-auto items-center justify-center rounded-2xl bg-slate-100 text-slate-500 dark:bg-surface-800 dark:text-neutral-400 mb-3">
             <FiLayers className="h-6 w-6" />
           </div>
@@ -1296,12 +1318,24 @@ function ClientBatterySortPage() {
             No sort groups yet.
           </p>
           <p className="mt-1 text-xs text-slate-400 max-w-sm mx-auto">
-            Click &apos;New Sort Group&apos; above to start categorizing and organizing batteries for your fleet requirements.
+            Click &apos;New Sort Group&apos; below to start categorizing and organizing batteries for your fleet requirements.
           </p>
+          <div className="mt-4 flex justify-center">
+            <button
+              type="button"
+              onClick={openCreateModal}
+              style={{ backgroundColor: accent }}
+              className="inline-flex items-center justify-center gap-2 rounded-xl px-4.5 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-98 cursor-pointer"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+                <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
+              </svg>
+              <span>New Sort Group</span>
+            </button>
+          </div>
         </div>
       ) : (
-        /* Cards Grid with Proper Generous Gapping (gap-6 on sm, gap-7 on xl) */
-        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:gap-7">
+        <div className="grid grid-cols-1 gap-3 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:gap-7">
           {filteredGroups.map((group) => {
             const totalCount = (group.batteries || []).length;
             const groupPacked = (group.batteries || [])
@@ -1326,7 +1360,7 @@ function ClientBatterySortPage() {
               <div
                 key={group.id}
                 onClick={() => openGroup(group)}
-                className={`group relative flex flex-col justify-between overflow-hidden rounded-3xl border bg-white p-6 shadow-xs transition-all duration-300 hover:-translate-y-1 hover:shadow-xl dark:bg-surface-900 cursor-pointer pl-7 ${
+                className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl sm:rounded-3xl border bg-white p-3.5 sm:p-6 shadow-xs transition-all duration-300 hover:-translate-y-0.5 hover:shadow-xl dark:bg-surface-900 cursor-pointer pl-4.5 sm:pl-7 ${
                   hasPacked
                     ? 'border-rose-200/90 hover:border-rose-400 dark:border-rose-900/40 dark:hover:border-rose-700/60'
                     : 'border-slate-200/90 hover:border-slate-300 dark:border-white/10 dark:hover:border-white/20'
@@ -1334,7 +1368,7 @@ function ClientBatterySortPage() {
               >
                 {/* Left Accent Color Stripe */}
                 <div
-                  className={`absolute left-0 top-0 bottom-0 w-2 ${
+                  className={`absolute left-0 top-0 bottom-0 w-1.5 sm:w-2 ${
                     hasPacked
                       ? 'bg-gradient-to-b from-rose-500 to-amber-500'
                       : 'bg-gradient-to-b from-emerald-500 to-teal-500'
@@ -1343,83 +1377,83 @@ function ClientBatterySortPage() {
 
                 {/* Card Top: Group Icon, Name, Units Badge */}
                 <div>
-                  <div className="flex items-start justify-between gap-3.5 pb-4 border-b border-slate-100 dark:border-white/5">
-                    <div className="flex items-center gap-3.5 min-w-0">
+                  <div className="flex items-start justify-between gap-2.5 sm:gap-3.5 pb-2.5 sm:pb-4 border-b border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-2.5 sm:gap-3.5 min-w-0">
                       <div
-                        className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border shadow-2xs ${
+                        className={`flex h-9 w-9 sm:h-12 sm:w-12 shrink-0 items-center justify-center rounded-xl sm:rounded-2xl border shadow-2xs ${
                           hasPacked
                             ? 'bg-rose-50 text-rose-600 border-rose-200/70 dark:bg-rose-950/40 dark:text-rose-400 dark:border-rose-900/40'
                             : 'bg-emerald-50 text-emerald-600 border-emerald-200/70 dark:bg-emerald-950/40 dark:text-emerald-400 dark:border-emerald-900/40'
                         }`}
                       >
-                        <FiLayers className="h-6 w-6" />
+                        <FiLayers className="h-4 w-4 sm:h-6 sm:w-6" />
                       </div>
                       <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        <div className="flex items-center gap-1 sm:gap-1.5">
+                          <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                             Sort Group
                           </span>
                           {hasPacked && (
-                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/70 px-2 py-0.5 text-[10px] font-extrabold text-rose-700 dark:text-rose-300">
+                            <span className="inline-flex items-center gap-1 rounded-full bg-rose-100 dark:bg-rose-950/70 px-1.5 sm:px-2 py-0.5 text-[9px] sm:text-[10px] font-extrabold text-rose-700 dark:text-rose-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-rose-500 animate-pulse" />
                               {groupPacked.length} In Service
                             </span>
                           )}
                         </div>
-                        <h3 className="truncate text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mt-0.5">
+                        <h3 className="truncate text-sm sm:text-lg font-black text-slate-900 dark:text-white tracking-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors mt-0.5">
                           {group.name}
                         </h3>
                       </div>
                     </div>
 
                     <span
-                      className={`inline-flex items-center gap-1 shrink-0 rounded-xl px-3 py-1.5 text-xs font-black shadow-2xs border ${
+                      className={`inline-flex items-center gap-1 shrink-0 rounded-lg sm:rounded-xl px-2 sm:px-3 py-1 sm:py-1.5 text-[11px] sm:text-xs font-black shadow-2xs border ${
                         hasPacked
                           ? 'border-rose-200 bg-rose-50 text-rose-800 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300'
                           : 'border-slate-200 bg-slate-50 text-slate-700 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200'
                       }`}
                     >
-                      <span className="font-mono text-sm">{totalCount}</span>
-                      <span className="text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase">
+                      <span className="font-mono text-xs sm:text-sm">{totalCount}</span>
+                      <span className="text-[9px] sm:text-[10px] font-bold text-slate-400 dark:text-neutral-500 uppercase">
                         {totalCount === 1 ? 'Unit' : 'Units'}
                       </span>
                     </span>
                   </div>
 
                   {/* Logistics Metric Sub-Cards with Clean Spacing */}
-                  <div className="mt-4 grid grid-cols-2 gap-3.5">
+                  <div className="mt-2.5 sm:mt-4 grid grid-cols-2 gap-2 sm:gap-3.5">
                     {/* Ready in Fleet Metric */}
-                    <div className="flex items-center gap-2.5 rounded-2xl bg-slate-50/90 dark:bg-surface-800/70 p-3 border border-slate-100 dark:border-white/5">
-                      <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                        <FiPackage className="h-4 w-4" />
+                    <div className="flex items-center gap-2 sm:gap-2.5 rounded-xl sm:rounded-2xl bg-slate-50/90 dark:bg-surface-800/70 p-2 sm:p-3 border border-slate-100 dark:border-white/5">
+                      <div className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-blue-100/70 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                        <FiPackage className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </div>
                       <div className="min-w-0">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                           Available
                         </span>
-                        <span className="block truncate text-xs font-black text-slate-900 dark:text-white">
+                        <span className="block truncate text-[11px] sm:text-xs font-black text-slate-900 dark:text-white">
                           {readyCount} {readyCount === 1 ? 'Battery' : 'Batteries'}
                         </span>
                       </div>
                     </div>
 
                     {/* In Maintenance Status Metric */}
-                    <div className="flex items-center gap-2.5 rounded-2xl bg-slate-50/90 dark:bg-surface-800/70 p-3 border border-slate-100 dark:border-white/5">
+                    <div className="flex items-center gap-2 sm:gap-2.5 rounded-xl sm:rounded-2xl bg-slate-50/90 dark:bg-surface-800/70 p-2 sm:p-3 border border-slate-100 dark:border-white/5">
                       <div
-                        className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-xl ${
+                        className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl ${
                           hasPacked
                             ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
                             : 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
                         }`}
                       >
-                        {hasPacked ? <FiTruck className="h-4 w-4" /> : <FiCheckCircle className="h-4 w-4" />}
+                        {hasPacked ? <FiTruck className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> : <FiCheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />}
                       </div>
                       <div className="min-w-0">
-                        <span className="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
+                        <span className="block text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-500">
                           {hasPacked ? 'In Repair' : 'Inventory'}
                         </span>
                         <span
-                          className={`block truncate text-xs font-black ${
+                          className={`block truncate text-[11px] sm:text-xs font-black ${
                             hasPacked
                               ? 'text-rose-700 dark:text-rose-400'
                               : 'text-emerald-700 dark:text-emerald-400'
@@ -1433,8 +1467,8 @@ function ClientBatterySortPage() {
 
                   {/* Distribution Readiness Progress Bar */}
                   {totalCount > 0 && (
-                    <div className="mt-4 space-y-1.5">
-                      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
+                    <div className="mt-2.5 sm:mt-4 space-y-1 sm:space-y-1.5">
+                      <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-semibold text-slate-500 dark:text-neutral-400">
                         <span>Readiness</span>
                         <span className="font-mono text-slate-700 dark:text-neutral-300 font-bold">
                           {Math.round((readyCount / totalCount) * 100)}% Available
@@ -1456,13 +1490,13 @@ function ClientBatterySortPage() {
                   )}
 
                   {/* Date & Subtitle */}
-                  <div className="mt-3.5 flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400">
+                  <div className="mt-2.5 sm:mt-3.5 flex items-center justify-between text-[10px] sm:text-[11px] text-slate-500 dark:text-neutral-400">
                     <div className="flex items-center gap-1.5">
-                      <FiCalendar className="w-3.5 h-3.5 text-slate-400" />
+                      <FiCalendar className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-slate-400" />
                       <span>Created {formatDate(group.createdAt)}</span>
                     </div>
                     {hasPacked && latestPackedDate && (
-                      <span className="text-[11px] font-semibold text-rose-600 dark:text-rose-400">
+                      <span className="text-[10px] sm:text-[11px] font-semibold text-rose-600 dark:text-rose-400">
                         Packed {formatDate(latestPackedDate)}
                       </span>
                     )}
@@ -1470,29 +1504,29 @@ function ClientBatterySortPage() {
                 </div>
 
                 {/* Card Footer: Delete Action & Open CTA */}
-                <div className="mt-4 flex items-center justify-between pt-3.5 border-t border-slate-100 dark:border-white/5">
+                <div className="mt-2.5 sm:mt-4 flex items-center justify-between pt-2.5 sm:pt-3.5 border-t border-slate-100 dark:border-white/5">
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       requestDeleteGroup(group);
                     }}
-                    className="inline-flex items-center gap-1.5 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 sm:gap-1.5 rounded-lg sm:rounded-xl px-2 sm:px-2.5 py-1 sm:py-1.5 text-[11px] sm:text-xs font-semibold text-slate-400 hover:bg-rose-50 hover:text-rose-600 dark:text-neutral-500 dark:hover:bg-rose-950/30 dark:hover:text-rose-400 transition-colors cursor-pointer"
                     title="Delete group"
                   >
-                    <FiTrash2 className="h-3.5 w-3.5" />
+                    <FiTrash2 className="h-3 sm:h-3.5 w-3 sm:w-3.5" />
                     <span>Delete</span>
                   </button>
 
                   <span
-                    className={`inline-flex items-center gap-1.5 text-xs font-black transition-all group-hover:translate-x-1 ${
+                    className={`inline-flex items-center gap-1 sm:gap-1.5 text-[11px] sm:text-xs font-black transition-all group-hover:translate-x-1 ${
                       hasPacked
                         ? 'text-rose-600 group-hover:text-rose-700 dark:text-rose-400'
                         : 'text-emerald-600 group-hover:text-emerald-700 dark:text-emerald-400'
                     }`}
                   >
                     <span>Open Group</span>
-                    <FiArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-1" />
+                    <FiArrowRight className="h-3 sm:h-3.5 w-3 sm:w-3.5 transition-transform group-hover:translate-x-1" />
                   </span>
                 </div>
               </div>
@@ -1505,6 +1539,7 @@ function ClientBatterySortPage() {
         <Modal
           title={nameModalMode === 'create' ? 'New Sort Group' : 'Rename Sort Group'}
           onClose={() => setNameModalOpen(false)}
+          centered
         >
           <form onSubmit={handleNameSubmit} className="flex flex-col gap-4">
             <div>
@@ -1573,6 +1608,7 @@ function ClientBatterySortPage() {
             setSaveSuccessModal(false);
             setSavedSuccessInfo(null);
           }}
+          centered
         >
           <div className="flex flex-col gap-5">
             <div className="flex items-start gap-3.5">

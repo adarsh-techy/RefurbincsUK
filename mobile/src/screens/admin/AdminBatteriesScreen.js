@@ -140,116 +140,154 @@ export default function AdminBatteriesScreen() {
   const hasFilters = statuses.length > 0 || clientName || date || search;
 
   const header = (
-    <View className="gap-3 pb-3">
+    <View className="gap-2.5 pb-2.5">
       <View>
-        <Text className="text-2xl font-bold text-green-600">Global Battery</Text>
-        <Text className="text-xs text-slate-500">Every battery ever taken in, tracked by its unique ID.</Text>
-        <View className="mt-2 flex-row flex-wrap items-center gap-2">
-          <View className="flex-row items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-1.5">
-            <View className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
-            <Text className="text-xs font-semibold text-emerald-800">
-              {hasFilters ? 'Matching Batteries: ' : 'Total Batteries: '}
-              <Text className="text-sm font-bold text-emerald-950">{total.toLocaleString()}</Text>
+        <View className="flex-row items-center justify-between">
+          <View>
+            <View className="flex-row items-center gap-1.5">
+              <Text className="text-base font-black text-slate-900">Battery Fleet</Text>
+              <View className="rounded-full bg-emerald-100 px-2 py-0.2">
+                <Text className="text-[9.5px] font-bold text-emerald-800">
+                  {hasFilters ? 'Filtered: ' : 'Total: '}
+                  {total.toLocaleString()}
+                </Text>
+              </View>
+            </View>
+            <Text className="text-[10px] text-slate-500">
+              Lifecycle tracking & service history by unique ID
             </Text>
           </View>
-          {statuses.map((s) => (
-            <TouchableOpacity key={s} onPress={() => toggleStatus(s)} className="flex-row items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-              <Text className="text-xs font-semibold text-blue-800">{STATUS_FILTERS.find((f) => f.id === s)?.label || s}</Text>
-              <Text className="text-xs font-bold text-blue-500">x</Text>
-            </TouchableOpacity>
-          ))}
-          {search ? (
-            <TouchableOpacity onPress={() => { setSearch(''); navigation.setParams({ search: undefined }); }} className="flex-row items-center gap-1.5 rounded-xl border border-blue-200 bg-blue-50 px-2.5 py-1.5">
-              <Text className="text-xs font-semibold text-blue-800">Search: {search}</Text>
-              <Text className="text-xs font-bold text-blue-500">x</Text>
+
+          {hasFilters ? (
+            <TouchableOpacity
+              onPress={resetFilters}
+              className="rounded-lg border border-slate-200 bg-slate-100 px-2.5 py-1"
+            >
+              <Text className="text-[10px] font-bold text-slate-600">Reset</Text>
             </TouchableOpacity>
           ) : null}
         </View>
+
+        {/* Active Removable Filter Chips */}
+        {(statuses.length > 0 || search) ? (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerClassName="mt-2 flex-row items-center gap-1"
+          >
+            {statuses.map((s) => (
+              <TouchableOpacity
+                key={s}
+                onPress={() => toggleStatus(s)}
+                className="flex-row items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5"
+              >
+                <Text className="text-[10px] font-bold text-blue-800">
+                  {STATUS_FILTERS.find((f) => f.id === s)?.label || s}
+                </Text>
+                <Text className="text-[9.5px] font-bold text-blue-500">✕</Text>
+              </TouchableOpacity>
+            ))}
+            {search ? (
+              <TouchableOpacity
+                onPress={() => { setSearch(''); navigation.setParams({ search: undefined }); }}
+                className="flex-row items-center gap-1 rounded-md border border-blue-200 bg-blue-50 px-2 py-0.5"
+              >
+                <Text className="text-[10px] font-bold text-blue-800">Search: {search}</Text>
+                <Text className="text-[9.5px] font-bold text-blue-500">✕</Text>
+              </TouchableOpacity>
+            ) : null}
+          </ScrollView>
+        ) : null}
       </View>
 
-      <View className="gap-3 rounded-2xl border border-blue-200 bg-white p-3.5">
+      <View className="gap-2.5 rounded-xl border border-slate-200 bg-white p-2.5 shadow-2xs">
         <BatteryLookup />
 
-        <TouchableOpacity onPress={() => setShowFilters((v) => !v)} className="flex-row items-center justify-between">
-          <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
+        <TouchableOpacity
+          onPress={() => setShowFilters((v) => !v)}
+          className="flex-row items-center justify-between border-t border-slate-100 pt-2"
+        >
+          <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
             Filters{statuses.length ? ` · ${statuses.length} status${statuses.length === 1 ? '' : 'es'}` : ''}
           </Text>
-          <Text className="text-[11px] font-bold text-blue-600">{showFilters ? 'Hide' : 'Show'}</Text>
+          <Text className="text-[10.5px] font-bold text-blue-600">
+            {showFilters ? 'Hide' : 'Show Options'}
+          </Text>
         </TouchableOpacity>
 
         {showFilters && (
           <>
+            {/* Client Filter Scroll Track */}
             <View>
-              <Text className="mb-1 text-xs font-bold uppercase tracking-wider text-slate-500">Client</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1.5">
+              <Text className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Client</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1">
                 {['', ...clients].map((c) => {
                   const active = clientName === c;
                   return (
-                    <TouchableOpacity key={c || 'all'} onPress={() => setClientName(c)} className={`rounded-xl border px-3 py-1.5 ${active ? 'border-emerald-700 bg-emerald-700' : 'border-slate-300 bg-white'}`}>
-                      <Text className={`text-[11px] font-semibold ${active ? 'text-white' : 'text-slate-700'}`}>{c || 'All Clients'}</Text>
+                    <TouchableOpacity
+                      key={c || 'all'}
+                      onPress={() => setClientName(c)}
+                      className={`rounded-lg border px-2.5 py-1 ${active ? 'border-slate-900 bg-slate-900' : 'border-slate-200 bg-slate-50'}`}
+                    >
+                      <Text className={`text-[10px] font-bold ${active ? 'text-white' : 'text-slate-700'}`}>{c || 'All Clients'}</Text>
                     </TouchableOpacity>
                   );
                 })}
               </ScrollView>
             </View>
 
+            {/* Status Filter Scroll Track (ZERO Vertical Mess) */}
             <View>
-              <View className="mb-1 flex-row items-center gap-2">
-                <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">Status Filter</Text>
-                {statuses.length > 0 && (
-                  <Text className="rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold text-white">{statuses.length}</Text>
-                )}
-              </View>
-              <View className="flex-row flex-wrap gap-1.5">
+              <Text className="mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Status</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-1">
                 {STATUS_FILTERS.map((f) => {
                   const active = f.id ? statuses.includes(f.id) : statuses.length === 0;
                   return (
-                    <TouchableOpacity key={f.id || 'all'} onPress={() => toggleStatus(f.id)} className={`rounded-lg px-2.5 py-1.5 ${active ? 'bg-emerald-700' : 'bg-slate-100'}`}>
-                      <Text className={`text-[11px] font-semibold ${active ? 'text-white' : 'text-slate-600'}`}>{f.label}</Text>
+                    <TouchableOpacity
+                      key={f.id || 'all'}
+                      onPress={() => toggleStatus(f.id)}
+                      className={`rounded-lg px-2.5 py-1 ${active ? 'bg-slate-900' : 'bg-slate-100'}`}
+                    >
+                      <Text className={`text-[10px] font-bold ${active ? 'text-white' : 'text-slate-600'}`}>{f.label}</Text>
                     </TouchableOpacity>
                   );
                 })}
-              </View>
+              </ScrollView>
             </View>
 
+            {/* Created on Date Filter */}
             <View>
               <TouchableOpacity onPress={() => setShowDate((v) => !v)} className="flex-row items-center justify-between">
-                <Text className="text-xs font-bold uppercase tracking-wider text-slate-500">
-                  Created on: <Text className={date ? 'text-blue-700' : 'text-slate-400'}>{date ? prettyYmd(date) : 'any date'}</Text>
+                <Text className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  Created on: <Text className={date ? 'text-blue-700' : 'text-slate-500'}>{date ? prettyYmd(date) : 'any date'}</Text>
                 </Text>
-                <View className="flex-row items-center gap-3">
+                <View className="flex-row items-center gap-2">
                   {date ? (
                     <TouchableOpacity onPress={() => setDate('')} hitSlop={6}>
-                      <Text className="text-[11px] font-semibold text-slate-500">Clear</Text>
+                      <Text className="text-[10px] font-bold text-slate-500">Clear</Text>
                     </TouchableOpacity>
                   ) : null}
-                  <Text className="text-[11px] font-bold text-blue-600">{showDate ? 'Hide' : 'Pick date'}</Text>
+                  <Text className="text-[10px] font-bold text-blue-600">{showDate ? 'Hide' : 'Pick date'}</Text>
                 </View>
               </TouchableOpacity>
               {showDate && (
-                <View className="mt-2">
+                <View className="mt-1.5">
                   <DateField value={date} onChange={setDate} />
                 </View>
               )}
             </View>
-
-            {hasFilters ? (
-              <TouchableOpacity onPress={resetFilters} className="self-start rounded-xl bg-slate-100 px-3 py-1.5">
-                <Text className="text-xs font-bold text-slate-600">Reset Filters</Text>
-              </TouchableOpacity>
-            ) : null}
           </>
         )}
       </View>
 
       {error ? (
-        <View className="rounded-2xl border border-red-200 bg-red-50 p-3">
+        <View className="rounded-xl border border-red-200 bg-red-50 p-2.5">
           <Text className="text-xs font-semibold text-red-700">{error}</Text>
         </View>
       ) : null}
 
       {!loading && (
-        <Text className="px-1 text-xs font-semibold text-slate-500">
+        <Text className="px-1 text-[10px] font-semibold text-slate-400">
           Showing <Text className="font-bold text-slate-800">{rows.length}</Text> of{' '}
           <Text className="font-bold text-slate-800">{total.toLocaleString()}</Text> {total === 1 ? 'battery' : 'batteries'}
           {hasFilters ? ' (filtered)' : ''}
@@ -263,62 +301,94 @@ export default function AdminBatteriesScreen() {
       className="flex-1 bg-slate-50"
       data={rows}
       keyExtractor={(b) => String(b.id)}
-      contentContainerClassName="p-4 gap-2 pb-16"
+      contentContainerClassName="p-2.5 gap-1.5 pb-16"
       ListHeaderComponent={header}
       refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); fetchPage(0, true); }} />}
       onEndReached={loadMore}
       onEndReachedThreshold={0.4}
       keyboardShouldPersistTaps="handled"
       ListEmptyComponent={
-        <View className="items-center rounded-2xl border border-slate-200 bg-white p-8">
-          <Icon name="battery" color="#94a3b8" size={24} />
-          <Text className="mt-2 text-sm font-semibold text-slate-800">{loading ? 'Loading...' : 'No batteries match these filters.'}</Text>
+        <View className="items-center rounded-xl border border-slate-200 bg-white p-8">
+          <Icon name="battery" color="#94a3b8" size={22} />
+          <Text className="mt-2 text-xs font-semibold text-slate-800">
+            {loading ? 'Loading batteries…' : 'No batteries match these filters.'}
+          </Text>
         </View>
       }
-      ListFooterComponent={loadingMore ? <Text className="py-3 text-center text-xs text-slate-400">Loading more…</Text> : null}
-      renderItem={({ item: b, index }) => (
-        <TouchableOpacity
-          onPress={() => navigation.navigate('BatteryDetail', { code: b.battery_code, fromScan: false })}
-          className="rounded-2xl border border-slate-200 bg-white p-3.5"
-        >
-          <View className="flex-row items-center justify-between gap-2">
-            <Text className="flex-1 text-sm font-extrabold text-blue-700">
-              <Text className="text-[11px] font-semibold text-slate-400">{index + 1}. </Text>
-              {b.battery_code}
-            </Text>
-            <FleetStatusBadge status={b.status} isPassedBack={b.is_passed_back} hasPendingParts={Number(b.pending_parts_count || 0) > 0} />
-          </View>
-          <View className="mt-1 flex-row flex-wrap">
-            <Field label="RFID Tag">
-              <Text className={`font-mono text-xs ${b.rfid_tag ? 'text-emerald-700' : 'text-slate-400'}`} numberOfLines={1}>{b.rfid_tag || '—'}</Text>
-            </Field>
-            <Field label="Battery Number">
-              <Text className={`text-xs ${b.serial_number ? 'font-semibold text-slate-800' : 'text-slate-400'}`} numberOfLines={1}>{b.serial_number || '—'}</Text>
-              {b.serial_number && b.serial_number_added_by_role === 'client' ? <Text className="text-[10px] font-semibold text-amber-700">Set by Client</Text> : null}
-            </Field>
-            <Field label="Client">
-              <Text className="text-xs font-semibold text-slate-800" numberOfLines={1}>{b.client_name || '-'}</Text>
-            </Field>
-            <Field label="Registered Time">
-              <Text className="text-xs text-slate-700">{b.created_at ? new Date(b.created_at).toLocaleString() : '-'}</Text>
-            </Field>
-            <Field label="Last Repaired">
-              <Text className="text-xs text-slate-700">{b.last_repaired_at ? new Date(b.last_repaired_at).toLocaleString() : '-'}</Text>
-              {b.repairs_this_month > 1 && Array.isArray(b.repairs_this_month_dates) ? (
-                <Text className="text-[10px] font-medium text-amber-600">
-                  Repaired {b.repairs_this_month}x this month ({b.repairs_this_month_dates.map(formatShortDate).join(', ')})
-                </Text>
+      ListFooterComponent={loadingMore ? <Text className="py-2.5 text-center text-[10.5px] text-slate-400">Loading more…</Text> : null}
+      renderItem={({ item: b, index }) => {
+        const hasRepeatRepairs = b.repairs_this_month > 1;
+
+        return (
+          <TouchableOpacity
+            activeOpacity={0.7}
+            onPress={() => navigation.navigate('BatteryDetail', { code: b.battery_code, fromScan: false })}
+            className="rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs"
+          >
+            {/* Top Bar: Battery ID & Fleet Status */}
+            <View className="flex-row items-center justify-between gap-1.5">
+              <Text className="flex-1 text-xs font-black text-blue-700" numberOfLines={1}>
+                <Text className="text-[10px] font-semibold text-slate-400">{index + 1}. </Text>
+                🔋 {b.battery_code}
+              </Text>
+              <FleetStatusBadge
+                status={b.status}
+                isPassedBack={b.is_passed_back}
+                hasPendingParts={Number(b.pending_parts_count || 0) > 0}
+              />
+            </View>
+
+            {/* Meta Tags Row */}
+            <View className="mt-1.5 flex-row flex-wrap items-center gap-1">
+              {b.client_name ? (
+                <View className="rounded bg-slate-100 px-1.5 py-0.2">
+                  <Text className="text-[9px] font-black text-slate-700" numberOfLines={1}>
+                    {b.client_name}
+                  </Text>
+                </View>
               ) : null}
-            </Field>
-            <Field label="Part(s) Changed">
-              <Text className="text-xs text-slate-700">{b.last_repaired_parts || '-'}</Text>
-            </Field>
-            <Field label="Repaired By">
-              <Text className="text-xs text-slate-700">{b.last_repaired_by || '-'}</Text>
-            </Field>
-          </View>
-        </TouchableOpacity>
-      )}
+
+              {b.serial_number ? (
+                <View className="rounded bg-slate-100 px-1.5 py-0.2 flex-row items-center gap-1">
+                  <Text className="font-mono text-[9px] font-semibold text-slate-800" numberOfLines={1}>
+                    SN: {b.serial_number}
+                  </Text>
+                  {b.serial_number_added_by_role === 'client' ? (
+                    <Text className="text-[7.5px] font-bold text-amber-700">Client</Text>
+                  ) : null}
+                </View>
+              ) : null}
+
+              {b.rfid_tag ? (
+                <View className="rounded bg-emerald-50 px-1.5 py-0.2 border border-emerald-200/60">
+                  <Text className="font-mono text-[8.5px] font-semibold text-emerald-800" numberOfLines={1}>
+                    RFID: {b.rfid_tag}
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+
+            {/* Service & Repair Footer */}
+            <View className="mt-1.5 flex-row items-center justify-between border-t border-slate-100 pt-1">
+              <Text className="text-[9px] text-slate-400" numberOfLines={1}>
+                {b.last_repaired_at ? (
+                  <>Repaired: {formatShortDate(b.last_repaired_at.slice(0, 10))}{b.last_repaired_by ? ` (${b.last_repaired_by})` : ''}</>
+                ) : (
+                  <>Registered: {formatShortDate(b.created_at?.slice(0, 10))}</>
+                )}
+              </Text>
+
+              {hasRepeatRepairs ? (
+                <View className="rounded bg-amber-50 px-1 py-0.2">
+                  <Text className="text-[8px] font-bold text-amber-800">
+                    ⚠️ {b.repairs_this_month}x this mo
+                  </Text>
+                </View>
+              ) : null}
+            </View>
+          </TouchableOpacity>
+        );
+      }}
     />
   );
 }

@@ -255,6 +255,7 @@ export default function HistoryScreen() {
       const tests = data.tests || [];
       const passed = tests.filter((t) => !t.passed_back);
       return {
+        totalBatteries: tests.length + issues.length,
         totalTests: tests.length,
         passed: passed.length,
         passedBack: tests.length - passed.length,
@@ -264,13 +265,17 @@ export default function HistoryScreen() {
     }
     const repairs = data.repairs || [];
     const completed = repairs.filter((r) => !r.parts_removed && (r.repaired_at || r.id));
-    const timed = repairs.filter((r) => typeof r.duration_seconds === 'number' && r.duration_seconds > 0);
+    const failedTest = repairs.filter(
+      (r) =>
+        r.parts_removed ||
+        r.battery_status === 'tested_parts_removed' ||
+        r.battery_status === 'unserviceable_parts_removed'
+    );
     return {
+      totalBatteries: repairs.length + issues.length,
       totalRepairs: repairs.length,
       completed: completed.length,
-      avgDuration: timed.length
-        ? Math.round(timed.reduce((sum, r) => sum + r.duration_seconds, 0) / timed.length)
-        : null,
+      failedTest: failedTest.length,
       issues: issues.length,
     };
   }, [data, isSupervisor]);
@@ -441,60 +446,23 @@ export default function HistoryScreen() {
   return (
     <View className="flex-1 bg-slate-50">
       {/* ── Top Header & Stats Summary Banner ────────────────────────── */}
-      <View className="bg-white px-4 pt-3 pb-3 border-b border-slate-200/80 shadow-2xs">
-        {/* Role Title & Staff Badge */}
-        <View className="mb-2.5 gap-2">
-          <View>
-            <View className="flex-row items-center gap-2">
-              <Text className="text-lg font-black text-slate-900 tracking-tight">
-                {isSupervisor ? 'QA Testing & Sign-off History' : 'Repair & Service History'}
-              </Text>
-              <View
-                className={`rounded-full px-2 py-0.5 ${
-                  isSupervisor ? 'bg-violet-100' : 'bg-blue-100'
-                }`}
-              >
-                <Text
-                  className={`text-[10px] font-black uppercase tracking-wider ${
-                    isSupervisor ? 'text-violet-700' : 'text-blue-700'
-                  }`}
-                >
-                  {isSupervisor ? 'Supervisor' : 'Technician'}
-                </Text>
-              </View>
-            </View>
-            <Text className="text-xs text-slate-400">
-              {isSupervisor
-                ? 'Battery testing sign-offs, QA services, and technician rework passes'
-                : 'Battery repairs, fitted parts, and workshop service logs'}
-            </Text>
-          </View>
-
-          {(staffInfo?.name || currentUser?.name) && (
-            <View className="flex-row items-center gap-1.5 self-start rounded-lg bg-slate-100 px-2.5 py-1">
-              <View className="h-2 w-2 rounded-full bg-emerald-500" />
-              <Text className="text-[11px] font-semibold text-slate-700">
-                Staff: {staffInfo?.name || currentUser?.name}
-              </Text>
-            </View>
-          )}
-        </View>
+      <View className="bg-white px-4 pt-2.5 pb-3 border-b border-slate-200/80 shadow-2xs">
 
         {/* Stats: the web's four cards, two per row */}
         {summaryStats && (
           <View className="mt-1 mb-2.5 flex-row flex-wrap gap-2">
             {(isSupervisor
               ? [
-                  { label: 'Total Tested', value: summaryStats.totalTests, sub: 'Sign-offs logged', box: 'bg-violet-50/80 border-violet-100', head: 'text-violet-700', num: 'text-violet-950', foot: 'text-violet-600' },
+                  { label: 'Total Batteries', value: summaryStats.totalBatteries, sub: `Total started work (${summaryStats.totalTests} tests)`, box: 'bg-violet-50/80 border-violet-100', head: 'text-violet-700', num: 'text-violet-950', foot: 'text-violet-600' },
                   { label: 'Passed QA', value: summaryStats.passed, sub: `${summaryStats.passRate}% pass rate`, box: 'bg-emerald-50/80 border-emerald-100', head: 'text-emerald-700', num: 'text-emerald-950', foot: 'text-emerald-600 font-semibold' },
                   { label: 'Passed Back', value: summaryStats.passedBack, sub: 'Returned for rework', box: 'bg-amber-50/80 border-amber-100', head: 'text-amber-700', num: 'text-amber-950', foot: 'text-amber-600' },
                   { label: 'Unserviceable', value: summaryStats.issues, sub: 'Failed testing', box: 'bg-rose-50/80 border-rose-100', head: 'text-rose-700', num: 'text-rose-950', foot: 'text-rose-600' },
                 ]
               : [
-                  { label: 'Total Repairs', value: summaryStats.totalRepairs, sub: 'Batteries repaired', box: 'bg-blue-50/80 border-blue-100', head: 'text-blue-700', num: 'text-blue-950', foot: 'text-blue-600' },
-                  { label: 'Completed', value: summaryStats.completed, sub: 'Submitted for test', box: 'bg-emerald-50/80 border-emerald-100', head: 'text-emerald-700', num: 'text-emerald-950', foot: 'text-emerald-600' },
-                  { label: 'Avg Duration', value: summaryStats.avgDuration ? formatDuration(summaryStats.avgDuration) : '—', sub: 'Per battery', box: 'bg-indigo-50/80 border-indigo-100', head: 'text-indigo-700', num: 'text-indigo-950', foot: 'text-indigo-600' },
-                  { label: 'Issues', value: summaryStats.issues, sub: 'Unserviceable', box: 'bg-rose-50/80 border-rose-100', head: 'text-rose-700', num: 'text-rose-950', foot: 'text-rose-600' },
+                  { label: 'Total Batteries', value: summaryStats.totalBatteries, sub: `Total started work (${summaryStats.totalRepairs} repairs)`, box: 'bg-blue-50/80 border-blue-100', head: 'text-blue-700', num: 'text-blue-950', foot: 'text-blue-600' },
+                  { label: 'Completed', value: summaryStats.completed, sub: 'Passed QA testing', box: 'bg-emerald-50/80 border-emerald-100', head: 'text-emerald-700', num: 'text-emerald-950', foot: 'text-emerald-600' },
+                  { label: 'Test Failed', value: summaryStats.failedTest, sub: 'Unserviceable test failed', box: 'bg-amber-50/80 border-amber-100', head: 'text-amber-700', num: 'text-amber-950', foot: 'text-amber-600' },
+                  { label: 'Unserviceable', value: summaryStats.issues, sub: 'Reported issues', box: 'bg-rose-50/80 border-rose-100', head: 'text-rose-700', num: 'text-rose-950', foot: 'text-rose-600' },
                 ]
             ).map((card) => (
               <View key={card.label} className={`w-[48.5%] rounded-xl border p-2.5 ${card.box}`}>
@@ -507,8 +475,8 @@ export default function HistoryScreen() {
         )}
 
         {/* Search Bar */}
-        <View className="flex-row items-center rounded-xl bg-slate-100 px-2.5 py-1.5 border border-slate-200/60">
-          <Icon name="search" color="#94a3b8" size={13} />
+        <View className="flex-row items-center rounded-xl bg-slate-100/90 px-3 py-2 border border-slate-200/80">
+          <Icon name="search" color="#94a3b8" size={14} />
           <TextInput
             value={search}
             onChangeText={setSearch}
@@ -525,15 +493,17 @@ export default function HistoryScreen() {
               <Icon name="close" color="#64748b" size={12} />
             </TouchableOpacity>
           ) : (
-            <Text className="text-[10px] font-medium text-slate-400">
-              {filteredTimeline.length} {filteredTimeline.length === 1 ? 'unit' : 'units'}
-            </Text>
+            <View className="rounded-full bg-slate-200/70 px-2 py-0.5">
+              <Text className="text-[10px] font-semibold text-slate-600">
+                {filteredTimeline.length} {filteredTimeline.length === 1 ? 'unit' : 'units'}
+              </Text>
+            </View>
           )}
         </View>
 
         {/* Type Filter Segmented Control & Reset */}
-        <View className="mt-2 flex-row items-center justify-between">
-          <View className="flex-row gap-0.5 rounded-lg bg-slate-100 p-0.5">
+        <View className="mt-3 flex-row items-center justify-between">
+          <View className="flex-row gap-1 rounded-xl bg-slate-100 p-1 border border-slate-200/60">
             {typeFilters.map((tf) => {
               const active = typeFilter === tf.id;
               return (
@@ -541,7 +511,7 @@ export default function HistoryScreen() {
                   key={tf.id}
                   activeOpacity={0.7}
                   onPress={() => setTypeFilter(tf.id)}
-                  className={`rounded-md px-2 py-1 ${
+                  className={`rounded-lg px-2.5 py-1 ${
                     active
                       ? isSupervisor
                         ? 'bg-white shadow-2xs'
@@ -550,7 +520,7 @@ export default function HistoryScreen() {
                   }`}
                 >
                   <Text
-                    className={`text-[10px] font-bold ${
+                    className={`text-[11px] font-bold ${
                       active
                         ? isSupervisor
                           ? 'text-violet-700'
@@ -566,18 +536,18 @@ export default function HistoryScreen() {
           </View>
 
           {hasActiveFilters && (
-            <TouchableOpacity onPress={resetFilters} hitSlop={5}>
-              <Text className="text-[10px] font-bold text-rose-600">Reset</Text>
+            <TouchableOpacity onPress={resetFilters} hitSlop={5} className="px-2 py-1">
+              <Text className="text-xs font-bold text-rose-600">Reset</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Date Filter Pills */}
-        <View className="mt-2">
+        <View className="mt-2.5">
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
-            contentContainerClassName="flex-row gap-1"
+            contentContainerClassName="flex-row gap-1.5"
           >
             {DATE_FILTERS.map((df) => {
               const active = dateFilter === df.id;
@@ -591,16 +561,16 @@ export default function HistoryScreen() {
                       setCustomRange({ start: null, end: null });
                     }
                   }}
-                  className={`rounded-md px-2 py-0.5 ${
+                  className={`rounded-lg px-2.5 py-1 ${
                     active
                       ? isSupervisor
                         ? 'bg-violet-600'
                         : 'bg-blue-600'
-                      : 'bg-slate-100'
+                      : 'bg-slate-100/90'
                   }`}
                 >
                   <Text
-                    className={`text-[10px] font-bold ${
+                    className={`text-[11px] font-bold ${
                       active ? 'text-white' : 'text-slate-600'
                     }`}
                   >
@@ -614,12 +584,12 @@ export default function HistoryScreen() {
             <TouchableOpacity
               activeOpacity={0.7}
               onPress={openCustomDateModal}
-              className={`flex-row items-center gap-1 rounded-md px-2 py-0.5 ${
+              className={`flex-row items-center gap-1 rounded-lg px-2.5 py-1 ${
                 dateFilter === 'custom'
                   ? isSupervisor
                     ? 'bg-violet-600'
                     : 'bg-blue-600'
-                  : 'bg-slate-100 border border-slate-200/60'
+                  : 'bg-slate-100/90 border border-slate-200/60'
               }`}
             >
               <Text
@@ -675,7 +645,7 @@ export default function HistoryScreen() {
       {/* ── Date-Wise Grouped Feed ─────────────────────────────────────── */}
       <ScrollView
         className="flex-1"
-        contentContainerClassName="p-4 gap-6 pb-16"
+        contentContainerClassName="p-3.5 gap-3.5 pb-16"
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -723,7 +693,7 @@ export default function HistoryScreen() {
           )
         ) : (
           dateGroups.map((group) => (
-            <View key={group.dateKey} className="gap-3 mb-2">
+            <View key={group.dateKey} className="gap-2 mb-2">
               {/* Date Header Tag */}
               <View className="flex-row items-center justify-between px-1">
                 <View className="flex-row items-center gap-1.5">
@@ -753,171 +723,56 @@ export default function HistoryScreen() {
                 </View>
               </View>
 
-              {/* Items for this date */}
-              <View className="gap-3.5">
+              {/* Compact Items for this date */}
+              <View className="gap-2">
                 {group.data.map((item) => {
-                  if (item.kind === 'test') {
-                    // SUPERVISOR TEST CARD
-                    const isPassedBack = item.passed_back;
-                    return (
-                      <TouchableOpacity
-                        key={`test-${item.id}`}
-                        activeOpacity={0.7}
-                        onPress={() =>
-                          navigation.navigate('BatteryDetail', { code: item.battery_code, fromHistory: true, fromScan: false })
-                        }
-                        className={`rounded-2xl border bg-white p-4 shadow-2xs overflow-hidden ${
-                          isPassedBack ? 'border-amber-200' : 'border-emerald-200'
-                        }`}
-                      >
-                        {/* Top row */}
-                        <View className="mb-2 flex-row flex-wrap items-center justify-between gap-2">
-                          <View className="flex-row items-center gap-2">
-                            <View
-                              className={`h-6 w-6 items-center justify-center rounded-full ${
-                                isPassedBack ? 'bg-amber-100' : 'bg-emerald-100'
-                              }`}
-                            >
-                              <Text
-                                className={`text-xs font-black ${
-                                  isPassedBack ? 'text-amber-700' : 'text-emerald-700'
-                                }`}
-                              >
-                                {isPassedBack ? '↩' : '✓'}
-                              </Text>
-                            </View>
-                            <Text className="font-mono text-sm font-extrabold text-slate-900">
-                              {item.battery_code}
-                            </Text>
-                            {isPassedBack ? (
-                              <View className="rounded-full bg-amber-100 px-2 py-0.5">
-                                <Text className="text-[10px] font-black uppercase text-amber-800">
-                                  Sent Back to Tech
-                                </Text>
-                              </View>
-                            ) : (
-                              <StatusBadge status="repaired" />
-                            )}
-                          </View>
+                  const isTest = item.kind === 'test';
+                  const isPassedBack = isTest && item.passed_back;
+                  const isIssue = item.kind === 'issue';
 
-                          <Text className="text-[11px] font-medium text-slate-400">
-                            {item.tested_at
-                              ? new Date(item.tested_at).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : ''}
-                          </Text>
-                        </View>
-
-                        {/* Footer row */}
-                        <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
-                          {typeof item.testing_duration_seconds === 'number' &&
-                          item.testing_duration_seconds > 0 ? (
-                            <View className="rounded-md bg-violet-50 px-2 py-0.5 border border-violet-100">
-                              <Text className="text-[10px] font-bold text-violet-700">
-                                ⏱️ Testing Time: {formatDuration(item.testing_duration_seconds)}
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text className="text-[10px] font-bold uppercase text-slate-400">
-                              {isPassedBack ? 'Rework Pass-Back' : 'QA Testing Sign-off'}
-                            </Text>
-                          )}
-                          <Text className="text-xs font-bold text-violet-600">View Battery Details ›</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }
-
-                  if (item.kind === 'repair') {
-                    // TECHNICIAN REPAIR CARD
-                    return (
-                      <TouchableOpacity
-                        key={`repair-${item.id}`}
-                        activeOpacity={0.7}
-                        onPress={() =>
-                          navigation.navigate('BatteryDetail', { code: item.battery_code, fromHistory: true, fromScan: false })
-                        }
-                        className="rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs"
-                      >
-                        <View className="flex-row flex-wrap items-center justify-between gap-2">
-                          <View className="flex-row items-center gap-2">
-                            <View className="h-6 w-6 items-center justify-center rounded-full bg-blue-100">
-                              <Icon name="wrench" color="#1d4ed8" size={12} />
-                            </View>
-                            <Text className="font-mono text-sm font-extrabold text-blue-700">
-                              {item.battery_code}
-                            </Text>
-                            <StatusBadge status={repairBadgeStatus(item)} />
-                          </View>
-                          <Text className="text-[11px] font-medium text-slate-400">
-                            {item.repaired_at
-                              ? new Date(item.repaired_at).toLocaleTimeString([], {
-                                  hour: '2-digit',
-                                  minute: '2-digit',
-                                })
-                              : ''}
-                          </Text>
-                        </View>
-
-                        <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
-                          {typeof item.duration_seconds === 'number' &&
-                          item.duration_seconds > 0 ? (
-                            <View className="rounded-md bg-blue-50 px-2 py-0.5 border border-blue-100">
-                              <Text className="text-[10px] font-bold text-blue-700">
-                                ⏱️ Repair Time: {formatDuration(item.duration_seconds)}
-                              </Text>
-                            </View>
-                          ) : (
-                            <Text className="text-[10px] font-bold uppercase text-slate-400">
-                              Completed Repair
-                            </Text>
-                          )}
-                          <Text className="text-xs font-bold text-blue-600">View Battery Details ›</Text>
-                        </View>
-                      </TouchableOpacity>
-                    );
-                  }
-
-                  // ISSUE CARD (UNSERVICEABLE)
                   return (
                     <TouchableOpacity
-                      key={`issue-${item.id}`}
+                      key={`${item.kind}-${item.id}`}
                       activeOpacity={0.7}
                       onPress={() =>
-                        navigation.navigate('BatteryDetail', { code: item.battery_code, fromHistory: true, fromScan: false })
+                        navigation.navigate('BatteryDetail', {
+                          code: item.battery_code,
+                          fromHistory: true,
+                          fromScan: false,
+                        })
                       }
-                      className="rounded-2xl border border-rose-200/90 bg-white p-4 shadow-2xs"
+                      className={`flex-row items-center justify-between rounded-xl border bg-white px-3.5 py-3.5 shadow-2xs ${
+                        isIssue
+                          ? 'border-rose-200/90'
+                          : isPassedBack
+                            ? 'border-amber-200'
+                            : 'border-slate-200/90'
+                      }`}
                     >
-                      <View className="flex-row flex-wrap items-center justify-between gap-2">
-                        <View className="flex-row items-center gap-2">
-                          <View className="h-6 w-6 items-center justify-center rounded-full bg-rose-100">
-                            <Icon name="alertTriangle" color="#be123c" size={12} />
-                          </View>
-                          <Text className="font-mono text-sm font-extrabold text-rose-700">
-                            {item.battery_code}
-                          </Text>
-                          <StatusBadge status={item.battery_status || 'unserviceable'} />
-                        </View>
-                        <Text className="text-[11px] font-medium text-slate-400">
-                          {item.reported_at
-                            ? new Date(item.reported_at).toLocaleTimeString([], {
-                                hour: '2-digit',
-                                minute: '2-digit',
-                              })
-                            : ''}
+                      <View className="flex-row items-center gap-2.5 flex-1 min-w-0 pr-2">
+                        <Text className="font-mono text-xs font-bold text-slate-900">
+                          {item.battery_code}
                         </Text>
+                        {isPassedBack ? (
+                          <View className="rounded-full bg-amber-100 px-1.5 py-0.5">
+                            <Text className="text-[8.5px] font-bold uppercase text-amber-800">
+                              Sent Back
+                            </Text>
+                          </View>
+                        ) : (
+                          <StatusBadge
+                            size="sm"
+                            status={
+                              isTest
+                                ? 'repaired'
+                                : isIssue
+                                  ? (item.battery_status || 'unserviceable')
+                                  : repairBadgeStatus(item)
+                            }
+                          />
+                        )}
                       </View>
-
-                      <View className="mt-3 flex-row items-center justify-between border-t border-slate-100 pt-2.5">
-                        <View className="rounded-md bg-rose-50 px-2 py-0.5 border border-rose-100">
-                          <Text className="text-[10px] font-bold text-rose-700">
-                            Marked Unserviceable
-                          </Text>
-                        </View>
-                        <Text className="text-xs font-bold text-rose-600">View Battery Details ›</Text>
-                      </View>
+                      <Icon name="chevronRight" color="#94a3b8" size={14} />
                     </TouchableOpacity>
                   );
                 })}

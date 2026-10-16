@@ -10,7 +10,6 @@ import {
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
-import { StatusBadge } from '../../components/ui/Badge';
 import Icon from '../../components/ui/Icon';
 import formatDuration from '../../utils/format-duration';
 import {
@@ -18,7 +17,6 @@ import {
   isActiveRepair,
   isVerifiedRepair,
   isPartsRemoved,
-  repairBadgeStatus,
 } from '../../components/technician/work-outcome';
 
 const DAYS_SHOWN = 14;
@@ -49,36 +47,7 @@ function buildDailyCounts(jobs) {
   return series;
 }
 
-function greeting() {
-  const hour = new Date().getHours();
-  if (hour < 12) return 'Good morning';
-  if (hour < 18) return 'Good afternoon';
-  return 'Good evening';
-}
 
-function initials(name) {
-  return (name || 'ST')
-    .split(' ')
-    .filter(Boolean)
-    .map((part) => part[0])
-    .slice(0, 2)
-    .join('')
-    .toUpperCase();
-}
-
-function timeAgo(dateString) {
-  if (!dateString) return 'recently';
-  const d = new Date(dateString);
-  if (isNaN(d.getTime())) return 'recently';
-  const seconds = Math.max(0, Math.floor((Date.now() - d.getTime()) / 1000));
-  if (seconds < 60) return 'just now';
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ago`;
-}
 
 
 
@@ -89,7 +58,6 @@ export default function DashboardScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
-  const [activeTab, setActiveTab] = useState('all');
 
   const loadData = useCallback(() => {
     return apiClient
@@ -209,61 +177,7 @@ export default function DashboardScreen() {
     return Math.round((completedJobs.length / totalAttempted) * 100);
   }, [isSupervisor, tests, passedTests, repairs.length, unserviceableIssues.length, completedJobs.length]);
 
-  // Combined workshop feed
-  const filteredFeed = useMemo(() => {
-    if (isSupervisor) {
-      if (activeTab === 'passed') return tests.filter((t) => !t.passed_back);
-      if (activeTab === 'passed_back') return tests.filter((t) => t.passed_back);
-      if (activeTab === 'unserviceable') return unserviceableIssues;
-      return tests;
-    }
 
-    if (activeTab === 'testing') {
-      return inTestingRepairs.map((r) => ({ ...r, entryType: 'testing', date: r.repaired_at }));
-    }
-    if (activeTab === 'unserviceable') {
-      return unserviceableIssues.map((i) => ({ ...i, entryType: 'issue', date: i.reported_at }));
-    }
-    if (activeTab === 'removed') {
-      return partsRemovedRepairs.map((r) => ({ ...r, entryType: 'removed', date: r.removed_at || r.repaired_at }));
-    }
-    if (activeTab === 'completed') {
-      return verifiedRepairs.map((r) => ({ ...r, entryType: 'completed', date: r.repaired_at }));
-    }
-
-    // 'all': blend repairs and issues
-    const repairItems = repairs.map((r) => ({
-      ...r,
-      entryType: isPartsRemoved(r) ? 'removed' : isActiveRepair(r) ? 'testing' : 'completed',
-      date: r.removed_at || r.repaired_at,
-    }));
-    const issueItems = unserviceableIssues.map((i) => ({
-      ...i,
-      entryType: 'issue',
-      date: i.reported_at,
-    }));
-
-    return [...repairItems, ...issueItems].sort(
-      (a, b) => new Date(b.date || 0) - new Date(a.date || 0)
-    );
-  }, [
-    isSupervisor,
-    activeTab,
-    tests,
-    unserviceableIssues,
-    inTestingRepairs,
-    partsRemovedRepairs,
-    verifiedRepairs,
-    repairs,
-  ]);
-
-  const todayDateFormatted = new Date().toLocaleDateString([], {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short',
-  });
-
-  const staffDisplayName = staff.name || user?.name || (isSupervisor ? 'Supervisor' : 'Technician');
 
   if (loading) {
     return (
@@ -289,61 +203,6 @@ export default function DashboardScreen() {
         />
       }
     >
-      {/* ── Executive Hero Card ─────────────────────────────────────────── */}
-      <View className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs">
-        <View className="flex-row flex-wrap items-center justify-between gap-2">
-          <View className="flex-row items-center gap-2">
-            <View
-              className={`h-2.5 w-2.5 rounded-full ${
-                isSupervisor ? 'bg-violet-500' : 'bg-emerald-500'
-              }`}
-            />
-            <Text
-              className={`text-[11px] font-black uppercase tracking-wider ${
-                isSupervisor ? 'text-violet-700' : 'text-emerald-700'
-              }`}
-            >
-              {isSupervisor ? 'QA Session Active · Verification' : 'Workshop Shift Active · Live'}
-            </Text>
-          </View>
-          <View className="rounded-full bg-slate-100 px-3 py-1">
-            <Text className="text-[11px] font-bold text-slate-600">{todayDateFormatted}</Text>
-          </View>
-        </View>
-
-        <View className="mt-3.5 flex-row items-center gap-3.5">
-          <View
-            className={`h-12 w-12 items-center justify-center rounded-2xl shadow-xs ${
-              isSupervisor ? 'bg-violet-600' : 'bg-blue-600'
-            }`}
-          >
-            <Text className="text-base font-black text-white">{initials(staffDisplayName)}</Text>
-          </View>
-          <View className="flex-1">
-            <Text className="text-lg font-black text-slate-900 tracking-tight" numberOfLines={1}>
-              {greeting()}, {staffDisplayName}
-            </Text>
-            <View className="mt-1 flex-row flex-wrap items-center gap-x-2 gap-y-1">
-              <View
-                className={`max-w-full shrink rounded-lg px-2 py-0.5 border ${
-                  isSupervisor
-                    ? 'bg-violet-50 border-violet-200'
-                    : 'bg-blue-50 border-blue-200'
-                }`}
-              >
-                <Text
-                  className={`text-[10px] font-black uppercase tracking-wider ${
-                    isSupervisor ? 'text-violet-700' : 'text-blue-700'
-                  }`}
-                >
-                  {isSupervisor ? 'Supervisor · QA Testing' : 'Technician · Workshop Repairs'}
-                </Text>
-              </View>
-              <Text className="text-xs text-slate-400">• Refurbnics Workshop</Text>
-            </View>
-          </View>
-        </View>
-      </View>
 
       {error && (
         <View className="rounded-2xl border border-red-200 bg-red-50 p-3.5">
@@ -377,7 +236,7 @@ export default function DashboardScreen() {
                     isSupervisor ? 'text-violet-800' : 'text-emerald-800'
                   }`}
                 >
-                  {isSupervisor ? 'Today Tested' : 'Repairs Today'}
+                  Total Batteries
                 </Text>
                 <View
                   className={`h-7 w-7 items-center justify-center rounded-lg ${
@@ -396,18 +255,20 @@ export default function DashboardScreen() {
                   isSupervisor ? 'text-violet-700' : 'text-emerald-700'
                 }`}
               >
-                {todayCount}
+                {isSupervisor
+                  ? tests.length + unserviceableIssues.length
+                  : repairs.length + unserviceableIssues.length}
               </Text>
               <Text
                 className={`mt-0.5 text-[10px] font-bold ${
                   isSupervisor ? 'text-violet-600' : 'text-emerald-600'
                 }`}
               >
-                {isSupervisor ? 'Tests signed off today' : 'Completed today'}
+                {`Total started work · ${todayCount} today`}
               </Text>
             </View>
 
-            {/* Pillar 2: Passed to Test / Queue */}
+            {/* Pillar 2: Verified Passed / QA */}
             <View
               className={`flex-1 rounded-2xl border p-3.5 ${
                 isSupervisor
@@ -421,7 +282,7 @@ export default function DashboardScreen() {
                     isSupervisor ? 'text-emerald-800' : 'text-blue-800'
                   }`}
                 >
-                  {isSupervisor ? 'Passed QA' : 'Passed to Test'}
+                  {isSupervisor ? 'Passed QA' : 'Verified Passed'}
                 </Text>
                 <View
                   className={`h-7 w-7 items-center justify-center rounded-lg ${
@@ -429,7 +290,7 @@ export default function DashboardScreen() {
                   }`}
                 >
                   <Icon
-                    name={isSupervisor ? 'checkCircle' : 'flask'}
+                    name={isSupervisor ? 'checkCircle' : 'checkCircle'}
                     color={isSupervisor ? '#059669' : '#2563eb'}
                     size={14}
                   />
@@ -440,133 +301,115 @@ export default function DashboardScreen() {
                   isSupervisor ? 'text-emerald-700' : 'text-blue-700'
                 }`}
               >
-                {isSupervisor ? passedTests.length : inTestingRepairs.length}
+                {isSupervisor ? passedTests.length : verifiedRepairs.length}
               </Text>
               <Text
                 className={`mt-0.5 text-[10px] font-bold ${
                   isSupervisor ? 'text-emerald-600' : 'text-blue-600'
                 }`}
               >
-                {isSupervisor ? 'Passed inspection' : 'In QA testing queue'}
+                {isSupervisor
+                  ? 'Passed inspection'
+                  : inTestingRepairs.length > 0
+                    ? `${inTestingRepairs.length} awaiting QA`
+                    : 'All QA verified'}
               </Text>
             </View>
           </View>
 
-          {/* Bottom Row: Unservice Marked & Parts Removed */}
+          {/* Bottom Row: Test Failed & Unservice Marked */}
           <View className="flex-row gap-2.5">
-            {/* Pillar 3: Unservice Marked / Passed Back */}
+            {/* Pillar 3: Test Failed / Passed Back */}
             <View
-              className={`flex-1 rounded-2xl border p-3.5 ${
-                isSupervisor
-                  ? 'border-amber-200 bg-amber-50/60'
-                  : 'border-rose-200 bg-rose-50/60'
-              }`}
+              className="flex-1 rounded-2xl border p-3.5 border-amber-200 bg-amber-50/60"
             >
               <View className="flex-row items-center justify-between">
                 <Text
-                  className={`text-[10px] font-extrabold uppercase tracking-wider ${
-                    isSupervisor ? 'text-amber-800' : 'text-rose-800'
-                  }`}
+                  className="text-[10px] font-extrabold uppercase tracking-wider text-amber-800"
                 >
-                  {isSupervisor ? 'Passed Back' : 'Unservice Marked'}
+                  {isSupervisor ? 'Passed Back' : 'Test Failed'}
                 </Text>
                 <View
-                  className={`h-7 w-7 items-center justify-center rounded-lg ${
-                    isSupervisor ? 'bg-amber-100' : 'bg-rose-100'
-                  }`}
+                  className="h-7 w-7 items-center justify-center rounded-lg bg-amber-100"
                 >
                   <Icon
-                    name={isSupervisor ? 'rotateCcw' : 'alertTriangle'}
-                    color={isSupervisor ? '#d97706' : '#e11d48'}
+                    name="rotateCcw"
+                    color="#d97706"
                     size={14}
                   />
                 </View>
               </View>
               <Text
-                className={`mt-1 text-2xl sm:text-3xl font-black ${
-                  isSupervisor ? 'text-amber-700' : 'text-rose-700'
-                }`}
+                className="mt-1 text-2xl sm:text-3xl font-black text-amber-700"
               >
-                {isSupervisor ? passedBackTests.length : unserviceableIssues.length}
+                {isSupervisor ? passedBackTests.length : partsRemovedRepairs.length}
               </Text>
               <Text
-                className={`mt-0.5 text-[10px] font-bold ${
-                  isSupervisor ? 'text-amber-600' : 'text-rose-600'
-                }`}
+                className="mt-0.5 text-[10px] font-bold text-amber-600"
               >
-                {isSupervisor ? 'Returned for rework' : 'Issues logged'}
+                {isSupervisor ? 'Returned for rework' : 'Unserviceable / restocked'}
               </Text>
             </View>
 
-            {/* Pillar 4: Parts Removed / Unserviceable */}
+            {/* Pillar 4: Unservice Marked */}
             <View
-              className={`flex-1 rounded-2xl border p-3.5 ${
-                isSupervisor
-                  ? 'border-rose-200 bg-rose-50/60'
-                  : 'border-amber-200 bg-amber-50/60'
-              }`}
+              className="flex-1 rounded-2xl border p-3.5 border-rose-200 bg-rose-50/60"
             >
               <View className="flex-row items-center justify-between">
                 <Text
-                  className={`text-[10px] font-extrabold uppercase tracking-wider ${
-                    isSupervisor ? 'text-rose-800' : 'text-amber-800'
-                  }`}
+                  className="text-[10px] font-extrabold uppercase tracking-wider text-rose-800"
                 >
-                  {isSupervisor ? 'Unserviceable' : 'Parts Removed'}
+                  {isSupervisor ? 'Unserviceable' : 'Unservice Marked'}
                 </Text>
                 <View
-                  className={`h-7 w-7 items-center justify-center rounded-lg ${
-                    isSupervisor ? 'bg-rose-100' : 'bg-amber-100'
-                  }`}
+                  className="h-7 w-7 items-center justify-center rounded-lg bg-rose-100"
                 >
                   <Icon
-                    name={isSupervisor ? 'alertTriangle' : 'rotateCcw'}
-                    color={isSupervisor ? '#e11d48' : '#d97706'}
+                    name="alertTriangle"
+                    color="#e11d48"
                     size={14}
                   />
                 </View>
               </View>
               <Text
-                className={`mt-1 text-2xl sm:text-3xl font-black ${
-                  isSupervisor ? 'text-rose-700' : 'text-amber-700'
-                }`}
+                className="mt-1 text-2xl sm:text-3xl font-black text-rose-700"
               >
-                {isSupervisor ? unserviceableIssues.length : partsRemovedRepairs.length}
+                {unserviceableIssues.length}
               </Text>
               <Text
-                className={`mt-0.5 text-[10px] font-bold ${
-                  isSupervisor ? 'text-rose-600' : 'text-amber-600'
-                }`}
+                className="mt-0.5 text-[10px] font-bold text-rose-600"
               >
-                {isSupervisor ? 'Marked failed tests' : 'Restocked to stock'}
+                {isSupervisor ? 'Marked failed tests' : 'Issues logged'}
               </Text>
             </View>
           </View>
         </View>
       </View>
 
-      {/* ── Secondary Performance Snapshot Bar ────────────────────────── */}
-      <View className="flex-row items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs">
-        <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">This Week</Text>
-          <Text className="text-sm font-black text-slate-800 mt-0.5">{weekCount} units</Text>
+      {/* ── Secondary Performance Snapshot (2x2 Grid with Proper Sizing) ── */}
+      <View className="rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs gap-3">
+        <View className="flex-row items-center justify-between">
+          <View className="flex-1 items-center border-r border-slate-100 pr-2">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">This Week</Text>
+            <Text className="text-sm font-black text-slate-800 mt-0.5">{weekCount} units</Text>
+          </View>
+          <View className="flex-1 items-center pl-2">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Lifetime</Text>
+            <Text className="text-sm font-black text-slate-800 mt-0.5">{completedJobs.length} done</Text>
+          </View>
         </View>
-        <View className="h-5 w-px bg-slate-200" />
-        <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Lifetime Completed</Text>
-          <Text className="text-sm font-black text-slate-800 mt-0.5">{completedJobs.length} done</Text>
-        </View>
-        <View className="h-5 w-px bg-slate-200" />
-        <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Avg Service Speed</Text>
-          <Text className="text-sm font-black text-slate-800 mt-0.5">
-            {avgDuration != null ? formatDuration(avgDuration) : '—'}
-          </Text>
-        </View>
-        <View className="h-5 w-px bg-slate-200" />
-        <View className="items-center flex-1">
-          <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Approval Rate</Text>
-          <Text className="text-sm font-black text-emerald-600 mt-0.5">{approvalRate}% pass</Text>
+        <View className="h-px bg-slate-100" />
+        <View className="flex-row items-center justify-between">
+          <View className="flex-1 items-center border-r border-slate-100 pr-2">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Avg Speed</Text>
+            <Text className="text-sm font-black text-slate-800 mt-0.5">
+              {avgDuration != null ? formatDuration(avgDuration) : '—'}
+            </Text>
+          </View>
+          <View className="flex-1 items-center pl-2">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">Approval Rate</Text>
+            <Text className="text-sm font-black text-emerald-600 mt-0.5">{approvalRate}% pass</Text>
+          </View>
         </View>
       </View>
 
@@ -668,297 +511,49 @@ export default function DashboardScreen() {
         )}
       </View>
 
-      {/* ── Workshop Activity Feed with Filter Tabs ─────────────────────── */}
-      <View>
-        <View className="mb-2.5 flex-row items-center justify-between gap-2">
-          <Text className="shrink text-[11px] font-extrabold uppercase tracking-wider text-slate-500">
-            Workshop Activity Details
-          </Text>
-          <TouchableOpacity
-            onPress={() => navigation.navigate('History')}
-            className="flex-row items-center gap-1"
-          >
-            <Text className="text-[11px] font-bold text-blue-600">
-              View Full Log ({completedJobs.length})
+      {/* ── Quick Workshop Navigation Shortcuts (Replaces duplicate activity list) ── */}
+      <View className="gap-2.5">
+        <TouchableOpacity
+          onPress={() => navigation.navigate('History')}
+          activeOpacity={0.7}
+          className="flex-row items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs"
+        >
+          <View className="flex-1 pr-3">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Complete Audit Logs
             </Text>
-            <Icon name="arrowRight" color="#2563eb" size={12} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Filter Tabs */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} className="mb-3">
-          <View className="flex-row gap-2">
-            <TouchableOpacity
-              onPress={() => setActiveTab('all')}
-              className={`rounded-xl px-3 py-1.5 ${
-                activeTab === 'all'
-                  ? 'bg-slate-900 shadow-xs'
-                  : 'bg-white border border-slate-200 shadow-none'
-              }`}
-            >
-              <Text
-                className={`text-[11px] font-bold ${
-                  activeTab === 'all' ? 'text-white' : 'text-slate-600'
-                }`}
-              >
-                All Activity
-              </Text>
-            </TouchableOpacity>
-
-            {!isSupervisor ? (
-              <>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('testing')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'testing'
-                      ? 'bg-blue-600 shadow-xs'
-                      : 'bg-white border border-blue-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'testing' ? 'text-white' : 'text-blue-700'
-                    }`}
-                  >
-                    In Testing ({inTestingRepairs.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setActiveTab('completed')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'completed'
-                      ? 'bg-emerald-600 shadow-xs'
-                      : 'bg-white border border-emerald-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'completed' ? 'text-white' : 'text-emerald-700'
-                    }`}
-                  >
-                    QA Verified ({verifiedRepairs.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setActiveTab('unserviceable')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'unserviceable'
-                      ? 'bg-rose-600 shadow-xs'
-                      : 'bg-white border border-rose-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'unserviceable' ? 'text-white' : 'text-rose-700'
-                    }`}
-                  >
-                    Unserviceable ({unserviceableIssues.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setActiveTab('removed')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'removed'
-                      ? 'bg-amber-600 shadow-xs'
-                      : 'bg-white border border-amber-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'removed' ? 'text-white' : 'text-amber-700'
-                    }`}
-                  >
-                    Parts Removed ({partsRemovedRepairs.length})
-                  </Text>
-                </TouchableOpacity>
-              </>
-            ) : (
-              <>
-                <TouchableOpacity
-                  onPress={() => setActiveTab('passed')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'passed'
-                      ? 'bg-emerald-600 shadow-xs'
-                      : 'bg-white border border-emerald-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'passed' ? 'text-white' : 'text-emerald-700'
-                    }`}
-                  >
-                    Passed ({passedTests.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setActiveTab('passed_back')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'passed_back'
-                      ? 'bg-amber-600 shadow-xs'
-                      : 'bg-white border border-amber-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'passed_back' ? 'text-white' : 'text-amber-700'
-                    }`}
-                  >
-                    Passed Back ({passedBackTests.length})
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  onPress={() => setActiveTab('unserviceable')}
-                  className={`rounded-xl px-3 py-1.5 ${
-                    activeTab === 'unserviceable'
-                      ? 'bg-rose-600 shadow-xs'
-                      : 'bg-white border border-rose-200 shadow-none'
-                  }`}
-                >
-                  <Text
-                    className={`text-[11px] font-bold ${
-                      activeTab === 'unserviceable' ? 'text-white' : 'text-rose-700'
-                    }`}
-                  >
-                    Unserviceable ({unserviceableIssues.length})
-                  </Text>
-                </TouchableOpacity>
-              </>
-            )}
-          </View>
-        </ScrollView>
-
-        {/* Activity List */}
-        {filteredFeed.length === 0 ? (
-          <View className="items-center rounded-3xl border border-slate-200/90 bg-white p-6 shadow-xs">
-            <View className="h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 mb-2.5">
-              <Icon name={isSupervisor ? 'flask' : 'wrench'} color="#64748b" size={22} />
-            </View>
-            <Text className="text-sm font-black text-slate-800">No entries in this view</Text>
-            <Text className="text-xs text-slate-400 text-center mt-1">
-              All workshop actions, completed jobs, and battery updates will appear here automatically.
+            <Text className="text-sm font-bold text-slate-900 mt-0.5">
+              Service History
+            </Text>
+            <Text className="text-xs text-slate-500 mt-0.5">
+              Review all {completedJobs.length} completed repairs, parts fitted, &amp; logs.
             </Text>
           </View>
-        ) : (
-          <View className="gap-2.5">
-            {filteredFeed.slice(0, 8).map((j, idx) => {
-              const isIssue = j.entryType === 'issue' || j.reason_label != null;
-              const isRemoved = j.entryType === 'removed' || isPartsRemoved(j);
-              const isTesting = j.entryType === 'testing' || j.battery_status === 'in_testing';
-
-              return (
-                <TouchableOpacity
-                  key={`${j.battery_code}-${j.id || idx}`}
-                  activeOpacity={0.7}
-                  onPress={() => navigation.navigate('BatteryDetail', { code: j.battery_code })}
-                  className="flex-row items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-3.5 shadow-xs"
-                >
-                  <View className="flex-row items-center gap-3 min-w-0 flex-1 pr-2">
-                    {/* Status Icon Indicator */}
-                    <View
-                      className={`h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                        isIssue
-                          ? 'bg-rose-50'
-                          : isRemoved
-                            ? 'bg-amber-50'
-                            : isTesting
-                              ? 'bg-blue-50'
-                              : 'bg-emerald-50'
-                      }`}
-                    >
-                      <Icon
-                        name={
-                          isIssue
-                            ? 'alertTriangle'
-                            : isRemoved
-                              ? 'rotateCcw'
-                              : isTesting
-                                ? 'zap'
-                                : 'checkCircle'
-                        }
-                        color={
-                          isIssue
-                            ? '#e11d48'
-                            : isRemoved
-                              ? '#d97706'
-                              : isTesting
-                                ? '#2563eb'
-                                : '#059669'
-                        }
-                        size={18}
-                      />
-                    </View>
-
-                    <View className="min-w-0 flex-1">
-                      <View className="mb-1 flex-row items-center gap-2">
-                        <Text className="font-mono text-sm font-black text-slate-900">
-                          {j.battery_code}
-                        </Text>
-
-                        {isIssue ? (
-                          <View className="rounded-full bg-rose-100 px-2 py-0.5">
-                            <Text className="text-[9px] font-black uppercase tracking-wider text-rose-800">
-                              Unserviceable
-                            </Text>
-                          </View>
-                        ) : isRemoved ? (
-                          <View className="rounded-full bg-amber-100 px-2 py-0.5">
-                            <Text className="text-[9px] font-black uppercase tracking-wider text-amber-800">
-                              Parts Removed
-                            </Text>
-                          </View>
-                        ) : isTesting ? (
-                          <View className="rounded-full bg-blue-100 px-2 py-0.5">
-                            <Text className="text-[9px] font-black uppercase tracking-wider text-blue-800">
-                              Passed to Testing
-                            </Text>
-                          </View>
-                        ) : (
-                          <StatusBadge status={repairBadgeStatus(j)} />
-                        )}
-
-                        <Text className="text-[10px] font-medium text-slate-400 ml-auto">
-                          {timeAgo(j.date || j.doneAt || j.repaired_at || j.reported_at)}
-                        </Text>
-                      </View>
-
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-xs font-medium text-slate-600 flex-1" numberOfLines={1}>
-                          {isIssue
-                            ? `Reported: ${j.reason_label || j.note || 'Can not service unit'}`
-                            : isRemoved
-                              ? `Parts restocked: ${j.part_name || 'Fitted parts returned'}`
-                              : isSupervisor
-                                ? j.passed_back
-                                  ? 'Returned to technician for rework'
-                                  : `QA Tested: ${j.service_name || 'Inspection passed'}`
-                                : j.part_name
-                                  ? `Fitted: ${j.part_name}`
-                                  : 'Completed service inspection'}
-                        </Text>
-                        {typeof (j.duration || j.duration_seconds) === 'number' &&
-                          (j.duration || j.duration_seconds) > 0 && (
-                            <View className="ml-2 flex-row items-center gap-1 rounded bg-slate-100 px-1.5 py-0.5">
-                              <Icon name="clock" color="#64748b" size={10} />
-                              <Text className="text-[9px] font-black text-slate-600">
-                                {formatDuration(j.duration || j.duration_seconds)}
-                              </Text>
-                            </View>
-                          )}
-                      </View>
-                    </View>
-                  </View>
-
-                  <Icon name="arrowRight" color="#94a3b8" size={14} />
-                </TouchableOpacity>
-              );
-            })}
+          <View className="h-9 w-9 items-center justify-center rounded-xl bg-slate-100">
+            <Icon name="arrowRight" color="#059669" size={16} />
           </View>
-        )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => navigation.navigate('Service')}
+          activeOpacity={0.7}
+          className="flex-row items-center justify-between rounded-2xl border border-slate-200/90 bg-white p-4 shadow-xs"
+        >
+          <View className="flex-1 pr-3">
+            <Text className="text-[10px] font-extrabold uppercase tracking-wider text-slate-400">
+              Station Ready
+            </Text>
+            <Text className="text-sm font-bold text-slate-900 mt-0.5">
+              Scan Next Battery
+            </Text>
+            <Text className="text-xs text-slate-500 mt-0.5">
+              Start new diagnosis, repair, or quality test with camera/RFID.
+            </Text>
+          </View>
+          <View className="h-9 w-9 items-center justify-center rounded-xl bg-emerald-50">
+            <Icon name="camera" color="#059669" size={16} />
+          </View>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );

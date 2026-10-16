@@ -225,23 +225,23 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
           <TextInput value={driverName} onChangeText={(t) => setDriverName(capitalizeFirst(t))} placeholder="e.g. George Davies" placeholderTextColor="#94a3b8" className={inputClass} />
         </View>
 
-        <View className="rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
+        <View className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-bold text-slate-900 dark:text-white">Scan Batteries (returning)</Text>
+            <Text className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Scan Batteries (returning)</Text>
             <Badge tone="info">{items.length} scanned</Badge>
           </View>
           <Text className="mt-1 text-[11px] text-slate-500">
             For batteries being packed or intaked for repair. Scan with the RFID reader or camera, type a code — or select from your registered battery list.
           </Text>
           {!ready && (
-            <View className="mt-2 flex-row items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2.5">
-              <Icon name="alertTriangle" color="#b45309" size={14} />
-              <Text className="flex-1 text-[11px] font-semibold text-amber-800">
+            <View className="mt-2 flex-row items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-2">
+              <Icon name="alertTriangle" color="#b45309" size={13} />
+              <Text className="flex-1 text-[10.5px] font-semibold text-amber-800">
                 Please enter Truck Number &amp; Driver Name above first to type battery number, scan, or pick from sort.
               </Text>
             </View>
           )}
-          <View className="mt-3">
+          <View className="mt-2.5">
             <ScanBatteryInput
               onSubmit={scanAdd}
               disabled={!ready}
@@ -251,27 +251,27 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
           <TouchableOpacity
             disabled={!ready}
             onPress={openPickFromSort}
-            className={`mt-2 items-center rounded-xl border border-violet-300 bg-violet-50 py-2.5 ${!ready ? 'opacity-50' : ''}`}
+            className={`mt-2 items-center rounded-xl border border-violet-300 bg-violet-50 py-2 ${!ready ? 'opacity-50' : ''}`}
           >
             <Text className="text-xs font-bold text-violet-700">Pick from Sort</Text>
           </TouchableOpacity>
 
           {ready && (
             showSuggestions ? (
-              <View className="mt-3 rounded-xl border border-slate-200 dark:border-slate-800">
-                <View className="flex-row items-center justify-between border-b border-slate-200 px-3 py-2 dark:border-slate-800">
+              <View className="mt-2.5 rounded-xl border border-slate-200 dark:border-slate-800">
+                <View className="flex-row items-center justify-between border-b border-slate-200 px-2.5 py-1.5 dark:border-slate-800">
                   <Text className="text-[11px] font-bold text-slate-600 dark:text-slate-300">Available Registered Batteries ({suggestions.length})</Text>
                   <TouchableOpacity onPress={() => setShowSuggestions(false)} hitSlop={8}>
                     <Text className="text-[11px] font-bold text-slate-500">Hide</Text>
                   </TouchableOpacity>
                 </View>
                 {suggestions.length === 0 ? (
-                  <Text className="p-3 text-center text-[11px] text-slate-400">No eligible batteries found in your returned fleet.</Text>
+                  <Text className="p-2.5 text-center text-[11px] text-slate-400">No eligible batteries found in your returned fleet.</Text>
                 ) : (
                   suggestions.map((b) => (
-                    <TouchableOpacity key={b.id || b.battery_code} onPress={() => pickSuggestion(b)} className="flex-row items-center justify-between border-b border-slate-100 px-3 py-2.5 dark:border-slate-800">
-                      <View className="flex-1 flex-row items-center gap-2">
-                        <Icon name="battery" color="#64748b" size={14} />
+                    <TouchableOpacity key={b.id || b.battery_code} onPress={() => pickSuggestion(b)} className="flex-row items-center justify-between border-b border-slate-100 px-2.5 py-2 dark:border-slate-800">
+                      <View className="flex-1 flex-row items-center gap-1.5">
+                        <Icon name="battery" color="#64748b" size={13} />
                         <Text className="text-xs font-bold text-slate-800 dark:text-slate-100">{b.battery_code}</Text>
                       </View>
                       <Text className="mr-2 text-[10px] capitalize text-slate-400">{b.status ? statusLabel(b.status) : 'Ready'}</Text>
@@ -288,18 +288,18 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
           )}
         </View>
 
-        <View className="rounded-2xl border border-slate-200 bg-white p-3.5 dark:border-slate-800 dark:bg-slate-900">
+        <View className="rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
           <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-bold text-slate-900 dark:text-white">Added Batteries</Text>
+            <Text className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">Added Batteries</Text>
             <Badge tone="good">{items.length} added</Badge>
           </View>
           {items.length === 0 ? (
-            <Text className="mt-3 rounded-xl border border-dashed border-slate-300 p-4 text-center text-[11px] text-slate-400">
+            <Text className="mt-2.5 rounded-xl border border-dashed border-slate-300 p-3 text-center text-[11px] text-slate-400">
               Batteries you add above will appear here.
             </Text>
           ) : (
             items.map((b, idx) => (
-              <View key={b.id} className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2.5 dark:border-slate-800 dark:bg-slate-950">
+              <View key={b.id} className="mt-2 rounded-xl border border-slate-200 bg-slate-50 p-2 dark:border-slate-800 dark:bg-slate-950">
                 <View className="flex-row items-center justify-between">
                   <Text className="text-xs font-bold text-slate-900 dark:text-white">
                     <Text className="text-slate-400">{idx + 1}. </Text>
@@ -314,7 +314,7 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
                   onChangeText={(t) => setItems((prev) => prev.map((x) => (x.id === b.id ? { ...x, issue: t } : x)))}
                   placeholder="Defect reason / notes (optional)"
                   placeholderTextColor="#94a3b8"
-                  className="mt-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
+                  className="mt-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-white"
                 />
               </View>
             ))
@@ -344,14 +344,14 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
                   </Text>
                 </View>
               ) : (
-                <View className="max-h-80 gap-2">
+                <View className="max-h-80 gap-1.5">
                   {availableGroups.map((g) => {
                     const rem = (g.batteries || []).filter((c) => !isAlreadyPacked(c));
                     return (
-                      <TouchableOpacity key={g.id} onPress={() => reviewGroup(g)} className="flex-row items-center justify-between rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                      <TouchableOpacity key={g.id} onPress={() => reviewGroup(g)} className="flex-row items-center justify-between rounded-xl border border-slate-200 p-2.5 dark:border-slate-700">
                         <View className="flex-1">
-                          <Text className="text-sm font-bold text-slate-900 dark:text-white">{g.name}</Text>
-                          <Text className="text-[11px] text-slate-500">
+                          <Text className="text-xs sm:text-sm font-bold text-slate-900 dark:text-white">{g.name}</Text>
+                          <Text className="text-[10.5px] text-slate-500">
                             {rem.length} {rem.length === 1 ? 'battery' : 'batteries'} available
                             {rem.length < (g.batteries || []).length ? ` (${(g.batteries || []).length - rem.length} already packed)` : ''}
                           </Text>
@@ -362,10 +362,10 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
                   })}
                 </View>
               )}
-              <Btn label="Close" tone="ghost" onPress={() => setPickOpen(false)} className="mt-4" />
+              <Btn label="Close" tone="ghost" onPress={() => setPickOpen(false)} className="mt-3" />
             </View>
           ) : (
-            <View className="mt-3">
+            <View className="mt-2.5">
               <View className="flex-row items-center justify-between">
                 <Text className="text-xs font-semibold text-slate-600">{pickSelected.size} of {pickAvailable.length} selected</Text>
                 <View className="flex-row gap-3">
@@ -395,7 +395,7 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
                           else next.add(code);
                           return next;
                         })}
-                        className={`mb-1.5 flex-row items-center justify-between gap-2 rounded-xl border px-3 py-2 ${checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}
+                        className={`mb-1.5 flex-row items-center justify-between gap-2 rounded-xl border px-2.5 py-1.5 ${checked ? 'border-emerald-300 bg-emerald-50' : 'border-slate-200 bg-white'}`}
                       >
                         <View className="flex-row items-center gap-2">
                           <View className={`h-4 w-4 items-center justify-center rounded border ${checked ? 'border-emerald-600 bg-emerald-600' : 'border-slate-400'}`}>
@@ -413,7 +413,7 @@ export default function AddIntakeModal({ visible, fleet = [], onClose, onRecorde
                   })}
                 </View>
               )}
-              <View className="mt-4 flex-row gap-2">
+              <View className="mt-3.5 flex-row gap-2">
                 <Btn label="← Back to Groups" tone="ghost" onPress={() => { setPickStep('groups'); setPickGroup(null); }} className="flex-1" />
                 <Btn label={`Add ${pickSelected.size > 0 ? `${pickSelected.size} ` : ''}to Intake`} onPress={confirmPick} disabled={pickSelected.size === 0} className="flex-1" />
               </View>

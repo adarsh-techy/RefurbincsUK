@@ -85,32 +85,43 @@ function UkClock({ className = '', compact = false, isAccentHeader = false }) {
 
   return (
     <div
-      className={`shrink-0 whitespace-nowrap text-right leading-tight select-none ${className || 'hidden sm:block'}`}
+      className={`shrink-0 whitespace-nowrap inline-flex items-center gap-2 select-none ${className || 'hidden sm:inline-flex'}`}
       title={syncTitle}
     >
-      <div className="flex items-center justify-end gap-1.5">
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            status.isSynced ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-400'
-          }`}
-          title={status.isSynced ? `Synced with ${status.syncSource}` : 'Syncing…'}
-        />
-        <p className={`text-sm font-bold tabular-nums tracking-tight ${
-          isAccentHeader ? 'text-white' : 'text-emerald-700 dark:text-emerald-400'
-        }`}>
-          {formattedTime}{' '}
-          <span className={`text-[11px] font-semibold ${
-            isAccentHeader ? 'text-white/80' : 'text-emerald-600/80 dark:text-emerald-500/80'
-          }`}>
-            UK
-          </span>
-        </p>
-      </div>
-      <p className={`text-[11px] font-medium mt-0.5 ${
-        isAccentHeader ? 'text-white/70' : 'text-slate-500 dark:text-neutral-400'
-      }`}>
+      <span
+        className={`h-2 w-2 rounded-full shrink-0 ${
+          status.isSynced ? 'bg-emerald-500 animate-pulse' : 'bg-emerald-400'
+        }`}
+        title={status.isSynced ? `Synced with ${status.syncSource}` : 'Syncing…'}
+      />
+      <span
+        className={`text-xs font-semibold ${
+          isAccentHeader ? 'text-white/80' : 'text-slate-600 dark:text-neutral-300'
+        }`}
+      >
         {formattedDate}
-      </p>
+      </span>
+      <span
+        className={`text-xs ${
+          isAccentHeader ? 'text-white/40' : 'text-slate-300 dark:text-neutral-600'
+        }`}
+      >
+        •
+      </span>
+      <span
+        className={`text-xs font-bold tabular-nums tracking-tight ${
+          isAccentHeader ? 'text-white' : 'text-emerald-700 dark:text-emerald-400'
+        }`}
+      >
+        {formattedTime}{' '}
+        <span
+          className={`text-[10px] font-semibold ${
+            isAccentHeader ? 'text-white/80' : 'text-emerald-600/80 dark:text-emerald-500/80'
+          }`}
+        >
+          UK
+        </span>
+      </span>
     </div>
   );
 }

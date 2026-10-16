@@ -187,7 +187,7 @@ function ClientMilestoneDetailPage() {
   const materialBreakdown = calculateMaterialBreakdown(breakdownCount);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="w-full max-w-full overflow-x-hidden space-y-4 sm:space-y-5 pb-12">
       {/* 1. Breadcrumbs & Top Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <Link

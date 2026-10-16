@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { FiDownload, FiArrowRight, FiInfo, FiUploadCloud, FiSearch, FiX } from 'react-icons/fi';
 import apiClient from '../../../services/api-client';
 import { clearTagCache, normalizeRfidTag } from '../../../utils/scan-input';
 import PageHeader from '../../../components/ui/primitives/PageHeader';
@@ -21,6 +22,7 @@ const STATUS_META = {
   unchanged: { label: '✓ Already has this tag', done: '✓ Already has this tag', cls: 'bg-slate-100 text-slate-600 border-slate-200 dark:bg-surface-800 dark:text-neutral-300 dark:border-white/10' },
   created: { label: '✓ New battery — will be registered', done: '✓ Registered + tag assigned', cls: 'bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/40 dark:text-violet-300 dark:border-violet-800/50' },
   not_found: { label: '✕ Battery number not found', done: '✕ Skipped — battery not found', cls: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/50' },
+  already_tagged: { label: '✕ Battery already has a tag', done: '✕ Skipped — battery already has a tag', cls: 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/40 dark:text-rose-300 dark:border-rose-800/50' },
   tag_in_use: { label: '✕ Tag belongs to another battery', done: '✕ Skipped — tag belongs to another battery', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50' },
   duplicate_in_sheet: { label: '✕ Repeated in this file', done: '✕ Skipped — repeated in this file', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50' },
   client_mismatch: { label: '✕ Client name does not match', done: '✕ Skipped — client name does not match', cls: 'bg-amber-50 text-amber-800 border-amber-200 dark:bg-amber-950/40 dark:text-amber-300 dark:border-amber-800/50' },
@@ -35,7 +37,7 @@ const FILTERS = [
   { id: 'all', label: 'All rows' },
   { id: 'ok', label: 'Matched ✓', test: (r) => ['assigned', 'replaced', 'unchanged', 'created'].includes(r.status) },
   { id: 'not_found', label: 'Battery not found ✕', test: (r) => r.status === 'not_found' },
-  { id: 'problem', label: 'Other problems ✕', test: (r) => ['tag_in_use', 'duplicate_in_sheet', 'client_mismatch', 'error'].includes(r.status) },
+  { id: 'problem', label: 'Other problems ✕', test: (r) => ['already_tagged', 'tag_in_use', 'duplicate_in_sheet', 'client_mismatch', 'error'].includes(r.status) },
 ];
 
 // .xlsx template from the API (Battery Number, RFID Tag, Client Name + a
@@ -64,8 +66,13 @@ function RfidAssignmentPage() {
   const [shown, setShown] = useState(PAGE_SIZE);
   const [assignedVersion, setAssignedVersion] = useState(0); // bump → assigned table reloads
   const [createMissing, setCreateMissing] = useState(false); // also register numbers that don't exist yet
+  const [showGuide, setShowGuide] = useState(false);
+  // desktop table and phone cards each scroll on their own, with their own
+  // "load more" marker — shared refs end up on the hidden layout
   const sentinelRef = useRef(null);
   const scrollRef = useRef(null);
+  const mobileSentinelRef = useRef(null);
+  const mobileScrollRef = useRef(null);
 
   useEffect(() => {
     apiClient.get('/clients')
@@ -154,22 +161,28 @@ function RfidAssignmentPage() {
   useEffect(() => {
     setShown(PAGE_SIZE);
     if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    if (mobileScrollRef.current) mobileScrollRef.current.scrollTop = 0;
   }, [rows, filter, search, clientFilter]);
 
   // Lazy load: when the sentinel row at the bottom of the scroll box becomes
   // visible, reveal the next PAGE_SIZE rows
   useEffect(() => {
-    const el = sentinelRef.current;
-    const root = scrollRef.current;
-    if (!el || !root || !hasMore) return undefined;
-    const io = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((e) => e.isIntersecting)) setShown((n) => Math.min(n + PAGE_SIZE, visible.length));
-      },
-      { root, rootMargin: '80px' }
-    );
-    io.observe(el);
-    return () => io.disconnect();
+    if (!hasMore) return undefined;
+    const reveal = (entries) => {
+      if (entries.some((e) => e.isIntersecting)) setShown((n) => Math.min(n + PAGE_SIZE, visible.length));
+    };
+    // one observer per layout; only the visible one ever fires
+    const observers = [
+      [sentinelRef.current, scrollRef.current],
+      [mobileSentinelRef.current, mobileScrollRef.current],
+    ]
+      .filter(([el, root]) => el && root)
+      .map(([el, root]) => {
+        const io = new IntersectionObserver(reveal, { root, rootMargin: '80px' });
+        io.observe(el);
+        return io;
+      });
+    return () => observers.forEach((io) => io.disconnect());
   }, [hasMore, visible.length, pageRows.length]);
 
   function exportResults() {
@@ -187,134 +200,205 @@ function RfidAssignmentPage() {
   }
 
   return (
-    <div className="space-y-5">
-      <PageHeader
-        title="RFID Assignment"
-        description="Upload a sheet of battery numbers and RFID tags. Each battery number is matched to a battery created on the Generate QR Code page and its tag is assigned."
-        titleClassName="text-2xl font-bold tracking-tight text-violet-700 dark:text-violet-300"
-      >
-        <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={downloadTemplate}>Download template (.xlsx)</Button>
-          <Link to="/batteries-qr-code" className="rounded-md border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700">
-            Generate QR Codes →
-          </Link>
+    <div className="space-y-2.5 sm:space-y-3.5 pb-12 w-full max-w-full">
+      {/* ── Executive Page Header ─────────────────────────────────────── */}
+      <div className="flex items-center justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-sm sm:text-lg font-black tracking-tight text-slate-900 dark:text-white truncate">
+              RFID Fleet Assignment
+            </h1>
+            <span className="rounded-full bg-violet-100 dark:bg-violet-950/60 px-1.5 py-0.2 text-[8.5px] sm:text-[9.5px] font-bold text-violet-700 dark:text-violet-300">
+              Bulk Sync
+            </span>
+          </div>
+          <p className="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 truncate">
+            Batch assign RFID tags via spreadsheet or register individual asset tags
+          </p>
         </div>
-      </PageHeader>
 
-      {/* Upload */}
-      <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-surface-900">
-        <div className="grid gap-4 md:grid-cols-[1fr_auto] md:items-center">
-          <div>
-            <p className="text-sm font-semibold text-slate-900 dark:text-white">1. Pick the client, then upload the sheet</p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-              .xlsx or .csv with columns <span className="font-mono font-semibold">Battery Number</span>, <span className="font-mono font-semibold">RFID Tag</span> and{' '}
-              <span className="font-mono font-semibold">Client Name</span> (header row required). The client you pick here is used for every row; a row with its own Client Name must match the battery's client. Tags are stored as upper-case letters and digits; colons and spaces are ignored. Up to 5,000 rows.
-            </p>
-            {file && (
-              <p className="mt-2 text-xs font-medium text-slate-700 dark:text-neutral-200">
-                Selected: <span className="font-mono">{file.name}</span> ({Math.round(file.size / 1024)} KB)
-              </p>
-            )}
+        <Link
+          to="/batteries-qr-code"
+          className="inline-flex h-7 items-center gap-1 shrink-0 rounded-lg border border-violet-200 bg-violet-50 px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/40 dark:bg-violet-950/40 dark:text-violet-300"
+        >
+          <span>QR Codes</span>
+          <FiArrowRight className="h-3 w-3" />
+        </Link>
+      </div>
+
+      {/* ── 1. Compact Bulk Upload Bar ─────────────────────────────────────── */}
+      <div className="rounded-xl border border-slate-200/90 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <span className="flex h-4.5 w-4.5 items-center justify-center rounded-md bg-violet-100 text-[9.5px] font-black text-violet-700 dark:bg-violet-950/60 dark:text-violet-300">
+              1
+            </span>
+            <span className="text-[11.5px] sm:text-xs font-extrabold text-slate-900 dark:text-white truncate">
+              Upload Assignment Spreadsheet
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <select
-              value={uploadClient}
-              onChange={(e) => { setUploadClient(e.target.value); setError(null); }}
-              disabled={stage === 'previewing' || stage === 'assigning'}
-              className={`rounded-md border px-3 py-2 text-sm text-slate-900 focus:border-violet-500 focus:outline-none dark:bg-surface-800 dark:text-neutral-100 ${uploadClient ? 'border-slate-300 dark:border-surface-600' : 'border-violet-400 ring-2 ring-violet-500/20'}`}
+          <div className="flex items-center gap-2 shrink-0 text-[10px]">
+            <button
+              type="button"
+              onClick={downloadTemplate}
+              className="inline-flex items-center gap-0.5 font-bold text-slate-600 dark:text-neutral-300 hover:text-slate-900 hover:underline cursor-pointer"
             >
-              <option value="">Select client *</option>
-              {clients.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
-            <input
-              ref={inputRef}
-              type="file"
-              accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0])}
-            />
-            <Button variant="darkViolet" onClick={() => inputRef.current?.click()} disabled={!uploadClient || stage === 'previewing' || stage === 'assigning'} title={uploadClient ? '' : 'Select the client first'}>
-              {stage === 'previewing' ? 'Reading sheet…' : file ? 'Choose another file' : 'Choose file'}
-            </Button>
-            {file && <Button variant="ghost" onClick={reset}>Clear</Button>}
+              <FiDownload className="h-3 w-3" />
+              <span>Template</span>
+            </button>
+            <span className="text-slate-300 dark:text-white/20">•</span>
+            <button
+              type="button"
+              onClick={() => setShowGuide((v) => !v)}
+              className="font-bold text-violet-600 dark:text-violet-400 hover:underline cursor-pointer"
+            >
+              {showGuide ? 'Hide Guide' : 'Format Guide'}
+            </button>
           </div>
         </div>
+
+        {showGuide && (
+          <div className="mt-2 rounded-lg bg-slate-50 dark:bg-surface-800/60 p-2 text-[10px] sm:text-[10.5px] text-slate-600 dark:text-neutral-300 space-y-0.5">
+            <p>• Required columns: <span className="font-mono font-bold text-slate-800 dark:text-neutral-100">Battery Number</span>, <span className="font-mono font-bold text-slate-800 dark:text-neutral-100">RFID Tag</span>, and optional <span className="font-mono font-bold text-slate-800 dark:text-neutral-100">Client Name</span>.</p>
+            <p>• Tags are automatically cleaned and stored in uppercase; colons, dashes, and whitespace are ignored.</p>
+          </div>
+        )}
+
+        {/* Upload action controls row */}
+        <div className="mt-2 flex items-center gap-1.5 w-full">
+          <select
+            value={uploadClient}
+            onChange={(e) => { setUploadClient(e.target.value); setError(null); }}
+            disabled={stage === 'previewing' || stage === 'assigning'}
+            className="h-8 flex-1 rounded-lg border border-slate-300 bg-white px-2.5 text-[11px] font-semibold text-slate-800 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 cursor-pointer truncate"
+          >
+            <option value="">Select Fleet Client *</option>
+            {clients.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".xlsx,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,text/csv"
+            className="hidden"
+            onChange={(e) => handleFile(e.target.files?.[0])}
+          />
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={!uploadClient || stage === 'previewing' || stage === 'assigning'}
+            title={uploadClient ? '' : 'Select the client first'}
+            className="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 px-3 text-[11px] font-bold text-white shadow-xs active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+          >
+            <FiUploadCloud className="h-3.5 w-3.5" />
+            <span>{stage === 'previewing' ? 'Reading…' : file ? 'Change File' : 'Choose File'}</span>
+          </button>
+          {file && (
+            <button
+              type="button"
+              onClick={reset}
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2 text-[10.5px] font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-300 cursor-pointer"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+
+        {file && (
+          <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg bg-violet-50 dark:bg-violet-950/40 px-2 py-0.5 text-[10px] font-bold text-violet-700 dark:text-violet-300 border border-violet-200/60 dark:border-violet-800/40">
+            <span>📄 {file.name}</span>
+            <span className="opacity-60">({Math.round(file.size / 1024)} KB)</span>
+          </div>
+        )}
+
         {error && (
-          <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-300">
-            {error}
+          <div className="mt-2 rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1.5 text-[10.5px] font-bold text-rose-700 dark:border-rose-800/50 dark:bg-rose-950/40 dark:text-rose-300">
+            ✕ {error}
           </div>
         )}
       </div>
 
       {result && (
         <>
-          {/* Summary + action */}
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 dark:border-white/10 dark:bg-surface-900">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          {/* ── 2. Dry Run Verification Summary ───────────────────────── */}
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4.5 dark:border-white/10 dark:bg-surface-900 shadow-2xs">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
               <div>
-                <p className="text-sm font-semibold text-slate-900 dark:text-white">
+                <p className="text-xs sm:text-sm font-extrabold text-slate-900 dark:text-white">
                   {committed ? '3. Done — tags saved' : '2. Check the table below, then press Assign'}
-                  <span className="ml-2 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[11px] font-bold text-violet-700 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">Client: {uploadClient}</span>
+                  <span className="ml-2 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.2 text-[10px] font-bold text-violet-700 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-300">Client: {uploadClient}</span>
                 </p>
                 {!committed && (
-                  <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
+                  <p className="mt-1 text-[11px] text-slate-500 dark:text-neutral-400">
                     Nothing has been saved yet. Rows marked ✓ will get their tag when you press <b>Assign</b>; rows marked ✕ are skipped and the reason is shown in the last column.
                   </p>
                 )}
-                <div className="mt-2 flex flex-wrap gap-2 text-xs">
+                <div className="mt-2 flex flex-wrap gap-1.5 text-xs">
                   <Stat label="rows in file" value={rows.length} />
                   <Stat label={committed ? 'tags assigned' : 'ready to assign'} value={matched} tone="emerald" />
                   {(summary.unchanged || 0) > 0 && <Stat label="already had this tag" value={summary.unchanged} />}
                   {(summary.created || 0) > 0 && <Stat label="new batteries registered" value={summary.created} tone="violet" />}
                   {(summary.not_found || 0) - willCreate > 0 && <Stat label="battery not found" value={summary.not_found - willCreate} tone="rose" />}
+                  {(summary.already_tagged || 0) > 0 && <Stat label="battery already has a tag" value={summary.already_tagged} tone="rose" />}
                   {(summary.tag_in_use || 0) > 0 && <Stat label="tag belongs to another battery" value={summary.tag_in_use} tone="amber" />}
                   {(summary.duplicate_in_sheet || 0) > 0 && <Stat label="repeated in file" value={summary.duplicate_in_sheet} tone="amber" />}
                   {(summary.client_mismatch || 0) > 0 && <Stat label="client name mismatch" value={summary.client_mismatch} tone="amber" />}
                   {(summary.error || 0) > 0 && <Stat label="incomplete rows" value={summary.error} tone="rose" />}
                 </div>
                 {!committed && creatable.length > 0 && (
-                  <label className="mt-3 flex cursor-pointer items-start gap-2.5 rounded-xl border border-violet-200 bg-violet-50 px-3 py-2.5 text-xs text-violet-900 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-200">
+                  <label className="mt-2.5 flex cursor-pointer items-start gap-2 rounded-xl border border-violet-200 bg-violet-50 p-2.5 text-[11px] text-violet-900 dark:border-violet-800/50 dark:bg-violet-950/40 dark:text-violet-200">
                     <input
                       type="checkbox"
                       checked={createMissing}
                       onChange={(e) => setCreateMissing(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 accent-violet-600"
+                      className="mt-0.5 h-3.5 w-3.5 accent-violet-600"
                     />
                     <span>
                       <b>Also register {creatable.length} new batter{creatable.length === 1 ? 'y' : 'ies'} for {uploadClient}</b>{' '}
                       ({creatable[0].batteryCode}{creatable.length > 1 ? ` … ${creatable[creatable.length - 1].batteryCode}` : ''}) and assign their tags.
-                      These numbers are in the sheet but not in the system yet — same as generating them on the QR page. Leave unticked to skip them.
+                      These numbers are in the sheet but not in the system yet. Leave unticked to skip them.
                     </span>
                   </label>
                 )}
-                {!committed && (summary.not_found || 0) - creatable.length > 0 && (
-                  <p className="mt-2 text-xs text-rose-700 dark:text-rose-300">
-                    {summary.not_found - creatable.length} battery number{summary.not_found - creatable.length === 1 ? '' : 's'} can't be matched or registered (wrong prefix or unknown client) — see the Why column. Those rows will be skipped.
-                  </p>
-                )}
                 {committed && (
-                  <p className="mt-2 text-xs font-medium text-emerald-700 dark:text-emerald-300">
-                    {result.written} tag{result.written === 1 ? '' : 's'} saved{result.created ? `, including ${result.created} newly registered batter${result.created === 1 ? 'y' : 'ies'}` : ''}. Scanning any of these tags now opens the battery just like its QR code.
+                  <p className="mt-2 text-xs font-bold text-emerald-700 dark:text-emerald-300">
+                    ✓ {result.written} tag{result.written === 1 ? '' : 's'} saved{result.created ? `, including ${result.created} newly registered batter${result.created === 1 ? 'y' : 'ies'}` : ''}. Scanning any of these tags now opens the battery just like its QR code.
                   </p>
                 )}
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="secondary" onClick={exportResults}>Export results (.csv)</Button>
+                <button
+                  type="button"
+                  onClick={exportResults}
+                  className="inline-flex h-8 sm:h-8.5 items-center justify-center rounded-xl border border-slate-200 bg-white px-3 text-[11px] sm:text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 cursor-pointer"
+                >
+                  Export results (.csv)
+                </button>
                 {!committed ? (
-                  <Button variant="primary" onClick={handleAssign} disabled={matched === 0 || stage === 'assigning'}>
+                  <button
+                    type="button"
+                    onClick={handleAssign}
+                    disabled={matched === 0 || stage === 'assigning'}
+                    className="inline-flex h-8 sm:h-8.5 items-center justify-center rounded-xl bg-emerald-600 px-3.5 text-[11px] sm:text-xs font-black text-white shadow-xs hover:bg-emerald-700 active:scale-95 disabled:opacity-50 transition-all cursor-pointer"
+                  >
                     {stage === 'assigning' ? 'Assigning…' : `Assign ${matched} tag${matched === 1 ? '' : 's'}`}
-                  </Button>
+                  </button>
                 ) : (
-                  <Button variant="darkViolet" onClick={reset}>Upload another sheet</Button>
+                  <button
+                    type="button"
+                    onClick={reset}
+                    className="inline-flex h-8 sm:h-8.5 items-center justify-center rounded-xl bg-violet-700 px-3.5 text-[11px] sm:text-xs font-black text-white shadow-xs hover:bg-violet-800 cursor-pointer"
+                  >
+                    Upload another sheet
+                  </button>
                 )}
               </div>
             </div>
           </div>
 
-          {/* Table */}
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900">
-            <div className="flex flex-col gap-3 border-b border-slate-200 p-4 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
-              <div className="flex flex-wrap gap-1.5">
+          {/* ── Table & Responsive Stream ─────────────────────────────── */}
+          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-white/10 dark:bg-surface-900 shadow-2xs">
+            <div className="flex flex-col gap-2.5 border-b border-slate-200 p-3 sm:flex-row sm:items-center sm:justify-between dark:border-white/10">
+              <div className="flex items-center gap-1 overflow-x-auto pb-0.5 no-scrollbar">
                 {FILTERS.map((f) => {
                   const count = f.test ? rows.filter(f.test).length : rows.length;
                   const active = filter === f.id;
@@ -323,19 +407,19 @@ function RfidAssignmentPage() {
                       key={f.id}
                       type="button"
                       onClick={() => setFilter(f.id)}
-                      className={`rounded-lg px-3 py-1.5 text-xs font-bold transition-colors ${active ? 'bg-violet-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'}`}
+                      className={`shrink-0 rounded-lg px-2.5 py-1 text-[10.5px] font-bold transition-colors cursor-pointer ${active ? 'bg-violet-600 text-white shadow-2xs' : 'bg-slate-100 text-slate-600 hover:bg-slate-200 dark:bg-surface-800 dark:text-neutral-300'}`}
                     >
                       {f.label} ({count})
                     </button>
                   );
                 })}
               </div>
-              <div className="flex flex-wrap gap-2">
+              <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
                 {clientsInFile.length > 1 && (
                   <select
                     value={clientFilter}
                     onChange={(e) => setClientFilter(e.target.value)}
-                    className="rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-900 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100"
+                    className="h-8 rounded-xl border border-slate-300 px-2.5 text-[11px] sm:text-xs text-slate-900 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100"
                   >
                     <option value="">All clients</option>
                     {clientsInFile.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -346,19 +430,21 @@ function RfidAssignmentPage() {
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   placeholder="Search battery number or tag…"
-                  className="w-full rounded-md border border-slate-300 px-3 py-1.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 sm:w-64"
+                  className="h-8 w-full rounded-xl border border-slate-300 px-2.5 text-[11px] sm:text-xs text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 sm:w-56"
                 />
               </div>
             </div>
-            <div ref={scrollRef} className="max-h-[60vh] overflow-auto">
-              <table className="w-full min-w-[640px] text-left text-xs">
+
+            {/* Desktop Table (>= lg) */}
+            <div ref={scrollRef} className="hidden lg:block max-h-[60vh] overflow-auto">
+              <table className="w-full text-left text-xs">
                 <thead className="sticky top-0 z-10 border-b border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-surface-800">
                   <tr>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">#</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Battery Number</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">RFID Tag (from file)</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Assignment Status</th>
-                    <th className="px-4 py-3 font-bold text-slate-700 dark:text-neutral-300">Why</th>
+                    <th className="px-4 py-2.5 font-bold text-slate-700 dark:text-neutral-300">#</th>
+                    <th className="px-4 py-2.5 font-bold text-slate-700 dark:text-neutral-300">Battery Number</th>
+                    <th className="px-4 py-2.5 font-bold text-slate-700 dark:text-neutral-300">RFID Tag (from file)</th>
+                    <th className="px-4 py-2.5 font-bold text-slate-700 dark:text-neutral-300">Assignment Status</th>
+                    <th className="px-4 py-2.5 font-bold text-slate-700 dark:text-neutral-300">Why</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -374,13 +460,13 @@ function RfidAssignmentPage() {
                       const bad = notFound || r.status === 'error';
                       return (
                         <tr key={`${r.rowNumber}-${r.batteryCode}`} className={bad ? 'bg-rose-50/70 dark:bg-rose-950/20' : ''}>
-                          <td className="px-4 py-2.5 font-mono font-semibold text-slate-500 dark:text-neutral-400">
+                          <td className="px-4 py-2 font-mono font-semibold text-slate-500 dark:text-neutral-400">
                             <span>{idx + 1}</span>
                             {r.rowNumber && r.rowNumber !== idx + 1 && (
-                              <span className="block text-[10px] font-normal text-slate-400">row {r.rowNumber}</span>
+                              <span className="block text-[9.5px] font-normal text-slate-400">row {r.rowNumber}</span>
                             )}
                           </td>
-                          <td className={`px-4 py-2.5 font-mono font-semibold ${notFound ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900 dark:text-white'}`}>
+                          <td className={`px-4 py-2 font-mono font-semibold ${notFound ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900 dark:text-white'}`}>
                             {r.batteryId ? (
                               <Link to={`/batteries/${encodeURIComponent(r.batteryCode)}`} className="hover:underline">{r.batteryCode}</Link>
                             ) : (
@@ -390,16 +476,16 @@ function RfidAssignmentPage() {
                               </span>
                             )}
                             {r.sheetBatteryCode && (
-                              <span className="block text-[10px] font-normal text-slate-400">written as {r.sheetBatteryCode}</span>
+                              <span className="block text-[9.5px] font-normal text-slate-400">written as {r.sheetBatteryCode}</span>
                             )}
                           </td>
-                          <td className="px-4 py-2.5 font-mono text-slate-700 dark:text-neutral-200">{r.rfidTag || <span className="italic text-slate-400">empty</span>}</td>
-                          <td className="px-4 py-2.5">
-                            <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${meta.cls}`}>
+                          <td className="px-4 py-2 font-mono text-slate-700 dark:text-neutral-200">{r.rfidTag || <span className="italic text-slate-400">empty</span>}</td>
+                          <td className="px-4 py-2">
+                            <span className={`inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] sm:text-[10.5px] font-bold ${meta.cls}`}>
                               {committed ? meta.done : meta.label}
                             </span>
                           </td>
-                          <td className="px-4 py-2.5 text-slate-500 dark:text-neutral-400">
+                          <td className="px-4 py-2 text-slate-500 dark:text-neutral-400 text-[11px]">
                             {r.status === 'assigned' ? '' : r.status === 'replaced' ? `Currently has ${r.previousTag}; it will be replaced` : r.message}
                           </td>
                         </tr>
@@ -408,7 +494,7 @@ function RfidAssignmentPage() {
                   )}
                   {visible.length > 0 && (
                     <tr ref={sentinelRef}>
-                      <td colSpan={5} className="px-4 py-3 text-center text-[11px] text-slate-400">
+                      <td colSpan={5} className="px-4 py-2.5 text-center text-[10.5px] text-slate-400">
                         {hasMore ? `Loading more… (${pageRows.length} of ${visible.length})` : `Showing all ${visible.length} rows`}
                       </td>
                     </tr>
@@ -416,17 +502,59 @@ function RfidAssignmentPage() {
                 </tbody>
               </table>
             </div>
+
+            {/* Mobile Card Stream (< lg) - ZERO HORIZONTAL SCROLL */}
+            <div ref={mobileScrollRef} className="block lg:hidden max-h-[60vh] overflow-y-auto divide-y divide-slate-100 dark:divide-white/5 p-2">
+              {visible.length === 0 ? (
+                <p className="py-6 text-center text-xs text-slate-400">No rows match this filter.</p>
+              ) : (
+                pageRows.map((r, idx) => {
+                  const toCreate = !committed && createMissing && r.status === 'not_found' && r.canCreate;
+                  const meta = STATUS_META[toCreate ? 'created' : r.status] || { label: r.status, done: r.status, cls: '' };
+                  const notFound = r.status === 'not_found' && !toCreate;
+                  const bad = notFound || r.status === 'error';
+                  const why = r.status === 'assigned' ? '' : r.status === 'replaced' ? `Currently has ${r.previousTag}; it will be replaced` : r.message;
+
+                  return (
+                    <div key={`${r.rowNumber}-${r.batteryCode}`} className={`rounded-xl p-2.5 mb-1.5 border transition-all ${bad ? 'border-rose-200 bg-rose-50/60 dark:border-rose-900/40 dark:bg-rose-950/20' : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-850'}`}>
+                      <div className="flex items-center justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-mono text-[10px] font-bold text-slate-400">#{idx + 1}</span>
+                          {r.batteryId ? (
+                            <Link to={`/batteries/${encodeURIComponent(r.batteryCode)}`} className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline truncate">
+                              🔋 {r.batteryCode}
+                            </Link>
+                          ) : (
+                            <span className="font-mono text-xs font-bold text-slate-900 dark:text-white truncate">{r.batteryCode || 'empty'}</span>
+                          )}
+                        </div>
+                        <span className={`inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[9.5px] font-bold ${meta.cls}`}>
+                          {committed ? meta.done : meta.label}
+                        </span>
+                      </div>
+
+                      <div className="mt-1 flex items-center justify-between gap-2 text-[10.5px]">
+                        <span className="text-slate-400">RFID Tag:</span>
+                        <span className="font-mono font-bold text-slate-800 dark:text-neutral-200">{r.rfidTag || '—'}</span>
+                      </div>
+
+                      {why ? (
+                        <p className="mt-1 border-t border-slate-100 dark:border-white/5 pt-1 text-[10px] text-slate-500 dark:text-neutral-400">
+                          {why}
+                        </p>
+                      ) : null}
+                    </div>
+                  );
+                })
+              )}
+              {visible.length > 0 && (
+                <div ref={mobileSentinelRef} className="py-2.5 text-center text-[10.5px] font-medium text-slate-400">
+                  {hasMore ? `Loading more… (${pageRows.length} of ${visible.length})` : `Showing all ${visible.length} rows`}
+                </div>
+              )}
+            </div>
           </div>
         </>
-      )}
-
-      {!result && stage === 'idle' && (
-        <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center dark:border-white/10">
-          <p className="text-sm font-semibold text-slate-700 dark:text-neutral-200">No sheet uploaded yet</p>
-          <p className="mt-1 text-xs text-slate-500 dark:text-neutral-400">
-            Export the battery numbers from the Battery Fleet page, add the RFID tag beside each one, and upload the file here.
-          </p>
-        </div>
       )}
 
       <AssignedTagsTable version={assignedVersion} />
@@ -453,12 +581,15 @@ function AssignedTagsTable({ version }) {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState(null);
   const scrollRef = useRef(null);
+  // desktop table and phone cards each have their own "load more" marker —
+  // one shared ref ends up on the hidden one and nothing past the first page loads
   const sentinelRef = useRef(null);
+  const mobileSentinelRef = useRef(null);
   const requestRef = useRef(0);
   const debounceRef = useRef(null);
 
   useEffect(() => {
-    apiClient.get('/clients').then(({ data }) => setClients((Array.isArray(data) ? data : data?.data || []).map((c) => c.name).sort())).catch(() => {});
+    apiClient.get('/clients').then(({ data }) => setClients((Array.isArray(data) ? data : data?.data || []).filter((c) => c.user_role !== 'recycle_client').map((c) => c.name).sort())).catch(() => {});
   }, []);
 
   async function fetchPage(offset, replace) {
@@ -492,16 +623,16 @@ function AssignedTagsTable({ version }) {
   }, [clientName, search, tagged, version]);
 
   useEffect(() => {
-    const el = sentinelRef.current;
+    const markers = [sentinelRef.current, mobileSentinelRef.current].filter(Boolean);
     const root = scrollRef.current;
-    if (!el || !root || !hasMore || loading) return undefined;
+    if (!markers.length || !root || !hasMore || loading) return undefined;
     const io = new IntersectionObserver((entries) => {
       if (entries.some((e) => e.isIntersecting) && !loadingMore) {
         setLoadingMore(true);
         fetchPage(rows.length, false);
       }
     }, { root, rootMargin: '80px' });
-    io.observe(el);
+    markers.forEach((m) => io.observe(m)); // only the visible one ever intersects
     return () => io.disconnect();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hasMore, loading, loadingMore, rows.length]);
@@ -541,97 +672,80 @@ function AssignedTagsTable({ version }) {
   }
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-slate-200/90 bg-white shadow-sm transition-shadow hover:shadow-md dark:border-white/10 dark:bg-surface-900">
-      {/* Header band */}
-      <div className="border-b border-slate-200 bg-gradient-to-r from-emerald-500/10 via-slate-50 to-emerald-500/5 px-6 py-4.5 dark:border-white/10 dark:from-emerald-950/30 dark:via-surface-900 dark:to-surface-900">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-center gap-3.5">
-            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-600 to-teal-700 text-white shadow-md shadow-emerald-600/20 ring-4 ring-emerald-100 dark:ring-emerald-950/50">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                <path d="M4.9 19.1a10 10 0 0 1 0-14.2" /><path d="M7.8 16.2a6 6 0 0 1 0-8.4" /><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8a6 6 0 0 1 0 8.4" /><path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
-              </svg>
-            </div>
-            <div>
-              <div className="flex flex-wrap items-center gap-2">
-                <p className="text-base font-black tracking-tight text-slate-900 dark:text-white">RFID Tags by Battery</p>
-                <span className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">LIVE REGISTER</span>
-              </div>
-              <p className="text-xs font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
-                {clientName ? `Filtered for ${clientName}` : 'All clients'} · Ordered sequentially by battery ID
-              </p>
-            </div>
+    <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:border-white/10 dark:bg-surface-900">
+      {/* Consolidated Header & Live Metrics Strip */}
+      <div className="border-b border-slate-200/80 bg-gradient-to-r from-emerald-500/10 via-slate-50 to-emerald-500/5 px-3 py-2 sm:px-4 sm:py-2.5 dark:border-white/10 dark:from-emerald-950/20 dark:via-surface-900 dark:to-surface-900">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5 min-w-0">
+            <h3 className="text-xs sm:text-sm font-black tracking-tight text-slate-900 dark:text-white truncate">
+              RFID Live Register
+            </h3>
+            <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.2 text-[8.5px] font-black text-emerald-700 dark:border-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-300">
+              LIVE
+            </span>
           </div>
-          <div className="grid grid-cols-3 gap-2 sm:w-[390px]">
-            <div className="rounded-2xl border border-emerald-200 bg-emerald-50/90 p-3 shadow-2xs backdrop-blur-xs dark:border-emerald-800/50 dark:bg-emerald-950/40">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Tagged</p>
-                <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-              </div>
-              <p className="text-xl font-black text-emerald-800 dark:text-emerald-200 mt-0.5">{loading ? '…' : counts.assigned.toLocaleString()}</p>
-            </div>
-            <div className={`rounded-2xl border p-3 shadow-2xs backdrop-blur-xs ${counts.unassigned > 0 ? 'border-rose-200 bg-rose-50/90 dark:border-rose-800/50 dark:bg-rose-950/40' : 'border-slate-200 bg-slate-50 dark:border-white/10 dark:bg-surface-800'}`}>
-              <div className="flex items-center justify-between">
-                <p className={`text-[10px] font-bold uppercase tracking-wider ${counts.unassigned > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500'}`}>Without tag</p>
-                {counts.unassigned > 0 && <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />}
-              </div>
-              <p className={`text-xl font-black mt-0.5 ${counts.unassigned > 0 ? 'text-rose-800 dark:text-rose-200' : 'text-slate-700 dark:text-neutral-200'}`}>{loading ? '…' : counts.unassigned.toLocaleString()}</p>
-            </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50/90 p-3 shadow-2xs backdrop-blur-xs dark:border-white/10 dark:bg-surface-800/70">
-              <div className="flex items-center justify-between">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300">Coverage</p>
-                <span className="hidden text-[10px] font-bold text-slate-400 sm:inline">Target 100%</span>
-              </div>
-              <p className="text-xl font-black text-slate-900 dark:text-white mt-0.5">{loading ? '…' : `${pct}%`}</p>
-            </div>
+
+          {/* Integrated Micro-Metrics */}
+          <div className="flex items-center gap-1.5 sm:gap-2.5 text-[10px] sm:text-[11px] font-bold shrink-0">
+            <span className="inline-flex items-center gap-1 text-emerald-700 dark:text-emerald-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span>{loading ? '…' : counts.assigned.toLocaleString()} Tagged</span>
+            </span>
+            <span className="text-slate-300 dark:text-white/20">•</span>
+            <span className="inline-flex items-center gap-1 text-rose-600 dark:text-rose-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-rose-500" />
+              <span>{loading ? '…' : counts.unassigned.toLocaleString()} Untagged</span>
+            </span>
+            <span className="text-slate-300 dark:text-white/20">•</span>
+            <span className="text-slate-700 dark:text-neutral-200 font-black">{pct}%</span>
           </div>
         </div>
-        <div className="mt-3.5 flex items-center gap-2">
-          <div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200/80 dark:bg-white/10">
-            <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500 transition-all duration-500" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="text-[11px] font-extrabold text-slate-500 dark:text-neutral-400 min-w-[2.5rem] text-right">{pct}%</span>
+
+        {/* 2px Progress Bar */}
+        <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-slate-200 dark:bg-white/10">
+          <div className="h-full rounded-full bg-emerald-500 transition-all duration-500" style={{ width: `${pct}%` }} />
         </div>
       </div>
 
-      {/* Toolbar */}
-      <div className="flex flex-col gap-3 border-b border-slate-200 px-6 py-3.5 sm:flex-row sm:items-center sm:justify-between dark:border-white/10 bg-slate-50/40 dark:bg-surface-800/30">
-        <div className="inline-flex rounded-xl bg-slate-200/70 p-1 dark:bg-surface-800 shadow-inner">
-          {[['all', 'All', counts.assigned + counts.unassigned], ['yes', 'Assigned', counts.assigned], ['no', 'Not assigned', counts.unassigned]].map(([id, label, n]) => (
+      {/* Unified Toolbar (Segmented Filters + Search) */}
+      <div className="border-b border-slate-200/80 px-2.5 sm:px-4 py-1.5 sm:py-2 dark:border-white/10 bg-slate-50/50 dark:bg-surface-800/30 flex flex-col gap-1.5 sm:flex-row sm:items-center sm:justify-between">
+        {/* Segmented Filter Pills */}
+        <div className="inline-flex rounded-lg bg-slate-200/70 p-0.5 dark:bg-surface-800 w-full sm:w-auto">
+          {[['all', 'All', counts.assigned + counts.unassigned], ['yes', 'Assigned', counts.assigned], ['no', 'Untagged', counts.unassigned]].map(([id, label, n]) => (
             <button
               key={id}
               type="button"
               onClick={() => setTagged(id)}
-              className={`rounded-lg px-3.5 py-1.5 text-xs font-bold transition-all cursor-pointer ${tagged === id ? 'bg-white text-emerald-800 shadow-xs dark:bg-surface-900 dark:text-emerald-300' : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'}`}
+              className={`flex-1 sm:flex-initial rounded-md px-2 py-1 text-[10px] sm:text-xs font-bold transition-all cursor-pointer ${tagged === id ? 'bg-white text-emerald-800 shadow-2xs dark:bg-surface-900 dark:text-emerald-300' : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'}`}
             >
-              {label} <span className={`ml-1.5 inline-block min-w-[2rem] rounded-full px-1.5 py-0.5 text-center text-[10px] font-bold tabular-nums ${tagged === id ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-300/60 text-slate-600 dark:bg-white/10 dark:text-neutral-400'}`}>{loading ? '…' : n.toLocaleString()}</span>
+              {label} <span className={`ml-0.5 rounded-full px-1 py-0.2 text-[8.5px] sm:text-[9.5px] font-bold tabular-nums ${tagged === id ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300' : 'bg-slate-300/60 text-slate-600 dark:bg-white/10 dark:text-neutral-400'}`}>{loading ? '…' : n.toLocaleString()}</span>
             </button>
           ))}
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+
+        {/* Client selector + Search input */}
+        <div className="flex items-center gap-1.5 w-full sm:w-auto">
           <select
             value={clientName}
             onChange={(e) => setClientName(e.target.value)}
-            className="w-48 rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-semibold text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 cursor-pointer"
+            className="h-7.5 max-w-[120px] sm:max-w-[150px] rounded-lg border border-slate-300 bg-white px-2 text-[10.5px] sm:text-xs font-semibold text-slate-900 shadow-2xs focus:border-emerald-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 cursor-pointer shrink-0 truncate"
           >
-            <option value="">All clients ({clients.length})</option>
+            <option value="">All Fleet Clients ({clients.length})</option>
             {clients.map((c) => <option key={c} value={c}>{c}</option>)}
           </select>
-          <div className="relative">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400">
-              <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
-            </svg>
+          <div className="relative flex-1 sm:w-48">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search battery or tag…"
-              className="w-full rounded-xl border border-slate-300 bg-white py-2 pl-9 pr-8 text-xs font-semibold text-slate-900 shadow-2xs placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 sm:w-64"
+              className="h-7.5 w-full rounded-lg border border-slate-300 bg-white pl-2.5 pr-6 text-[10.5px] sm:text-xs font-semibold text-slate-900 shadow-2xs placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100"
             />
             {search && (
               <button
                 type="button"
                 onClick={() => setSearch('')}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
+                className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
               >
                 ✕
               </button>
@@ -639,11 +753,12 @@ function AssignedTagsTable({ version }) {
           </div>
         </div>
       </div>
-      {error && <p className="px-6 py-2.5 text-xs font-semibold text-rose-600 bg-rose-50/50">{error}</p>}
+      {error && <p className="px-6 py-2 text-xs font-semibold text-rose-600 bg-rose-50/50">{error}</p>}
 
-      {/* Table */}
+      {/* Table & Mobile Stream */}
       <div ref={scrollRef} className="h-[520px] overflow-auto">
-        <table className="w-full min-w-[720px] table-fixed text-left text-xs">
+        {/* Desktop Table (>= lg) */}
+        <table className="hidden lg:table w-full min-w-[720px] table-fixed text-left text-xs">
           <colgroup>
             <col className="w-[8%]" />
             <col className="w-[23%]" />
@@ -653,11 +768,11 @@ function AssignedTagsTable({ version }) {
           </colgroup>
           <thead className="sticky top-0 z-10 bg-slate-100/95 backdrop-blur-md dark:bg-surface-800/95">
             <tr className="border-b border-slate-200/90 dark:border-white/10">
-              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400 text-center">#</th>
-              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Battery</th>
-              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">RFID Tag</th>
-              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Serial Number</th>
-              <th className="px-5 py-3.5 text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Status</th>
+              <th className="px-5 py-3 text-[10.5px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400 text-center">#</th>
+              <th className="px-5 py-3 text-[10.5px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Battery</th>
+              <th className="px-5 py-3 text-[10.5px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">RFID Tag</th>
+              <th className="px-5 py-3 text-[10.5px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Serial Number</th>
+              <th className="px-5 py-3 text-[10.5px] font-black uppercase tracking-wider text-slate-500 dark:text-neutral-400">Status</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 dark:divide-white/5">
@@ -665,19 +780,14 @@ function AssignedTagsTable({ version }) {
               Array.from({ length: 7 }).map((_, i) => (
                 <tr key={`sk-${i}`} className="animate-pulse">
                   {[8, 23, 37, 16, 16].map((w, c) => (
-                    <td key={c} className="px-5 py-4"><div className="h-3.5 rounded-md bg-slate-200/80 dark:bg-white/10" style={{ width: `${w * 3}%` }} /></td>
+                    <td key={c} className="px-5 py-3.5"><div className="h-3 rounded-md bg-slate-200/80 dark:bg-white/10" style={{ width: `${w * 3}%` }} /></td>
                   ))}
                 </tr>
               ))
             ) : rows.length === 0 ? (
               <tr>
-                <td colSpan={5} className="px-5 py-16 text-center">
-                  <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400 dark:bg-surface-800">
-                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6">
-                      <path d="M4.9 19.1a10 10 0 0 1 0-14.2" /><path d="M7.8 16.2a6 6 0 0 1 0-8.4" /><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8a6 6 0 0 1 0 8.4" /><path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
-                    </svg>
-                  </div>
-                  <p className="mt-3 text-sm font-bold text-slate-800 dark:text-neutral-200">
+                <td colSpan={5} className="px-5 py-14 text-center">
+                  <p className="text-sm font-bold text-slate-800 dark:text-neutral-200">
                     {tagged === 'no' ? `Every battery${clientName ? ` for ${clientName}` : ''} already has a tag` : tagged === 'yes' ? `No batteries with an RFID tag${clientName ? ` for ${clientName}` : ''} yet` : 'No batteries found'}
                   </p>
                   <p className="mt-1 text-xs text-slate-400">{tagged === 'yes' ? 'Upload a sheet above to assign tags.' : search ? 'Try a different search query.' : ''}</p>
@@ -685,7 +795,7 @@ function AssignedTagsTable({ version }) {
                     <button
                       type="button"
                       onClick={() => { setTagged('all'); setSearch(''); setClientName(''); }}
-                      className="mt-4 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 cursor-pointer"
+                      className="mt-3.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs hover:bg-emerald-100 dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 cursor-pointer"
                     >
                       Reset filters & show all
                     </button>
@@ -695,25 +805,25 @@ function AssignedTagsTable({ version }) {
             ) : (
               rows.map((r, idx) => (
                 <tr key={r.id} className="group transition-colors hover:bg-emerald-50/30 dark:hover:bg-emerald-950/15">
-                  <td className="px-5 py-3.5 text-center">
-                    <span className="inline-flex h-6.5 w-6.5 items-center justify-center rounded-lg bg-slate-100/90 font-mono text-[11px] font-black text-slate-600 transition-colors group-hover:bg-emerald-100 group-hover:text-emerald-800 dark:bg-surface-800 dark:text-neutral-400 dark:group-hover:bg-emerald-950/60 dark:group-hover:text-emerald-300">
+                  <td className="px-5 py-2.5 text-center">
+                    <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-slate-100/90 font-mono text-[10.5px] font-black text-slate-600 transition-colors group-hover:bg-emerald-100 group-hover:text-emerald-800 dark:bg-surface-800 dark:text-neutral-400 dark:group-hover:bg-emerald-950/60 dark:group-hover:text-emerald-300">
                       {idx + 1}
                     </span>
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-2.5">
                     <Link
                       to={`/batteries/${encodeURIComponent(r.battery_code)}`}
-                      className="inline-block truncate font-mono text-[13px] font-extrabold text-blue-700 transition-colors hover:text-blue-800 hover:underline dark:text-blue-400"
+                      className="inline-block truncate font-mono text-xs font-extrabold text-blue-700 transition-colors hover:text-blue-800 hover:underline dark:text-blue-400"
                     >
                       {r.battery_code}
                     </Link>
                     {r.client_name && (
-                      <span className="block truncate text-[11px] font-medium text-slate-400 dark:text-neutral-500">
+                      <span className="block truncate text-[10.5px] font-medium text-slate-400 dark:text-neutral-500">
                         {r.client_name}
                       </span>
                     )}
                   </td>
-                  <td className="px-5 py-3.5">
+                  <td className="px-5 py-2.5">
                     <TagCell
                       row={r}
                       editing={editingId === r.id}
@@ -725,10 +835,10 @@ function AssignedTagsTable({ version }) {
                       onCopy={copyTag}
                     />
                   </td>
-                  <td className="truncate px-5 py-3.5 font-mono text-xs font-semibold text-slate-700 dark:text-neutral-300">
+                  <td className="truncate px-5 py-2.5 font-mono text-xs font-semibold text-slate-700 dark:text-neutral-300">
                     {r.serial_number || <span className="font-normal italic text-slate-300 dark:text-neutral-600">—</span>}
                   </td>
-                  <td className="whitespace-nowrap px-5 py-3.5">
+                  <td className="whitespace-nowrap px-5 py-2.5">
                     <StatusBadge status={r.status} />
                   </td>
                 </tr>
@@ -736,9 +846,9 @@ function AssignedTagsTable({ version }) {
             )}
             {!loading && rows.length > 0 && (
               <tr ref={sentinelRef}>
-                <td colSpan={5} className="px-5 py-3.5 text-center text-[11px] font-medium text-slate-400 bg-slate-50/50 dark:bg-surface-800/20">
+                <td colSpan={5} className="px-5 py-3 text-center text-[10.5px] font-medium text-slate-400 bg-slate-50/50 dark:bg-surface-800/20">
                   {hasMore ? (
-                    <span className="inline-flex items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5">
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
                       Loading more batteries… ({rows.length} of {total})
                     </span>
@@ -750,6 +860,92 @@ function AssignedTagsTable({ version }) {
             )}
           </tbody>
         </table>
+
+        {/* Mobile Stream (< lg) - ZERO HORIZONTAL SCROLL */}
+        <div className="block lg:hidden divide-y divide-slate-100 dark:divide-white/5 p-2">
+          {loading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <div key={`sk-m-${i}`} className="py-2.5 animate-pulse space-y-2">
+                <div className="h-4 w-3/4 rounded bg-slate-200/80 dark:bg-white/10" />
+                <div className="h-3 w-1/2 rounded bg-slate-200/60 dark:bg-white/5" />
+              </div>
+            ))
+          ) : rows.length === 0 ? (
+            <div className="py-10 text-center">
+              <p className="text-xs sm:text-sm font-bold text-slate-700 dark:text-neutral-300">
+                {tagged === 'no' ? `Every battery${clientName ? ` for ${clientName}` : ''} already has a tag` : tagged === 'yes' ? `No batteries with an RFID tag${clientName ? ` for ${clientName}` : ''} yet` : 'No batteries found'}
+              </p>
+              {(tagged !== 'all' || search || clientName) && (
+                <button
+                  type="button"
+                  onClick={() => { setTagged('all'); setSearch(''); setClientName(''); }}
+                  className="mt-3 rounded-xl border border-emerald-300 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800 shadow-2xs dark:border-emerald-800/50 dark:bg-emerald-950/40 dark:text-emerald-300 cursor-pointer"
+                >
+                  Reset filters & show all
+                </button>
+              )}
+            </div>
+          ) : (
+            rows.map((r, idx) => (
+              <div key={r.id} className="py-2.5 first:pt-1 last:pb-1">
+                <div className="flex items-center justify-between gap-1.5">
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded bg-slate-100 font-mono text-[10px] font-bold text-slate-500 dark:bg-surface-800 dark:text-neutral-400">
+                      {idx + 1}
+                    </span>
+                    <Link
+                      to={`/batteries/${encodeURIComponent(r.battery_code)}`}
+                      className="truncate font-mono text-xs font-black text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      🔋 {r.battery_code}
+                    </Link>
+                  </div>
+                  <StatusBadge status={r.status} />
+                </div>
+
+                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[10px]">
+                  {r.client_name ? (
+                    <span className="rounded bg-slate-100 dark:bg-surface-800 px-1.5 py-0.2 font-bold text-slate-700 dark:text-slate-300">
+                      {r.client_name}
+                    </span>
+                  ) : null}
+                  {r.serial_number ? (
+                    <span className="rounded bg-slate-100 dark:bg-surface-800 px-1.5 py-0.2 font-mono font-semibold text-slate-600 dark:text-neutral-400">
+                      SN: {r.serial_number}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">No serial</span>
+                  )}
+                </div>
+
+                <div className="mt-2 pt-1.5 border-t border-slate-100 dark:border-white/5">
+                  <TagCell
+                    row={r}
+                    editing={editingId === r.id}
+                    onEdit={() => setEditingId(r.id)}
+                    onCancel={() => setEditingId(null)}
+                    onSave={saveTag}
+                    onSaved={() => setEditingId(null)}
+                    copied={copied}
+                    onCopy={copyTag}
+                  />
+                </div>
+              </div>
+            ))
+          )}
+          {!loading && rows.length > 0 && (
+            <div ref={mobileSentinelRef} className="py-2.5 text-center text-[10px] font-medium text-slate-400">
+              {hasMore ? (
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
+                  Loading more batteries… ({rows.length} of {total})
+                </span>
+              ) : (
+                <span>✓ Showing all {rows.length} batteries</span>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -1,15 +1,21 @@
-# Reverse proxy + automatic HTTPS (Let's Encrypt) for the whole stack.
-# DOMAIN/API_DOMAIN come from .env — point their DNS A records at this
-# VPS's IP before starting the stack, or Caddy can't issue certificates.
+# Reverse proxy for the whole stack on ONE address, path-routed:
+#   /api/*, /uploads/*, /socket.io/*, /health  -> backend:5000
+#   everything else                            -> frontend:8080 (React SPA)
 #
-# Local testing without a real domain: set DOMAIN=localhost:8080 and
-# API_DOMAIN=localhost:8081 in .env — Caddy serves plain HTTP for
-# non-public hostnames instead of attempting ACME.
+# SITE_ADDRESS comes from .env:
+#   :80              plain HTTP on the server's IP (no domain yet)
+#   app.example.com  automatic HTTPS via Let's Encrypt (point the DNS A
+#                    record at this server first, or Caddy can't issue a cert)
 
-{$DOMAIN} {
-	reverse_proxy frontend:8080
-}
+{$SITE_ADDRESS} {
+	encode gzip
 
-{$API_DOMAIN} {
-	reverse_proxy backend:5000
+	@backend path /api/* /uploads/* /socket.io/* /health
+	handle @backend {
+		reverse_proxy backend:5000
+	}
+
+	handle {
+		reverse_proxy frontend:8080
+	}
 }

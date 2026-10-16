@@ -148,7 +148,7 @@ function PortalHeader() {
           <UkClock compact className="hidden sm:inline-flex xl:hidden" />
 
           {/* User Info & Role Badge */}
-          <div className="flex items-center gap-2 pl-1 sm:pl-2.5 border-l border-slate-200 dark:border-white/10">
+          <div className="hidden sm:flex items-center gap-2 pl-1 sm:pl-2.5 border-l border-slate-200 dark:border-white/10">
             <div
               className={`flex h-8 w-8 sm:h-[2.125rem] sm:w-[2.125rem] shrink-0 items-center justify-center rounded-full text-xs font-bold ring-1 transition-all ${
                 isSupervisor
@@ -187,7 +187,7 @@ function PortalHeader() {
             onClick={handleLogout}
             title="Log out"
             aria-label="Log out"
-            className="flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200 dark:hover:border-red-900/50 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-all cursor-pointer shadow-2xs shrink-0"
+            className="hidden sm:flex items-center gap-1.5 rounded-xl border border-slate-200/90 bg-slate-50 px-2.5 py-1.5 sm:px-3 sm:py-2 text-xs font-bold text-slate-700 hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95 dark:border-white/10 dark:bg-white/5 dark:text-neutral-200 dark:hover:border-red-900/50 dark:hover:bg-red-950/40 dark:hover:text-red-400 transition-all cursor-pointer shadow-2xs shrink-0"
           >
             <svg
               xmlns="http://www.w3.org/2000/svg"

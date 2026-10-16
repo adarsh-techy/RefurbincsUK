@@ -47,42 +47,42 @@ export default function SortedBattery({ code, index, match, view, onOpenHistory,
 
   return (
     <View
-      className={`rounded-2xl border p-4 ${
+      className={`rounded-xl sm:rounded-2xl border p-3 sm:p-4 ${
         packed ? 'border-rose-300 bg-rose-50 dark:border-rose-900/40 dark:bg-rose-950/20' : 'border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900'
       }`}
     >
-      <View className="flex-row items-start justify-between gap-3">
+      <View className="flex-row items-start justify-between gap-2.5">
         <View className="min-w-0 flex-1">
           <TouchableOpacity onPress={onOpenHistory}>
-            <Text className={`font-mono text-sm font-black ${packed ? 'text-rose-700' : 'text-slate-900 dark:text-white'}`} numberOfLines={1}>
+            <Text className={`font-mono text-xs sm:text-sm font-black ${packed ? 'text-rose-700' : 'text-slate-900 dark:text-white'}`} numberOfLines={1}>
               {code}
             </Text>
           </TouchableOpacity>
-          {match?.serial_number ? <Text className="mt-0.5 font-mono text-[11px] text-slate-500">SN: {match.serial_number}</Text> : null}
+          {match?.serial_number ? <Text className="mt-0.5 font-mono text-[10px] sm:text-[11px] text-slate-500">SN: {match.serial_number}</Text> : null}
         </View>
         {removeButton}
       </View>
-      <View className="mt-3 border-t border-slate-100 pt-3 dark:border-slate-800">
-        <View className="flex-row flex-wrap items-center justify-between gap-2">
+      <View className="mt-2.5 sm:mt-3 border-t border-slate-100 pt-2.5 sm:pt-3 dark:border-slate-800">
+        <View className="flex-row flex-wrap items-center justify-between gap-1.5 sm:gap-2">
           {match ? (
             <StatusBadge status={clientBatteryStatus(match)} />
           ) : (
-            <Text className="text-[10px] font-bold uppercase tracking-wider text-amber-600">Not in your fleet</Text>
+            <Text className="text-[9px] sm:text-[10px] font-bold uppercase tracking-wider text-amber-600">Not in your fleet</Text>
           )}
           {packed ? (
-            <View className="rounded-full bg-rose-100 px-2.5 py-0.5">
-              <Text className="text-[10px] font-black uppercase text-rose-800">Packed to Service</Text>
+            <View className="rounded-full bg-rose-100 px-2 sm:px-2.5 py-0.5">
+              <Text className="text-[9px] sm:text-[10px] font-black uppercase text-rose-800">Packed to Service</Text>
             </View>
           ) : null}
         </View>
         {packed && packedDate ? (
-          <Text className="mt-2 text-[11px] font-semibold text-rose-700">
+          <Text className="mt-1.5 sm:mt-2 text-[10px] sm:text-[11px] font-semibold text-rose-700">
             Packed to Service: <Text className="font-normal text-slate-600">{formatDate(packedDate)}</Text>
             {match?.truck_number ? ` • Truck ${match.truck_number}` : ''}
           </Text>
         ) : null}
-        <TouchableOpacity onPress={onOpenHistory} className="mt-2.5 self-start rounded-lg bg-slate-100 px-2.5 py-1 dark:bg-slate-800">
-          <Text className="text-xs font-bold text-slate-700 dark:text-slate-200">History →</Text>
+        <TouchableOpacity onPress={onOpenHistory} className="mt-2 sm:mt-2.5 self-start rounded-md sm:rounded-lg bg-slate-100 px-2 sm:px-2.5 py-0.5 sm:py-1 dark:bg-slate-800">
+          <Text className="text-[11px] sm:text-xs font-bold text-slate-700 dark:text-slate-200">History →</Text>
         </TouchableOpacity>
       </View>
     </View>

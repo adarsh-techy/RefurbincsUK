@@ -9,7 +9,7 @@ installRfidKeystrokeSupport();
 // the button's whole job is to put the cursor in the right box and show that
 // the page is waiting for a tag. `target` is the data-rfid-scan value on the
 // input it controls.
-function RfidScanButton({ target, className = '' }) {
+function RfidScanButton({ target, className = '', hideHint = false }) {
   const [waiting, setWaiting] = useState(false);
   const timer = useRef(null);
 
@@ -59,7 +59,7 @@ function RfidScanButton({ target, className = '' }) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   return (
-    <div className={`mt-1.5 flex flex-wrap items-center gap-2 ${className}`}>
+    <div className={`flex flex-wrap items-center gap-2 ${className}`}>
       <button
         type="button"
         onClick={toggle}
@@ -73,12 +73,18 @@ function RfidScanButton({ target, className = '' }) {
         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={`h-3.5 w-3.5 ${waiting ? 'animate-pulse' : ''}`}>
           <path d="M4.9 19.1a10 10 0 0 1 0-14.2" /><path d="M7.8 16.2a6 6 0 0 1 0-8.4" /><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8a6 6 0 0 1 0 8.4" /><path d="M19.1 4.9a10 10 0 0 1 0 14.2" />
         </svg>
-        {waiting ? 'Stop RFID Scan' : 'Scan RFID tag'}
+        <span>{waiting ? 'Stop RFID Scan' : 'Scan RFID tag'}</span>
       </button>
       {!waiting ? (
-        <span className="text-[11px] text-slate-400 dark:text-neutral-500">QR, battery code or RFID tag all work here</span>
+        !hideHint && (
+          <span className="hidden sm:inline text-[11px] text-slate-400 dark:text-neutral-500">
+            QR, battery code or RFID tag all work here
+          </span>
+        )
       ) : (
-        <span className="text-[11px] font-medium text-red-600 dark:text-red-400 animate-pulse">Waiting for tag… Tap red button to stop</span>
+        <span className="text-[10px] sm:text-[11px] font-semibold text-red-600 dark:text-red-400 animate-pulse">
+          Waiting for tag… Tap to stop
+        </span>
       )}
     </div>
   );

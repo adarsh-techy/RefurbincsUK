@@ -1,18 +1,24 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, RefreshControl, ScrollView, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import {
+  Alert,
+  RefreshControl,
+  ScrollView,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { useSelector } from 'react-redux';
 import apiClient from '../../../services/api-client';
-import DateField from '../../../components/admin/DateField';
-import { Banner, Chips, ConfirmModal, EmptyState, Loading, SmallButton, initials, relativeTime } from '../../../components/admin/sa5/common';
+import Icon from '../../../components/ui/Icon';
+import DateField, { prettyYmd } from '../../../components/admin/DateField';
+import { Banner, ConfirmModal, initials, relativeTime } from '../../../components/admin/sa5/common';
 import RestoreModal from '../../../components/admin/sa5/RestoreModal';
 import { ITEM_TYPES, TYPE_CONFIG, typeConfig } from './trash-config';
 
-// Trash Bin — the web TrashPage: GET /trash/stats for the counter cards and
-// GET /trash?page=&limit=15&search=&itemType=&startDate=&endDate= for the
-// list (Previous / Next pages). Tap a counter to filter by type. Each item
-// has Inspect (→ AdminTrashDetail), Restore and Delete Permanently
-// (DELETE /trash/:id); the super admin can Empty Trash (DELETE /trash).
+// Trash Bin — mobile version of TrashPage:
+// Audit trail of deleted items across batteries, truck intakes, staff, parts, etc.
 
 const LIMIT = 15;
 
@@ -32,6 +38,7 @@ export default function TrashScreen() {
   const [selectedType, setSelectedType] = useState('all');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [showDates, setShowDates] = useState(false);
   const [page, setPage] = useState(1);
   const [pagination, setPagination] = useState({ total: 0, totalPages: 1, limit: LIMIT });
 
@@ -54,7 +61,7 @@ export default function TrashScreen() {
       const { data } = await apiClient.get('/trash/stats');
       setStats(data?.data || { total: 0, byType: {} });
     } catch {
-      // counters stay as they were; the list shows its own error
+      // keep current stats
     }
   }, []);
 
@@ -75,7 +82,8 @@ export default function TrashScreen() {
       setItems(data?.data || []);
       setPagination(data?.pagination || { total: 0, totalPages: 1, limit: LIMIT });
     } catch (err) {
-      if (id === reqRef.current) setError(err.response?.data?.message || 'Failed to fetch trash items');
+      if (id === reqRef.current)
+        setError(err.response?.data?.message || 'Failed to fetch trash items');
     } finally {
       if (id === reqRef.current) {
         setLoading(false);
@@ -89,7 +97,7 @@ export default function TrashScreen() {
     fetchTrash();
   }, [fetchTrash]);
 
-  // back from the detail page (which can delete) → fresh counters and list
+  // Back from detail page → refresh
   const latest = useRef({ fetchStats, fetchTrash });
   latest.current = { fetchStats, fetchTrash };
   const firstFocus = useRef(true);
@@ -117,6 +125,7 @@ export default function TrashScreen() {
     setSelectedType('all');
     setStartDate('');
     setEndDate('');
+    setShowDates(false);
     setPage(1);
   }
 
@@ -142,7 +151,7 @@ export default function TrashScreen() {
       setPage(1);
       refreshAll();
     } catch (err) {
-      Alert.alert('Could not empty the trash', err.response?.data?.message || 'Failed to empty trash');
+      Alert.alert('Could not empty trash', err.response?.data?.message || 'Failed to empty trash');
     } finally {
       setActionLoading(false);
     }
@@ -150,151 +159,360 @@ export default function TrashScreen() {
 
   const filtersActive = Boolean(search || selectedType !== 'all' || startDate || endDate);
   const openItem = (item) => navigation.navigate('AdminTrashDetail', { id: item.id });
-  const counterCls = (active) => (active ? 'border-red-500 bg-red-50' : 'border-slate-200 bg-white');
 
   return (
     <View className="flex-1 bg-slate-50">
       <ScrollView
         className="flex-1"
-        contentContainerClassName="gap-4 p-4 pb-16"
+        contentContainerClassName="p-2.5 pb-16 gap-2"
         keyboardShouldPersistTaps="handled"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); refreshAll(); }} />}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => {
+              setRefreshing(true);
+              refreshAll();
+            }}
+          />
+        }
       >
-        {/* Header */}
-        <View className="gap-3">
-          <View>
-            <Text className="text-2xl font-bold text-slate-900">🗑 Trash Bin</Text>
-            <Text className="text-xs text-slate-500">Audit trail of deleted items with detailed logs of who deleted them and when.</Text>
+        {/* Executive Header Card — COMPACT */}
+        <View className="rounded-2xl border border-slate-200/90 bg-white p-3 shadow-2xs gap-2">
+          <View className="flex-row items-start justify-between gap-2">
+            <View className="flex-1 gap-0.5">
+              <View className="flex-row items-center gap-2 flex-wrap">
+                <Text className="text-base font-extrabold tracking-tight text-slate-900">
+                  Trash Bin
+                </Text>
+                <View className="rounded-md border border-rose-200 bg-rose-50 px-1.5 py-0.5">
+                  <Text className="text-[9.5px] font-bold text-rose-700">
+                    Audit Archive
+                  </Text>
+                </View>
+              </View>
+              <Text className="text-[11px] text-slate-500">
+                Audit trail of soft-deleted records across batteries, intakes, staff, and parts.
+              </Text>
+            </View>
+
+            {/* Actions */}
+            <View className="flex-row items-center gap-1.5">
+              <TouchableOpacity
+                onPress={() => {
+                  setLoading(true);
+                  refreshAll();
+                }}
+                className="flex-row items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2 py-1 shadow-2xs"
+              >
+                <Icon name="refresh" size={11} color="#64748b" />
+                <Text className="text-[10.5px] font-semibold text-slate-700">Sync</Text>
+              </TouchableOpacity>
+
+              {isSuperAdmin && stats.total > 0 && (
+                <TouchableOpacity
+                  onPress={() => setEmptyTrashModal(true)}
+                  className="flex-row items-center gap-1 rounded-xl border border-rose-200 bg-rose-50 px-2 py-1 shadow-2xs"
+                >
+                  <Icon name="trash" size={11} color="#e11d48" />
+                  <Text className="text-[10.5px] font-bold text-rose-700">Empty</Text>
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <View className="flex-row gap-2">
-            <SmallButton label="↻ Refresh" onPress={() => { setLoading(true); refreshAll(); }} />
-            {isSuperAdmin && stats.total > 0 ? (
-              <SmallButton label="Empty Trash" tone="danger" onPress={() => setEmptyTrashModal(true)} />
-            ) : null}
+
+          {/* Live Counters Strip */}
+          <View className="flex-row items-center gap-2 pt-1.5 border-t border-slate-100 flex-wrap">
+            <Text className="text-[10.5px] text-slate-500">
+              Total Deleted: <Text className="font-bold text-slate-900">{stats.total || 0}</Text>
+            </Text>
+            <Text className="text-slate-300">•</Text>
+            <Text className="text-[10.5px] text-emerald-700">
+              Batteries: <Text className="font-bold">{stats.byType?.battery || 0}</Text>
+            </Text>
+            <Text className="text-slate-300">•</Text>
+            <Text className="text-[10.5px] text-blue-700">
+              Intakes: <Text className="font-bold">{stats.byType?.truck_intake || 0}</Text>
+            </Text>
+            <Text className="text-slate-300">•</Text>
+            <Text className="text-[10.5px] text-amber-700">
+              Parts: <Text className="font-bold">{stats.byType?.part || 0}</Text>
+            </Text>
           </View>
         </View>
 
-        {/* Counter cards (tap to filter) */}
-        <View className="flex-row flex-wrap gap-2">
-          <TouchableOpacity onPress={() => pickType('all')} className={`min-w-[30%] flex-1 rounded-xl border p-3 ${counterCls(selectedType === 'all')}`}>
-            <Text className="text-[11px] font-medium text-slate-500">Total Deleted</Text>
-            <Text className="mt-0.5 text-xl font-bold text-slate-900">{stats.total || 0}</Text>
-          </TouchableOpacity>
-          {Object.entries(TYPE_CONFIG).map(([key, cfg]) => {
-            const selected = selectedType === key;
+        {/* Type Filter Pills Bar — WRAPPING (Zero Horizontal Scrolling) */}
+        <View className="flex-row flex-wrap gap-1 pb-0.5">
+          {ITEM_TYPES.map((t) => {
+            const isSelected = selectedType === t.value;
+            const count = t.value === 'all' ? stats.total || 0 : stats.byType?.[t.value] || 0;
             return (
               <TouchableOpacity
-                key={key}
-                onPress={() => pickType(selected ? 'all' : key)}
-                className={`min-w-[30%] flex-1 rounded-xl border p-3 ${selected ? 'border-emerald-500 bg-emerald-50' : 'border-slate-200 bg-white'}`}
+                key={t.value}
+                onPress={() => pickType(t.value)}
+                className={`flex-row items-center gap-1 rounded-lg border px-2 py-0.5 ${
+                  isSelected
+                    ? 'border-slate-900 bg-slate-900'
+                    : 'border-slate-200 bg-white'
+                }`}
               >
-                <Text className="text-[11px] font-medium text-slate-500" numberOfLines={1}>{cfg.label}s</Text>
-                <Text className="mt-0.5 text-xl font-bold text-slate-900">{stats.byType?.[key] || 0}</Text>
+                <Text
+                  className={`text-[10px] font-bold ${
+                    isSelected ? 'text-white' : 'text-slate-600'
+                  }`}
+                >
+                  {t.label}
+                </Text>
+                <View
+                  className={`rounded px-1 py-0.2 ${
+                    isSelected ? 'bg-white/20' : 'bg-slate-100'
+                  }`}
+                >
+                  <Text
+                    className={`text-[9px] font-extrabold ${
+                      isSelected ? 'text-white' : 'text-slate-600'
+                    }`}
+                  >
+                    {count}
+                  </Text>
+                </View>
               </TouchableOpacity>
             );
           })}
         </View>
 
-        {/* Filters */}
-        <View className="gap-3 rounded-2xl border border-slate-200 bg-white p-3.5">
-          <TextInput
-            value={search}
-            onChangeText={setSearch}
-            placeholder="Search deleted items by title, detail, or user..."
-            placeholderTextColor="#94a3b8"
-            autoCapitalize="none"
-            className="rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900"
-          />
-          <Chips options={ITEM_TYPES.map((t) => ({ id: t.value, label: t.label }))} value={selectedType} onChange={pickType} />
-          <DateField label="Start date" value={startDate} onChange={(v) => { setStartDate(v); setPage(1); }} quick={false} />
-          <DateField label="End date" value={endDate} onChange={(v) => { setEndDate(v); setPage(1); }} quick={false} />
-          {filtersActive ? (
-            <TouchableOpacity onPress={resetFilters} className="self-start rounded-xl px-2.5 py-1.5">
-              <Text className="text-xs font-semibold text-slate-500">Reset</Text>
+        {/* Toolbar: Search & Date Filters — COMPACT */}
+        <View className="rounded-xl border border-slate-200/90 bg-white p-2 shadow-2xs gap-1.5">
+          {/* Search Input */}
+          <View className="flex-row items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 px-2.5 py-1">
+            <Icon name="search" size={13} color="#94a3b8" />
+            <TextInput
+              value={search}
+              onChangeText={setSearch}
+              placeholder="Search by title, detail, or user…"
+              placeholderTextColor="#94a3b8"
+              autoCapitalize="none"
+              className="flex-1 p-0 text-xs text-slate-800"
+            />
+            {search ? (
+              <TouchableOpacity onPress={() => setSearch('')} hitSlop={8}>
+                <Icon name="x" size={12} color="#94a3b8" />
+              </TouchableOpacity>
+            ) : null}
+          </View>
+
+          {/* Date Picker Button & Reset Row */}
+          <View className="flex-row items-center justify-between pt-0.5">
+            <TouchableOpacity
+              onPress={() => setShowDates((v) => !v)}
+              className="flex-row items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5"
+            >
+              <Icon name="clock" size={11} color="#64748b" />
+              <Text className="text-[10.5px] font-semibold text-slate-700">
+                {startDate || endDate
+                  ? `${startDate ? prettyYmd(startDate) : 'Start'} → ${
+                      endDate ? prettyYmd(endDate) : 'End'
+                    }`
+                  : 'Filter by Date'}
+              </Text>
+              <Text className="text-[9.5px] font-bold text-blue-600">
+                {showDates ? '▲' : '▼'}
+              </Text>
             </TouchableOpacity>
-          ) : null}
+
+            {filtersActive && (
+              <TouchableOpacity onPress={resetFilters} className="px-1.5 py-0.5">
+                <Text className="text-[10.5px] font-bold text-rose-600">Reset</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {showDates && (
+            <View className="pt-1.5 border-t border-slate-100 gap-1.5">
+              <DateField
+                label="Start Date"
+                value={startDate}
+                onChange={(v) => {
+                  setStartDate(v);
+                  setPage(1);
+                }}
+                compact
+              />
+              <DateField
+                label="End Date"
+                value={endDate}
+                onChange={(v) => {
+                  setEndDate(v);
+                  setPage(1);
+                }}
+                compact
+              />
+            </View>
+          )}
         </View>
 
         {error ? <Banner tone="bad" text={error} /> : null}
 
+        {/* Main Content Area */}
         {loading && !refreshing ? (
-          <Loading text="Loading trash bin..." />
+          <View className="rounded-xl border border-slate-200/90 bg-white p-6 items-center justify-center gap-1 shadow-2xs">
+            <Text className="text-xs font-semibold text-slate-500">Loading trash bin…</Text>
+          </View>
         ) : items.length === 0 ? (
-          <EmptyState
-            icon="🗑"
-            title={search || selectedType !== 'all' ? 'No matching deleted items' : 'Trash Bin is Empty'}
-            text={search || selectedType !== 'all'
-              ? 'Try changing your search term or adjusting filters to find what you are looking for.'
-              : 'Items deleted across batteries, truck intakes, parts, and staff will appear here with an audit of who deleted them and when.'}
-          />
+          <View className="rounded-xl border border-slate-200/90 bg-white p-6 items-center justify-center gap-1 shadow-2xs">
+            <Icon name="trash" size={20} color="#94a3b8" />
+            <Text className="text-xs font-semibold text-slate-800">
+              {filtersActive ? 'No matching deleted items' : 'Trash Bin is Empty'}
+            </Text>
+            <Text className="text-[10.5px] text-slate-400 text-center">
+              {filtersActive
+                ? 'Try adjusting your search or filters.'
+                : 'Items soft-deleted across the system will appear here.'}
+            </Text>
+          </View>
         ) : (
-          <View className="overflow-hidden rounded-2xl border border-slate-200 bg-white">
-            {items.map((item, i) => {
+          <View className="gap-2">
+            {items.map((item) => {
               const cfg = typeConfig(item.item_type);
               return (
-                <View key={item.id} className={`gap-2.5 p-3.5 ${i ? 'border-t border-slate-100' : ''}`}>
-                  <View className="flex-row items-start gap-2">
-                    <TouchableOpacity className="flex-1" onPress={() => openItem(item)}>
-                      <Text className="text-sm font-semibold text-slate-900">{item.title}</Text>
-                      {item.subtitle ? <Text className="mt-0.5 text-xs text-slate-500">{item.subtitle}</Text> : null}
+                <View
+                  key={item.id}
+                  className="rounded-xl border border-slate-200/80 bg-white p-2.5 shadow-2xs gap-1.5"
+                >
+                  {/* Top Row: Title + Original ID + Type Badge */}
+                  <View className="flex-row items-start justify-between gap-1.5">
+                    <TouchableOpacity
+                      className="flex-1 min-w-0"
+                      onPress={() => openItem(item)}
+                    >
+                      <Text className="text-xs font-bold text-slate-900 truncate">
+                        {item.title}
+                      </Text>
+                      {item.subtitle ? (
+                        <Text className="text-[10.5px] text-slate-500 truncate mt-0.5">
+                          {item.subtitle}
+                        </Text>
+                      ) : null}
                       {item.original_id ? (
-                        <Text className="mt-1 self-start rounded bg-slate-100 px-1.5 py-0.5 font-mono text-[10px] text-slate-600">Original ID: #{item.original_id}</Text>
+                        <View className="self-start mt-0.5 rounded bg-slate-100 px-1 py-0.2">
+                          <Text className="font-mono text-[9px] text-slate-600">
+                            Original ID: #{item.original_id}
+                          </Text>
+                        </View>
                       ) : null}
                     </TouchableOpacity>
-                    <Text className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${cfg.cls} ${cfg.text}`}>{cfg.label}</Text>
-                  </View>
 
-                  <View className="flex-row items-center gap-2.5">
-                    <View className="h-8 w-8 items-center justify-center rounded-full bg-slate-200">
-                      <Text className="text-xs font-bold text-slate-700">{initials(item.deleted_by_name)}</Text>
-                    </View>
-                    <View className="flex-1">
-                      <View className="flex-row flex-wrap items-center gap-1.5">
-                        <Text className="text-xs font-medium text-slate-900">{item.deleted_by_name || 'System / Admin'}</Text>
-                        {item.deleted_by_role ? (
-                          <Text className="rounded bg-slate-100 px-1.5 text-[10px] font-semibold uppercase text-slate-600">{item.deleted_by_role.replace(/_/g, ' ')}</Text>
-                        ) : null}
-                      </View>
-                      {item.deleted_by_email ? <Text className="text-[11px] text-slate-500">{item.deleted_by_email}</Text> : null}
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-[11px] font-medium text-slate-800">
-                        {new Date(item.deleted_at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
+                    <View className={`rounded-full border px-1.5 py-0.2 ${cfg.cls}`}>
+                      <Text className={`text-[9.5px] font-bold ${cfg.text}`}>
+                        {cfg.label}
                       </Text>
-                      <Text className="text-[10px] text-slate-400">{relativeTime(item.deleted_at)}</Text>
                     </View>
                   </View>
 
-                  <View className="flex-row flex-wrap justify-end gap-2">
-                    <SmallButton label="👁 Inspect" onPress={() => openItem(item)} />
-                    {item.restorable ? (
-                      <SmallButton label="↺ Restore" tone="green" onPress={() => setRestoreTarget(item)} />
-                    ) : (
-                      <SmallButton
-                        label="Can’t restore"
-                        onPress={() => Alert.alert('Can’t be restored', item.restore_blocked_reason || 'This item can’t be restored.')}
-                      />
-                    )}
-                    <SmallButton label="✕ Delete Permanently" tone="danger" onPress={() => setDeleteTarget(item)} />
+                  {/* Deleted By User & Timestamp Container */}
+                  <View className="rounded-lg border border-slate-100 bg-slate-50/70 p-2 flex-row items-center justify-between gap-2">
+                    <View className="flex-row items-center gap-1.5 flex-1 min-w-0">
+                      <View className="h-5 w-5 items-center justify-center rounded-full bg-slate-200 shrink-0">
+                        <Text className="text-[9px] font-bold text-slate-700">
+                          {initials(item.deleted_by_name)}
+                        </Text>
+                      </View>
+                      <View className="flex-1 min-w-0">
+                        <View className="flex-row items-center gap-1 flex-wrap">
+                          <Text className="text-[10.5px] font-semibold text-slate-800 truncate">
+                            {item.deleted_by_name || 'System / Admin'}
+                          </Text>
+                          {item.deleted_by_role ? (
+                            <View className="rounded bg-slate-200/60 px-1 py-0.2">
+                              <Text className="text-[8.5px] font-bold uppercase text-slate-600">
+                                {item.deleted_by_role.replace(/_/g, ' ')}
+                              </Text>
+                            </View>
+                          ) : null}
+                        </View>
+                      </View>
+                    </View>
+
+                    <Text className="text-[10px] text-slate-400 shrink-0">
+                      {relativeTime(item.deleted_at)}
+                    </Text>
+                  </View>
+
+                  {/* Compact Action Buttons Row */}
+                  <View className="flex-row items-center justify-between pt-0.5">
+                    <TouchableOpacity
+                      onPress={() => openItem(item)}
+                      className="flex-row items-center gap-0.5 rounded border border-slate-200 bg-white px-2 py-0.5 shadow-2xs"
+                    >
+                      <Icon name="eye" size={10} color="#64748b" />
+                      <Text className="text-[10px] font-semibold text-slate-700">Inspect</Text>
+                    </TouchableOpacity>
+
+                    <View className="flex-row items-center gap-1">
+                      {item.restorable ? (
+                        <TouchableOpacity
+                          onPress={() => setRestoreTarget(item)}
+                          className="flex-row items-center gap-0.5 rounded border border-emerald-200 bg-emerald-50 px-2 py-0.5 shadow-2xs"
+                        >
+                          <Icon name="rotateCcw" size={10} color="#059669" />
+                          <Text className="text-[10px] font-bold text-emerald-700">Restore</Text>
+                        </TouchableOpacity>
+                      ) : (
+                        <TouchableOpacity
+                          onPress={() =>
+                            Alert.alert(
+                              'Cannot Restore',
+                              item.restore_blocked_reason || 'This item cannot be restored.'
+                            )
+                          }
+                          className="px-1"
+                        >
+                          <Text className="text-[9.5px] font-medium text-slate-400">
+                            Locked
+                          </Text>
+                        </TouchableOpacity>
+                      )}
+
+                      <TouchableOpacity
+                        onPress={() => setDeleteTarget(item)}
+                        className="flex-row items-center gap-0.5 rounded border border-rose-200 bg-rose-50 px-2 py-0.5 shadow-2xs"
+                      >
+                        <Icon name="trash" size={10} color="#e11d48" />
+                        <Text className="text-[10px] font-bold text-rose-700">Purge</Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
                 </View>
               );
             })}
 
-            {pagination.totalPages > 1 ? (
-              <View className="gap-2 border-t border-slate-200 px-3.5 py-3">
-                <Text className="text-xs text-slate-500">
-                  Showing <Text className="font-medium text-slate-700">{(page - 1) * pagination.limit + 1}</Text> to{' '}
-                  <Text className="font-medium text-slate-700">{Math.min(page * pagination.limit, pagination.total)}</Text> of{' '}
-                  <Text className="font-medium text-slate-700">{pagination.total}</Text> items
+            {/* Pagination Controls */}
+            {pagination.totalPages > 1 && (
+              <View className="flex-row items-center justify-between rounded-xl border border-slate-200/90 bg-white p-2.5 shadow-2xs">
+                <TouchableOpacity
+                  disabled={page <= 1}
+                  onPress={() => setPage((p) => Math.max(1, p - 1))}
+                  className={`rounded border border-slate-200 bg-white px-2 py-0.5 shadow-2xs ${
+                    page <= 1 ? 'opacity-40' : ''
+                  }`}
+                >
+                  <Text className="text-[10.5px] font-semibold text-slate-700">Prev</Text>
+                </TouchableOpacity>
+
+                <Text className="text-[10.5px] font-bold text-slate-600">
+                  Page {page} of {pagination.totalPages}
                 </Text>
-                <View className="flex-row items-center justify-between">
-                  <SmallButton label="Previous" disabled={page <= 1} onPress={() => setPage((p) => Math.max(1, p - 1))} />
-                  <Text className="text-xs font-medium text-slate-600">Page {page} of {pagination.totalPages}</Text>
-                  <SmallButton label="Next" disabled={page >= pagination.totalPages} onPress={() => setPage((p) => Math.min(pagination.totalPages, p + 1))} />
-                </View>
+
+                <TouchableOpacity
+                  disabled={page >= pagination.totalPages}
+                  onPress={() => setPage((p) => Math.min(pagination.totalPages, p + 1))}
+                  className={`rounded border border-slate-200 bg-white px-2 py-0.5 shadow-2xs ${
+                    page >= pagination.totalPages ? 'opacity-40' : ''
+                  }`}
+                >
+                  <Text className="text-[10.5px] font-semibold text-slate-700">Next</Text>
+                </TouchableOpacity>
               </View>
-            ) : null}
+            )}
           </View>
         )}
       </ScrollView>
@@ -307,15 +525,19 @@ export default function TrashScreen() {
           refreshAll();
         }}
       />
+
       <ConfirmModal
-        open={!!deleteTarget}
+        open={Boolean(deleteTarget)}
         title="Permanently Delete Item?"
-        description={`Are you sure you want to permanently purge "${deleteTarget?.title || ''}" from the trash bin? This action cannot be undone.`}
+        description={`Are you sure you want to permanently purge "${
+          deleteTarget?.title || ''
+        }" from the trash bin? This action cannot be undone.`}
         confirmLabel="Permanently Delete"
         loading={actionLoading}
         onConfirm={permanentDelete}
         onCancel={() => setDeleteTarget(null)}
       />
+
       <ConfirmModal
         open={emptyTrashModal}
         title="Empty Entire Trash Bin?"

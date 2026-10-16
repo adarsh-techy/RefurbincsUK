@@ -17,7 +17,9 @@ const SIZES = {
 // size: 'md' (default) through '4xl', for forms that need more room.
 // Phones get a full-width bottom sheet; from sm up it's a centred card.
 // Either way it never exceeds the viewport — the body scrolls inside.
-function Modal({ title, description, onClose, size = 'md', className = '', children }) {
+function Modal({ open = true, title, description, onClose, size = 'md', className = '', centered = false, children }) {
+  if (open === false) return null;
+
   useEffect(() => {
     function handleKeyDown(e) {
       if (e.key === 'Escape') onClose();
@@ -37,7 +39,9 @@ function Modal({ title, description, onClose, size = 'md', className = '', child
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-end justify-center bg-slate-900/60 backdrop-blur-xs sm:items-center sm:p-4 touch-scroll"
+      className={`fixed inset-0 z-50 flex ${
+        centered ? 'items-center p-3 sm:p-4' : 'items-end sm:items-center sm:p-4'
+      } justify-center bg-slate-900/60 backdrop-blur-xs touch-scroll`}
       onClick={onClose}
     >
       <div
@@ -45,7 +49,9 @@ function Modal({ title, description, onClose, size = 'md', className = '', child
         aria-modal="true"
         aria-label={title}
         onClick={(e) => e.stopPropagation()}
-        className={`flex max-h-[92vh] supports-[height:100dvh]:max-h-[92dvh] w-full min-w-0 flex-col rounded-t-2xl sm:rounded-2xl border-[0.25px] border-blue-200 bg-white pb-[env(safe-area-inset-bottom)] shadow-2xl dark:border-blue-700 dark:bg-surface-900 ${SIZES[size] || SIZES.md} ${className}`}
+        className={`flex max-h-[85vh] supports-[height:100dvh]:max-h-[85dvh] w-full min-w-0 flex-col ${
+          centered ? 'rounded-2xl' : 'rounded-t-2xl sm:rounded-2xl'
+        } border-[0.25px] border-blue-200 bg-white pb-2 sm:pb-0 shadow-2xl dark:border-blue-700 dark:bg-surface-900 ${SIZES[size] || SIZES.md} ${className}`}
       >
         <div className="flex shrink-0 items-start justify-between border-b border-slate-100 px-4 py-3 sm:px-6 sm:py-4 dark:border-surface-700">
           <div className="min-w-0 pr-2">
@@ -63,7 +69,7 @@ function Modal({ title, description, onClose, size = 'md', className = '', child
             ✕
           </button>
         </div>
-        <div className="custom-scrollbar overflow-y-auto overflow-x-hidden flex-1 min-h-0 min-w-0 flex flex-col px-4 py-4 sm:px-6 sm:py-5">{children}</div>
+        <div className="custom-scrollbar overflow-y-auto overflow-x-hidden flex-1 min-h-0 min-w-0 flex flex-col px-4 py-3 sm:px-6 sm:py-4">{children}</div>
       </div>
     </div>
   );

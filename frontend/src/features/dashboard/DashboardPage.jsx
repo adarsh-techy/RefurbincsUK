@@ -235,22 +235,22 @@ function DashboardPage() {
   return (
     <div className="space-y-6 pb-12">
       {/* ── Page Header ─────────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between border-b border-slate-200/80 pb-3 sm:pb-4 dark:border-white/10">
         <div>
-          <h1 className="text-xl font-black tracking-tight text-slate-900 dark:text-white sm:text-2xl">
+          <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
             Welcome back{user?.name ? `, ${user.name}` : ''}!
           </h1>
-          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
-            Real-time battery refurbishment overview, workshop throughput analytics & return dispatches
+          <p className="text-[11px] sm:text-xs font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
+            Refurbishment throughput analytics, active workshop queue & return dispatches
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5">
+        <div className="flex flex-wrap items-center gap-2">
           {!isToday && (
             <button
               type="button"
               onClick={() => setSelectedDate(new Date())}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 dark:hover:bg-white/5 transition-all"
+              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 dark:hover:bg-white/5 transition-all cursor-pointer"
             >
               <FiCalendar className="h-3.5 w-3.5 text-blue-500" />
               <span>Reset to Today</span>
@@ -259,12 +259,12 @@ function DashboardPage() {
 
           <Link
             to="/notifications"
-            className="inline-flex items-center gap-2 rounded-xl bg-blue-600 px-3.5 py-2 text-xs font-black text-white shadow-xs hover:bg-blue-700 transition-all"
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 px-3 py-1.5 text-xs font-black text-white shadow-xs hover:bg-blue-700 transition-all"
           >
             <FiActivity className="h-3.5 w-3.5" />
             <span>Operations Feed</span>
             {totals?.lowStockParts > 0 && (
-              <span className="flex h-4.5 min-w-[1.125rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[10px] font-black text-white">
+              <span className="flex h-4 min-w-[1rem] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-black text-white">
                 {totals.lowStockParts}
               </span>
             )}
@@ -272,33 +272,33 @@ function DashboardPage() {
         </div>
       </div>
 
-      {/* ── 6 Primary Operational KPI Metrics ─────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+      {/* ── 6 Primary Operational KPI Metrics (2-col on mobile, 3-col on tablet, 6-col on desktop) ── */}
+      <div className="grid grid-cols-2 gap-2.5 sm:gap-3.5 sm:grid-cols-3 xl:grid-cols-6">
         {/* 1. Total Fleet Batteries */}
         <Link
           to="/batteries"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
-              Total Batteries
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 truncate">
+              Total Units
             </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <FiBatteryCharging className="h-4 w-4" />
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+              <FiBatteryCharging className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           </div>
-          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+          <div className="mt-1.5 text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
             {Number(totals?.totalBatteries || 0).toLocaleString()}
           </div>
           {typeof changes?.totalBatteries === 'number' && (
-            <div className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+            <div className="mt-0.5 flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
               <FiTrendingUp className="h-3 w-3" />
               <span>{changes.totalBatteries > 0 ? `+${changes.totalBatteries}%` : `${changes.totalBatteries}%`}</span>
-              <span className="font-normal text-slate-400">vs mo.</span>
+              <span className="font-normal text-slate-400 hidden sm:inline">vs mo.</span>
             </div>
           )}
           {trends?.totalBatteries && (
-            <div className="mt-2 pt-1 border-t border-slate-100 dark:border-white/5">
+            <div className="mt-1.5 pt-1 border-t border-slate-100 dark:border-white/5">
               <Sparkline values={trends.totalBatteries} color="#2563eb" />
             </div>
           )}
@@ -307,24 +307,24 @@ function DashboardPage() {
         {/* 2. Pending Repair Backlog */}
         <Link
           to="/batteries?status=in_repair"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-amber-200/80 bg-linear-to-b from-amber-50/40 to-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/40 dark:from-amber-950/20 dark:to-surface-900"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border border-amber-200/80 bg-linear-to-b from-amber-50/40 to-white p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-amber-900/40 dark:from-amber-950/20 dark:to-surface-900"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300">
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-700 dark:text-amber-300 truncate">
               In Workshop
             </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
-              <FiTool className="h-4 w-4" />
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/60 dark:text-amber-300">
+              <FiTool className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           </div>
-          <div className="mt-2 text-2xl font-black text-amber-950 dark:text-amber-100">
+          <div className="mt-1.5 text-lg sm:text-2xl font-black text-amber-950 dark:text-amber-100">
             {Number(totals?.pendingRepair || 0).toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] font-medium text-amber-700/80 dark:text-amber-300/80">
-            Active service queue
+          <div className="mt-0.5 text-[10px] sm:text-[11px] font-medium text-amber-700/80 dark:text-amber-300/80 truncate">
+            Active queue
           </div>
           {trends?.pendingRepair && (
-            <div className="mt-2 pt-1 border-t border-amber-100 dark:border-white/5">
+            <div className="mt-1.5 pt-1 border-t border-amber-100 dark:border-white/5">
               <Sparkline values={trends.pendingRepair} color="#d97706" />
             </div>
           )}
@@ -333,28 +333,28 @@ function DashboardPage() {
         {/* 3. Successfully Repaired */}
         <Link
           to="/batteries?status=repaired"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-emerald-200/80 bg-linear-to-b from-emerald-50/40 to-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-900"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border border-emerald-200/80 bg-linear-to-b from-emerald-50/40 to-white p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-emerald-900/40 dark:from-emerald-950/20 dark:to-surface-900"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">
-              Repaired & Ready
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300 truncate">
+              Repaired
             </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
-              <FiCheckCircle className="h-4 w-4" />
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-300">
+              <FiCheckCircle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           </div>
-          <div className="mt-2 text-2xl font-black text-emerald-950 dark:text-emerald-100">
+          <div className="mt-1.5 text-lg sm:text-2xl font-black text-emerald-950 dark:text-emerald-100">
             {Number(totals?.repaired || 0).toLocaleString()}
           </div>
           {typeof changes?.repaired === 'number' && (
-            <div className="mt-1 flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
+            <div className="mt-0.5 flex items-center gap-1 text-[10px] sm:text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
               <FiTrendingUp className="h-3 w-3" />
               <span>{changes.repaired > 0 ? `+${changes.repaired}%` : `${changes.repaired}%`}</span>
-              <span className="font-normal text-slate-400">throughput</span>
+              <span className="font-normal text-slate-400 hidden sm:inline">throughput</span>
             </div>
           )}
           {trends?.repaired && (
-            <div className="mt-2 pt-1 border-t border-emerald-100 dark:border-white/5">
+            <div className="mt-1.5 pt-1 border-t border-emerald-100 dark:border-white/5">
               <Sparkline values={trends.repaired} color="#059669" />
             </div>
           )}
@@ -363,105 +363,104 @@ function DashboardPage() {
         {/* 4. Critical Stock Watch */}
         <Link
           to={hasPermission(user, 'parts') ? '/parts?lowStock=true' : '/notifications'}
-          className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
+          className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
             totals?.lowStockParts > 0
               ? 'border-rose-300 bg-linear-to-b from-rose-50/50 to-white dark:border-rose-900/50 dark:from-rose-950/20 dark:to-surface-900'
               : 'border-slate-200/90 bg-white dark:border-white/10 dark:bg-surface-900'
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
-              Low Stock Parts
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 truncate">
+              Low Stock
             </span>
             <span
-              className={`flex h-8 w-8 items-center justify-center rounded-xl ${
+              className={`flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl ${
                 totals?.lowStockParts > 0
                   ? 'bg-rose-100 text-rose-700 dark:bg-rose-900/60 dark:text-rose-300 animate-pulse'
                   : 'bg-slate-100 text-slate-600 dark:bg-surface-800 dark:text-neutral-300'
               }`}
             >
-              <FiPackage className="h-4 w-4" />
+              <FiPackage className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           </div>
           <div
-            className={`mt-2 text-2xl font-black ${
+            className={`mt-1.5 text-lg sm:text-2xl font-black ${
               totals?.lowStockParts > 0 ? 'text-rose-750 dark:text-rose-300' : 'text-slate-900 dark:text-white'
             }`}
           >
             {Number(totals?.lowStockParts || 0).toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-            {totals?.lowStockParts > 0 ? '⚠️ Replenishment needed' : '✓ Stock levels healthy'}
+          <div className="mt-0.5 text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-neutral-400 truncate">
+            {totals?.lowStockParts > 0 ? '⚠️ Restock needed' : '✓ Stock healthy'}
           </div>
         </Link>
 
         {/* 5. Unserviceable Batteries */}
         <Link
           to="/batteries/unserviceable"
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
-              Unserviceable
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 truncate">
+              Scrap
             </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400">
-              <FiAlertTriangle className="h-4 w-4" />
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-orange-50 text-orange-600 dark:bg-orange-950/50 dark:text-orange-400">
+              <FiAlertTriangle className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           </div>
-          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+          <div className="mt-1.5 text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
             {Number(totals?.unserviceable || 0).toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-            Awaiting scrap batch
+          <div className="mt-0.5 text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-neutral-400 truncate">
+            Unserviceable
           </div>
         </Link>
 
-        {/* 6. Recycled Batteries — the shipments page needs the recycle
-            permission; everyone else gets the recycled-batteries list */}
+        {/* 6. Recycled Batteries */}
         <Link
           to={hasPermission(user, 'recycle') ? '/recycle' : '/batteries/recycled'}
-          className="group relative flex flex-col justify-between overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
+          className="group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3 sm:p-4 shadow-2xs transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md dark:border-white/10 dark:bg-surface-900"
         >
-          <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400">
-              Recycled & Saved
+          <div className="flex items-center justify-between gap-1">
+            <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-neutral-400 truncate">
+              Recycled
             </span>
-            <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
-              <FiShield className="h-4 w-4" />
+            <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
+              <FiShield className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
             </span>
           </div>
-          <div className="mt-2 text-2xl font-black text-slate-900 dark:text-white">
+          <div className="mt-1.5 text-lg sm:text-2xl font-black text-slate-900 dark:text-white">
             {Number(totals?.recycled || 0).toLocaleString()}
           </div>
-          <div className="mt-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
-            Diverted to recycling
+          <div className="mt-0.5 text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-neutral-400 truncate">
+            Saved & recycled
           </div>
         </Link>
       </div>
 
       {/* ── Main Operations Grid: Repairs Activity & Calendar/Actions ── */}
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-3">
         {/* Left 2 Cols: Activity Feed for Selected Date + Hourly Velocity */}
-        <div className="space-y-6 lg:col-span-2">
+        <div className="space-y-4 sm:space-y-6 lg:col-span-2">
           {/* Repairs Stream Container */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-4 dark:border-white/5">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-6 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 sm:pb-4 dark:border-white/5">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-                  <FiTool className="h-5 w-5" />
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                  <FiTool className="h-4 w-4 sm:h-5 sm:w-5" />
                 </div>
                 <div>
-                  <h2 className="text-sm font-black text-slate-900 dark:text-white sm:text-base">
+                  <h2 className="text-xs sm:text-base font-black text-slate-900 dark:text-white">
                     {isToday ? "Today's Logged Repairs" : `Repairs Log — ${selectedDateLabel}`}
                   </h2>
-                  <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+                  <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400">
                     Workshop technician diagnostic & repair execution stream
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-slate-300">
+              <div className="flex items-center gap-2 self-start sm:self-auto">
+                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2.5 py-0.5 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-bold text-slate-700 dark:bg-surface-800 dark:text-slate-300">
                   {todaysRepairs.length} logged unit{todaysRepairs.length === 1 ? '' : 's'}
                 </span>
               </div>
@@ -542,10 +541,10 @@ function DashboardPage() {
         </div>
 
         {/* Right 1 Col: Mini Calendar & Quick Launcher */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {/* Mini Calendar Card */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
-            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/5">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5 sm:pb-3 dark:border-white/5">
               <div className="flex items-center gap-2">
                 <FiCalendar className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                 <span className="text-xs font-bold text-slate-900 dark:text-white">
@@ -560,7 +559,7 @@ function DashboardPage() {
           </div>
 
           {/* Quick Action Commands */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900">
             <div className="mb-3 flex items-center justify-between border-b border-slate-100 pb-2.5 dark:border-white/5">
               <div className="flex items-center gap-2">
                 <FiZap className="h-4 w-4 text-amber-500" />
@@ -579,22 +578,22 @@ function DashboardPage() {
                   <Link
                     key={action.to}
                     to={action.to}
-                    className="group flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/50 p-2.5 transition-all hover:border-slate-200 hover:bg-white hover:shadow-2xs dark:border-white/5 dark:bg-surface-850/50 dark:hover:border-white/10 dark:hover:bg-surface-800"
+                    className="group flex items-center justify-between gap-2.5 rounded-xl sm:rounded-2xl border border-slate-100 bg-slate-50/50 p-2 sm:p-2.5 transition-all hover:border-slate-200 hover:bg-white hover:shadow-2xs dark:border-white/5 dark:bg-surface-850/50 dark:hover:border-white/10 dark:hover:bg-surface-800"
                   >
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-slate-700 shadow-2xs group-hover:bg-blue-600 group-hover:text-white transition-all dark:bg-surface-700 dark:text-slate-200">
-                        <ActionIcon className="h-4 w-4" />
+                      <span className="flex h-7 w-7 sm:h-8 sm:w-8 shrink-0 items-center justify-center rounded-lg sm:rounded-xl bg-white text-slate-700 shadow-2xs group-hover:bg-blue-600 group-hover:text-white transition-all dark:bg-surface-700 dark:text-slate-200">
+                        <ActionIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                       </span>
                       <div className="min-w-0">
                         <p className="truncate text-xs font-bold text-slate-800 group-hover:text-blue-600 dark:text-white dark:group-hover:text-blue-400">
                           {action.label}
                         </p>
-                        <p className="truncate text-[10px] text-slate-400 dark:text-neutral-400">
+                        <p className="truncate text-[9.5px] sm:text-[10px] text-slate-400 dark:text-neutral-400">
                           {action.desc}
                         </p>
                       </div>
                     </div>
-                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wider text-slate-600 dark:bg-surface-700 dark:text-slate-300">
+                    <span className="rounded-md bg-slate-100 px-1.5 py-0.5 text-[8.5px] sm:text-[9px] font-black uppercase tracking-wider text-slate-600 dark:bg-surface-700 dark:text-slate-300">
                       {action.badge}
                     </span>
                   </Link>
@@ -606,24 +605,24 @@ function DashboardPage() {
       </div>
 
       {/* ── Operations Notifications & System Alerts Stream ────────────── */}
-      <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-6 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        <div className="mb-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 dark:border-white/5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-              <FiBell className="h-5 w-5" />
+            <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+              <FiBell className="h-4 w-4 sm:h-5 sm:w-5" />
             </span>
             <div>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white sm:text-base">
+              <h2 className="text-xs sm:text-base font-black text-slate-900 dark:text-white">
                 Operational Alerts & System Notifications
               </h2>
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 Critical workshop stock thresholds, logistics dispatches & client alerts
               </p>
             </div>
           </div>
           <Link
             to="/notifications"
-            className="inline-flex items-center gap-1 rounded-xl bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-all"
+            className="inline-flex items-center gap-1 self-start sm:self-auto rounded-xl bg-blue-50 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-blue-700 hover:bg-blue-100 dark:bg-blue-950/40 dark:text-blue-300 dark:hover:bg-blue-900/50 transition-all"
           >
             <span>View All Operations Feed</span>
             <FiArrowRight className="h-3.5 w-3.5" />
@@ -635,12 +634,12 @@ function DashboardPage() {
             All systems normal. No active operational alerts.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {recentNotifications.map((notif) => (
               <Link
                 key={notif.id}
                 to={`/notifications/${notif.id}`}
-                className={`group flex flex-col justify-between gap-3 rounded-2xl border p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:shadow-xs ${
+                className={`group flex flex-col justify-between gap-3 rounded-2xl border p-3.5 sm:p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:shadow-xs ${
                   notif.severity === 'urgent'
                     ? 'border-rose-200 bg-rose-50/30 hover:border-rose-300 dark:border-rose-900/40 dark:bg-rose-950/15'
                     : notif.severity === 'warning'
@@ -676,7 +675,7 @@ function DashboardPage() {
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-100/80 pt-2.5 text-[11px] font-bold text-blue-600 group-hover:text-blue-700 dark:border-white/5 dark:text-blue-400">
+                <div className="flex items-center justify-between border-t border-slate-100/80 pt-2 text-[11px] font-bold text-blue-600 group-hover:text-blue-700 dark:border-white/5 dark:text-blue-400">
                   <span>View Details</span>
                   <FiArrowRight className="h-3.5 w-3.5 transition-transform group-hover:translate-x-0.5" />
                 </div>
@@ -687,17 +686,17 @@ function DashboardPage() {
       </div>
 
       {/* ── Client Returns & Logistics Stream ────────────────────────── */}
-      <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+      <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-6 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+        <div className="mb-3.5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between border-b border-slate-100 pb-3 dark:border-white/5">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
-              <FiTruck className="h-5 w-5" />
+            <span className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-teal-50 text-teal-600 dark:bg-teal-950/50 dark:text-teal-400">
+              <FiTruck className="h-4 w-4 sm:h-5 sm:w-5" />
             </span>
             <div>
-              <h2 className="text-sm font-black text-slate-900 dark:text-white sm:text-base">
+              <h2 className="text-xs sm:text-base font-black text-slate-900 dark:text-white">
                 Client Battery Returns & Receipt Dispatches
               </h2>
-              <p className="text-[11px] font-medium text-slate-500 dark:text-slate-400">
+              <p className="text-[10px] sm:text-[11px] font-medium text-slate-500 dark:text-slate-400">
                 Live dispatches of repaired packs returned to customer fleets
               </p>
             </div>
@@ -705,7 +704,7 @@ function DashboardPage() {
           {hasPermission(user, 'returns') && (
             <Link
               to="/returns"
-              className="inline-flex items-center gap-1 rounded-xl bg-teal-50 px-3 py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-all"
+              className="inline-flex items-center gap-1 self-start sm:self-auto rounded-xl bg-teal-50 px-2.5 sm:px-3 py-1 sm:py-1.5 text-xs font-bold text-teal-700 hover:bg-teal-100 dark:bg-teal-950/40 dark:text-teal-300 dark:hover:bg-teal-900/50 transition-all"
             >
               <span>Manage All Returns</span>
               <FiArrowRight className="h-3.5 w-3.5" />
@@ -714,32 +713,32 @@ function DashboardPage() {
         </div>
 
         {recentClientReturns.length === 0 ? (
-          <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+          <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
             No recent client return dispatches recorded.
           </p>
         ) : (
-          <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {recentClientReturns.map((ret) => (
               <Link
                 key={ret.id}
                 to={`/returns/${ret.id}`}
-                className="group flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:shadow-xs hover:border-teal-300 dark:border-white/10 dark:bg-surface-850 dark:hover:border-teal-700/60"
+                className="group flex flex-col justify-between gap-3 rounded-2xl border border-slate-200/80 bg-white p-3.5 sm:p-4 shadow-2xs transition-all hover:-translate-y-0.5 hover:shadow-xs hover:border-teal-300 dark:border-white/10 dark:bg-surface-850 dark:hover:border-teal-700/60"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-teal-700 dark:bg-teal-950/60 dark:text-teal-300">
                       ✓ Dispatched
                     </span>
-                    <h3 className="mt-2 truncate text-xs font-black text-slate-900 group-hover:text-teal-600 dark:text-white dark:group-hover:text-teal-400">
+                    <h3 className="mt-1.5 truncate text-xs font-black text-slate-900 group-hover:text-teal-600 dark:text-white dark:group-hover:text-teal-400">
                       {ret.clientName}
                     </h3>
                   </div>
-                  <span className="shrink-0 rounded-xl bg-slate-100 px-2.5 py-1 font-mono text-xs font-bold text-slate-800 dark:bg-surface-700 dark:text-slate-200">
+                  <span className="shrink-0 rounded-xl bg-slate-100 px-2 py-0.5 font-mono text-[11px] sm:text-xs font-bold text-slate-800 dark:bg-surface-700 dark:text-slate-200">
                     {ret.batteryCount} {ret.batteryCount === 1 ? 'pack' : 'packs'}
                   </span>
                 </div>
 
-                <div className="flex items-center justify-between border-t border-slate-100 pt-2.5 text-[11px] text-slate-400 dark:border-white/5 dark:text-neutral-500">
+                <div className="flex items-center justify-between border-t border-slate-100 pt-2 text-[10px] sm:text-[11px] text-slate-400 dark:border-white/5 dark:text-neutral-500">
                   <span className="truncate font-medium">
                     Truck {ret.truckNumber || 'N/A'} {ret.driverName ? `• ${ret.driverName}` : ''}
                   </span>
@@ -755,26 +754,26 @@ function DashboardPage() {
 
       {/* ── Workshop Performance Matrix: Average Times ──────────────── */}
       {isSuperAdmin && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6 lg:grid-cols-2">
           {/* Average Time by Service / Part */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-6 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/5">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
-                  <FiClock className="h-4 w-4" />
+                <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-blue-50 text-blue-600 dark:bg-blue-950/50 dark:text-blue-400">
+                  <FiClock className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
-                <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
                   Average Duration by Service / Part
                 </h2>
               </div>
               {serviceTimes?.byPart?.length > 0 && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
                   {serviceTimes.byPart.length} monitored
                 </span>
               )}
             </div>
             {!serviceTimes?.byPart?.length ? (
-              <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+              <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
                 Not enough completed service sessions recorded to benchmark times.
               </p>
             ) : (
@@ -787,24 +786,24 @@ function DashboardPage() {
           </div>
 
           {/* Average Time by Technician */}
-          <div className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-2xs dark:border-white/10 dark:bg-surface-900 sm:p-6">
-            <div className="mb-4 flex items-center justify-between border-b border-slate-100 pb-3.5 dark:border-white/5">
+          <div className="rounded-2xl sm:rounded-3xl border border-slate-200/80 bg-white p-3.5 sm:p-6 shadow-2xs dark:border-white/10 dark:bg-surface-900">
+            <div className="mb-3.5 flex items-center justify-between border-b border-slate-100 pb-3 dark:border-white/5">
               <div className="flex items-center gap-2">
-                <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
-                  <FiUser className="h-4 w-4" />
+                <span className="flex h-7 w-7 sm:h-8 sm:w-8 items-center justify-center rounded-xl bg-purple-50 text-purple-600 dark:bg-purple-950/50 dark:text-purple-400">
+                  <FiUser className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                 </span>
-                <h2 className="text-sm font-black text-slate-900 dark:text-white">
+                <h2 className="text-xs sm:text-sm font-black text-slate-900 dark:text-white">
                   Average Duration by Technician
                 </h2>
               </div>
               {serviceTimes?.byStaff?.length > 0 && (
-                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
+                <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] sm:text-xs font-bold text-slate-600 dark:bg-surface-800 dark:text-slate-300">
                   {serviceTimes.byStaff.length} technicians
                 </span>
               )}
             </div>
             {!serviceTimes?.byStaff?.length ? (
-              <p className="py-8 text-center text-xs text-slate-400 dark:text-neutral-500">
+              <p className="py-6 text-center text-xs text-slate-400 dark:text-neutral-500">
                 Not enough completed technician sessions recorded to benchmark times.
               </p>
             ) : (

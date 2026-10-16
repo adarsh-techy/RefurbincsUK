@@ -49,6 +49,24 @@ services:
       # public HTTPS domain via Caddy), or the browser's CORS preflight
       # rejects every API call — see backend/src/config/cors-origin.js.
       CLIENT_URL: ${CLIENT_URL:?set CLIENT_URL in .env}
+      # Optional: outgoing email (invoices / notifications). Empty = disabled.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURE: ${SMTP_SECURE:-}
+      SMTP_USER: ${SMTP_USER:-}
+      SMTP_PASS: ${SMTP_PASS:-}
+      EMAIL_FROM: ${EMAIL_FROM:-}
+      # Optional: S3-compatible object storage for uploads. Empty = the
+      # persistent `uploads` volume mounted at /app/uploads below.
+      STORAGE_BUCKET: ${STORAGE_BUCKET:-}
+      STORAGE_ENDPOINT: ${STORAGE_ENDPOINT:-}
+      STORAGE_REGION: ${STORAGE_REGION:-auto}
+      STORAGE_ACCESS_KEY_ID: ${STORAGE_ACCESS_KEY_ID:-}
+      STORAGE_SECRET_ACCESS_KEY: ${STORAGE_SECRET_ACCESS_KEY:-}
+    volumes:
+      # Uploaded files (client logos, invoices, staff docs, issue photos,
+      # return docs) survive `docker compose up --build` / container recreation.
+      - uploads:/app/uploads
     healthcheck:
       test: ['CMD', 'wget', '-qO-', 'http://127.0.0.1:5000/health']
       interval: 15s
@@ -96,8 +114,8 @@ services:
       - frontend
       - backend
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in .env}
-      API_DOMAIN: ${API_DOMAIN:?set API_DOMAIN in .env}
+      # ":80" for IP-only HTTP, or a hostname for automatic HTTPS (see Caddyfile)
+      SITE_ADDRESS: ${SITE_ADDRESS:?set SITE_ADDRESS in .env}
     ports:
       - '80:80'
       - '443:443'
@@ -113,5 +131,6 @@ services:
 
 volumes:
   db-data:
+  uploads:
   caddy-data:
   caddy-config:

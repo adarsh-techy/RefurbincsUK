@@ -1,14 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, Link } from 'react-router-dom';
 import { useSelector } from 'react-redux';
 import apiClient from '../../services/api-client';
 import Modal from '../../components/ui/overlays/Modal';
-import { useTheme } from '../../context/ThemeContext';
 import { socket } from '../../services/socket-client';
 
 const CATEGORIES = [
   { id: 'general', label: 'General Inquiry & Assistance' },
-  { id: 'battery_inquiry', label: 'Battery Status / QR Code Question' },
+  { id: 'battery_inquiry', label: 'Battery Status / QR Code' },
   { id: 'repair_status', label: 'Repair & Service Inquiries' },
   { id: 'delivery_pickup', label: 'Delivery & Logistics' },
   { id: 'billing', label: 'Billing & Invoice Question' },
@@ -50,8 +49,6 @@ function timeAgo(ts) {
 
 export default function ClientSupportPage() {
   const userRole = useSelector((state) => state.auth.user?.role);
-  const { customTheme } = useTheme();
-  const accent = customTheme?.accentColor || '#10b981';
 
   const [searchParams, setSearchParams] = useSearchParams();
   const selectedTicketIdParam = searchParams.get('ticket');
@@ -68,6 +65,9 @@ export default function ClientSupportPage() {
   const [replyMessage, setReplyMessage] = useState('');
   const [sendingReply, setSendingReply] = useState(false);
 
+  // Mobile view toggle: 'list' | 'chat'
+  const [mobileView, setMobileView] = useState('list');
+
   // New ticket modal
   const [createOpen, setCreateOpen] = useState(false);
   const [newSubject, setNewSubject] = useState('');
@@ -78,9 +78,6 @@ export default function ClientSupportPage() {
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState(null);
 
-  // The client's own registered batteries — used to suggest and validate
-  // the "Linked Battery ID" field, so a ticket can't be filed against a
-  // code that isn't actually theirs (typo'd or otherwise).
   const [myBatteries, setMyBatteries] = useState([]);
   const [batteriesLoaded, setBatteriesLoaded] = useState(false);
   const [showBatterySuggestions, setShowBatterySuggestions] = useState(false);
@@ -97,8 +94,11 @@ export default function ClientSupportPage() {
 
       if (selectedTicketIdParam) {
         const found = list.find((t) => String(t.id) === String(selectedTicketIdParam));
-        if (found) loadTicketDetail(found.id);
-      } else if (list.length > 0 && !activeTicket) {
+        if (found) {
+          loadTicketDetail(found.id);
+          setMobileView('chat');
+        }
+      } else if (list.length > 0 && !activeTicket && window.innerWidth >= 1024) {
         loadTicketDetail(list[0].id);
       }
     } catch (err) {
@@ -114,6 +114,7 @@ export default function ClientSupportPage() {
       const res = await apiClient.get(`/tickets/${id}`);
       setActiveTicket(res.data);
       setSearchParams({ ticket: id });
+      setMobileView('chat');
     } catch {
       // ignore
     } finally {
@@ -126,10 +127,6 @@ export default function ClientSupportPage() {
   }, []);
 
   useEffect(() => {
-    // Only fleet clients have a battery list (the endpoint is
-    // requireRole('client')); a recycle_client or office login would just
-    // get a 403, so don't ask. batteriesLoaded stays false and the battery
-    // field isn't validated against an empty list.
     if (userRole !== 'client') return;
     apiClient
       .get('/clients/me/batteries')
@@ -148,7 +145,11 @@ export default function ClientSupportPage() {
 
     function onMessage(payload) {
       setTickets((prev) =>
-        prev.map((t) => (t.id === payload.ticketId ? { ...t, updated_at: new Date().toISOString(), last_message: payload.message } : t))
+        prev.map((t) =>
+          t.id === payload.ticketId
+            ? { ...t, updated_at: new Date().toISOString(), last_message: payload.message }
+            : t
+        )
       );
       if (activeTicket && activeTicket.id === payload.ticketId) {
         setActiveTicket((prev) => ({
@@ -199,9 +200,6 @@ export default function ClientSupportPage() {
     e.preventDefault();
     if (!newSubject.trim() || !newMessage.trim()) return;
 
-    // Only enforced once the client's own battery list has actually loaded
-    // (it doesn't for every account this page serves, e.g. recycle_client)
-    // — otherwise a real code could get rejected against an empty list.
     if (batteriesLoaded && newBatteryCode.trim() && !isKnownBatteryCode(newBatteryCode)) {
       setCreateError('That battery code isn’t linked to your account. Pick one from the suggestions.');
       return;
@@ -261,55 +259,60 @@ export default function ClientSupportPage() {
     return true;
   });
 
+  const counts = {
+    all: tickets.length,
+    open: tickets.filter((t) => t.status === 'open').length,
+    in_progress: tickets.filter((t) => t.status === 'in_progress').length,
+    resolved: tickets.filter((t) => t.status === 'resolved').length,
+  };
+
   return (
-    <div className="space-y-4">
-      {/* ── Top Header Bar ─────────────────────────────────────────── */}
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <div className="flex items-center gap-2.5">
-            <span
-              className="flex h-9 w-9 items-center justify-center rounded-xl text-white shadow-sm"
-              style={{ backgroundColor: accent }}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-5 w-5">
-                <path fillRule="evenodd" d="M4.804 21.644A6.707 6.707 0 0 0 6 21.75a6.721 6.721 0 0 0 3.583-1.029c.774.182 1.584.279 2.417.279 5.322 0 9.75-3.97 9.75-9 0-5.03-4.428-9-9.75-9s-9.75 3.97-9.75 9c0 2.409 1.025 4.587 2.674 6.192.232.226.277.428.254.543a3.73 3.73 0 0 1-.814 1.686.75.75 0 0 0 .44 1.223ZM8.25 10.875a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25ZM10.875 12a1.125 1.125 0 1 1 2.25 0 1.125 1.125 0 0 1-2.25 0Zm4.875-1.125a1.125 1.125 0 1 0 0 2.25 1.125 1.125 0 0 0 0-2.25Z" clipRule="evenodd" />
-              </svg>
-            </span>
-            <div>
-              <h1 className="text-xl font-bold tracking-tight text-slate-900 dark:text-white sm:text-2xl">
-                Help & Support Center
-              </h1>
-              <p className="text-xs text-slate-500 dark:text-neutral-400">
-                Direct messaging with the Refurbinics service & repair team.
-              </p>
-            </div>
+    <div className="space-y-2.5 pb-8">
+      {/* ── Header Bar: Unbreakable Button ─────────────────────────────── */}
+      <div className="flex items-center justify-between gap-3 pt-0.5">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-sm sm:text-base font-bold tracking-tight text-slate-900 dark:text-white truncate">
+              Help & Support
+            </h1>
+            {counts.all > 0 && (
+              <span className="rounded-full bg-slate-100 dark:bg-slate-800 px-1.5 py-0.2 text-[10px] font-bold text-slate-600 dark:text-slate-300">
+                {counts.all}
+              </span>
+            )}
           </div>
+          <p className="text-[10.5px] text-slate-500 dark:text-slate-400 truncate">
+            Direct communication with Refurbnics engineering
+          </p>
         </div>
 
         <button
           type="button"
           onClick={() => setCreateOpen(true)}
-          style={{ backgroundColor: accent }}
-          className="inline-flex items-center gap-2 self-start rounded-xl px-4 py-2.5 text-xs font-bold text-white shadow-sm transition-all hover:opacity-90 active:scale-98"
+          className="shrink-0 whitespace-nowrap inline-flex h-8 items-center gap-1.5 rounded-lg bg-blue-600 px-3 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 active:scale-95 transition"
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
             <path d="M10.75 4.75a.75.75 0 0 0-1.5 0v4.5h-4.5a.75.75 0 0 0 0 1.5h4.5v4.5a.75.75 0 0 0 1.5 0v-4.5h4.5a.75.75 0 0 0 0-1.5h-4.5v-4.5Z" />
           </svg>
-          New Help Request
+          <span>New Ticket</span>
         </button>
       </div>
 
-      {/* ── Modern 2-Pane Unified Workspace ─────────────────────────── */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-12 min-h-[640px] items-stretch">
-        {/* ── Left Pane: My Tickets Queue ────────────────────────────── */}
-        <div className="lg:col-span-5 flex flex-col rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-surface-900">
-          {/* Status Tabs */}
-          <div className="flex items-center gap-1 rounded-2xl border border-slate-200/80 bg-slate-100/80 p-1 dark:border-white/10 dark:bg-surface-800 mb-3">
+      {/* ── Main Layout: Queue List vs Chat Thread ─────────────────────── */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3 min-h-[560px] items-stretch">
+        {/* Left Pane: Queue (Hidden on mobile if chat is active) */}
+        <div
+          className={`lg:col-span-5 flex flex-col rounded-xl border border-slate-200/80 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-900 ${
+            mobileView === 'chat' && activeTicket ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
+          {/* 4-Segment Grid Bar (ZERO Horizontal Scroll) */}
+          <div className="grid grid-cols-4 gap-1 w-full mb-2">
             {[
-              { id: 'all', label: 'All' },
-              { id: 'open', label: 'Open' },
-              { id: 'in_progress', label: 'In Progress' },
-              { id: 'resolved', label: 'Resolved' },
+              { id: 'all', short: 'All', full: 'All', count: counts.all },
+              { id: 'open', short: 'Open', full: 'Open', count: counts.open },
+              { id: 'in_progress', short: 'Active', full: 'In Progress', count: counts.in_progress },
+              { id: 'resolved', short: 'Done', full: 'Resolved', count: counts.resolved },
             ].map((tab) => {
               const isActive = filterStatus === tab.id;
               return (
@@ -317,41 +320,75 @@ export default function ClientSupportPage() {
                   key={tab.id}
                   type="button"
                   onClick={() => setFilterStatus(tab.id)}
-                  style={isActive ? { backgroundColor: accent, color: '#ffffff' } : {}}
-                  className={`flex-1 flex items-center justify-center gap-1 rounded-xl py-2 text-xs font-bold transition-all ${
+                  className={`flex items-center justify-center gap-1 rounded-lg py-1 px-1 text-[10.5px] font-semibold transition-all w-full truncate ${
                     isActive
-                      ? 'shadow-xs'
-                      : 'text-slate-600 hover:text-slate-900 dark:text-neutral-300 dark:hover:text-white'
+                      ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900 shadow-2xs'
+                      : 'bg-white border border-slate-200/80 text-slate-600 hover:bg-slate-50 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-300'
                   }`}
                 >
-                  <span>{tab.label}</span>
+                  <span className="truncate sm:hidden">{tab.short}</span>
+                  <span className="hidden sm:inline truncate">{tab.full}</span>
+                  <span
+                    className={`rounded-full px-1 text-[9px] font-bold ${
+                      isActive
+                        ? 'bg-white/20 text-white dark:bg-slate-900/20 dark:text-slate-900'
+                        : 'bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400'
+                    }`}
+                  >
+                    {tab.count}
+                  </span>
                 </button>
               );
             })}
           </div>
 
           {/* Search Box */}
-          <div className="relative mb-3">
+          <div className="relative mb-2">
             <input
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search your requests…"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-8 pr-3 text-xs font-medium text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:placeholder:text-neutral-500 dark:focus:bg-surface-700"
+              placeholder="Search by ticket #, subject or battery…"
+              className="w-full h-8 rounded-lg border border-slate-200/80 bg-slate-50/70 py-1 pl-7 pr-7 text-[11px] font-medium text-slate-900 placeholder:text-slate-400 shadow-2xs focus:border-blue-500 focus:bg-white focus:outline-hidden dark:border-slate-800 dark:bg-slate-950 dark:text-white"
             />
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400 dark:text-neutral-500">
-              <path fillRule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clipRule="evenodd" />
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-slate-400"
+            >
+              <path
+                fillRule="evenodd"
+                d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z"
+                clipRule="evenodd"
+              />
             </svg>
+            {search && (
+              <button
+                type="button"
+                onClick={() => setSearch('')}
+                className="absolute right-2 top-2 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
+                  <path d="M6.28 5.22a.75.75 0 0 0-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 1 0 1.06 1.06L10 11.06l3.72 3.72a.75.75 0 1 0 1.06-1.06L11.06 10l3.72-3.72a.75.75 0 0 0-1.06-1.06L10 8.94 6.28 5.22Z" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Tickets Scroll List */}
-          <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar max-h-[520px] pr-1">
+          <div className="flex-1 space-y-1.5 overflow-y-auto no-scrollbar max-h-[480px]">
             {loading && tickets.length === 0 ? (
-              <div className="py-12 text-center text-xs text-slate-400 dark:text-neutral-500">Loading your tickets…</div>
+              <div className="py-8 text-center text-[11px] text-slate-400">Loading tickets…</div>
             ) : filteredTickets.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50/50 p-8 text-center dark:border-white/10 dark:bg-surface-800">
-                <p className="text-xs font-semibold text-slate-700 dark:text-neutral-300">No support tickets</p>
-                <p className="mt-1 text-[11px] text-slate-400 dark:text-neutral-500">Click &apos;New Help Request&apos; to submit an inquiry.</p>
+              <div className="flex flex-col items-center justify-center py-8 px-3 text-center">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 mb-1.5">
+                  <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-4 w-4">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-.974-.94 4.053 4.053 0 0 0 .546-1.503C3.606 17.07 3 14.655 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
+                  </svg>
+                </div>
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-200">No support tickets</p>
+                <p className="mt-0.5 text-[10.5px] text-slate-400">Click &apos;New Ticket&apos; to submit an inquiry.</p>
               </div>
             ) : (
               filteredTickets.map((t) => {
@@ -361,76 +398,65 @@ export default function ClientSupportPage() {
                 const isResolved = t.status === 'resolved';
 
                 const lastRole = t.last_message?.sender_role;
-                const isSupportReply = lastRole === 'admin' || lastRole === 'super_admin' || lastRole === 'staff';
+                const isSupportReply =
+                  lastRole === 'admin' || lastRole === 'super_admin' || lastRole === 'staff';
 
                 return (
                   <div
                     key={t.id}
                     onClick={() => loadTicketDetail(t.id)}
-                    className={`group relative cursor-pointer rounded-2xl border p-3.5 transition-all ${
+                    className={`relative cursor-pointer rounded-xl border p-2.5 transition ${
                       isSelected
-                        ? 'border-emerald-500 bg-emerald-50/50 shadow-xs dark:border-emerald-500 dark:bg-emerald-950/40'
-                        : 'border-slate-200/80 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-300 dark:border-white/10 dark:bg-surface-800 dark:hover:bg-surface-700/70 dark:hover:border-white/20'
+                        ? 'border-blue-500 bg-blue-50/50 dark:border-blue-500 dark:bg-blue-950/40 shadow-2xs'
+                        : 'border-slate-200/70 bg-slate-50/50 hover:bg-slate-100/70 hover:border-slate-300 dark:border-slate-800 dark:bg-slate-950/40 dark:hover:bg-slate-800/60'
                     }`}
                   >
-                    {/* Active accent vertical indicator bar */}
-                    {isSelected && (
-                      <span
-                        className="absolute left-0 top-3 bottom-3 w-1.5 rounded-r-full"
-                        style={{ backgroundColor: accent }}
-                      />
-                    )}
-
-                    <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center justify-between gap-1.5">
                       <div className="flex items-center gap-1.5 min-w-0">
-                        <span className="font-mono text-xs font-extrabold text-slate-900 dark:text-white">
+                        <span className="font-mono text-[11px] font-bold text-slate-900 dark:text-white">
                           {t.ticket_number}
                         </span>
                         {isSupportReply && t.status !== 'closed' && (
-                          <span className="rounded-full bg-emerald-500 px-1.5 py-0.2 text-[9px] font-bold text-white">
+                          <span className="rounded-full bg-blue-600 px-1.5 py-0.2 text-[8.5px] font-bold text-white">
                             New Reply
                           </span>
                         )}
                       </div>
 
                       <span
-                        className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                        className={`rounded-md px-1.5 py-0.2 text-[9.5px] font-bold ${
                           isOpen
-                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300 dark:border dark:border-amber-800/40'
+                            ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/70 dark:text-amber-300'
                             : isInProgress
-                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 dark:border dark:border-blue-800/40'
+                              ? 'bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300'
                               : isResolved
-                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 dark:border dark:border-emerald-800/40'
-                                : 'bg-slate-100 text-slate-600 dark:bg-white/10 dark:text-neutral-400'
+                                ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300'
+                                : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                         }`}
                       >
                         {t.status.replace(/_/g, ' ')}
                       </span>
                     </div>
 
-                    <p className="mt-2 text-xs font-bold text-slate-900 dark:text-white line-clamp-1">
+                    <p className="mt-1 text-xs font-bold text-slate-900 dark:text-white truncate">
                       {t.subject}
                     </p>
 
-                    <p className="mt-0.5 text-[11px] text-slate-500 dark:text-neutral-300 line-clamp-1">
+                    <p className="mt-0.5 text-[10.5px] text-slate-500 dark:text-slate-400 truncate">
                       {isSupportReply ? 'Support: ' : 'You: '}
                       {t.last_message?.message || 'No messages yet'}
                     </p>
 
-                    <div className="mt-2.5 flex items-center justify-between border-t border-slate-200/60 pt-2 text-[10px] text-slate-400 dark:border-white/5 dark:text-neutral-400">
-                      <div className="flex items-center gap-1.5">
+                    <div className="mt-2 flex items-center justify-between border-t border-slate-200/60 dark:border-slate-800/60 pt-1.5 text-[9.5px] text-slate-400">
+                      <div className="flex items-center gap-1 truncate mr-2">
                         <span className="capitalize">{t.category?.replace(/_/g, ' ')}</span>
                         {t.battery_code && (
-                          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 px-2 py-0.5 font-mono font-bold text-white shadow-2xs dark:bg-emerald-500">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3 w-3 shrink-0 text-yellow-300">
-                              <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
-                              <line x1="22" x2="22" y1="11" y2="13" />
-                            </svg>
+                          <span className="rounded bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200/70 px-1 font-mono font-bold">
                             {t.battery_code}
                           </span>
                         )}
                       </div>
-                      <span>{timeAgo(t.updated_at)}</span>
+                      <span className="shrink-0">{timeAgo(t.updated_at)}</span>
                     </div>
                   </div>
                 );
@@ -439,70 +465,78 @@ export default function ClientSupportPage() {
           </div>
         </div>
 
-        {/* ── Right Pane: Live Support Chat ─────────────────────────── */}
-        <div className="lg:col-span-7 flex flex-col rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-surface-900 justify-between">
+        {/* Right Pane: Live Support Chat Thread */}
+        <div
+          className={`lg:col-span-7 flex flex-col rounded-xl border border-slate-200/80 bg-white p-2.5 sm:p-3 shadow-2xs dark:border-slate-800 dark:bg-slate-900 justify-between ${
+            mobileView === 'list' && activeTicket ? 'hidden lg:flex' : 'flex'
+          }`}
+        >
           {loadingActive ? (
-            <div className="flex flex-1 flex-col items-center justify-center gap-2">
-              <div className="h-8 w-8 animate-spin rounded-full border-3 border-emerald-500 border-t-transparent" />
-              <p className="text-xs font-medium text-slate-400">Loading conversation…</p>
+            <div className="flex flex-1 flex-col items-center justify-center gap-1.5 py-14">
+              <div className="h-6 w-6 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              <p className="text-[11px] text-slate-400">Loading conversation…</p>
             </div>
           ) : activeTicket ? (
-            <div className="flex flex-1 flex-col justify-between gap-4">
-              {/* ── Enhanced Thread Header Container ── */}
-              <div className="rounded-2xl border border-slate-200/90 bg-slate-50/80 p-4 shadow-2xs dark:border-white/10 dark:bg-surface-800">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                  <div className="flex items-center gap-2">
-                    <span className="font-mono text-sm font-bold text-slate-900 dark:text-white bg-slate-200/90 dark:bg-surface-700 dark:border dark:border-white/10 px-2.5 py-0.5 rounded-lg">
+            <div className="flex flex-1 flex-col justify-between gap-2">
+              {/* Thread Header */}
+              <div className="rounded-lg border border-slate-200/80 bg-slate-50/80 p-2 sm:p-2.5 dark:border-slate-800 dark:bg-slate-950">
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5">
+                    {/* Mobile Back Button */}
+                    <button
+                      type="button"
+                      onClick={() => setMobileView('list')}
+                      className="lg:hidden inline-flex items-center gap-1 rounded-md border border-slate-200 bg-white px-2 py-0.5 text-xs font-bold text-slate-700 shadow-2xs dark:border-slate-800 dark:bg-slate-900 dark:text-slate-200"
+                    >
+                      <span>←</span>
+                      <span>List</span>
+                    </button>
+
+                    <span className="font-mono text-xs font-bold text-slate-900 dark:text-white bg-slate-200/80 dark:bg-slate-800 px-2 py-0.5 rounded-md">
                       {activeTicket.ticket_number}
                     </span>
+
                     <span
-                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold ${
+                      className={`rounded-md px-1.5 py-0.2 text-[9.5px] font-bold ${
                         activeTicket.status === 'open'
-                          ? 'bg-amber-100 text-amber-900 border border-amber-300/80 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60'
+                          ? 'bg-amber-100 text-amber-900 dark:bg-amber-950/60 dark:text-amber-300'
                           : activeTicket.status === 'in_progress'
-                            ? 'bg-blue-100 text-blue-900 border border-blue-300/80 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60'
+                            ? 'bg-blue-100 text-blue-900 dark:bg-blue-950/60 dark:text-blue-300'
                             : activeTicket.status === 'resolved'
-                              ? 'bg-emerald-100 text-emerald-900 border border-emerald-300/80 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/60'
-                              : 'bg-slate-100 text-slate-800 border border-slate-300 dark:bg-white/10 dark:text-neutral-300 dark:border-white/10'
+                              ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-300'
+                              : 'bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-300'
                       }`}
                     >
                       {activeTicket.status.replace(/_/g, ' ').toUpperCase()}
                     </span>
                   </div>
 
-                  <span className="text-xs text-slate-500 dark:text-neutral-400 font-medium">
-                    Created {formatTime(activeTicket.created_at)}
+                  <span className="text-[10px] text-slate-400">
+                    {formatTime(activeTicket.created_at)}
                   </span>
                 </div>
 
-                <h2 className="mt-2 text-base font-bold text-slate-900 dark:text-white">
+                <h2 className="mt-1 text-xs sm:text-sm font-bold text-slate-900 dark:text-white leading-snug">
                   {activeTicket.subject}
                 </h2>
 
-                {/* ── Enhanced Details Bar ── */}
-                <div className="mt-3.5 flex flex-wrap items-center gap-2 rounded-xl border border-slate-200/90 bg-white/90 p-2.5 text-xs font-semibold text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-900/90 dark:text-neutral-200">
-                  <span className="rounded-lg bg-blue-50 px-2.5 py-1 text-[11px] font-bold text-blue-900 shadow-2xs border border-blue-200/70 dark:bg-blue-950/60 dark:text-blue-300 dark:border-blue-800/60">
-                    Category: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.category?.replace(/_/g, ' ')}</strong>
+                <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px]">
+                  <span className="rounded bg-blue-50 px-1.5 py-0.5 font-semibold text-blue-800 border border-blue-200/60 dark:bg-blue-950/60 dark:text-blue-300">
+                    Category: <strong className="capitalize">{activeTicket.category?.replace(/_/g, ' ')}</strong>
                   </span>
-                  
-                  <span className="rounded-lg bg-amber-50 px-2.5 py-1 text-[11px] font-bold text-amber-900 shadow-2xs border border-amber-200/70 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800/60">
-                    Priority: <strong className="capitalize text-slate-900 dark:text-white">{activeTicket.priority}</strong>
+                  <span className="rounded bg-amber-50 px-1.5 py-0.5 font-semibold text-amber-800 border border-amber-200/60 dark:bg-amber-950/60 dark:text-amber-300">
+                    Priority: <strong className="capitalize">{activeTicket.priority}</strong>
                   </span>
-
                   {activeTicket.battery_code && (
-                    <span className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-100 text-emerald-900 border border-emerald-300/70 px-2.5 py-1 text-[11px] font-mono font-bold shadow-2xs dark:bg-emerald-950/70 dark:text-emerald-300 dark:border-emerald-800/60">
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-3.5 w-3.5 shrink-0 text-emerald-600 dark:text-emerald-400">
-                        <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
-                        <line x1="22" x2="22" y1="11" y2="13" />
-                      </svg>
-                      {activeTicket.battery_code}
+                    <span className="rounded bg-emerald-50 text-emerald-800 border border-emerald-200/60 px-1.5 py-0.5 font-mono font-bold dark:bg-emerald-950/60 dark:text-emerald-300">
+                      🔋 {activeTicket.battery_code}
                     </span>
                   )}
                 </div>
               </div>
 
-              {/* Chat Messages Canvas */}
-              <div className="flex-1 space-y-3.5 overflow-y-auto no-scrollbar pr-1 max-h-[380px] p-3 bg-slate-50/40 rounded-2xl dark:bg-black/30 border border-transparent dark:border-white/5">
+              {/* Chat Messages */}
+              <div className="flex-1 space-y-2 overflow-y-auto no-scrollbar max-h-[380px] p-2 bg-slate-50/40 rounded-lg dark:bg-slate-950/40 border border-slate-100 dark:border-slate-800/60">
                 {(activeTicket.messages || []).map((msg) => {
                   const isMe = msg.sender_role === 'client' || msg.sender_role === 'recycle_client';
 
@@ -511,21 +545,20 @@ export default function ClientSupportPage() {
                       key={msg.id}
                       className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
                     >
-                      <div className="flex items-center gap-1.5 text-[10px] text-slate-400 mb-1 px-1">
-                        <span className="font-bold text-slate-700 dark:text-neutral-300">
-                          {isMe ? 'You' : `${msg.sender_name} (Support Team)`}
+                      <div className="flex items-center gap-1 text-[9px] text-slate-400 mb-0.5 px-1">
+                        <span className="font-semibold text-slate-600 dark:text-slate-300">
+                          {isMe ? 'You' : `${msg.sender_name} (Support)`}
                         </span>
                         <span>•</span>
                         <span>{formatTime(msg.created_at)}</span>
                       </div>
 
                       <div
-                        className={`max-w-[82%] rounded-2xl px-4 py-2.5 text-xs font-medium leading-relaxed shadow-2xs ${
+                        className={`max-w-[85%] rounded-xl px-3 py-2 text-xs font-medium leading-relaxed shadow-2xs ${
                           isMe
-                            ? 'text-white'
-                            : 'bg-white text-slate-900 border border-slate-200/80 dark:bg-surface-800 dark:border-white/10 dark:text-neutral-100'
+                            ? 'bg-blue-600 text-white'
+                            : 'bg-white text-slate-900 border border-slate-200/80 dark:bg-slate-900 dark:border-slate-800 dark:text-slate-100'
                         }`}
-                        style={isMe ? { backgroundColor: accent } : {}}
                       >
                         <p className="whitespace-pre-wrap">{msg.message}</p>
                       </div>
@@ -535,69 +568,64 @@ export default function ClientSupportPage() {
                 <div ref={messagesEndRef} />
               </div>
 
-              {/* Reply Studio Composer */}
+              {/* Composer */}
               {activeTicket.status === 'closed' ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-center text-xs font-semibold text-slate-500 dark:border-white/10 dark:bg-surface-800">
-                  This ticket has been marked as closed. You can open a new request if you need further help.
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-2 text-center text-xs text-slate-500 dark:border-slate-800 dark:bg-slate-950">
+                  This ticket is marked as closed. You can open a new request if you need further help.
                 </div>
               ) : (
-                <form onSubmit={handleSendReply} className="flex flex-col gap-2 border-t border-slate-100 pt-3 dark:border-white/5">
-                  <div className="relative flex items-center">
-                    <textarea
-                      rows={2}
-                      value={replyMessage}
-                      onChange={(e) => setReplyMessage(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
-                          handleSendReply(e);
-                        }
-                      }}
-                      placeholder="Type your message or response (Press ⌘+Enter to send)…"
-                      className="w-full rounded-2xl border border-slate-200 bg-slate-50/70 p-3 pr-24 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-hidden focus:ring-2 focus:ring-emerald-500/20 dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-900"
-                    />
-                    <button
-                      type="submit"
-                      disabled={sendingReply || !replyMessage.trim()}
-                      style={{ backgroundColor: accent }}
-                      className="absolute right-2.5 top-3.5 inline-flex items-center gap-1.5 rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50 transition-all"
-                    >
-                      <span>Send</span>
-                      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-3.5 w-3.5">
-                        <path d="M3.105 2.288a.75.75 0 0 0-.826.95l1.414 4.926A1.5 1.5 0 0 0 5.135 9.25h6.115a.75.75 0 0 1 0 1.5H5.135a1.5 1.5 0 0 0-1.442 1.086l-1.414 4.926a.75.75 0 0 0 .826.95 28.897 28.897 0 0 0 15.293-7.155.75.75 0 0 0 0-1.114A28.897 28.897 0 0 0 3.105 2.288Z" />
-                      </svg>
-                    </button>
-                  </div>
+                <form onSubmit={handleSendReply} className="flex gap-1.5 pt-1 border-t border-slate-100 dark:border-slate-800">
+                  <input
+                    type="text"
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    placeholder="Type a message or response…"
+                    className="flex-1 h-8.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
+                  />
+                  <button
+                    type="submit"
+                    disabled={sendingReply || !replyMessage.trim()}
+                    className="inline-flex h-8.5 items-center justify-center rounded-lg bg-blue-600 px-3 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 disabled:opacity-50 transition"
+                  >
+                    <span>Send</span>
+                  </button>
                 </form>
               )}
             </div>
           ) : (
-            <div className="flex flex-1 flex-col items-center justify-center text-center p-12">
-              <div className="flex h-14 w-14 items-center justify-center rounded-3xl bg-slate-100 dark:bg-white/5 text-slate-400 mb-3">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-7 w-7">
+            <div className="flex flex-1 flex-col items-center justify-center text-center p-6">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-400 mb-1.5">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth="1.5" stroke="currentColor" className="h-5 w-5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M8.625 12a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H8.25m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0H12m4.125 0a.375.375 0 1 1-.75 0 .375.375 0 0 1 .75 0Zm0 0h-.375M21 12c0 4.556-4.03 8.25-9 8.25a9.764 9.764 0 0 1-2.555-.337A5.972 5.972 0 0 1 5.41 20.97a.75.75 0 0 1-.974-.94 4.053 4.053 0 0 0 .546-1.503C3.606 17.07 3 14.655 3 12c0-4.556 4.03-8.25 9-8.25s9 3.694 9 8.25Z" />
                 </svg>
               </div>
-              <h3 className="text-base font-bold text-slate-900 dark:text-white">Need Help with Your Battery Fleet?</h3>
-              <p className="mt-1 max-w-sm text-xs text-slate-500 dark:text-neutral-400">
-                Select an existing ticket from the left or click &quot;New Help Request&quot; to message our support team.
+              <h3 className="text-xs font-bold text-slate-900 dark:text-white">Select a Ticket</h3>
+              <p className="mt-0.5 text-[10.5px] text-slate-500 max-w-xs">
+                Pick a ticket from the left list to view conversation history or send a reply.
               </p>
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Create New Ticket Modal ─────────────────────────────────── */}
+      {/* ── New Support Ticket Modal (Centered, Compact & 100% Visible) ── */}
       {createOpen && (
-        <Modal title="Create New Help Request / Ticket" onClose={() => setCreateOpen(false)}>
-          <form onSubmit={handleCreateTicket} className="space-y-4">
+        <Modal
+          open={createOpen}
+          onClose={() => setCreateOpen(false)}
+          title="New Support Ticket"
+          size="md"
+          centered={true}
+        >
+          <form onSubmit={handleCreateTicket} className="flex flex-col gap-2">
             {createError && (
-              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-xs font-semibold text-red-600 dark:border-red-900/40 dark:bg-red-950/40 dark:text-red-300">
+              <div className="rounded-lg bg-red-50 p-2 text-xs font-medium text-red-600 dark:bg-red-950/40 dark:text-red-300">
                 {createError}
               </div>
             )}
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300 mb-1">
+              <label className="block text-[10.5px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
                 Subject *
               </label>
               <input
@@ -605,37 +633,38 @@ export default function ClientSupportPage() {
                 required
                 value={newSubject}
                 onChange={(e) => setNewSubject(e.target.value)}
-                placeholder="Brief summary of your inquiry (e.g. Battery UBE-0012 inquiry)"
-                className="w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-850"
+                placeholder="Brief summary of your inquiry"
+                className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
               />
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {/* Category & Priority in compact 2-column grid */}
+            <div className="grid grid-cols-2 gap-2">
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300 mb-1">
+                <label className="block text-[10.5px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
                   Category
                 </label>
                 <select
                   value={newCategory}
                   onChange={(e) => setNewCategory(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                  className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                 >
-                  {CATEGORIES.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.label}
-                    </option>
-                  ))}
+                  <option value="general">General Inquiry</option>
+                  <option value="battery_inquiry">Battery Status</option>
+                  <option value="repair_status">Repair Inquiries</option>
+                  <option value="delivery_pickup">Logistics / Pickup</option>
+                  <option value="billing">Billing & Invoices</option>
                 </select>
               </div>
 
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300 mb-1">
+                <label className="block text-[10.5px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
                   Priority
                 </label>
                 <select
                   value={newPriority}
                   onChange={(e) => setNewPriority(e.target.value)}
-                  className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white"
+                  className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
                 >
                   {PRIORITIES.map((p) => (
                     <option key={p.id} value={p.id}>
@@ -647,46 +676,33 @@ export default function ClientSupportPage() {
             </div>
 
             <div className="relative">
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300 mb-1">
-                Linked Battery ID <span className="text-[11px] font-normal text-slate-400">(optional)</span>
+              <label className="block text-[10.5px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
+                Linked Battery Code (Optional)
               </label>
               <input
                 type="text"
                 value={newBatteryCode}
-                onChange={(e) => setNewBatteryCode(e.target.value.toUpperCase())}
+                onChange={(e) => {
+                  setNewBatteryCode(e.target.value);
+                  setShowBatterySuggestions(true);
+                }}
                 onFocus={() => setShowBatterySuggestions(true)}
-                onBlur={() => setTimeout(() => setShowBatterySuggestions(false), 150)}
-                placeholder={batteriesLoaded ? 'Start typing to pick from your batteries…' : 'e.g. UBE-0001 or serial number'}
-                autoComplete="off"
-                className={`w-full rounded-xl border bg-white px-3.5 py-2 text-xs font-medium focus:outline-hidden dark:bg-surface-800 ${
-                  batteriesLoaded && newBatteryCode.trim() && !isKnownBatteryCode(newBatteryCode)
-                    ? 'border-red-400 text-red-600 focus:border-red-500 dark:border-red-500/60 dark:text-red-400'
-                    : 'border-slate-300 text-slate-800 focus:border-emerald-500 dark:border-white/10 dark:text-white dark:focus:bg-surface-850'
-                }`}
+                placeholder="e.g. BAT-2024-001"
+                className="w-full h-8 rounded-lg border border-slate-200 bg-white px-2.5 font-mono text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white"
               />
-              {batteriesLoaded && newBatteryCode.trim() && !isKnownBatteryCode(newBatteryCode) && (
-                <p className="mt-1 text-[11px] font-semibold text-red-600 dark:text-red-400">
-                  Not one of your registered batteries — pick from the suggestions below.
-                </p>
-              )}
-              {showBatterySuggestions && batteriesLoaded && batterySuggestions.length > 0 && (
-                <div className="absolute z-10 mt-1 w-full max-h-48 overflow-y-auto rounded-xl border border-slate-200 bg-white shadow-lg dark:border-white/10 dark:bg-surface-850">
+              {showBatterySuggestions && batterySuggestions.length > 0 && (
+                <div className="absolute left-0 right-0 top-full z-10 mt-1 max-h-28 overflow-y-auto rounded-lg border border-slate-200 bg-white p-1 shadow-lg dark:border-slate-800 dark:bg-slate-900">
                   {batterySuggestions.map((b) => (
                     <button
-                      key={b.id}
+                      key={b.id || b.battery_code}
                       type="button"
-                      onMouseDown={() => {
+                      onClick={() => {
                         setNewBatteryCode(b.battery_code);
                         setShowBatterySuggestions(false);
                       }}
-                      className="flex w-full items-center justify-between px-3.5 py-2 text-left text-xs hover:bg-slate-50 dark:hover:bg-white/5"
+                      className="w-full rounded px-2 py-1 text-left font-mono text-xs hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-800 dark:text-slate-200"
                     >
-                      <span className="font-mono font-semibold text-slate-800 dark:text-neutral-100">
-                        {b.battery_code}
-                      </span>
-                      {b.serial_number && (
-                        <span className="text-[10px] text-slate-400 dark:text-neutral-500">{b.serial_number}</span>
-                      )}
+                      {b.battery_code}
                     </button>
                   ))}
                 </div>
@@ -694,37 +710,32 @@ export default function ClientSupportPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider text-slate-600 dark:text-neutral-300 mb-1">
+              <label className="block text-[10.5px] font-bold text-slate-700 dark:text-slate-300 mb-0.5">
                 Message / Details *
               </label>
               <textarea
                 required
-                rows={4}
+                rows={2}
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
-                placeholder="Describe your request or issue in detail…"
-                className="w-full rounded-xl border border-slate-300 bg-white p-3 text-xs font-medium text-slate-800 focus:border-emerald-500 focus:outline-hidden dark:border-white/10 dark:bg-surface-800 dark:text-white dark:focus:bg-surface-850"
+                placeholder="Describe what you need assistance with…"
+                className="w-full h-14 rounded-lg border border-slate-200 bg-white p-2 text-xs font-medium text-slate-900 focus:border-blue-500 focus:outline-hidden dark:border-slate-800 dark:bg-slate-900 dark:text-white resize-none"
               />
             </div>
 
-            <div className="flex items-center justify-end gap-2 pt-2">
+            {/* Always-visible Modal Footer */}
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
               <button
                 type="button"
                 onClick={() => setCreateOpen(false)}
-                className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200"
+                className="rounded-lg border border-slate-200 px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-slate-800 dark:text-slate-300"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                disabled={
-                  creating ||
-                  !newSubject.trim() ||
-                  !newMessage.trim() ||
-                  (batteriesLoaded && newBatteryCode.trim() && !isKnownBatteryCode(newBatteryCode))
-                }
-                style={{ backgroundColor: accent }}
-                className="rounded-xl px-4 py-2 text-xs font-bold text-white shadow-xs hover:opacity-90 disabled:opacity-50"
+                disabled={creating || !newSubject.trim() || !newMessage.trim()}
+                className="rounded-lg bg-blue-600 px-3.5 py-1.5 text-xs font-bold text-white shadow-2xs hover:bg-blue-700 disabled:opacity-50"
               >
                 {creating ? 'Submitting…' : 'Submit Ticket'}
               </button>

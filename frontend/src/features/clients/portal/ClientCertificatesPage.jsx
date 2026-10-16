@@ -148,29 +148,30 @@ function ClientCertificatesPage() {
   const clientBreakdown = calculateMaterialBreakdown(clientBreakdownCount);
 
   return (
-    <div className="space-y-6 pb-12">
+    <div className="space-y-4 sm:space-y-6 pb-12">
       {/* 1. Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200/80 pb-4 dark:border-white/10">
-        <div>
-          <div className="flex items-center gap-2.5 flex-wrap">
-            <h1 className="text-xl sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
-              Milestone Certificates & Sustainability Impact
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b border-slate-200/80 pb-3.5 sm:pb-4 dark:border-white/10">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              Milestone Certificates & ESG Impact
             </h1>
-            <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-bold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-bold text-emerald-800 border border-emerald-200 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800/50">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
               Verified ESG Records
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-slate-500 dark:text-neutral-400 mt-1">
-            Track your fleet&apos;s circular economy achievements, carbon offsets, and official sustainability certifications.
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-neutral-400 mt-1 leading-relaxed">
+            Track circular economy milestones, CO₂ offsets, and official sustainability certifications.
           </p>
         </div>
 
         <button
           type="button"
           onClick={fetchMilestones}
-          className="inline-flex items-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors shadow-2xs cursor-pointer"
+          className="inline-flex items-center justify-center gap-1.5 self-start sm:self-auto rounded-xl border border-slate-200 bg-white px-3 py-1.5 sm:px-3.5 sm:py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors shadow-2xs cursor-pointer shrink-0"
         >
-          <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
+          <FiRefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin text-emerald-600' : ''}`} />
           <span>Refresh</span>
         </button>
       </div>
@@ -181,89 +182,101 @@ function ClientCertificatesPage() {
         <TableState tone="error">{error}</TableState>
       ) : (
         <>
-          {/* 2. Top Key Impact Metrics Ribbon */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-            <div className="rounded-2xl border border-emerald-200/90 bg-emerald-50/50 p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
-                  CO₂ Saved
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
-                  <FiGlobe className="w-4 h-4" />
+          {/* 2. Top Key Impact Metrics Ribbon - Compact 2x2 grid on mobile */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3.5">
+            {/* Metric 1: CO2 */}
+            <div className="rounded-xl sm:rounded-2xl border border-emerald-200/90 bg-emerald-50/50 p-3 sm:p-4 dark:border-emerald-900/40 dark:bg-emerald-950/20 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">
+                    CO₂ Saved
+                  </span>
+                  <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 dark:bg-emerald-900/50 dark:text-emerald-300">
+                    <FiGlobe className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1">
+                  <span className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">~{co2SavedTons}</span>
+                  <span className="text-[10px] sm:text-xs text-emerald-700 dark:text-emerald-300 font-bold">Tons</span>
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">~{co2SavedTons}</span>
-                <span className="text-xs text-emerald-700 dark:text-emerald-300 font-bold">Metric Tons</span>
-              </div>
-              <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-medium">
-                15.2 kg CO₂ prevented per repaired battery
+              <p className="text-[9.5px] sm:text-[11px] text-emerald-700/80 dark:text-emerald-400/90 mt-1 font-medium leading-tight line-clamp-1 sm:line-clamp-none">
+                15.2 kg prevented/pack
               </p>
             </div>
 
-            <div className="rounded-2xl border border-blue-200/90 bg-blue-50/50 p-4 dark:border-blue-900/40 dark:bg-blue-950/20 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
-                  E-Waste Diverted
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
-                  <FiShield className="w-4 h-4" />
+            {/* Metric 2: E-Waste */}
+            <div className="rounded-xl sm:rounded-2xl border border-blue-200/90 bg-blue-50/50 p-3 sm:p-4 dark:border-blue-900/40 dark:bg-blue-950/20 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-blue-800 dark:text-blue-300 uppercase tracking-wider">
+                    E-Waste Diverted
+                  </span>
+                  <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-blue-100 text-blue-700 dark:bg-blue-900/50 dark:text-blue-300">
+                    <FiShield className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1">
+                  <span className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">{ewasteKg}</span>
+                  <span className="text-[10px] sm:text-xs text-blue-700 dark:text-blue-300 font-bold">kg</span>
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">{ewasteKg}</span>
-                <span className="text-xs text-blue-700 dark:text-blue-300 font-bold">kg</span>
-              </div>
-              <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1 font-medium">
-                Hazardous battery materials kept out of landfills
+              <p className="text-[9.5px] sm:text-[11px] text-blue-700/80 dark:text-blue-400/90 mt-1 font-medium leading-tight line-clamp-1 sm:line-clamp-none">
+                Hazardous metals salvaged
               </p>
             </div>
 
-            <div className="rounded-2xl border border-amber-200/90 bg-amber-50/50 p-4 dark:border-amber-900/40 dark:bg-amber-950/20 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider">
-                  Packs Received & Serviced
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300">
-                  <FiTrendingUp className="w-4 h-4" />
+            {/* Metric 3: Serviced Packs */}
+            <div className="rounded-xl sm:rounded-2xl border border-amber-200/90 bg-amber-50/50 p-3 sm:p-4 dark:border-amber-900/40 dark:bg-amber-950/20 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-amber-800 dark:text-amber-300 uppercase tracking-wider truncate mr-1">
+                    Packs Serviced
+                  </span>
+                  <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300 shrink-0">
+                    <FiTrendingUp className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1">
+                  <span className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">{servicedCount.toLocaleString()}</span>
+                  <span className="text-[10px] sm:text-xs text-amber-700 dark:text-amber-300 font-bold">Units</span>
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">{servicedCount.toLocaleString()}</span>
-                <span className="text-xs text-amber-700 dark:text-amber-300 font-bold">Packs</span>
-              </div>
-              <p className="text-[11px] text-amber-700 dark:text-amber-400 mt-1 font-medium">
-                Packs dispatched & received at workshop for service
+              <p className="text-[9.5px] sm:text-[11px] text-amber-700/80 dark:text-amber-400/90 mt-1 font-medium leading-tight line-clamp-1 sm:line-clamp-none">
+                Batteries processed
               </p>
             </div>
 
-            <div className="rounded-2xl border border-purple-200/90 bg-purple-50/50 p-4 dark:border-purple-900/40 dark:bg-purple-950/20 shadow-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
-                  Milestone Awards
-                </span>
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
-                  <FiAward className="w-4 h-4" />
+            {/* Metric 4: Milestone Awards */}
+            <div className="rounded-xl sm:rounded-2xl border border-purple-200/90 bg-purple-50/50 p-3 sm:p-4 dark:border-purple-900/40 dark:bg-purple-950/20 shadow-xs flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-[11px] font-bold text-purple-800 dark:text-purple-300 uppercase tracking-wider">
+                    Awards Earned
+                  </span>
+                  <div className="flex h-6 w-6 sm:h-7 sm:w-7 items-center justify-center rounded-lg bg-purple-100 text-purple-700 dark:bg-purple-900/50 dark:text-purple-300">
+                    <FiAward className="w-3.5 h-3.5" />
+                  </div>
+                </div>
+                <div className="mt-1.5 sm:mt-2 flex items-baseline gap-1">
+                  <span className="text-lg sm:text-2xl font-black text-slate-900 dark:text-white">{allCerts.length}</span>
+                  <span className="text-[10px] sm:text-xs text-purple-700 dark:text-purple-300 font-bold">Certificates</span>
                 </div>
               </div>
-              <div className="mt-2 flex items-baseline gap-1.5">
-                <span className="text-2xl font-black text-slate-900 dark:text-white">{allCerts.length}</span>
-                <span className="text-xs text-purple-700 dark:text-purple-300 font-bold">Earned</span>
-              </div>
-              <p className="text-[11px] text-purple-600 dark:text-purple-400 mt-1 font-medium">
-                Official ISO-compliant ESG certificates
+              <p className="text-[9.5px] sm:text-[11px] text-purple-700/80 dark:text-purple-400/90 mt-1 font-medium leading-tight line-clamp-1 sm:line-clamp-none">
+                ISO-audited accreditations
               </p>
             </div>
           </div>
 
           {/* 3. Milestone Progress Bar */}
-          <div className="rounded-2xl border border-slate-200/90 bg-white p-5 md:p-6 shadow-xs dark:border-white/10 dark:bg-surface-900">
+          <div className="rounded-2xl border border-slate-200/90 bg-white p-4 sm:p-5 shadow-xs dark:border-white/10 dark:bg-surface-900">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
               <div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+                <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400 block">
                   Milestone Status
                 </span>
-                <h3 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white mt-0.5">
                   {nextTier
                     ? `Leveling Up to ${nextTier.badge} Tier (${nextTier.count.toLocaleString()} Batteries)`
                     : '🎉 Top Milestone Tier Achieved!'}
@@ -273,21 +286,21 @@ function ClientCertificatesPage() {
                 <span className="font-mono text-xs font-bold text-slate-500 dark:text-neutral-400">
                   {servicedCount.toLocaleString()} / {targetUnits.toLocaleString()} units
                 </span>
-                <span className="rounded-lg bg-emerald-50 px-2.5 py-1 text-xs font-black text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
+                <span className="rounded-lg bg-emerald-50 px-2 py-0.5 text-xs font-black text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border border-emerald-200/60 dark:border-emerald-800/40">
                   {progressPct}%
                 </span>
               </div>
             </div>
 
-            <div className="mt-3.5">
-              <div className="h-3 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-800">
+            <div className="mt-3">
+              <div className="h-2.5 sm:h-3 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-800">
                 <div
                   style={{ width: `${progressPct}%` }}
                   className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-700"
                 />
               </div>
-              <div className="mt-2 flex justify-between text-xs text-slate-500 dark:text-neutral-400">
-                <span>{servicedCount.toLocaleString()} units completed</span>
+              <div className="mt-2 flex flex-col sm:flex-row sm:justify-between text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400 gap-0.5">
+                <span>{servicedCount.toLocaleString()} units serviced to date</span>
                 {nextTier && (
                   <span className="font-semibold text-slate-700 dark:text-neutral-200">
                     {neededUnits.toLocaleString()} more units to unlock {nextTier.badge} Certificate
@@ -297,20 +310,20 @@ function ClientCertificatesPage() {
             </div>
           </div>
 
-          {/* 4. Circular Economy Milestone Roadmap */}
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
+          {/* 4. Circular Economy Milestone Roadmap - 2-col on mobile, 3-col on tablet, 6-col on desktop */}
+          <div className="space-y-2.5 sm:space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div>
-                <h2 className="text-base font-black text-slate-900 dark:text-white">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
                   Milestone Roadmap
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-neutral-400">
-                  Certificates unlock automatically as batteries are packed & received at the workshop (100, 500, 1,000, 5,000, 10,000, 20,000 units).
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
+                  Certificates unlock automatically as batteries reach service thresholds (100, 500, 1,000, 5,000, 10,000, 20,000).
                 </p>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-3.5">
+            <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-2 sm:gap-3">
               {tiers.map((t) => {
                 const isReached = servicedCount >= t.count;
                 const meta = TIER_META[t.badge] || TIER_META.Bronze;
@@ -319,7 +332,7 @@ function ClientCertificatesPage() {
                 return (
                   <div
                     key={t.count}
-                    className={`group relative flex flex-col justify-between overflow-hidden rounded-2xl border transition-all duration-200 ${
+                    className={`group relative flex flex-col justify-between overflow-hidden rounded-xl sm:rounded-2xl border transition-all duration-200 ${
                       isReached
                         ? meta.cardActive
                         : `${meta.cardInactive} hover:border-slate-300 dark:hover:border-white/20`
@@ -328,36 +341,36 @@ function ClientCertificatesPage() {
                     {/* Top Metallic Accent Bar */}
                     <div className={`h-1 w-full bg-gradient-to-r ${meta.accentGradient} opacity-90`} />
 
-                    <div className="p-3.5 sm:p-4 flex flex-col justify-between h-full">
+                    <div className="p-2.5 sm:p-3.5 flex flex-col justify-between h-full">
                       <div>
                         {/* Header: Tier Medallion & Status */}
-                        <div className="flex items-center justify-between gap-1.5 mb-3">
-                          <div className="flex items-center gap-1.5">
-                            <div className={`w-6 h-6 rounded-md flex items-center justify-center border text-xs shadow-2xs ${meta.iconBg}`}>
-                              <FiAward className="w-3.5 h-3.5" />
+                        <div className="flex items-center justify-between gap-1 mb-2">
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            <div className={`w-5 h-5 sm:w-6 sm:h-6 rounded-md flex items-center justify-center border text-[10px] sm:text-xs shadow-2xs shrink-0 ${meta.iconBg}`}>
+                              <FiAward className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                             </div>
-                            <span className="font-extrabold text-xs tracking-wider uppercase text-slate-800 dark:text-neutral-200">
+                            <span className="font-extrabold text-[11px] sm:text-xs tracking-wider uppercase text-slate-800 dark:text-neutral-200 truncate">
                               {t.badge}
                             </span>
                           </div>
 
                           {!isReached && (
-                            <span className="text-[10px] font-medium text-slate-400 dark:text-neutral-400">
-                              {Math.max(0, t.count - servicedCount).toLocaleString()} to go
+                            <span className="text-[9px] sm:text-[10px] font-medium text-slate-400 dark:text-neutral-400 shrink-0">
+                              {Math.max(0, t.count - servicedCount).toLocaleString()} left
                             </span>
                           )}
                         </div>
 
                         {/* Target Units */}
-                        <div className="mt-2">
-                          <div className="text-[9.5px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
-                            Target Milestone
+                        <div className="mt-1">
+                          <div className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-neutral-400">
+                            Milestone
                           </div>
                           <div className="flex items-baseline gap-1 mt-0.5">
-                            <span className="text-lg sm:text-xl font-black text-slate-900 dark:text-white tracking-tight">
+                            <span className="text-base sm:text-lg font-black text-slate-900 dark:text-white tracking-tight">
                               {t.count.toLocaleString()}
                             </span>
-                            <span className="text-xs font-semibold text-slate-500 dark:text-neutral-400">
+                            <span className="text-[10px] sm:text-xs font-semibold text-slate-500 dark:text-neutral-400">
                               Units
                             </span>
                           </div>
@@ -365,22 +378,22 @@ function ClientCertificatesPage() {
                       </div>
 
                       {/* Footer: Active Status or Progress Bar */}
-                      <div className="mt-3.5 pt-2.5 border-t border-slate-100 dark:border-white/5">
+                      <div className="mt-2.5 pt-2 border-t border-slate-100 dark:border-white/5">
                         {isReached ? (
-                          <div className="flex items-center justify-between text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
-                            <span className="flex items-center gap-1.5">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-                              Active Certificate
+                          <div className="flex items-center justify-between text-[10px] sm:text-[11px] font-bold text-emerald-700 dark:text-emerald-400">
+                            <span className="flex items-center gap-1 truncate">
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shrink-0" />
+                              Active
                             </span>
                             <span className="text-xs font-black">✓</span>
                           </div>
                         ) : (
                           <div>
-                            <div className="flex items-center justify-between text-[10px] font-semibold text-slate-400 dark:text-neutral-400 mb-1">
+                            <div className="flex items-center justify-between text-[9px] sm:text-[10px] font-semibold text-slate-400 dark:text-neutral-400 mb-0.5">
                               <span>Progress</span>
                               <span className="font-bold text-slate-600 dark:text-neutral-300">{tierProgress}%</span>
                             </div>
-                            <div className="h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-800">
+                            <div className="h-1 sm:h-1.5 w-full bg-slate-100 rounded-full overflow-hidden dark:bg-surface-800">
                               <div
                                 style={{ width: `${tierProgress}%` }}
                                 className="h-full bg-emerald-500 dark:bg-emerald-400 rounded-full transition-all duration-500"
@@ -397,25 +410,25 @@ function ClientCertificatesPage() {
           </div>
 
           {/* 5. Official Milestone Certificates Showcase */}
-          <div className="mt-8 pt-6 border-t border-slate-200/80 dark:border-white/10 space-y-4">
-            <div className="flex items-center justify-between">
+          <div className="mt-6 pt-5 sm:pt-6 border-t border-slate-200/80 dark:border-white/10 space-y-3 sm:space-y-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
               <div>
-                <h2 className="text-base sm:text-lg font-black text-slate-900 dark:text-white">
+                <h2 className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
                   Official Milestone Certificates ({allCerts.length})
                 </h2>
-                <p className="text-xs text-slate-500 dark:text-neutral-400">
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400">
                   Download or print verified 2-page ESG sustainability certificates for your records and compliance.
                 </p>
               </div>
             </div>
 
             {allCerts.length === 0 ? (
-              <div className="rounded-2xl border border-dashed border-slate-200 p-8 sm:p-10 text-center bg-white dark:border-white/10 dark:bg-surface-900 space-y-3">
-                <FiAward className="mx-auto h-12 w-12 text-slate-300 dark:text-neutral-600" />
-                <h3 className="text-base font-bold text-slate-900 dark:text-white">
+              <div className="rounded-2xl border border-dashed border-slate-200 p-6 sm:p-10 text-center bg-white dark:border-white/10 dark:bg-surface-900 space-y-3">
+                <FiAward className="mx-auto h-10 w-10 sm:h-12 sm:w-12 text-slate-300 dark:text-neutral-600" />
+                <h3 className="text-sm sm:text-base font-bold text-slate-900 dark:text-white">
                   First Milestone In Progress
                 </h3>
-                <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-md mx-auto">
+                <p className="text-xs text-slate-500 dark:text-neutral-400 max-w-md mx-auto leading-relaxed">
                   Your first Bronze Milestone Certificate will automatically unlock once 100 batteries are packed and received for service ({servicedCount}/100 currently completed).
                 </p>
                 <button
@@ -431,14 +444,14 @@ function ClientCertificatesPage() {
                       issued_at: new Date().toISOString(),
                     });
                   }}
-                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-200 dark:hover:bg-surface-800 transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 px-3.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:text-neutral-200 dark:hover:bg-surface-800 transition-colors cursor-pointer"
                 >
                   <FiEye className="w-3.5 h-3.5" />
                   <span>Preview Certificate Template</span>
                 </button>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5 sm:gap-4">
                 {allCerts.map((cert) => {
                   const tier = getTierForCertificate(cert);
                   const meta = TIER_META[tier.badge] || TIER_META.Gold;
@@ -456,31 +469,31 @@ function ClientCertificatesPage() {
                       {/* Top Metallic Accent Bar */}
                       <div className={`h-1 w-full bg-gradient-to-r ${meta.accentGradient} opacity-90`} />
 
-                      <div className="p-5 flex flex-col justify-between h-full">
+                      <div className="p-3.5 sm:p-5 flex flex-col justify-between h-full">
                         <div>
                           {/* Header: Tier Medallion & Certificate Code */}
-                          <div className="flex items-center justify-between gap-2 mb-3">
-                            <span className={`inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full font-black text-[10.5px] uppercase tracking-wider border shadow-2xs ${badgeStyle}`}>
-                              <FiAward className="w-3.5 h-3.5" />
+                          <div className="flex items-center justify-between gap-1.5 mb-2.5">
+                            <span className={`inline-flex items-center gap-1 px-2 sm:px-2.5 py-0.5 rounded-full font-black text-[10px] sm:text-[10.5px] uppercase tracking-wider border shadow-2xs ${badgeStyle}`}>
+                              <FiAward className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                               <span>{tier.badge} Tier • {cert.milestone_count.toLocaleString()}</span>
                             </span>
-                            <span className="font-mono text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/90 text-slate-500 dark:bg-surface-800/90 dark:text-neutral-400 border border-slate-200/80 dark:border-white/10">
+                            <span className="font-mono text-[9.5px] sm:text-[10px] font-semibold px-2 py-0.5 rounded-md bg-white/90 text-slate-500 dark:bg-surface-800/90 dark:text-neutral-400 border border-slate-200/80 dark:border-white/10 shrink-0">
                               {cert.certificate_code}
                             </span>
                           </div>
 
                           {/* Certificate Award Title */}
-                          <h3 className="font-black text-base text-slate-900 dark:text-white tracking-tight leading-snug">
+                          <h3 className="font-black text-sm sm:text-base text-slate-900 dark:text-white tracking-tight leading-snug line-clamp-2">
                             {cleanTitle}
                           </h3>
-                          <p className="text-[11px] font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
+                          <p className="text-[10.5px] sm:text-[11px] font-medium text-slate-500 dark:text-neutral-400 mt-0.5">
                             Official 2-Page ESG Sustainability Award
                           </p>
 
                           {/* CO2 & E-Waste Impact Grid */}
-                          <div className="grid grid-cols-2 gap-2 my-3.5 p-2.5 rounded-xl bg-white/90 dark:bg-surface-800/90 border border-slate-200/60 dark:border-white/5 text-center shadow-2xs">
+                          <div className="grid grid-cols-2 gap-2 my-3 p-2 sm:p-2.5 rounded-xl bg-white/90 dark:bg-surface-800/90 border border-slate-200/60 dark:border-white/5 text-center shadow-2xs">
                             <div>
-                              <span className="text-[9.5px] uppercase font-extrabold text-emerald-700 dark:text-emerald-400 block tracking-wider">
+                              <span className="text-[9px] uppercase font-extrabold text-emerald-700 dark:text-emerald-400 block tracking-wider">
                                 CO₂ Prevented
                               </span>
                               <span className="font-black text-xs sm:text-sm text-slate-900 dark:text-white block mt-0.5">
@@ -488,7 +501,7 @@ function ClientCertificatesPage() {
                               </span>
                             </div>
                             <div className="border-l border-slate-100 dark:border-white/10">
-                              <span className="text-[9.5px] uppercase font-extrabold text-blue-700 dark:text-blue-400 block tracking-wider">
+                              <span className="text-[9px] uppercase font-extrabold text-blue-700 dark:text-blue-400 block tracking-wider">
                                 E-Waste Diverted
                               </span>
                               <span className="font-black text-xs sm:text-sm text-slate-900 dark:text-white block mt-0.5">
@@ -497,32 +510,32 @@ function ClientCertificatesPage() {
                             </div>
                           </div>
 
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-neutral-400">
+                          <div className="flex items-center justify-between text-[10.5px] sm:text-[11px] text-slate-500 dark:text-neutral-400">
                             <span>Issued: {new Date(cert.issued_at).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</span>
-                            <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 text-[10.5px]">
+                            <span className="inline-flex items-center gap-1 font-bold text-emerald-600 dark:text-emerald-400 text-[10px] sm:text-[10.5px]">
                               <FiCheckCircle className="w-3 h-3" /> Verified Seal
                             </span>
                           </div>
                         </div>
 
-                        {/* Action Buttons */}
-                        <div className="mt-4 pt-3.5 border-t border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
+                        {/* Action Buttons - Stack/Wrap naturally on mobile */}
+                        <div className="mt-3.5 pt-3 border-t border-slate-200/60 dark:border-white/10 flex items-center justify-between gap-2">
                           <button
                             type="button"
                             onClick={() => setSelectedCert(cert)}
-                            className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-1.5 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors shadow-2xs cursor-pointer"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl border border-slate-200 bg-white px-2.5 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 hover:text-slate-950 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700 transition-colors shadow-2xs cursor-pointer"
                           >
                             <FiEye className="w-3.5 h-3.5 text-slate-500 dark:text-neutral-400" />
-                            <span>View Certificate</span>
+                            <span className="truncate">View Certificate</span>
                           </button>
 
                           <button
                             type="button"
                             onClick={() => downloadMilestoneCertificatePDF(cert, client?.name)}
-                            className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-600 px-3.5 py-1.5 text-xs font-bold text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 transition-colors shadow-2xs cursor-pointer"
+                            className="flex-1 inline-flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-2.5 py-2 text-xs font-bold text-white hover:bg-emerald-700 dark:bg-emerald-600 dark:hover:bg-emerald-500 transition-colors shadow-2xs cursor-pointer"
                           >
                             <FiDownload className="w-3.5 h-3.5" />
-                            <span>Download PDF</span>
+                            <span className="truncate">Download PDF</span>
                           </button>
                         </div>
                       </div>
@@ -538,29 +551,29 @@ function ClientCertificatesPage() {
             <button
               type="button"
               onClick={() => setShowTechnicalAnnex(!showTechnicalAnnex)}
-              className="w-full flex items-center justify-between p-4 sm:p-5 text-left hover:bg-slate-50 dark:hover:bg-surface-800/60 transition-colors cursor-pointer"
+              className="w-full flex items-center justify-between p-3.5 sm:p-5 text-left hover:bg-slate-50 dark:hover:bg-surface-800/60 transition-colors cursor-pointer"
             >
-              <div className="flex items-center gap-3">
-                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0">
-                  <FiLayers className="w-5 h-5" />
+              <div className="flex items-center gap-2.5 sm:gap-3 min-w-0 pr-2">
+                <div className="flex h-8 w-8 sm:h-9 sm:w-9 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400 shrink-0">
+                  <FiLayers className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <div>
-                  <h3 className="font-bold text-sm text-slate-900 dark:text-white">
-                    Technical Annex: 14-Element Chemical Recovery Audit & ISO Standards
+                <div className="min-w-0">
+                  <h3 className="font-bold text-xs sm:text-sm text-slate-900 dark:text-white truncate">
+                    Technical Annex: 14-Element Chemical Recovery Audit
                   </h3>
-                  <p className="text-xs text-slate-500 dark:text-neutral-400">
-                    Detailed chemical formulas, CAS registry numbers, and metallurgical recovery data for compliance & ESG audits.
+                  <p className="text-[10.5px] sm:text-xs text-slate-500 dark:text-neutral-400 truncate">
+                    Formulas, CAS numbers & recovery audit for compliance & ESG records.
                   </p>
                 </div>
               </div>
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-neutral-300 shrink-0">
-                <span className="hidden sm:inline">{showTechnicalAnnex ? 'Hide Technical Details' : 'Show Details'}</span>
+              <div className="flex items-center gap-1.5 text-xs font-bold text-slate-600 dark:text-neutral-300 shrink-0">
+                <span className="hidden sm:inline">{showTechnicalAnnex ? 'Hide Details' : 'Show Details'}</span>
                 {showTechnicalAnnex ? <FiChevronUp className="w-4 h-4" /> : <FiChevronDown className="w-4 h-4" />}
               </div>
             </button>
 
             {showTechnicalAnnex && (
-              <div className="border-t border-slate-200/80 dark:border-white/10 p-4 sm:p-5 space-y-4 bg-slate-50/40 dark:bg-surface-950/40">
+              <div className="border-t border-slate-200/80 dark:border-white/10 p-3.5 sm:p-5 space-y-3 sm:space-y-4 bg-slate-50/40 dark:bg-surface-950/40">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
                   <span className="text-xs font-bold text-slate-700 dark:text-neutral-300">
                     Calculated for {clientBreakdownCount.toLocaleString()} Serviced Batteries:
@@ -570,7 +583,35 @@ function ClientCertificatesPage() {
                   </span>
                 </div>
 
-                <div className="overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface-900">
+                {/* Mobile Friendly Stacked Cards View (< md) - Eliminates horizontal scroll on mobile! */}
+                <div className="block md:hidden space-y-2">
+                  {clientBreakdown.map((item, idx) => (
+                    <div
+                      key={idx}
+                      className="p-3 rounded-xl border border-slate-200/90 bg-white dark:border-white/10 dark:bg-surface-900 shadow-2xs space-y-1.5"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <span className="font-bold text-xs text-slate-900 dark:text-white">{item.nameEn}</span>
+                        <span className="font-mono text-xs font-black text-emerald-700 dark:text-emerald-400 shrink-0">
+                          {item.formattedAmount}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2 text-[10.5px] font-mono text-slate-600 dark:text-neutral-400">
+                        <span>{item.formula}</span>
+                        <span>•</span>
+                        <span>CAS {item.casNo}</span>
+                        <span>•</span>
+                        <span className="font-bold text-slate-700 dark:text-neutral-300">{item.weightPct}</span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 dark:text-neutral-400 leading-snug">
+                        {item.role}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Desktop Full Table View (>= md) */}
+                <div className="hidden md:block overflow-x-auto rounded-xl border border-slate-200 dark:border-white/10 bg-white dark:bg-surface-900">
                   <table className="w-full text-left text-xs">
                     <thead className="bg-slate-50 border-b border-slate-200 dark:bg-surface-800 dark:border-white/10">
                       <tr>
@@ -597,7 +638,7 @@ function ClientCertificatesPage() {
                   </table>
                 </div>
 
-                <p className="text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
+                <p className="text-[11px] sm:text-xs text-slate-500 dark:text-neutral-400 leading-relaxed">
                   Refurbnics certifies that 100% of these 14 components (~{clientBreakdown[0]?.formattedAmount} active cathode material) from your {clientBreakdownCount.toLocaleString()} restored batteries are audited and retained within a closed-loop economy, preventing toxic landfill pollution in accordance with ISO 14001, RoHS, and EU Battery Passport standards.
                 </p>
               </div>
@@ -606,9 +647,10 @@ function ClientCertificatesPage() {
         </>
       )}
 
-      {/* Certificate Modal */}
+      {/* Certificate Modal - Centered and responsive */}
       {selectedCert && (
         <Modal
+          centered={true}
           title="Sustainability Milestone Certificate"
           description={selectedCert.title}
           size="5xl"

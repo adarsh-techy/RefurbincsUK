@@ -78,36 +78,36 @@ export default function CertificateViewModal({ certificate, clientName, onClose 
           ))}
         </View>
 
-        <ScrollView contentContainerClassName="p-4 pb-6 gap-3">
+        <ScrollView contentContainerClassName="p-3.5 pb-6 gap-3">
           {tab === 'certificate' ? (
-            <View className={`rounded-2xl border-4 bg-white p-5 ${colors.border}`}>
-              <View className={`self-center rounded-full border px-3 py-1 ${colors.badge}`}>
+            <View className={`rounded-2xl border-2 bg-white p-4 ${colors.border}`}>
+              <View className={`self-center rounded-full border px-3 py-0.5 ${colors.badge}`}>
                 <Text className={`text-[10px] font-extrabold uppercase tracking-widest ${colors.text}`}>{tier.badge} Tier Accreditation</Text>
               </View>
-              <Text className="mt-3 text-center text-[11px] font-bold uppercase italic tracking-wider" style={{ color: colors.accent }}>
+              <Text className="mt-2 text-center text-[10.5px] font-bold uppercase italic tracking-wider leading-tight" style={{ color: colors.accent }}>
                 Official {tier.badge} Certificate of Environmental Leadership & Closed-Loop Decarbonization
               </Text>
-              <Text className="mt-4 text-center text-[10px] uppercase tracking-wider text-slate-400">Presented to</Text>
-              <View className="mt-1 rounded-2xl border-2 border-slate-200 bg-slate-50 px-4 py-3">
-                <Text className="text-center text-lg font-black text-slate-900">{certClient}</Text>
-                <Text className="mt-0.5 text-center text-[10px] font-semibold text-emerald-700">✓ Verified Enterprise Partner</Text>
-                <Text className="mt-0.5 text-center font-mono text-[10px] text-slate-500">{certCode}</Text>
+              <Text className="mt-3 text-center text-[9.5px] uppercase tracking-wider text-slate-400">Presented to</Text>
+              <View className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
+                <Text className="text-center text-base font-black text-slate-900 leading-snug">{certClient}</Text>
+                <Text className="mt-0.5 text-center text-[9.5px] font-semibold text-emerald-700">✓ Verified Enterprise Partner</Text>
+                <Text className="mt-0.5 text-center font-mono text-[9.5px] text-slate-500">{certCode}</Text>
               </View>
-              <View className="mt-4 gap-2">
+              <View className="mt-3 gap-1.5">
                 {[
                   ['Batteries Restored', `${count.toLocaleString()} Packs`],
                   ['CO₂ Prevented', `~${co2Tons} t CO₂e`],
                   ['Critical Metals Diverted', `~${ewasteKg} kg`],
                 ].map(([label, value]) => (
-                  <View key={label} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2.5">
-                    <Text className="text-[11px] font-bold uppercase text-slate-500">{label}</Text>
-                    <Text className="text-sm font-black text-slate-900">{value}</Text>
+                  <View key={label} className="flex-row items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2">
+                    <Text className="text-[10px] font-bold uppercase text-slate-500">{label}</Text>
+                    <Text className="text-xs font-black text-slate-900">{value}</Text>
                   </View>
                 ))}
               </View>
-              <View className="mt-4 flex-row items-center justify-between">
-                <Text className="text-[11px] text-slate-500">Issued: {issueDate}</Text>
-                <Text className="text-[11px] font-bold text-emerald-600">✓ Verified Seal</Text>
+              <View className="mt-3 flex-row items-center justify-between">
+                <Text className="text-[10px] text-slate-500">Issued: {issueDate}</Text>
+                <Text className="text-[10px] font-bold text-emerald-600">✓ Verified Seal</Text>
               </View>
             </View>
           ) : (
@@ -118,11 +118,11 @@ export default function CertificateViewModal({ certificate, clientName, onClose 
           )}
         </ScrollView>
 
-        <View className="gap-2 border-t border-slate-200 bg-white p-4">
-          <TouchableOpacity disabled={Boolean(busy)} onPress={() => run('pdf')} className={`items-center rounded-xl bg-emerald-600 py-3 ${busy ? 'opacity-60' : ''}`}>
-            <Text className="text-xs font-bold text-white">{busy === 'pdf' ? 'Creating PDF…' : `Download Official ${tier.badge} PDF (Complete 2-Page Audit)`}</Text>
+        <View className="gap-2 border-t border-slate-200 bg-white p-3.5">
+          <TouchableOpacity disabled={Boolean(busy)} onPress={() => run('pdf')} className={`items-center justify-center rounded-xl bg-emerald-600 py-3 ${busy ? 'opacity-60' : ''}`}>
+            <Text className="text-xs font-bold text-white">{busy === 'pdf' ? 'Creating PDF…' : `Download Official ${tier.badge} PDF`}</Text>
           </TouchableOpacity>
-          <TouchableOpacity disabled={Boolean(busy)} onPress={() => run('print')} className={`items-center rounded-xl border border-slate-300 py-3 ${busy ? 'opacity-60' : ''}`}>
+          <TouchableOpacity disabled={Boolean(busy)} onPress={() => run('print')} className={`items-center justify-center rounded-xl border border-slate-300 py-2.5 ${busy ? 'opacity-60' : ''}`}>
             <Text className="text-xs font-bold text-slate-700">{busy === 'print' ? 'Opening…' : 'Print Official Certificate'}</Text>
           </TouchableOpacity>
         </View>

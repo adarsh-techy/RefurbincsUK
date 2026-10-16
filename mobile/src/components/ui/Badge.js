@@ -44,31 +44,33 @@ export function statusLabel(status) {
   return String(status).replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
 }
 
-export function Badge({ tone = 'neutral', children }) {
+export function Badge({ tone = 'neutral', size = 'md', children }) {
   const { bg, text } = TONES[tone] || TONES.neutral;
+  const isSmall = size === 'xs' || size === 'sm';
   return (
-    <View className={`max-w-full shrink self-start rounded-full px-2.5 py-1 ${bg}`}>
-      <Text className={`text-xs font-medium ${text}`}>{children}</Text>
+    <View className={`max-w-full shrink self-start rounded-full ${isSmall ? 'px-1.5 py-0.5' : 'px-2 py-0.5'} ${bg}`}>
+      <Text className={`${isSmall ? 'text-[9px] font-bold' : 'text-[10px] font-semibold'} ${text}`}>{children}</Text>
     </View>
   );
 }
 
 // Convenience wrapper for the battery status enum specifically.
-export function StatusBadge({ status }) {
+export function StatusBadge({ status, size = 'md' }) {
   const meta = STATUS_MAP[status] || { tone: 'neutral', label: status };
+  const isSmall = size === 'xs' || size === 'sm';
   if (meta.subLabel) {
     return (
-      <View className="flex-row items-center self-start gap-1.5 rounded-full border border-red-500/20 bg-red-500/10 px-2.5 py-1">
-        <View className="h-1.5 w-1.5 rounded-full bg-red-500" />
-        <Text className="text-xs font-medium text-red-700 dark:text-red-400">
+      <View className={`flex-row items-center self-start gap-1 rounded-full border border-red-500/20 bg-red-500/10 ${isSmall ? 'px-1.5 py-0.5' : 'px-2 py-0.5'}`}>
+        <View className={`${isSmall ? 'h-1 w-1' : 'h-1.5 w-1.5'} rounded-full bg-red-500`} />
+        <Text className={`${isSmall ? 'text-[8.5px]' : 'text-[10px]'} font-semibold text-red-700 dark:text-red-400`}>
           {meta.label}
         </Text>
-        <Text className="text-xs text-red-400 dark:text-red-600">·</Text>
-        <Text className="text-[11px] font-bold text-red-600 dark:text-red-400">
+        <Text className={`${isSmall ? 'text-[8px]' : 'text-[9.5px]'} text-red-400 dark:text-red-600`}>·</Text>
+        <Text className={`${isSmall ? 'text-[8px]' : 'text-[9.5px]'} font-bold text-red-600 dark:text-red-400`}>
           {meta.subLabel}
         </Text>
       </View>
     );
   }
-  return <Badge tone={meta.tone}>{meta.label}</Badge>;
+  return <Badge tone={meta.tone} size={size}>{meta.label}</Badge>;
 }

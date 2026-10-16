@@ -15,13 +15,15 @@ import RowActions from '../../../components/ui/table/RowActions';
 import useFetchList from '../../../utils/use-fetch-list';
 import { downloadQrSheet, previewQrSheet, DEFAULT_COLUMNS, ROWS, SHEET_SIZE } from '../../../utils/generate-qr-sheet';
 
+import { FiDownload, FiArrowRight, FiEye, FiPrinter, FiSquare, FiLayers } from 'react-icons/fi';
+
 const BATTERY_NUMBER_DIGITS = 7;
 
 const inputClasses =
-  'w-full rounded-md border border-slate-300 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30';
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-violet-400';
 const formInputClasses =
-  'w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 placeholder:text-slate-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-blue-900/10 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-blue-400 dark:focus:ring-blue-400/30';
-const labelClasses = 'mb-1.5 block text-sm font-medium text-slate-700 dark:text-neutral-200';
+  'w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/20 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 dark:placeholder:text-neutral-500 dark:focus:border-violet-400';
+const labelClasses = 'mb-1 block text-xs font-bold text-slate-700 dark:text-neutral-200';
 
 const DEBOUNCE_MS = 250;
 const LIST_PAGE_SIZE = 20;
@@ -460,86 +462,95 @@ function GenerateQrPage() {
   ];
 
   return (
-    <div>
-      <PageHeader
-        title="Generate QR Code"
-        description="Create QR codes for batteries — scan one to open its full history."
-        titleClassName="text-2xl font-bold tracking-tight text-green-600 dark:text-green-400"
-      >
-        <div className="flex items-center gap-3">
-          <div className="inline-flex items-center gap-2 rounded-xl border border-blue-200 bg-blue-50/90 px-4 py-2 text-sm font-semibold text-blue-800 shadow-2xs dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300">
-            <span className="h-2.5 w-2.5 rounded-full bg-blue-500 animate-pulse" />
-            <span>
-              Total Generated QR Codes:{' '}
-              <strong className="ml-1 text-base font-bold text-blue-950 dark:text-blue-100">
-                {(listTotal || 0).toLocaleString()}
-              </strong>
+    <div className="space-y-4 pb-12 w-full max-w-full">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <div className="flex items-center gap-1.5">
+            <h1 className="text-base sm:text-2xl font-black tracking-tight text-slate-900 dark:text-white">
+              Generate QR Code
+            </h1>
+            <span className="rounded-full bg-violet-100 dark:bg-violet-950/60 px-2 py-0.2 text-[9px] sm:text-[10px] font-bold text-violet-700 dark:text-violet-300">
+              Asset Identifiers
             </span>
           </div>
+          <p className="mt-0.5 text-[10.5px] sm:text-xs text-slate-500 dark:text-slate-400">
+            Create QR codes for batteries — scan one to open its full history
+          </p>
         </div>
-      </PageHeader>
+
+        <div className="flex items-center gap-1.5">
+          <Link
+            to="/rfid-assignment"
+            className="inline-flex h-7 sm:h-8 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 sm:px-2.5 text-[10px] sm:text-xs font-bold text-slate-700 shadow-2xs hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 cursor-pointer"
+          >
+            <span>RFID Assignment</span>
+            <FiArrowRight className="h-3 w-3" />
+          </Link>
+          <div className="inline-flex h-7 sm:h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] sm:text-xs font-bold text-slate-700 shadow-2xs dark:border-white/10 dark:bg-surface-800 dark:text-slate-200">
+            <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span>Total: <strong className="text-slate-900 dark:text-white">{(listTotal || 0).toLocaleString()}</strong></span>
+          </div>
+        </div>
+      </div>
 
       {/* ── Tab switcher ───────────────────────────────────────────────────── */}
-      <div className="mb-6 flex gap-1 rounded-xl border border-blue-200 bg-blue-50/50 p-1 dark:border-blue-800/40 dark:bg-blue-900/10">
+      <div className="flex gap-1 rounded-xl bg-slate-100 p-0.5 dark:bg-surface-800/80 max-w-xs sm:max-w-sm">
         <button
           type="button"
           onClick={() => { setActiveTab('individual'); setError(null); setQrResult(null); }}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'individual'
-              ? 'bg-violet-600 shadow-sm text-white dark:bg-blue-900/40 dark:text-blue-300'
-              : 'text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200'
+              ? 'bg-white shadow-2xs text-violet-700 dark:bg-surface-900 dark:text-violet-300'
+              : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
           }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-            <path fillRule="evenodd" d="M4.25 2A2.25 2.25 0 0 0 2 4.25v11.5A2.25 2.25 0 0 0 4.25 18h11.5A2.25 2.25 0 0 0 18 15.75V4.25A2.25 2.25 0 0 0 15.75 2H4.25ZM15 5.75a.75.75 0 0 0-1.5 0v8.5a.75.75 0 0 0 1.5 0v-8.5Zm-8.5 6a.75.75 0 0 0-1.5 0v2.5a.75.75 0 0 0 1.5 0v-2.5ZM8.25 8a.75.75 0 0 1 .75.75v5.5a.75.75 0 0 1-1.5 0v-5.5A.75.75 0 0 1 8.25 8Zm3.25 2a.75.75 0 0 1 .75.75v3.5a.75.75 0 0 1-1.5 0v-3.5a.75.75 0 0 1 .75-.75Z" clipRule="evenodd" />
-          </svg>
-          Individual QR Code
+          <FiSquare className="h-3.5 w-3.5" />
+          Individual QR
         </button>
         <button
           type="button"
           onClick={() => { setActiveTab('bulk'); setBulkError(null); setBulkResult(null); }}
-          className={`flex flex-1 items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-medium transition-all ${
+          className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-bold transition-all cursor-pointer ${
             activeTab === 'bulk'
-              ? 'bg-violet-600 shadow-sm text-white dark:bg-violet-900/40 dark:text-violet-300'
-              : 'text-slate-500 hover:text-slate-700 dark:text-neutral-400 dark:hover:text-neutral-200'
+              ? 'bg-white shadow-2xs text-violet-700 dark:bg-surface-900 dark:text-violet-300'
+              : 'text-slate-600 hover:text-slate-900 dark:text-neutral-400 dark:hover:text-white'
           }`}
         >
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" className="h-4 w-4">
-            <path d="M2 4.5A2.5 2.5 0 0 1 4.5 2h11A2.5 2.5 0 0 1 18 4.5v11a2.5 2.5 0 0 1-2.5 2.5H8.457a4.5 4.5 0 0 0 .043-.5c0-.67-.145-1.306-.404-1.879L6.943 13.5H15.5a.5.5 0 0 0 .5-.5v-8a.5.5 0 0 0-.5-.5h-11a.5.5 0 0 0-.5.5V12l-1.5-3.5V4.5Z" />
-            <path d="M6 14.5a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" />
-          </svg>
-          Bulk Generation 
+          <FiLayers className="h-3.5 w-3.5" />
+          Bulk Generation
         </button>
       </div>
 
       {/* ── Individual tab ─────────────────────────────────────────────────── */}
       {activeTab === 'individual' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <form
             onSubmit={handleSubmit}
-            className="flex flex-col gap-5 rounded-xl border border-blue-200 p-5 shadow-sm dark:border-blue-800/40"
+            className="flex flex-col gap-3.5 rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4.5 shadow-2xs dark:border-white/10 dark:bg-surface-900"
           >
             <div>
-              <label className={labelClasses}>Battery Number <span className="text-xs font-normal text-slate-400 dark:text-neutral-500">(optional — can be added later)</span></label>
+              <label className={labelClasses}>
+                Battery Number <span className="text-[10.5px] font-normal text-slate-400 dark:text-neutral-500">(optional)</span>
+              </label>
               <input
                 type="text"
                 value={serialNumber}
                 onChange={(e) => setSerialNumber(e.target.value)}
-                placeholder="e.g. SN-88213 — the number printed on the battery"
+                placeholder="e.g. SN-88213 (printed on battery)"
                 autoComplete="off"
                 className={formInputClasses}
               />
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-                The manufacturer's serial number physically printed on the battery. Leave blank if unknown — Admin or Client can add it later.
+              <p className="mt-1 text-[10.5px] text-slate-500 dark:text-neutral-400">
+                The manufacturer's serial number physically printed on the battery.
               </p>
             </div>
 
             <div>
-              <label className={labelClasses}>Client <span className="text-critical-600 dark:text-red-400">*</span></label>
+              <label className={labelClasses}>Client <span className="text-rose-500">*</span></label>
               <select
                 value={clientName}
                 onChange={(e) => setClientName(e.target.value)}
-                className="w-full rounded-md border border-blue-200 bg-blue-50/60 px-3.5 py-2.5 text-sm text-slate-900 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:border-blue-800/40 dark:bg-black dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/30"
+                className={formInputClasses}
                 required
               >
                 <option value="">Select a client</option>
@@ -547,9 +558,6 @@ function GenerateQrPage() {
                   <option key={c.id} value={c.name}>{c.name}</option>
                 ))}
               </select>
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-                Select the client/company that owns this battery.
-              </p>
             </div>
 
             <div>
@@ -559,58 +567,59 @@ function GenerateQrPage() {
                 value={computedBatteryId}
                 readOnly
                 placeholder="Select a client to auto-generate"
-                className={`${formInputClasses} cursor-not-allowed font-mono opacity-75`}
+                className={`${formInputClasses} cursor-not-allowed font-mono opacity-80`}
               />
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-                Automatically generated from the client name. The QR code encodes a link to this ID.
+              <p className="mt-1 text-[10.5px] text-slate-500 dark:text-neutral-400">
+                Automatically generated from the client name. The QR code links to this ID.
               </p>
             </div>
 
-            {error && <p className="text-sm text-critical-600 dark:text-red-400">{error}</p>}
+            {error && <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{error}</p>}
 
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-100 dark:border-white/5">
               <button
                 type="button"
                 onClick={handleReset}
-                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-blue-900/30"
+                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 cursor-pointer"
               >
                 Reset
               </button>
               <button
                 type="submit"
                 disabled={submitting || !clientName.trim()}
-                className="rounded-md bg-violet-900 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-800 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-lg bg-violet-700 hover:bg-violet-800 px-3.5 text-xs font-bold text-white shadow-xs disabled:cursor-not-allowed disabled:opacity-50 transition-all cursor-pointer"
               >
                 {submitting ? 'Generating…' : 'Generate QR Code'}
               </button>
             </div>
           </form>
 
-          <div className="flex flex-col items-center justify-center rounded-xl border border-blue-200 p-5 shadow-sm dark:border-blue-800/40">
+          <div className="flex flex-col items-center justify-center rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
             {qrResult ? (
-              <>
+              <div className="flex flex-col items-center text-center">
                 <img
                   src={qrResult.dataUrl}
                   alt={`QR code for battery ${qrResult.batteryCode}`}
-                  className="h-64 w-64 rounded-lg border border-slate-100 dark:border-surface-700"
+                  className="h-48 w-48 sm:h-56 sm:w-56 rounded-xl border border-slate-100 p-2 shadow-2xs dark:border-white/10"
                 />
-                <p className="mt-4 text-sm font-semibold text-slate-800 dark:text-neutral-100">{qrResult.batteryCode}</p>
+                <p className="mt-2.5 font-mono text-sm font-black text-slate-900 dark:text-white">{qrResult.batteryCode}</p>
                 {qrResult.clientName && (
-                  <p className="text-sm text-slate-500 dark:text-neutral-400">Client: {qrResult.clientName}</p>
+                  <p className="text-[11px] font-semibold text-slate-500 dark:text-neutral-400">Client: {qrResult.clientName}</p>
                 )}
-                <p className="mt-1 max-w-xs truncate text-center text-xs text-slate-400 dark:text-neutral-500">
+                <p className="mt-0.5 max-w-xs truncate text-[10px] text-slate-400">
                   {qrResult.detailUrl}
                 </p>
                 <button
                   type="button"
                   onClick={handleDownload}
-                  className="mt-4 rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white shadow-sm hover:bg-blue-700 dark:bg-blue-600 dark:hover:bg-blue-500"
+                  className="mt-3 inline-flex h-8 items-center gap-1.5 rounded-lg bg-violet-700 hover:bg-violet-800 px-3.5 text-xs font-bold text-white shadow-xs transition-all cursor-pointer"
                 >
-                  Download PNG
+                  <FiDownload className="h-3.5 w-3.5" />
+                  <span>Download PNG</span>
                 </button>
-              </>
+              </div>
             ) : (
-              <p className="text-center text-sm text-slate-400 dark:text-neutral-500">
+              <p className="text-center text-xs text-slate-400 dark:text-neutral-500 py-8">
                 Select a client and generate its QR code to preview it here.
               </p>
             )}
@@ -620,17 +629,17 @@ function GenerateQrPage() {
 
       {/* ── Bulk tab ───────────────────────────────────────────────────────── */}
       {activeTab === 'bulk' && (
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           <form
             onSubmit={handleBulkSubmit}
-            className="flex flex-col gap-5 rounded-xl border border-violet-200 p-5 shadow-sm dark:border-violet-800/40"
+            className="flex flex-col gap-3.5 rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-3.5 sm:p-4.5 shadow-2xs dark:border-white/10 dark:bg-surface-900"
           >
             <div>
-              <label className={labelClasses}>Client <span className="text-critical-600 dark:text-red-400">*</span></label>
+              <label className={labelClasses}>Client <span className="text-rose-500">*</span></label>
               <select
                 value={bulkClientName}
                 onChange={(e) => setBulkClientName(e.target.value)}
-                className="w-full rounded-md border border-violet-200 bg-violet-50/60 px-3.5 py-2.5 text-sm text-slate-900 focus:border-violet-500 focus:outline-none focus:ring-2 focus:ring-violet-500/30 dark:border-violet-800/40 dark:bg-black dark:text-white dark:focus:border-violet-400 dark:focus:ring-violet-400/30"
+                className={formInputClasses}
                 required
               >
                 <option value="">Select a client</option>
@@ -644,12 +653,12 @@ function GenerateQrPage() {
               <label className={labelClasses}>
                 Starting Number
                 {bulkClientName ? (
-                  <span className="ml-2 text-xs font-normal text-slate-400 dark:text-neutral-500">
-                    (next for {bulkClientName}: {bulkSuggestedStart})
+                  <span className="ml-1.5 text-[10.5px] font-normal text-slate-400">
+                    (next: {bulkSuggestedStart})
                   </span>
                 ) : (
-                  <span className="ml-2 text-xs font-normal text-slate-400 dark:text-neutral-500">
-                    (Select a client first)
+                  <span className="ml-1.5 text-[10.5px] font-normal text-slate-400">
+                    (Select client first)
                   </span>
                 )}
               </label>
@@ -662,32 +671,25 @@ function GenerateQrPage() {
                 placeholder={bulkClientName.trim() ? String(bulkSuggestedStart) : 'Select a client first'}
                 className={`${formInputClasses} [appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50`}
               />
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-                Leave blank to auto-continue from the last generated number for this client.
+              <p className="mt-1 text-[10.5px] text-slate-500 dark:text-neutral-400">
+                Leave blank to auto-continue from the last generated number.
               </p>
             </div>
 
             <div>
-              <label className={labelClasses}>
-                How many QR Codes
-                {!bulkClientName.trim() && (
-                  <span className="ml-2 text-xs font-normal text-amber-600 dark:text-amber-400">
-                    (Select a client first)
-                  </span>
-                )}
-              </label>
+              <label className={labelClasses}>How many QR Codes</label>
               {/* Quick presets */}
-              <div className="mb-2 flex flex-wrap gap-1.5">
+              <div className="mb-1.5 flex flex-wrap gap-1">
                 {BULK_PRESETS.map((preset) => (
                   <button
                     key={preset}
                     type="button"
                     disabled={!bulkClientName.trim()}
                     onClick={() => setBulkCount(String(preset))}
-                    className={`rounded-md border px-2.5 py-1 text-xs font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:text-slate-600 ${
+                    className={`rounded-md border px-2 py-0.5 text-[11px] font-bold transition-all cursor-pointer disabled:cursor-not-allowed disabled:opacity-40 ${
                       bulkCount === String(preset) && bulkClientName.trim()
-                        ? 'border-violet-500 bg-violet-100 text-violet-700 dark:border-violet-400 dark:bg-violet-900/40 dark:text-violet-300'
-                        : 'border-slate-200 bg-white text-slate-600 hover:border-violet-300 hover:text-violet-700 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-300 dark:hover:border-violet-500 dark:hover:text-violet-300'
+                        ? 'border-violet-500 bg-violet-50 text-violet-700 dark:border-violet-400 dark:bg-violet-950/40 dark:text-violet-300'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300'
                     }`}
                   >
                     {preset >= 1000 ? `${preset / 1000}k` : preset}
@@ -701,31 +703,26 @@ function GenerateQrPage() {
                 disabled={!bulkClientName.trim()}
                 value={bulkCount}
                 onChange={(e) => setBulkCount(e.target.value)}
-                placeholder={bulkClientName.trim() ? 'e.g. 500' : 'Select a client first'}
+                placeholder={bulkClientName.trim() ? 'e.g. 500' : 'Select client first'}
                 className={`${formInputClasses} [appearance:textfield] disabled:cursor-not-allowed disabled:opacity-50`}
                 required
               />
-              <p className="mt-1.5 text-xs text-slate-500 dark:text-neutral-400">
-                {bulkClientName.trim()
-                  ? 'Maximum 50,000 per batch. Battery Numbers can be assigned later by Admin or Client.'
-                  : 'Select a client above before choosing how many QR codes to generate.'}
-              </p>
             </div>
 
-            {bulkError && <p className="text-sm text-critical-600 dark:text-red-400">{bulkError}</p>}
+            {bulkError && <p className="text-xs font-bold text-rose-600 dark:text-rose-400">{bulkError}</p>}
 
-            <div className="flex justify-end gap-2 pt-4">
+            <div className="flex justify-end gap-1.5 pt-2 border-t border-slate-100 dark:border-white/5">
               <button
                 type="button"
                 onClick={handleBulkReset}
-                className="rounded-md px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100 dark:text-neutral-300 dark:hover:bg-violet-900/30"
+                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-bold text-slate-600 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-300 cursor-pointer"
               >
                 Reset
               </button>
               <button
                 type="submit"
                 disabled={bulkSubmitting || !bulkClientName.trim()}
-                className="rounded-md bg-violet-700 px-5 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-violet-600 disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex h-8 items-center justify-center rounded-lg bg-violet-700 hover:bg-violet-800 px-3.5 text-xs font-bold text-white shadow-xs disabled:cursor-not-allowed disabled:opacity-50 transition-all cursor-pointer"
               >
                 {bulkSubmitting ? 'Generating…' : 'Generate Bulk QR Codes'}
               </button>
@@ -733,65 +730,65 @@ function GenerateQrPage() {
           </form>
 
           {/* ── Bulk preview card ────────────────────────────────────────── */}
-          <div className="flex flex-col justify-center gap-4 rounded-xl border border-violet-200 p-5 shadow-sm dark:border-violet-800/40">
+          <div className="flex flex-col justify-center rounded-xl sm:rounded-2xl border border-slate-200/90 bg-white p-4 shadow-2xs dark:border-white/10 dark:bg-surface-900">
             {bulkResult ? (
-              <div className="flex flex-col items-center gap-4">
-                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-emerald-500/15">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-8 w-8 text-green-600 dark:text-emerald-400">
+              <div className="flex flex-col items-center gap-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-950/60">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" className="h-6 w-6 text-emerald-600 dark:text-emerald-400">
                     <path fillRule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm13.36-1.814a.75.75 0 1 0-1.22-.872l-3.236 4.53L9.53 12.22a.75.75 0 0 0-1.06 1.06l2.25 2.25a.75.75 0 0 0 1.14-.094l3.75-5.25Z" clipRule="evenodd" />
                   </svg>
                 </div>
                 <div className="text-center">
-                  <p className="text-lg font-bold text-slate-800 dark:text-neutral-100">
+                  <p className="text-sm sm:text-base font-black text-slate-900 dark:text-white">
                     {bulkResult.count?.toLocaleString()} QR Codes Generated!
                   </p>
-                  <p className="mt-1 text-sm text-slate-500 dark:text-neutral-400">
-                    Client: <span className="font-medium">{bulkResult.clientName}</span>
+                  <p className="text-xs text-slate-500">
+                    Client: <span className="font-semibold text-slate-800 dark:text-neutral-200">{bulkResult.clientName}</span>
                   </p>
                 </div>
-                <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 dark:border-surface-700 dark:bg-surface-900">
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-slate-500 dark:text-neutral-400">First ID</span>
-                    <span className="font-mono font-medium text-slate-800 dark:text-neutral-100">{bulkResult.firstCode}</span>
+                <div className="w-full rounded-xl border border-slate-200/80 bg-slate-50 p-2.5 dark:border-white/10 dark:bg-surface-850">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">First ID</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{bulkResult.firstCode}</span>
                   </div>
-                  <div className="mt-1 flex items-center justify-between text-sm">
-                    <span className="text-slate-500 dark:text-neutral-400">Last ID</span>
-                    <span className="font-mono font-medium text-slate-800 dark:text-neutral-100">{bulkResult.lastCode}</span>
+                  <div className="mt-1 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Last ID</span>
+                    <span className="font-mono font-bold text-slate-900 dark:text-white">{bulkResult.lastCode}</span>
                   </div>
                 </div>
-                <p className="text-center text-xs text-slate-400 dark:text-neutral-500">
-                  Battery Numbers (manufacturer serials) can be assigned to each battery later by Admin or Client.
+                <p className="text-center text-[10.5px] text-slate-400">
+                  Battery Numbers can be assigned later by Admin or Client.
                 </p>
               </div>
             ) : (
               <>
-                <h3 className="text-sm font-semibold text-slate-600 dark:text-neutral-300">Range Preview</h3>
-                <div className="rounded-lg border border-violet-100 bg-violet-50/60 p-4 dark:border-violet-800/30 dark:bg-violet-900/10">
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Client</span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
-                      {bulkClientName || <span className="text-slate-300 dark:text-neutral-600">Not selected</span>}
+                <h3 className="text-xs font-extrabold uppercase tracking-wider text-slate-500 dark:text-neutral-400 mb-2">Range Preview</h3>
+                <div className="rounded-xl border border-slate-200/80 bg-slate-50/70 p-3 dark:border-white/10 dark:bg-surface-850">
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Client</span>
+                    <span className="font-semibold text-slate-800 dark:text-neutral-100">
+                      {bulkClientName || <span className="text-slate-400">Not selected</span>}
                     </span>
                   </div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Count</span>
-                    <span className="text-sm font-semibold text-slate-800 dark:text-neutral-100">
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Count</span>
+                    <span className="font-semibold text-slate-800 dark:text-neutral-100">
                       {bulkClientName.trim() && Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '—'}
                     </span>
                   </div>
-                  <div className="mb-3 flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">First ID</span>
-                    <span className="font-mono text-sm font-semibold text-violet-700 dark:text-violet-300">{bulkClientName.trim() ? bulkFirstPreview : '—'}</span>
+                  <div className="mb-2 flex items-center justify-between text-xs">
+                    <span className="text-slate-500">First ID</span>
+                    <span className="font-mono font-bold text-violet-700 dark:text-violet-300">{bulkClientName.trim() ? bulkFirstPreview : '—'}</span>
                   </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-slate-500 dark:text-neutral-400">Last ID</span>
-                    <span className="font-mono text-sm font-semibold text-violet-700 dark:text-violet-300">{bulkClientName.trim() ? bulkLastPreview : '—'}</span>
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-slate-500">Last ID</span>
+                    <span className="font-mono font-bold text-violet-700 dark:text-violet-300">{bulkClientName.trim() ? bulkLastPreview : '—'}</span>
                   </div>
                 </div>
-                <p className="text-xs text-slate-400 dark:text-neutral-500">
+                <p className="mt-2 text-[10.5px] text-slate-400">
                   {bulkClientName.trim()
-                    ? `All ${Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '…'} batteries will be created instantly. Battery Numbers (physical serials) are optional — Admin or Client can fill them in after printing.`
-                    : 'Select a client on the left to configure quantity and preview the generated ID range.'}
+                    ? `All ${Number(bulkCount) > 0 ? Number(bulkCount).toLocaleString() : '…'} batteries will be created instantly.`
+                    : 'Select a client to configure quantity and preview generated IDs.'}
                 </p>
               </>
             )}
@@ -800,60 +797,55 @@ function GenerateQrPage() {
       )}
 
       {/* ── Generated QR Codes list ─────────────────────────────────────────── */}
-      <div className="mt-8">
-        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5">
-            <h2 className="text-sm font-bold uppercase tracking-wide text-slate-500 dark:text-neutral-400">
+      <div className="mt-6">
+        <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <h2 className="text-xs sm:text-sm font-black tracking-tight text-slate-900 dark:text-white uppercase">
               Generated QR Codes
             </h2>
-            <div className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50/80 px-2.5 py-1 text-xs font-semibold text-blue-800 shadow-2xs dark:border-blue-800/50 dark:bg-blue-950/40 dark:text-blue-300">
-              <span>Total:</span>
-              <strong className="font-bold text-blue-950 dark:text-blue-100">
-                {(listTotal || 0).toLocaleString()}
-              </strong>
-            </div>
+            <span className="rounded-full bg-slate-100 text-slate-700 dark:bg-surface-800 dark:text-neutral-300 px-2 py-0.5 text-[10px] font-bold">
+              {(listTotal || 0).toLocaleString()}
+            </span>
           </div>
-          <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap sm:gap-6 sm:pr-4">
-            <div className="relative w-full sm:max-w-sm">
+
+          <div className="flex items-center gap-1.5 w-full sm:w-auto">
+            <div className="relative flex-1 sm:w-56">
               <input
                 type="text"
                 value={listSearchInput}
                 onChange={(e) => setListSearchInput(e.target.value)}
-                placeholder="Search by Battery ID or Client Name"
-                className={`${inputClasses} w-full pr-8`}
+                placeholder="Search battery or client…"
+                className="h-8 w-full rounded-lg border border-slate-300 bg-white pl-2.5 pr-6 text-xs font-semibold text-slate-900 shadow-2xs placeholder:text-slate-400 placeholder:font-normal focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100"
               />
               {listSearchInput && (
                 <button
                   type="button"
                   onClick={() => { setListSearchInput(''); setListSearch(''); }}
-                  aria-label="Clear search"
-                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 dark:text-neutral-500 dark:hover:bg-blue-900/30 dark:hover:text-neutral-300"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 cursor-pointer"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" className="h-3.5 w-3.5">
-                    <path d="M5.28 4.22a.75.75 0 0 0-1.06 1.06L6.94 8l-2.72 2.72a.75.75 0 1 0 1.06 1.06L8 9.06l2.72 2.72a.75.75 0 1 0 1.06-1.06L9.06 8l2.72-2.72a.75.75 0 0 0-1.06-1.06L8 6.94 5.28 4.22Z" />
-                  </svg>
+                  ✕
                 </button>
               )}
             </div>
             <select
               value={listClientFilter}
               onChange={(e) => setListClientFilter(e.target.value)}
-              className="min-w-0 flex-1 sm:w-full sm:flex-none sm:max-w-[10rem] shrink-0 rounded-md border border-slate-300 bg-white px-3.5 py-2.5 text-sm text-slate-900 focus:border-brand-500 focus:outline-none focus:ring-2 focus:ring-brand-500/30 dark:border-blue-800/40 dark:bg-black dark:text-white dark:focus:border-blue-400 dark:focus:ring-blue-400/30"
+              className="h-8 max-w-[130px] rounded-lg border border-slate-300 bg-white px-2 text-[11px] font-semibold text-slate-900 shadow-2xs focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-100 cursor-pointer shrink-0 truncate"
             >
-              <option value="">All Clients</option>
+              <option value="">All Clients ({fleetClients.length})</option>
               {fleetClients.map((c) => (
                 <option key={c.id} value={c.name}>{c.name}</option>
               ))}
             </select>
             {isSuperAdmin && (
-              <label className="flex shrink-0 items-center gap-1.5 whitespace-nowrap text-sm text-slate-600 dark:text-neutral-300">
+              <label className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-slate-600 dark:text-neutral-300 cursor-pointer ml-1">
                 <input
                   type="checkbox"
                   checked={showBlocked}
                   onChange={(e) => setShowBlocked(e.target.checked)}
-                  className="rounded border-slate-300 text-brand-600 focus:ring-brand-500/30 dark:border-surface-600"
+                  className="rounded border-slate-300 text-violet-600 focus:ring-violet-500/20"
                 />
-                Show blocked
+                <span className="hidden sm:inline">Blocked</span>
               </label>
             )}
           </div>
@@ -862,67 +854,69 @@ function GenerateQrPage() {
         {/* ── Print Sheet form ───────────────────────────────────────────── */}
         <form
           onSubmit={handleDownloadSheet}
-          className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-blue-200 p-4 dark:border-blue-800/40"
+          className="mb-3.5 flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200/90 bg-slate-50/70 p-2.5 sm:p-3 dark:border-white/10 dark:bg-surface-850/60"
         >
-          <div>
-            <label className={labelClasses}>Print QR Sheet — start from #</label>
-            <input
-              type="number"
-              min="1"
-              value={sheetStart}
-              onChange={(e) => setSheetStart(e.target.value)}
-              className={`${inputClasses} max-w-[8rem]`}
-            />
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-[11px] font-bold text-slate-700 dark:text-neutral-300 flex items-center gap-1">
+              <FiPrinter className="h-3.5 w-3.5 text-slate-500" />
+              <span>Print Sheet (A4):</span>
+            </span>
+            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 dark:text-neutral-400">
+              <span>From #</span>
+              <input
+                type="number"
+                min="1"
+                value={sheetStart}
+                onChange={(e) => setSheetStart(e.target.value)}
+                className="h-7 w-16 rounded-md border border-slate-300 bg-white px-1.5 text-xs font-semibold text-slate-900 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+              />
+            </div>
+            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 dark:text-neutral-400">
+              <span>Count</span>
+              <input
+                type="number"
+                min="1"
+                value={sheetCount}
+                onChange={(e) => setSheetCount(e.target.value)}
+                className="h-7 w-16 rounded-md border border-slate-300 bg-white px-1.5 text-xs font-semibold text-slate-900 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+              />
+            </div>
+            <div className="flex items-center gap-1 text-[10.5px] text-slate-600 dark:text-neutral-400">
+              <span>Cols</span>
+              <input
+                type="number"
+                min="1"
+                value={sheetColumns}
+                onChange={(e) => setSheetColumns(e.target.value)}
+                className="h-7 w-12 rounded-md border border-slate-300 bg-white px-1.5 text-xs font-semibold text-slate-900 focus:border-violet-500 focus:outline-none dark:border-surface-600 dark:bg-surface-800 dark:text-white"
+              />
+            </div>
           </div>
-          <div>
-            <label className={labelClasses}>How many</label>
-            <input
-              type="number"
-              min="1"
-              value={sheetCount}
-              onChange={(e) => setSheetCount(e.target.value)}
-              className={`${inputClasses} max-w-[8rem]`}
-            />
-          </div>
-          <div>
-            <label className={labelClasses}>Per row</label>
-            <input
-              type="number"
-              min="1"
-              value={sheetColumns}
-              onChange={(e) => setSheetColumns(e.target.value)}
-              className={`${inputClasses} max-w-[8rem]`}
-            />
-          </div>
-          <p className="mb-2.5 text-xs text-slate-500 dark:text-neutral-400">
-            One A4 sheet = {(Math.max(Number(sheetColumns) || DEFAULT_COLUMNS, 1)) * ROWS} QR codes (
-            {Math.max(Number(sheetColumns) || DEFAULT_COLUMNS, 1)} across × {ROWS} down), oldest-generated
-            first, each labeled with its Battery ID. Asking for more spills onto extra sheets in the same PDF.
-          </p>
-          <div className="ml-auto flex shrink-0 gap-2">
+
+          <div className="flex items-center gap-1.5 ml-auto">
             <button
               type="button"
               onClick={handlePreviewSheet}
               disabled={sheetLoading}
-              className="rounded-md border border-slate-300 bg-white px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-surface-600 dark:bg-surface-800 dark:text-neutral-200 dark:hover:bg-surface-700"
+              className="inline-flex h-7 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-[10.5px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 dark:border-white/10 dark:bg-surface-800 dark:text-neutral-200 cursor-pointer"
             >
-              {sheetLoading ? 'Building sheet…' : 'View Sheet'}
+              {sheetLoading ? 'Building…' : 'View Sheet'}
             </button>
             <button
               type="submit"
               disabled={sheetLoading}
-              className="rounded-md bg-brand-600 px-4 py-2.5 text-sm font-medium text-white shadow-sm hover:bg-brand-700 disabled:opacity-50 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              className="inline-flex h-7 items-center justify-center rounded-lg bg-emerald-600 hover:bg-emerald-700 px-3 text-[10.5px] font-bold text-white shadow-2xs disabled:opacity-50 transition-all cursor-pointer"
             >
-              {sheetLoading ? 'Building sheet…' : 'Download Sheet (PDF)'}
+              {sheetLoading ? 'Building…' : 'Download PDF'}
             </button>
           </div>
-          {sheetError && <p className="w-full text-sm text-critical-600 dark:text-red-400">{sheetError}</p>}
+          {sheetError && <p className="w-full text-xs font-semibold text-rose-600 dark:text-rose-400">{sheetError}</p>}
         </form>
 
         {rowError && <AlertModal title="Action Failed" message={rowError} onClose={() => setRowError(null)} />}
         {listError && <TableState tone="error">{listError}</TableState>}
 
-        <div className="mb-3 flex items-center justify-between px-1 text-xs font-semibold text-slate-500 dark:text-neutral-400">
+        <div className="mb-2 flex items-center justify-between px-1 text-[11px] font-medium text-slate-500 dark:text-neutral-400">
           <div>
             Showing <span className="font-bold text-slate-800 dark:text-neutral-200">{generatedBatteries.length}</span> of{' '}
             <span className="font-bold text-slate-800 dark:text-neutral-200">{(listTotal || 0).toLocaleString()}</span>{' '}
@@ -935,15 +929,106 @@ function GenerateQrPage() {
           <TableState>Loading…</TableState>
         ) : (
           <>
-            <DataTable
-              columns={qrColumns}
-              rows={generatedBatteries}
-              emptyMessage="No QR codes generated yet."
-              showRowNumber
-              headerColor="blue"
-              maxHeight="calc(100vh - 270px)"
-              onScrollBottom={listHasMore && !listLoading ? loadMoreGenerated : null}
-            />
+            {/* Desktop Table (>= lg) */}
+            <div className="hidden lg:block overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-2xs dark:border-white/10 dark:bg-surface-900">
+              <DataTable
+                columns={qrColumns}
+                rows={generatedBatteries}
+                emptyMessage="No QR codes generated yet."
+                showRowNumber
+                headerColor="blue"
+                maxHeight="calc(100vh - 270px)"
+                onScrollBottom={listHasMore && !listLoading ? loadMoreGenerated : null}
+              />
+            </div>
+
+            {/* Mobile Card Stream (< lg) - ZERO HORIZONTAL SCROLL */}
+            <div className="block lg:hidden max-h-[60vh] overflow-y-auto divide-y divide-slate-100 dark:divide-white/5 p-1">
+              {generatedBatteries.length === 0 ? (
+                <p className="py-6 text-center text-xs text-slate-400">No QR codes generated yet.</p>
+              ) : (
+                generatedBatteries.map((r, idx) => (
+                  <div
+                    key={r.id}
+                    className={`p-2.5 mb-1.5 rounded-xl border transition-all ${
+                      r.is_blocked
+                        ? 'border-rose-200 bg-rose-50/50 dark:border-rose-900/40 dark:bg-rose-950/20'
+                        : 'border-slate-200/80 bg-white dark:border-white/10 dark:bg-surface-850'
+                    }`}
+                  >
+                    {/* Header Row */}
+                    <div className="flex items-center justify-between gap-1.5">
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        <span className="font-mono text-[10px] font-bold text-slate-400">#{idx + 1}</span>
+                        <Link
+                          to={`/batteries/${encodeURIComponent(r.battery_code)}`}
+                          className="font-mono text-xs font-bold text-blue-600 dark:text-blue-400 hover:underline truncate"
+                        >
+                          🔋 {r.battery_code}
+                        </Link>
+                        {r.is_blocked && (
+                          <span className="shrink-0 rounded-full bg-rose-100 px-1.5 py-0.2 text-[9px] font-bold text-rose-700 dark:bg-rose-950/60 dark:text-rose-300">
+                            Blocked
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-slate-400 font-medium shrink-0">
+                        {r.qr_generated_at ? new Date(r.qr_generated_at).toLocaleDateString() : ''}
+                      </span>
+                    </div>
+
+                    {/* Client & Battery Serial Row */}
+                    <div className="mt-1 flex items-center justify-between gap-2 text-[10.5px]">
+                      <div className="text-slate-500 dark:text-neutral-400 truncate">
+                        Client: <span className="font-semibold text-slate-800 dark:text-neutral-200">{r.client_name || '—'}</span>
+                      </div>
+                      <div className="shrink-0">
+                        {renderSerialCell(r)}
+                      </div>
+                    </div>
+
+                    {/* Action Buttons Row */}
+                    <div className="mt-2 flex items-center justify-end gap-1.5 border-t border-slate-100 dark:border-white/5 pt-1.5">
+                      <button
+                        type="button"
+                        onClick={() => handleViewRow(r)}
+                        className="inline-flex h-6.5 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[10px] font-bold text-slate-700 hover:bg-slate-50 dark:border-white/10 dark:bg-surface-800 dark:text-slate-200 cursor-pointer"
+                      >
+                        <FiEye className="h-3 w-3" />
+                        <span>View</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => handleDownloadRow(r)}
+                        className="inline-flex h-6.5 items-center gap-1 rounded-md border border-violet-200 bg-violet-50 px-2 text-[10px] font-bold text-violet-700 hover:bg-violet-100 dark:border-violet-800/40 dark:bg-violet-950/40 dark:text-violet-300 cursor-pointer"
+                      >
+                        <FiDownload className="h-3 w-3" />
+                        <span>Download</span>
+                      </button>
+                      {isSuperAdmin && (
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => handleToggleBlock(r)}
+                            className="inline-flex h-6.5 items-center rounded-md border border-amber-200 bg-amber-50 px-1.5 text-[10px] font-bold text-amber-800 hover:bg-amber-100 dark:border-amber-800/40 dark:bg-amber-950/40 dark:text-amber-300 cursor-pointer"
+                          >
+                            {r.is_blocked ? 'Unblock' : 'Block'}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setDeleteTarget(r)}
+                            className="inline-flex h-6.5 items-center rounded-md border border-rose-200 bg-rose-50 px-1.5 text-[10px] font-bold text-rose-700 hover:bg-rose-100 dark:border-rose-800/40 dark:bg-rose-950/40 dark:text-rose-300 cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+
             <InfiniteScrollTrigger hasMore={listHasMore} loading={listLoading} onVisible={loadMoreGenerated} />
           </>
         )}
